@@ -490,20 +490,20 @@
     transform: translateY(-1px);
   }
 
-  /* 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) */
+  /* 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) - 锚定在右侧栏左侧，决不遮挡侧边栏 */
   .dialogue-deck {
     position: fixed;
-    bottom: 54px;
-    right: 16px;
-    width: 380px;
-    background: rgba(10, 16, 28, 0.94);
-    backdrop-filter: blur(14px);
+    bottom: 24px;
+    right: 330px;
+    width: 360px;
+    background: rgba(10, 16, 28, 0.95);
+    backdrop-filter: blur(16px);
     border: 1px solid rgba(56, 189, 248, 0.4);
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(56, 189, 248, 0.15);
     display: flex;
     flex-direction: column;
-    z-index: 120;
+    z-index: 100;
     transition: all 0.25s ease;
   }
   .dialogue-deck.collapsed .deck-body {
@@ -673,7 +673,17 @@
     </div>
   </div>
 
-  <!-- 卡片 2: 模型预设与真实权重 -->
+  <!-- 卡片 2: 硅基生命体与文化典籍 -->
+  <div class="card" id="card-library">
+    <div class="card-title">
+      <span>硅基生命体与典籍 (Organisms & Books)</span>
+      <span class="card-title-badge" id="st-total-books">4 大生命体 / 9 册典籍</span>
+    </div>
+    <div id="library-shelf" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;font-size:10px;">
+    </div>
+  </div>
+
+  <!-- 卡片 3: 模型预设与真实权重 -->
   <div class="card">
     <div class="card-title">
       <span>模型与检查点载入</span>
@@ -687,20 +697,7 @@
     </div>
   </div>
 
-  <!-- 卡片 3: 视距自适应显微镜 (Dynamic Semantic Zoom) -->
-  <div class="card">
-    <div class="card-title">
-      <span>视距自适应显微镜</span>
-      <span class="card-title-badge" id="st-pipe" style="color:var(--cyan);">微观器官 3D</span>
-    </div>
-    <div style="font-size:10px;color:var(--text-dim);line-height:1.5;">
-      滚轮拉远俯瞰<b>百万拓扑计算流形</b>，滚轮拉近无缝钻入<b>微观单神经元脉冲</b>。
-    </div>
-    <div class="kv" style="margin-top:2px;"><span>当前视距 (Distance)</span><b id="st-cam-r" style="color:var(--amber)">560 单位</b></div>
-    <div class="kv"><span>GPU 单批次吞吐</span><b style="color:var(--emerald)">30,000 点元 (1 DrawCall)</b></div>
-  </div>
-
-  <!-- 卡片 4: 演化加速曲率 -->
+  <!-- 卡片 4: 时空曲率演化加速 -->
   <div class="card">
     <div class="card-title">
       <span>时空曲率演化加速</span>
@@ -756,16 +753,6 @@
       <button id="b-apop" class="btn-ctrl" style="flex:1;">凋亡剪枝</button>
     </div>
     <div id="bio-biomes" style="font-size:9px;line-height:1.8;color:var(--text-dim);margin-top:4px;"></div>
-  </div>
-
-    <!-- 卡片: 硅基生命体与文化典籍 -->
-  <div class="card" id="card-library">
-    <div class="card-title">
-      <span>硅基生命体与典籍 (Organisms & Books)</span>
-      <span class="card-title-badge" id="st-total-books">4 大生命体 / 9 册典籍</span>
-    </div>
-    <div id="library-shelf" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;font-size:10px;">
-    </div>
   </div>
 
   <!-- 卡片 3: 全息事件流终端 -->
