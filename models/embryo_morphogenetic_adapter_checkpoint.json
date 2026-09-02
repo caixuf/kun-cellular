@@ -1,0 +1,112 @@
+{
+  "model_type": "EmbryoMorphogeneticAdapter",
+  "best_fitness": 1.7111670310278984,
+  "mature_cells_count": 10,
+  "mature_synapses_count": 22,
+  "cleavage_factor": 1.6716937259762186,
+  "morphogen_gradient_sensitivity": 1.2310488680451281,
+  "maternal_loci": [
+    {
+      "gene_id": 0,
+      "op_type": "HYSTERESIS",
+      "weight": 0.6053538909341076
+    },
+    {
+      "gene_id": 1,
+      "op_type": "INTEGRAL",
+      "weight": 0.4281801842021278
+    },
+    {
+      "gene_id": 2,
+      "op_type": "QUADRATIC",
+      "weight": -0.999104198366554
+    },
+    {
+      "gene_id": 3,
+      "op_type": "EMA",
+      "weight": 0.31668222126192513
+    },
+    {
+      "gene_id": 4,
+      "op_type": "RATIO",
+      "weight": 0.20030043653498497
+    },
+    {
+      "gene_id": 5,
+      "op_type": "RATIO",
+      "weight": -1.1920738517495297
+    }
+  ],
+  "cells": [
+    {
+      "id": 8,
+      "type": "SENSE_0",
+      "weight": 1.0,
+      "x": -100.0,
+      "y": -30.0
+    },
+    {
+      "id": 9,
+      "type": "SENSE_1",
+      "weight": 1.0,
+      "x": -100.0,
+      "y": 30.0
+    },
+    {
+      "id": 6,
+      "type": "ACT_POS",
+      "weight": 1.0,
+      "x": 120.0,
+      "y": -30.0
+    },
+    {
+      "id": 5,
+      "type": "ACT_NEG",
+      "weight": 1.0,
+      "x": 120.0,
+      "y": 30.0
+    },
+    {
+      "id": 0,
+      "type": "HYSTERESIS",
+      "weight": 0.6053538909341076,
+      "x": -18.098265294343104,
+      "y": -5.565257809383805
+    },
+    {
+      "id": 3,
+      "type": "INTEGRAL",
+      "weight": 0.4281801842021278,
+      "x": -15.811546829337823,
+      "y": -44.64506400176148
+    },
+    {
+      "id": 1,
+      "type": "QUADRATIC",
+      "weight": -0.999104198366554,
+      "x": 3.958101195411674,
+      "y": 24.762002256284013
+    },
+    {
+      "id": 7,
+      "type": "EMA",
+      "weight": 0.31668222126192513,
+      "x": 16.14814429012183,
+      "y": -38.79506276785365
+    },
+    {
+      "id": 4,
+      "type": "RATIO",
+      "weight": 0.20030043653498497,
+      "x": 25.472688031675286,
+      "y": -7.728082873668008
+    },
+    {
+      "id": 2,
+      "type": "RATIO",
+      "weight": -1.1920738517495297,
+      "x": 36.33558691707684,
+      "y": 47.88562846569421
+    }
+  ]
+}
