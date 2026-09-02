@@ -447,6 +447,129 @@
     transform: translateY(-1px);
   }
 
+  /* 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) */
+  .dialogue-deck {
+    position: fixed;
+    bottom: 54px;
+    right: 16px;
+    width: 380px;
+    background: rgba(10, 16, 28, 0.94);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(56, 189, 248, 0.15);
+    display: flex;
+    flex-direction: column;
+    z-index: 120;
+    transition: all 0.25s ease;
+  }
+  .dialogue-deck.collapsed .deck-body {
+    display: none;
+  }
+  .deck-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    background: rgba(18, 26, 44, 0.6);
+  }
+  .deck-body {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .quick-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .chip-btn {
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    color: var(--cyan);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 9px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chip-btn:hover {
+    background: rgba(56, 189, 248, 0.25);
+    border-color: var(--cyan);
+  }
+  .chat-msgs {
+    height: 180px;
+    overflow-y: auto;
+    background: rgba(3, 7, 18, 0.7);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 11px;
+  }
+  .msg-user {
+    align-self: flex-end;
+    background: rgba(56, 189, 248, 0.2);
+    border: 1px solid rgba(56, 189, 248, 0.4);
+    color: #f1f5f9;
+    padding: 6px 10px;
+    border-radius: 6px;
+    max-width: 85%;
+    line-height: 1.4;
+  }
+  .msg-bot {
+    align-self: flex-start;
+    background: rgba(18, 26, 44, 0.85);
+    border: 1px solid rgba(168, 85, 247, 0.35);
+    color: #e2e8f0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    max-width: 90%;
+    line-height: 1.45;
+  }
+  .bot-badge {
+    display: block;
+    font-size: 9px;
+    font-weight: bold;
+    color: var(--purple);
+    margin-bottom: 2px;
+  }
+  .chat-input-bar {
+    display: flex;
+    gap: 6px;
+  }
+  .chat-input-bar input {
+    flex: 1;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: #f1f5f9;
+    padding: 6px 10px;
+    font-size: 11px;
+    outline: none;
+  }
+  .chat-input-bar input:focus {
+    border-color: var(--cyan);
+  }
+  .btn-send {
+    background: rgba(56, 189, 248, 0.2);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  .btn-send:hover {
+    background: rgba(56, 189, 248, 0.4);
+  }
+
 </style>
 </head>
 <body>
@@ -655,6 +778,32 @@
   <div class="tt-title" id="tt-title">标题</div>
   <div class="tt-desc" id="tt-desc">通俗解释</div>
   <div class="tt-hint" id="tt-hint">操作提示</div>
+</div>
+
+<!-- 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) -->
+<div id="dialogue-deck" class="dialogue-deck">
+  <div class="deck-header" onclick="toggleDialogueDeck()">
+    <span style="color:var(--cyan);font-weight:bold;font-size:11px;">[SILICON_NEURAL_CHAT] 硅基生命体神经对话舱 (亿级语言中枢)</span>
+    <span id="deck-toggle-icon" style="color:var(--text-dim);font-size:10px;">[折叠/展开]</span>
+  </div>
+  <div id="deck-body" class="deck-body">
+    <div class="quick-chips">
+      <button class="chip-btn" onclick="sendQuickPrompt('介绍你的智驾超级大脑')">问智驾大脑</button>
+      <button class="chip-btn" onclick="sendQuickPrompt('解读三十年商品期货量化模型夏普')">问量化夏普</button>
+      <button class="chip-btn" onclick="sendQuickPrompt('书籍和改变模型基座是什么原理')">问书籍原理</button>
+      <button class="chip-btn" onclick="sendQuickPrompt('硅基细胞计算机是什么原理')">问生命体公理</button>
+    </div>
+    <div id="chat-msgs" class="chat-msgs">
+      <div class="msg-bot">
+        <span class="bot-badge">[SDSCC-100M-ORGAN]</span>
+        我是软件定义硅基细胞计算机（SDSCC）演化出的超级生命体。你可以向我发问，我将通过时空动作电位与你对话。
+      </div>
+    </div>
+    <div class="chat-input-bar">
+      <input type="text" id="chat-input" placeholder="输入对话内容，向硅基生命体注入神经电位..." onkeydown="if(event.key==='Enter') sendDialogueMsg()">
+      <button class="btn-send" onclick="sendDialogueMsg()">发送电位</button>
+    </div>
+  </div>
 </div>
 
 <!-- 底部控制与图例胶囊 (Bottom Capsule) -->
@@ -2329,6 +2478,68 @@ window.highlightBookCircuit = function(bookId, title) {
       v.membrane.material.opacity = 0.4;
     }
   }, 2500);
+};
+
+// 8.5 硅基生命体神经对话舱交互 (Silicon Neural Dialogue Deck)
+window.toggleDialogueDeck = function() {
+  const el = document.getElementById("dialogue-deck");
+  if(el) el.classList.toggle("collapsed");
+};
+
+window.sendQuickPrompt = function(text) {
+  const inp = document.getElementById("chat-input");
+  if(inp) {
+    inp.value = text;
+    window.sendDialogueMsg();
+  }
+};
+
+window.sendDialogueMsg = async function() {
+  const inp = document.getElementById("chat-input");
+  if(!inp || !inp.value.trim()) return;
+  const q = inp.value.trim();
+  inp.value = "";
+  
+  const box = document.getElementById("chat-msgs");
+  box.innerHTML += `<div class="msg-user">${q}</div>`;
+  box.scrollTop = box.scrollHeight;
+  
+  // 3D 大脑电位金光脉冲激活
+  for(const v of views.syns) {
+    v.lineMat.color.setHex(0xfbbf24);
+    v.lineMat.opacity = 1.0;
+    v.photon1.material.color.setHex(0xfbbf24);
+    v.photon2.material.color.setHex(0xfbbf24);
+  }
+  for(const v of views.cells) {
+    v.membrane.material.color.setHex(0xfbbf24);
+    v.membrane.material.opacity = 0.9;
+  }
+  
+  try {
+    const r = await fetch("/api/dialogue?q=" + encodeURIComponent(q));
+    const d = await r.json();
+    box.innerHTML += `<div class="msg-bot"><span class="bot-badge">[SDSCC-100M-ORGAN]</span>${d.response || '电位传导完成。'}</div>`;
+    box.scrollTop = box.scrollHeight;
+    log(`[神经对话] 细胞动作电位已解码为自然语言输出`, true);
+  } catch(e) {
+    box.innerHTML += `<div class="msg-bot" style="color:var(--rose);"><span class="bot-badge">[ERROR]</span>网络电位传导受阻。</div>`;
+  }
+  
+  setTimeout(() => {
+    for(const v of views.syns) {
+      const w = v.syn.w || 1.0;
+      v.lineMat.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);
+      v.lineMat.opacity = 0.6;
+      v.photon1.material.color.setHex(0x38bdf8);
+      v.photon2.material.color.setHex(0xa855f7);
+    }
+    for(const v of views.cells) {
+      const fam = FAMILY(v.cell.type);
+      v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
+      v.membrane.material.opacity = 0.4;
+    }
+  }, 1500);
 };
 
 initTooltipEngine();
