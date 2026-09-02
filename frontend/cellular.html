@@ -458,12 +458,20 @@
     <span class="brand-tag">SDSCC // 硅基细胞计算机</span>
   </div>
 
+  <!-- 顶栏中央常驻高亮加速器 (100% 绝对可见) -->
+  <div style="display:flex;align-items:center;gap:6px;background:rgba(15,23,42,0.9);border:1px solid rgba(56,189,248,0.5);border-radius:6px;padding:3px 10px;box-shadow:0 0 12px rgba(56,189,248,0.2);">
+    <span style="color:var(--cyan);font-weight:bold;font-size:11px;">⚡ 演化加速:</span>
+    <button class="nav-tab-btn active" onclick="setWarp('1x')" id="hw-1x" style="padding:3px 8px;font-size:11px;">1x 实时</button>
+    <button class="nav-tab-btn" onclick="setWarp('100x')" id="hw-100x" style="padding:3px 8px;font-size:11px;">100x 快速</button>
+    <button class="nav-tab-btn" onclick="setWarp('1000x')" id="hw-1000x" style="padding:3px 8px;font-size:11px;">1000x 涡轮</button>
+    <button class="nav-tab-btn" onclick="setWarp('unlimited')" id="hw-max" style="padding:3px 8px;font-size:11px;color:var(--rose);border-color:var(--rose);font-weight:bold;">MAX 狂飙</button>
+  </div>
+
   <div class="nav-tabs">
     <a href="index.html" class="nav-tab-btn">工作台门户</a>
     <a href="cellular.html" class="nav-tab-btn active">3D 全息力场</a>
     <a href="maze.html" class="nav-tab-btn">具身迷宫沙盒</a>
-    <a href="https://github.com/caixuf/kun-cellular/blob/main/docs/morphogenetic_cellular_evolution_paper.zh.md" target="_blank" class="nav-tab-btn" style="color:var(--purple)">学术论文</a>
-    <button onclick="startAutoTour()" class="nav-tab-btn" style="background:rgba(56,189,248,0.2);color:var(--cyan);border-color:var(--cyan);font-weight:bold;cursor:pointer;">[一键新手导览]</button>
+    <button onclick="startAutoTour()" class="nav-tab-btn" style="background:rgba(56,189,248,0.2);color:var(--cyan);border-color:var(--cyan);font-weight:bold;cursor:pointer;">[新手导览]</button>
   </div>
 
   <div class="header-metrics">
