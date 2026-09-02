@@ -542,6 +542,12 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         
+        
+        if self.path == "/favicon.ico":
+            self.send_response(204)
+            self.end_headers()
+            return
+
         if self.path == "/api/universe":
             elapsed = time.time()
             px = round(3620.0 + 20.0 * math.sin(elapsed * 0.6), 1)

@@ -1184,22 +1184,23 @@ setInterval(()=>{ if(!paused){ mitosis(org); rebuildViews(); } }, 14000);
 /* 每 5 个分裂后自我净化一次 */
 setInterval(()=>{ if(!paused && org.cells.length>16) apoptosis(org), rebuildViews(); }, 42000);
 
-document.getElementById('b-mito').onclick = ()=>{ mitosis(org); rebuildViews(); };
-document.getElementById('b-rewire').onclick = ()=>{ rewire(org); rebuildViews(); };
-document.getElementById('b-apop').onclick = ()=>{ apoptosis(org); rebuildViews(); };
-document.getElementById('b-bio').onclick = e=>{
+const _bind = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
+_bind('b-mito', ()=>{ mitosis(org); rebuildViews(); });
+_bind('b-rewire', ()=>{ rewire(org); rebuildViews(); });
+_bind('b-apop', ()=>{ apoptosis(org); rebuildViews(); });
+_bind('b-bio', e=>{
   bioLayerVisible = !bioLayerVisible;
   e.target.textContent = bioLayerVisible ? ' 生态圈' : ' 生态圈(关)';
   for(const v of bioViews.values()) v.sprite.visible = bioLayerVisible;
-};
-document.getElementById('b-rad').onclick = e=>{
+});
+_bind('b-rad', e=>{
   radVisible = !radVisible;
   e.target.textContent = radVisible ? '[RAD] 辐射场' : '[RAD] 辐射场(关)';
   radPlane.visible = radVisible;
   for(const v of radRays.values()){ v.sprite.visible = radVisible; v.trail.visible = radVisible; }
-};
-document.getElementById('b-pause').onclick = e=>{ paused=!paused; e.target.textContent = paused?'[RESUME] 继续':'[PAUSE] 暂停'; };
-document.getElementById('b-reset').onclick = ()=>{ org = seedOrganism(); compile(org); rebuildViews(); log('[RESET] 重置为种子形态生物 Genesis-0', true); };
+});
+_bind('b-pause', e=>{ paused=!paused; e.target.textContent = paused?'[RESUME] 继续':'[PAUSE] 暂停'; });
+_bind('b-reset', ()=>{ org = seedOrganism(); compile(org); rebuildViews(); log('[RESET] 重置为种子形态生物 Genesis-0', true); });
 
 /* 尝试从守护进程获取真实冠军有机体快照做坐标水合 (后台持续演化, 前端毫秒级实时同步观察) */
 async function syncServerChampion() {
