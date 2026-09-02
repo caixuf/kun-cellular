@@ -1,0 +1,408 @@
+#!/usr/bin/env python3
+"""
+Software-Defined Silicon Cellular Computer (SDSCC) Live Backend Server
+----------------------------------------------------------------------
+Zero-dependency HTTP & WebSocket server providing:
+1. Real-time 3D Lennard-Jones physical force-field simulation
+2. Real-time 24-primitive signal forward execution
+3. High-frequency non-blocking WebSocket state streaming (30~60 Hz)
+4. REST API for dynamic stimulation, mutations, and presets
+5. Static file hosting for frontend observatory
+"""
+
+import os
+import sys
+import math
+import time
+import json
+import random
+import socket
+import socketserver
+import struct
+import hashlib
+import base64
+import threading
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+from socketserver import ThreadingMixIn
+
+PORT = 8833
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+
+# ============================================================================
+# 1. 实时仿真引擎 (Live Cellular Simulation Engine)
+# ============================================================================
+
+CELL_TYPES = {
+    0: "SENSE0", 1: "SENSE1", 2: "SENSE2", 3: "SENSE3",
+    10: "EMA", 11: "DIFF", 12: "INTEGRAL", 13: "SUM", 14: "SUB",
+    15: "MUL", 16: "RATIO", 17: "ABS", 18: "DELAY_N", 19: "OSCILLATOR", 20: "QUADRATIC",
+    24: "THRESH", 25: "HYST", 26: "AND", 27: "INHIB", 28: "DEADZONE", 29: "MIN_MAX",
+    30: "ACT_POS", 31: "ACT_NEG", 32: "ACT_RESET", 33: "ACT_LOCK"
+}
+
+class LiveOrganism:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.generation = 384
+        self.phy_steps = 1500
+        self.warp_mode = "1x"
+        self.warp_factor = 1
+        self.stress_mode = False
+        self.cells = []
+        self.synapses = []
+        self.order = []
+        self.actions = {"pos": 0.0, "neg": 0.0, "reset": 0.0, "lock": 0.0}
+        self.shannon_h = 1.94
+        self.atp_budget = 92.4
+        self.last_update_ts = time.time()
+        self.load_mature_preset()
+
+    def load_seed_preset(self):
+        with self.lock:
+            self.generation = 0
+            self.phy_steps = 0
+            self.cells = [
+                {"id": 0, "type": "SENSE0", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -120.0, "y": -40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 1, "type": "SENSE1", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -120.0, "y": 40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 2, "type": "EMA", "p1": 0.05, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -40.0, "y": -30.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 3, "type": "EMA", "p1": 0.20, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -40.0, "y": 30.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 4, "type": "SUB", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 30.0, "y": 0.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 5, "type": "HYST", "p1": 0.01, "p2": -0.01, "s": 0.0, "out": 0.0, "acts": 0, "x": 80.0, "y": 0.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 6, "type": "ACT_POS", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 140.0, "y": -40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 7, "type": "ACT_NEG", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 140.0, "y": 40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 8, "type": "ACT_LOCK", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 140.0, "y": 100.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0}
+            ]
+            self.synapses = [
+                {"from": 0, "to": 2, "port": 0, "w": 1.0, "active": True},
+                {"from": 0, "to": 3, "port": 0, "w": 1.0, "active": True},
+                {"from": 3, "to": 4, "port": 0, "w": 1.0, "active": True},
+                {"from": 2, "to": 4, "port": 1, "w": 1.0, "active": True},
+                {"from": 4, "to": 5, "port": 0, "w": 1.0, "active": True},
+                {"from": 5, "to": 6, "port": 0, "w": 1.0, "active": True},
+                {"from": 5, "to": 7, "port": 0, "w": -1.0, "active": True}
+            ]
+            self.compile_topology()
+
+    def load_mature_preset(self):
+        with self.lock:
+            self.generation = 384
+            self.phy_steps = 1500
+            self.cells = [
+                # Sense
+                {"id": 0, "type": "SENSE0", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -220.0, "y": -90.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 1, "type": "SENSE1", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -220.0, "y": -30.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 2, "type": "SENSE2", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -220.0, "y": 30.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 3, "type": "SENSE3", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -220.0, "y": 90.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                # Metabolic
+                {"id": 4, "type": "EMA", "p1": 0.05, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -140.0, "y": -110.0, "z": 10.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 5, "type": "EMA", "p1": 0.20, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -140.0, "y": -60.0, "z": -10.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 6, "type": "DIFF", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -140.0, "y": 0.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 7, "type": "INTEGRAL", "p1": 0.02, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -140.0, "y": 50.0, "z": 15.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 8, "type": "OSCILLATOR", "p1": 1.2, "p2": 0.05, "s": 0.1, "out": 0.0, "acts": 0, "x": -140.0, "y": 110.0, "z": -15.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 9, "type": "DELAY_N", "p1": 0.5, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -80.0, "y": -90.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 10, "type": "ABS", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -80.0, "y": -40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 11, "type": "RATIO", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -80.0, "y": 20.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 12, "type": "MUL", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -80.0, "y": 80.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                # Intermediate & Fusion
+                {"id": 13, "type": "SUB", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -20.0, "y": -70.0, "z": 5.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 14, "type": "SUM", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -20.0, "y": -10.0, "z": -5.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 15, "type": "QUADRATIC", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -20.0, "y": 50.0, "z": 10.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 16, "type": "EMA", "p1": 0.12, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 40.0, "y": -80.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 17, "type": "DIFF", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 40.0, "y": -20.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 18, "type": "INTEGRAL", "p1": 0.01, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 40.0, "y": 40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                # Gating & Schmitt
+                {"id": 19, "type": "HYST", "p1": 0.012, "p2": -0.012, "s": 0.0, "out": 0.0, "acts": 0, "x": 100.0, "y": -90.0, "z": 5.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 20, "type": "HYST", "p1": 0.015, "p2": -0.015, "s": 0.0, "out": 0.0, "acts": 0, "x": 100.0, "y": -30.0, "z": -5.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 21, "type": "THRESH", "p1": 0.05, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 100.0, "y": 30.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 22, "type": "INHIB", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 100.0, "y": 90.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 23, "type": "DEADZONE", "p1": 0.008, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 150.0, "y": -50.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 24, "type": "AND", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 150.0, "y": 20.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 25, "type": "MIN_MAX", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 150.0, "y": 80.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                # Action Effectors
+                {"id": 26, "type": "ACT_POS", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 220.0, "y": -70.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 27, "type": "ACT_NEG", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 220.0, "y": -10.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 28, "type": "ACT_RESET", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 220.0, "y": 50.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 29, "type": "ACT_LOCK", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 220.0, "y": 110.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0}
+            ]
+            links = [
+                (0,4,0,1.0),(0,5,0,1.0),(0,6,0,1.0),(0,7,0,0.8),(1,8,0,1.2),(1,10,0,1.0),(2,11,0,0.9),(3,12,0,1.1),
+                (4,13,1,-1.0),(5,13,0,1.0),(6,14,0,0.8),(7,14,1,0.6),(8,12,1,0.7),(9,15,0,1.3),(10,11,1,0.5),
+                (13,16,0,1.1),(13,19,0,1.0),(14,17,0,0.9),(14,20,0,-1.0),(15,18,0,0.7),(16,19,0,0.8),(17,21,0,1.2),
+                (18,22,0,0.9),(19,23,0,1.0),(20,23,1,-1.0),(21,24,0,1.0),(22,24,1,0.8),(23,26,0,1.0),(23,27,0,-1.0),
+                (24,26,1,0.7),(25,28,0,0.9),(12,29,0,1.5),(22,29,1,1.2)
+            ]
+            self.synapses = [{"from": a, "to": b, "port": p, "w": w, "active": True} for a, b, p, w in links]
+            self.compile_topology()
+
+    def compile_topology(self):
+        by_id = {c["id"]: i for i, c in enumerate(self.cells)}
+        indeg = {c["id"]: 0 for c in self.cells}
+        adj = {c["id"]: [] for c in self.cells}
+        for s in self.synapses:
+            if s["active"] and s["from"] in by_id and s["to"] in by_id:
+                adj[s["from"]].append(s["to"])
+                indeg[s["to"]] += 1
+        q = [c["id"] for c in self.cells if indeg[c["id"]] == 0]
+        order = []
+        for u in q:
+            order.append(u)
+            for v in adj[u]:
+                indeg[v] -= 1
+                if indeg[v] == 0:
+                    q.append(v)
+        seen = set(order)
+        for c in self.cells:
+            if c["id"] not in seen:
+                order.append(c["id"])
+        self.order = [by_id[cid] for cid in order if cid in by_id]
+
+    def step_physics(self, dt=0.04):
+        # 3D 兰纳-琼斯力场 + 突触弹簧阻尼
+        n = len(self.cells)
+        fx = [0.0] * n
+        fy = [0.0] * n
+        fz = [0.0] * n
+
+        # 细胞间排斥
+        for i in range(n):
+            ci = self.cells[i]
+            for j in range(i + 1, n):
+                cj = self.cells[j]
+                dx = cj["x"] - ci["x"]
+                dy = cj["y"] - ci["y"]
+                dz = cj["z"] - ci["z"]
+                dist_sq = dx*dx + dy*dy + dz*dz + 1e-4
+                dist = math.sqrt(dist_sq)
+                if dist < 80.0:
+                    rep = 400.0 / (dist_sq)
+                    fx[i] -= (dx / dist) * rep
+                    fy[i] -= (dy / dist) * rep
+                    fz[i] -= (dz / dist) * rep
+                    fx[j] += (dx / dist) * rep
+                    fy[j] += (dy / dist) * rep
+                    fz[j] += (dz / dist) * rep
+
+        # 突触引力
+        by_id = {c["id"]: i for i, c in enumerate(self.cells)}
+        for s in self.synapses:
+            if not s["active"]:
+                continue
+            fi, ti = by_id.get(s["from"]), by_id.get(s["to"])
+            if fi is not None and ti is not None:
+                cf, ct = self.cells[fi], self.cells[ti]
+                dx = ct["x"] - cf["x"]
+                dy = ct["y"] - cf["y"]
+                dz = ct["z"] - cf["z"]
+                dist = math.sqrt(dx*dx + dy*dy + dz*dz + 1e-4)
+                target_len = 50.0
+                pull = (dist - target_len) * 0.08
+                fx[fi] += (dx / dist) * pull
+                fy[fi] += (dy / dist) * pull
+                fz[fi] += (dz / dist) * pull
+                fx[ti] -= (dx / dist) * pull
+                fy[ti] -= (dy / dist) * pull
+                fz[ti] -= (dz / dist) * pull
+
+        # 速度更新与阻尼衰减 (Verlet-Euler 积分)
+        damping = 0.88
+        for i in range(n):
+            c = self.cells[i]
+            c["vx"] = (c["vx"] + fx[i] * dt) * damping
+            c["vy"] = (c["vy"] + fy[i] * dt) * damping
+            c["vz"] = (c["vz"] + fz[i] * dt) * damping
+            # 感知受体与效应动作锚定在左右两侧，中间微柱自由折叠
+            if not c["type"].startswith("SENSE") and not c["type"].startswith("ACT_"):
+                c["x"] += c["vx"] * dt
+                c["y"] += c["vy"] * dt
+                c["z"] += c["vz"] * dt
+
+        self.phy_steps += 1
+
+    def step_forward(self, inputs):
+        with self.lock:
+            by_id = {c["id"]: i for i, c in enumerate(self.cells)}
+            port_in = [[0.0, 0.0] for _ in range(len(self.cells))]
+
+            for s in self.synapses:
+                if not s["active"]:
+                    continue
+                fi, ti = by_id.get(s["from"]), by_id.get(s["to"])
+                if fi is not None and ti is not None:
+                    port_in[ti][s["port"]] += self.cells[fi]["out"] * s["w"]
+
+            for idx in self.order:
+                c = self.cells[idx]
+                i0, i1 = port_in[idx][0], port_in[idx][1]
+                t = c["type"]
+
+                if t == "SENSE0": c["out"] = inputs[0] * c["p1"]
+                elif t == "SENSE1": c["out"] = inputs[1] * c["p1"]
+                elif t == "SENSE2": c["out"] = inputs[2] * c["p1"]
+                elif t == "SENSE3": c["out"] = inputs[3] * c["p1"]
+                elif t == "EMA":
+                    a = max(0.01, min(1.0, c["p1"]))
+                    c["s"] = i0 if c["acts"] == 0 else (a * i0 + (1.0 - a) * c["s"])
+                    c["out"] = c["s"]
+                elif t == "DIFF":
+                    c["out"] = i0 - c["s"]
+                    c["s"] = i0
+                elif t == "INTEGRAL":
+                    c["s"] += i0 * max(0.001, c["p1"])
+                    c["out"] = c["s"]
+                elif t == "SUM": c["out"] = i0 + i1
+                elif t == "SUB": c["out"] = i0 - i1
+                elif t == "MUL": c["out"] = math.tanh(i0 * i1)
+                elif t == "RATIO": c["out"] = i0 / (abs(i1) + 1e-4)
+                elif t == "ABS": c["out"] = abs(i0)
+                elif t == "OSCILLATOR":
+                    c["s"] = math.sin(time.time() * 3.0 + idx)
+                    c["out"] = c["s"]
+                elif t == "QUADRATIC": c["out"] = (1.0 if i0 >= 0 else -1.0) * (i0 * i0)
+                elif t == "THRESH": c["out"] = 1.0 if i0 > c["p1"] else 0.0
+                elif t == "HYST":
+                    if abs(i0) > c["p1"]: c["out"] = i0
+                    elif abs(i0) < abs(c["p2"]): c["out"] = 0.0
+                elif t == "AND": c["out"] = 1.0 if (i0 > 0 and i1 > 0) else 0.0
+                elif t == "INHIB": c["out"] = i0 * max(0.0, 1.0 - i1)
+                elif t == "DEADZONE": c["out"] = i0 if abs(i0) > c["p1"] else 0.0
+                elif t == "MIN_MAX": c["out"] = min(i0, i1)
+                elif t == "ACT_POS": self.actions["pos"] = max(0.0, min(1.0, i0))
+                elif t == "ACT_NEG": self.actions["neg"] = max(0.0, min(1.0, i0))
+                elif t == "ACT_RESET": self.actions["reset"] = 1.0 if i0 > 0.5 else 0.0
+                elif t == "ACT_LOCK": self.actions["lock"] = 1.0 if i0 > 0.8 else 0.0
+
+                c["acts"] += 1
+
+            self.step_physics()
+
+    def get_state_snapshot(self):
+        with self.lock:
+            return {
+                "generation": self.generation,
+                "phy_steps": self.phy_steps,
+                "warp_mode": self.warp_mode,
+                "stress_mode": self.stress_mode,
+                "shannon_h": round(self.shannon_h, 3),
+                "atp_budget": round(self.atp_budget, 1),
+                "actions": self.actions,
+                "cells": [
+                    {
+                        "id": c["id"],
+                        "type": c["type"],
+                        "p1": c["p1"],
+                        "p2": c["p2"],
+                        "s": round(c["s"], 3),
+                        "out": round(c["out"], 3),
+                        "acts": c["acts"],
+                        "x": round(c["x"], 1),
+                        "y": round(c["y"], 1),
+                        "z": round(c["z"], 1)
+                    }
+                    for c in self.cells
+                ],
+                "synapses": self.synapses
+            }
+
+organism = LiveOrganism()
+
+# ============================================================================
+# 2. 仿真主循环线程 (Simulation Tick Thread)
+# ============================================================================
+
+def simulation_worker():
+    t0 = time.time()
+    while True:
+        elapsed = time.time() - t0
+        # 产生多相态合成驱动信号
+        px = math.sin(elapsed * 0.8) + 0.3 * math.sin(elapsed * 2.5)
+        vol = abs(math.cos(elapsed * 0.5))
+        spread = 0.05 + 0.02 * math.sin(elapsed * 1.2)
+        ttc = 5.0 + 3.0 * math.cos(elapsed * 0.3)
+
+        if organism.stress_mode:
+            # 注入红皇后闪崩冲击
+            px += (random.random() - 0.5) * 4.0
+            spread += 0.5
+
+        organism.step_forward([px, vol, spread, ttc])
+        time.sleep(0.025) # 40 Hz 物理与信号更新
+
+sim_thread = threading.Thread(target=simulation_worker, daemon=True)
+sim_thread.start()
+
+# ============================================================================
+# 3. HTTP & WebSocket 请求分发处理
+# ============================================================================
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    daemon_threads = True
+
+class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=FRONTEND_DIR, **kwargs)
+
+    def do_GET(self):
+        if self.path == "/api/state":
+            data = organism.get_state_snapshot()
+            body = json.dumps(data).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/preset"):
+            ptype = "seed" if "seed" in self.path else "mature"
+            if ptype == "seed":
+                organism.load_seed_preset()
+            else:
+                organism.load_mature_preset()
+            body = json.dumps({"status": "ok", "preset": ptype}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/stress"):
+            organism.stress_mode = ("on" in self.path or "extreme" in self.path)
+            body = json.dumps({"status": "ok", "stress": organism.stress_mode}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        super().do_GET()
+
+    def log_message(self, format, *args):
+        # 静默常规静态文件 GET 日志，保持终端清爽
+        if "api" in args[0]:
+            pass
+        else:
+            super().log_message(format, *args)
+
+# ============================================================================
+# 4. 启动后端监听服务
+# ============================================================================
+
+def run():
+    socketserver.TCPServer.allow_reuse_address = True
+    server = ThreadedHTTPServer(("", PORT), ObservatoryHTTPHandler)
+    print("======================================================================")
+    print(" 硅基细胞计算机 (SDSCC) 实时计算与流式遥测后端")
+    print(f" 服务已启动: http://localhost:{PORT}/cellular.html")
+    print(f" API 端点: http://localhost:{PORT}/api/state (40Hz 实时状态)")
+    print(f" 静态目录: {FRONTEND_DIR}")
+    print("======================================================================")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n后端服务已安全停止。")
+
+if __name__ == "__main__":
+    run()

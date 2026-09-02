@@ -814,6 +814,7 @@ window.setWarp = async function(speed) {
 };
 
 window.setStress = async function(level) {
+  fetch("/api/stress?level=" + level).catch(() => {});
   try {
     await fetch('/api/control/stress?level=' + level, { method: 'POST' });
     log(level === 'extreme' ? ' [兵部] 触发红皇后极端流动性闪崩与对抗加压!' : '✓ 恢复平稳演化生境', true);
@@ -1070,6 +1071,7 @@ function initLODCloud(count) {
 
 
 window.loadPreset = function(type) {
+  fetch("/api/preset?type=" + type).catch(() => {});
   if(type === "seed") {
     org = seedOrganism();
     compile(org);
@@ -1121,7 +1123,102 @@ window.switchLOD = function(mode) {
 const clock = new THREE.Clock();
 let frameCount = 0, lastFpsTime = performance.now();
 
+
+/* ============================================================
+ * 6. 后端实时流同步与防卡顿优化 (Anti-Lag Real Backend Sync)
+ * ============================================================ */
+let isFetchingState = false;
+let serverOnline = false;
+
+async function syncBackendState() {
+  if (isFetchingState) return;
+  isFetchingState = true;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 800);
+    const r = await fetch("/api/state", { signal: controller.signal });
+    clearTimeout(timeoutId);
+    if (r.ok) {
+      const data = await r.json();
+      if (!serverOnline) {
+        serverOnline = true;
+        const srcEl = document.getElementById("src");
+        if (srcEl) {
+          srcEl.textContent = "数据源: SDSCC 真实实时物理后端 (40Hz 连续推演)";
+          srcEl.style.color = "var(--emerald)";
+          srcEl.style.background = "rgba(52,211,153,0.1)";
+        }
+        log("已连接至 SDSCC 真实物理后端引擎 (40Hz 连续力场 + 24原语前向)", true);
+      }
+      updateFromBackendState(data);
+    }
+  } catch (e) {
+    if (serverOnline) {
+      serverOnline = false;
+      const srcEl = document.getElementById("src");
+      if (srcEl) {
+        srcEl.textContent = "数据源: 本地离线平滑降级 (60FPS)";
+        srcEl.style.color = "var(--cyan)";
+      }
+    }
+  } finally {
+    isFetchingState = false;
+  }
+}
+
+function updateFromBackendState(data) {
+  if (!data || !data.cells) return;
+  
+  // 1. 节流更新 DOM 文本指标
+  const genEl = document.getElementById("st-gen");
+  if (genEl && genEl.textContent != data.generation) genEl.textContent = data.generation;
+  
+  const cellsEl = document.getElementById("st-cells");
+  if (cellsEl && cellsEl.textContent != data.cells.length) cellsEl.textContent = data.cells.length;
+  
+  const synEl = document.getElementById("st-syn");
+  if (synEl && synEl.textContent != (data.synapses ? data.synapses.length : 0)) {
+    synEl.textContent = data.synapses ? data.synapses.length : 0;
+  }
+  
+  const physEl = document.getElementById("st-phys");
+  if (physEl) physEl.textContent = data.phy_steps;
+  
+  if (data.actions) {
+    const buyEl = document.getElementById("v-buy");
+    if (buyEl) buyEl.textContent = (data.actions.pos || 0).toFixed(2);
+    
+    const sellEl = document.getElementById("v-sell");
+    if (sellEl) sellEl.textContent = (data.actions.neg || 0).toFixed(2);
+    
+    const lockEl = document.getElementById("v-immune");
+    const isLocked = (data.actions.lock || 0) > 0.5;
+    if (lockEl) lockEl.textContent = isLocked ? "LOCKED" : "NORMAL";
+    
+    const actImmune = document.getElementById("act-immune");
+    if (actImmune) actImmune.classList.toggle("flash-immune", isLocked);
+  }
+
+  // 2. 平滑插值更新元胞 3D 坐标与放电电位 (零 GC 对象复用)
+  const byId = new Map(data.cells.map(c => [c.id, c]));
+  for (const v of views.cells) {
+    const remote = byId.get(v.cell.id);
+    if (remote) {
+      // 目标平滑阻尼趋近 (Lerp)
+      v.cell.x += (remote.x - v.cell.x) * 0.35;
+      v.cell.y += (remote.y - v.cell.y) * 0.35;
+      v.cell.z += (remote.z - v.cell.z) * 0.35;
+      v.cell.out = remote.out;
+      v.cell.state = remote.s;
+    }
+  }
+}
+
+// 30 Hz 高频轮询 (带防重叠锁，零卡顿)
+setInterval(syncBackendState, 33);
+
 function animate(){
+
   requestAnimationFrame(animate);
   const now = performance.now();
   frameCount++;
