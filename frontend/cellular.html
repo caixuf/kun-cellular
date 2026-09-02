@@ -271,6 +271,138 @@
   /* 滚动条定制 */
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
+  /* 视角控制微型罗盘 */
+  .cam-controls {
+    position: fixed;
+    top: 58px;
+    right: 325px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: rgba(10, 16, 28, 0.9);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    z-index: 60;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+  .cam-btn {
+    background: rgba(18, 26, 44, 0.8);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 11px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    font-family: var(--font-mono);
+  }
+  .cam-btn:hover { color: var(--cyan); border-color: var(--cyan); }
+  .cam-btn.active {
+    background: rgba(56, 189, 248, 0.2);
+    color: var(--cyan);
+    border-color: var(--cyan);
+    font-weight: bold;
+  }
+
+  /* 通用智能悬浮解释气泡 (Smart Tooltip) */
+  .smart-tooltip {
+    position: fixed;
+    display: none;
+    max-width: 290px;
+    background: rgba(10, 16, 28, 0.96);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--cyan);
+    border-radius: 8px;
+    padding: 10px 12px;
+    z-index: 999;
+    pointer-events: none;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 12px rgba(56, 189, 248, 0.25);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    transition: opacity 0.15s ease-out;
+  }
+  .smart-tooltip .tt-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--cyan);
+    margin-bottom: 4px;
+  }
+  .smart-tooltip .tt-desc {
+    font-size: 11px;
+    color: var(--text-main);
+    line-height: 1.5;
+    margin-bottom: 4px;
+  }
+  .smart-tooltip .tt-hint {
+    font-size: 10px;
+    color: var(--amber);
+    border-top: 1px dashed #334155;
+    padding-top: 4px;
+  }
+
+  /* 5幕式漫游导览浮窗 (Tour HUD) */
+  .tour-hud {
+    position: fixed;
+    bottom: 75px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 480px;
+    background: rgba(10, 16, 28, 0.96);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--cyan);
+    border-radius: 10px;
+    padding: 14px 18px;
+    z-index: 80;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.8), 0 0 20px rgba(56, 189, 248, 0.3);
+    display: none;
+  }
+  .tour-hud-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .tour-hud-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--cyan);
+  }
+  .tour-hud-step {
+    font-size: 10px;
+    color: var(--amber);
+    font-family: var(--font-mono);
+  }
+  .tour-hud-desc {
+    font-size: 12px;
+    color: var(--text-main);
+    line-height: 1.6;
+    margin-bottom: 12px;
+  }
+  .tour-hud-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  /* 图书馆卡片可点击高亮样式 */
+  .book-card {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 5px;
+    padding: 6px 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .book-card:hover {
+    border-color: var(--amber);
+    background: rgba(251, 191, 36, 0.12);
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.25);
+    transform: translateY(-1px);
+  }
+
 </style>
 </head>
 <body>
@@ -287,6 +419,7 @@
     <a href="cellular.html" class="nav-tab-btn active">3D 全息力场</a>
     <a href="maze.html" class="nav-tab-btn">具身迷宫沙盒</a>
     <a href="https://github.com/caixuf/kun-cellular/blob/main/docs/morphogenetic_cellular_evolution_paper.zh.md" target="_blank" class="nav-tab-btn" style="color:var(--purple)">学术论文</a>
+    <button onclick="startAutoTour()" class="nav-tab-btn" style="background:rgba(56,189,248,0.2);color:var(--cyan);border-color:var(--cyan);font-weight:bold;cursor:pointer;">[一键新手导览]</button>
   </div>
 
   <div class="header-metrics">
@@ -307,8 +440,8 @@
       <span>计算拓扑遥测</span>
       <span class="card-title-badge">SDSCC Core</span>
     </div>
-    <div class="kv"><span>演化世代 Generation</span><b id="st-gen">0</b></div>
-    <div class="kv"><span>活跃细胞 Cells</span><b id="st-cells" style="color:var(--cyan)">0</b></div>
+    <div class="kv" data-tip="st-gen"><span>演化世代 Generation</span><b id="st-gen">0</b></div>
+    <div class="kv" data-tip="st-cells"><span>活跃细胞 Cells</span><b id="st-cells" style="color:var(--cyan)">0</b></div>
     <div class="kv"><span>神经突触 Synapses</span><b id="st-syn" style="color:var(--purple)">0</b></div>
     <div class="kv"><span>力场积分步 Force Steps</span><b id="st-phys">0</b></div>
     <div class="kv"><span>代谢放电次数</span><b id="st-act">0</b></div>
@@ -338,10 +471,10 @@
       <span class="card-title-badge" id="st-pipe">Organ</span>
     </div>
     <div class="btn-grid-4">
-      <button id="lod-organ" class="btn-ctrl active" onclick="switchLOD('organ')">器官(30)</button>
+      <button id="lod-organ" class="btn-ctrl active" onclick="switchLOD('organ')" data-tip="lod-organ">器官(30)</button>
       <button id="lod-1k" class="btn-ctrl" onclick="switchLOD('1k')" style="color:var(--emerald);font-weight:bold;">千元皮层(1k)</button>
       <button id="lod-10k" class="btn-ctrl" onclick="switchLOD('10k')">流形(1万)</button>
-      <button id="lod-1m" class="btn-ctrl" onclick="switchLOD('1m')" style="color:var(--purple)">百万星系(1M)</button>
+      <button id="lod-1m" class="btn-ctrl" onclick="switchLOD('1m')" style="color:var(--purple)" data-tip="lod-1m">百万星系(1M)</button>
     </div>
     <div class="kv"><span>GPU 批处理 Draw Calls</span><b id="st-draws">1</b></div>
   </div>
@@ -382,9 +515,9 @@
       <span>效应器动作决策输出</span>
       <span class="card-title-badge">Actions</span>
     </div>
-    <div class="act-bar" id="act-buy"><span>买开 / 加速 ACT_POS</span><b id="v-buy">0.00</b></div>
-    <div class="act-bar" id="act-sell"><span>卖开 / 制动 ACT_NEG</span><b id="v-sell">0.00</b></div>
-    <div class="act-bar" id="act-immune"><span>免疫阻断 ACT_LOCK</span><b id="v-immune">NORMAL</b></div>
+    <div class="act-bar" id="act-buy" data-tip="act-buy"><span>买开 / 加速 ACT_POS</span><b id="v-buy">0.00</b></div>
+    <div class="act-bar" id="act-sell" data-tip="act-sell"><span>卖开 / 制动 ACT_NEG</span><b id="v-sell">0.00</b></div>
+    <div class="act-bar" id="act-immune" data-tip="act-immune"><span>免疫阻断 ACT_LOCK</span><b id="v-immune">NORMAL</b></div>
   </div>
 
   <!-- 卡片 2: 生态圈多样性 -->
@@ -427,6 +560,38 @@
     </div>
   </div>
 </aside>
+
+
+<!-- 3D 视角微型罗盘 -->
+<div class="cam-controls">
+  <span style="color:var(--text-dim);font-size:10px;margin-right:2px;">视角:</span>
+  <button class="cam-btn active" onclick="setCameraPreset('front')">正视</button>
+  <button class="cam-btn" onclick="setCameraPreset('top')">俯视</button>
+  <button class="cam-btn" onclick="setCameraPreset('side')">侧视</button>
+  <button id="btn-auto-orbit" class="cam-btn" onclick="toggleAutoOrbit()">自动巡航</button>
+  <button class="cam-btn" onclick="setCameraPreset('reset')" style="color:var(--cyan);">居中复位</button>
+</div>
+
+<!-- 5幕式新手漫游导览 HUD -->
+<div id="tour-hud" class="tour-hud">
+  <div class="tour-hud-header">
+    <span class="tour-hud-title" id="tour-hud-title">第一步：感官受体</span>
+    <span class="tour-hud-step" id="tour-hud-step">第 1 / 5 幕</span>
+  </div>
+  <div class="tour-hud-desc" id="tour-hud-desc">这里是大脑的感官受体，实时接收外部世界的数据流。</div>
+  <div class="tour-hud-actions">
+    <button class="btn-ctrl" onclick="prevTourStep()" style="padding:4px 12px;">上一步</button>
+    <button class="btn-ctrl" onclick="nextTourStep()" style="padding:4px 12px;background:rgba(56,189,248,0.25);color:var(--cyan);font-weight:bold;">下一步</button>
+    <button class="btn-ctrl btn-danger" onclick="endAutoTour()" style="padding:4px 12px;">退出导览</button>
+  </div>
+</div>
+
+<!-- 通用智能悬浮解释气泡 -->
+<div id="smart-tooltip" class="smart-tooltip">
+  <div class="tt-title" id="tt-title">标题</div>
+  <div class="tt-desc" id="tt-desc">通俗解释</div>
+  <div class="tt-hint" id="tt-hint">操作提示</div>
+</div>
 
 <!-- 底部控制与图例胶囊 (Bottom Capsule) -->
 <div class="dock-bottom">
@@ -1354,14 +1519,14 @@ async function pollLibrary() {
       const shelf = document.getElementById('library-shelf');
       if(shelf) {
         shelf.innerHTML = j.books.map(b => {
-          return `<div style="background:rgba(15,23,42,0.75);border:1px solid rgba(56,189,248,0.25);border-radius:5px;padding:5px 7px;">
+          return `<div class="book-card" onclick="highlightBookCircuit('${b.book_id}', '${b.title || b.book_id}')">
             <div style="display:flex;justify-content:space-between;color:var(--cyan);font-weight:bold;font-size:10px;">
               <span>《${b.title || b.book_id}》</span>
               <span style="color:var(--amber);">⭐ ${b.impact_score || 8.5}</span>
             </div>
             <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:9px;margin-top:2px;">
               <span>Gen ${b.discovered_at_gen} · ${b.author_deme || 'Origin'}</span>
-              <span style="color:var(--emerald);">引用: ${b.citations || 1}次</span>
+              <span style="color:var(--emerald);">引用: ${b.citations || 1}次 (点击高亮)</span>
             </div>
           </div>`;
         }).join('');
@@ -1802,6 +1967,20 @@ function animate(){
     if(tickTimer >= 0.6){ tickTimer = 0; marketTick(); }
     stepPhysics(org);
   }
+  // 平滑相机插值与自动巡航
+  if (autoOrbitEnabled && !dragging && !isCamTransitioning) {
+    camTheta += dt * 0.15;
+    targetTheta = camTheta;
+  }
+  if (isCamTransitioning) {
+    camTheta += (targetTheta - camTheta) * 0.1;
+    camPhi += (targetPhi - camPhi) * 0.1;
+    camR += (targetR - camR) * 0.1;
+    if (Math.abs(targetTheta - camTheta) < 0.002 && Math.abs(targetPhi - camPhi) < 0.002 && Math.abs(targetR - camR) < 0.8) {
+      camTheta = targetTheta; camPhi = targetPhi; camR = targetR; isCamTransitioning = false;
+    }
+  }
+
   camera.position.set(
     camR*Math.sin(camPhi)*Math.sin(camTheta),
     camR*Math.cos(camPhi),
@@ -1831,6 +2010,201 @@ function animate(){
   }
   renderer.render(scene, camera);
 }
+
+/* ============================================================
+ * 8. 新手友好 UX 交互套件 (Camera Lerp, Auto Tour, Smart Tooltips)
+ * ============================================================ */
+
+// 8.1 3D 视角预设与平滑过渡控制器
+let targetTheta = 0, targetPhi = Math.PI / 2, targetR = 560;
+let isCamTransitioning = false;
+let autoOrbitEnabled = false;
+
+window.setCameraPreset = function(viewMode) {
+  isCamTransitioning = true;
+  document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
+  if (viewMode === 'front') {
+    targetTheta = 0; targetPhi = Math.PI / 2; targetR = 560;
+  } else if (viewMode === 'top') {
+    targetTheta = 0; targetPhi = 0.05; targetR = 620;
+  } else if (viewMode === 'side') {
+    targetTheta = Math.PI / 2; targetPhi = Math.PI / 2; targetR = 560;
+  } else if (viewMode === 'reset') {
+    targetTheta = 0; targetPhi = Math.PI / 2; targetR = 560;
+    autoOrbitEnabled = false;
+    const btn = document.getElementById('btn-auto-orbit');
+    if (btn) btn.classList.remove('active');
+  }
+};
+
+window.toggleAutoOrbit = function() {
+  autoOrbitEnabled = !autoOrbitEnabled;
+  const btn = document.getElementById('btn-auto-orbit');
+  if (btn) btn.classList.toggle('active', autoOrbitEnabled);
+  log(autoOrbitEnabled ? '[视角] 开启 360 度自动全景环绕巡航' : '[视角] 停止自动环绕');
+};
+
+// 8.2 5幕式新手沉浸导览漫游
+let tourStep = 0;
+let tourActive = false;
+
+const TOUR_STAGES = [
+  {
+    target: { theta: 0, phi: Math.PI / 2, r: 420 },
+    title: '第一步：感官受体（眼睛与耳朵）',
+    desc: '左侧青蓝色细胞接收外部世界的多维实时输入（如行情价格、成交量、激光雷达距离）。',
+    highlightFam: 'receptor'
+  },
+  {
+    target: { theta: 0.2, phi: 1.4, r: 380 },
+    title: '第二步：代谢与特征提取中枢',
+    desc: '中间绿色细胞（EMA均线、DIFF微分动量、OSCILLATOR振荡器）将原始信号加工为趋势记忆与波动周期。',
+    highlightFam: 'metabolic'
+  },
+  {
+    target: { theta: -0.2, phi: 1.4, r: 380 },
+    title: '第三步：门控迟滞与决策抑制',
+    desc: '紫色门控细胞（迟滞HYST、阈值THRESH、抑制INHIB）过滤假信号，防止大脑在震荡中反复摇摆。',
+    highlightFam: 'gating'
+  },
+  {
+    target: { theta: 0, phi: Math.PI / 2, r: 400 },
+    title: '第四步：效应器输出最终行为决策',
+    desc: '右侧红色效应细胞输出买入加速、卖出制动与安全免疫熔断指令，直接驱动外部执行器。',
+    highlightFam: 'effector'
+  },
+  {
+    target: { theta: 0.4, phi: 1.2, r: 680 },
+    title: '第五步：宏观生态与跨代进化',
+    desc: '外层彩色光球与量子干涉平面正在持续优胜劣汰，8个部落在辐射诱变下不断迭代进化出更聪明的大脑！',
+    highlightFam: null
+  }
+];
+
+window.startAutoTour = function() {
+  tourActive = true;
+  tourStep = 0;
+  window.showTourStep(0);
+};
+
+window.showTourStep = function(step) {
+  if (step < 0 || step >= TOUR_STAGES.length) {
+    window.endAutoTour();
+    return;
+  }
+  tourStep = step;
+  const stage = TOUR_STAGES[step];
+  
+  targetTheta = stage.target.theta;
+  targetPhi = stage.target.phi;
+  targetR = stage.target.r;
+  isCamTransitioning = true;
+
+  for (const v of views.cells) {
+    const fam = FAMILY(v.cell.type);
+    const match = !stage.highlightFam || fam === stage.highlightFam;
+    v.membrane.material.opacity = match ? 0.85 : 0.12;
+    v.nucleus.scale.set(match ? 1.4 : 0.7, match ? 1.4 : 0.7, match ? 1.4 : 0.7);
+  }
+
+  const box = document.getElementById('tour-hud');
+  if (box) {
+    box.style.display = 'block';
+    document.getElementById('tour-hud-title').textContent = stage.title;
+    document.getElementById('tour-hud-desc').textContent = stage.desc;
+    document.getElementById('tour-hud-step').textContent = `第 ${step + 1} / ${TOUR_STAGES.length} 幕`;
+  }
+};
+
+window.nextTourStep = function() { window.showTourStep(tourStep + 1); };
+window.prevTourStep = function() { window.showTourStep(tourStep - 1); };
+window.endAutoTour = function() {
+  tourActive = false;
+  const box = document.getElementById('tour-hud');
+  if (box) box.style.display = 'none';
+  for (const v of views.cells) {
+    v.membrane.material.opacity = 0.4;
+    v.nucleus.scale.set(1.0, 1.0, 1.0);
+  }
+  window.setCameraPreset('reset');
+};
+
+// 8.3 通用通俗 Smart Tooltip 引擎
+const TOOLTIP_DICT = {
+  'st-gen': { title: '演化世代 (Generation)', desc: '大脑经历自然选择和突变的迭代总代数。代数越多，回路越成熟、越抗极端风险。', hint: '系统在后台持续自动演化' },
+  'st-cells': { title: '活跃神经细胞 (Active Cells)', desc: '当前大脑中承担感知、计算和决策的基本神经元总量。', hint: '点击右侧[有丝分裂]可诞生新细胞' },
+  'lod-organ': { title: '器官微观视图 (Organ 30)', desc: '以高精细生物质膜动画观察 30 个核心决策细胞的呼吸与放电脉冲。', hint: '适合初学者清晰观察信号传递因果' },
+  'lod-1m': { title: '百万星系流形 (1M Manifold)', desc: 'GPU 单批次点云渲染，模拟由 100 万个神经元汇聚而成的宏观心智。', hint: '点击领略宏观星系级流形视觉' },
+  'act-buy': { title: '买开 / 加速信号 (ACT_POS)', desc: '经过层层神经计算后，大脑输出的主动进攻/加速行为强度。', hint: '数值大于 0.2 时高亮发光' },
+  'act-sell': { title: '卖开 / 制动信号 (ACT_NEG)', desc: '大脑感知到危险或反向趋势时，输出的刹车/避险行为强度。', hint: '数值小于 -0.2 时高亮发光' },
+  'act-immune': { title: '安全免疫熔断 (ACT_LOCK)', desc: '当外界数据发生剧烈异常波动时，大脑自动触发的防御性锁死保护。', hint: '防止在极端危机中盲目决策' }
+};
+
+function initTooltipEngine() {
+  const ttEl = document.getElementById('smart-tooltip');
+  const titleEl = document.getElementById('tt-title');
+  const descEl = document.getElementById('tt-desc');
+  const hintEl = document.getElementById('tt-hint');
+  if (!ttEl) return;
+
+  document.querySelectorAll('[data-tip]').forEach(el => {
+    el.addEventListener('mouseenter', () => {
+      const key = el.getAttribute('data-tip');
+      const info = TOOLTIP_DICT[key];
+      if (!info) return;
+      titleEl.textContent = info.title;
+      descEl.textContent = info.desc;
+      hintEl.textContent = info.hint ? '[提示] ' + info.hint : '';
+      hintEl.style.display = info.hint ? 'block' : 'none';
+      ttEl.style.display = 'block';
+    });
+    el.addEventListener('mousemove', e => {
+      const x = Math.min(window.innerWidth - 310, e.clientX + 16);
+      const y = Math.min(window.innerHeight - 160, e.clientY + 16);
+      ttEl.style.left = x + 'px';
+      ttEl.style.top = y + 'px';
+    });
+    el.addEventListener('mouseleave', () => {
+      ttEl.style.display = 'none';
+    });
+  });
+}
+
+// 8.4 硅基文化图书馆点击回路联动高亮
+window.highlightBookCircuit = function(bookId, title) {
+  log(`[图书馆] 正在全息高亮名著回路: 《${title || bookId}》`, true);
+  window.setCameraPreset('front');
+
+  // 突触金光脉冲
+  for (const v of views.syns) {
+    v.lineMat.color.setHex(0xfbbf24);
+    v.lineMat.opacity = 1.0;
+    v.photon1.material.color.setHex(0xfbbf24);
+    v.photon2.material.color.setHex(0xfbbf24);
+  }
+  for (const v of views.cells) {
+    v.membrane.material.color.setHex(0xfbbf24);
+    v.membrane.material.opacity = 0.8;
+  }
+
+  // 2.5 秒后平滑恢复原生颜色
+  setTimeout(() => {
+    for (const v of views.syns) {
+      const w = v.syn.w || 1.0;
+      v.lineMat.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);
+      v.lineMat.opacity = 0.6;
+      v.photon1.material.color.setHex(0x38bdf8);
+      v.photon2.material.color.setHex(0xa855f7);
+    }
+    for (const v of views.cells) {
+      const fam = FAMILY(v.cell.type);
+      v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
+      v.membrane.material.opacity = 0.4;
+    }
+  }, 2500);
+};
+
+initTooltipEngine();
 animate();
 </script>
 </body>
