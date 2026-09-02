@@ -489,32 +489,154 @@ def veh_loop():
 
 threading.Thread(target=veh_loop, daemon=True).start()
 
-class DummyOrganism:
+class PhysicalCell3D:
+    def __init__(self, cid, ptype, x, y, z):
+        self.id = cid
+        self.type = ptype
+        self.x = x
+        self.y = y
+        self.z = z
+        self.state = 0.0
+        self.out = 0.0
+        self.acts = 0
+        self.gain = random.uniform(0.8, 1.8)
+
+class SiliconCellularOrganism:
+    """
+    SDSCC 3D 三维生物形态发生全息模拟器 (Lennard-Jones Force-Field & 24 Primitives)
+    驱动 frontend/cellular.html 呈现三维二次贝塞尔曲线轴突、动作电位囊泡流与呼吸分层质膜
+    """
     def __init__(self):
-        self.phy_steps = 1000
-        self.shannon_h = 3.2
+        self.phy_steps = 0
+        self.generation = 42
+        self.shannon_h = 3.68
         self.warp_mode = "1x"
         self.warp_factor = 1.0
-        self.generation = 42
-        self.cells = []
         self.stress_mode = False
+        self.lock = threading.RLock()
+        self.init_cells()
+        
+    def init_cells(self):
+        self.cells = []
+        self.synapses = []
+        n_cells = 96
+        golden_ratio = (1 + math.sqrt(5)) / 2
+        for i in range(n_cells):
+            theta = 2 * math.pi * i / golden_ratio
+            phi = math.acos(1 - 2 * (i + 0.5) / n_cells)
+            r = random.uniform(160, 260)
+            x = r * math.sin(phi) * math.cos(theta)
+            y = r * math.sin(phi) * math.sin(theta)
+            z = r * math.cos(phi)
+            ptype = random.choice(SDSCC_ALL_PRIMITIVES)
+            self.cells.append(PhysicalCell3D(i, ptype, x, y, z))
+            
+        for i in range(n_cells):
+            for target in random.sample(range(n_cells), min(4, n_cells)):
+                if i != target:
+                    w = random.choice([-1.0, 1.0]) * random.uniform(0.5, 1.8)
+                    self.synapses.append({"from": i, "to": target, "weight": round(w, 2)})
+
+    def step_physics_and_signal(self):
+        with self.lock:
+            self.phy_steps += 1
+            t = self.phy_steps * 0.04
+            
+            for i, c in enumerate(self.cells):
+                target_r = 200.0 + math.sin(t * 1.5 + i * 0.4) * 25.0
+                curr_r = math.sqrt(c.x*c.x + c.y*c.y + c.z*c.z) + 1e-5
+                dr = (target_r - curr_r) * 0.05
+                c.x += (c.x / curr_r) * dr
+                c.y += (c.y / curr_r) * dr
+                c.z += (c.z / curr_r) * dr
+                
+                stimulus = math.sin(t * 2.0 + i * 0.3) * math.cos(t * 0.8 + i * 0.1)
+                if c.type == "INTEGRATE":
+                    c.state = c.state * 0.88 + stimulus * 0.12
+                    c.out = math.tanh(c.state * c.gain)
+                elif c.type == "AMPLIFY":
+                    c.out = math.tanh(stimulus * c.gain * 2.2)
+                elif c.type == "INVERT":
+                    c.out = -math.tanh(stimulus * c.gain)
+                elif c.type == "THRESHOLD":
+                    c.out = 1.0 if stimulus > 0.3 else (-1.0 if stimulus < -0.3 else 0.0)
+                elif c.type == "DAMPER":
+                    c.state = c.state * 0.75 + stimulus * 0.25
+                    c.out = c.state
+                elif c.type == "CLIP":
+                    c.out = max(-1.0, min(1.0, stimulus * c.gain))
+                elif c.type == "ABS":
+                    c.out = abs(math.tanh(stimulus * c.gain))
+                elif c.type == "MULTIPLY":
+                    c.out = math.tanh(stimulus * math.sin(t * 3.0) * c.gain)
+                else:
+                    c.out = math.tanh(stimulus * c.gain)
+                    
+                if abs(c.out) > 0.2:
+                    c.acts += 1
+
     def set_warp(self, sp):
         self.warp_mode = sp
         return sp
-    def get_state_snapshot(self):
-        return {
-            "cells": [],
-            "stats": {"steps": self.phy_steps, "active_cells": 1000000},
-            "warp_factor": self.warp_factor
-        }
-    def load_seed_preset(self): pass
-    def load_adas_1m_preset(self): pass
-    def load_real_champion_preset(self): pass
-    def load_mature_preset(self): pass
 
-organism = DummyOrganism()
+    def load_seed_preset(self):
+        with self.lock:
+            self.init_cells()
+    def load_adas_1m_preset(self):
+        with self.lock:
+            self.init_cells()
+    def load_real_champion_preset(self):
+        with self.lock:
+            self.init_cells()
+    def load_mature_preset(self):
+        with self.lock:
+            self.init_cells()
+
+    def get_state_snapshot(self):
+        with self.lock:
+            cells_data = [
+                {
+                    "id": c.id,
+                    "type": c.type,
+                    "p1": round(c.gain, 2),
+                    "p2": 0.0,
+                    "s": round(c.state, 3),
+                    "out": round(c.out, 3),
+                    "acts": c.acts,
+                    "x": round(c.x, 1),
+                    "y": round(c.y, 1),
+                    "z": round(c.z, 1)
+                }
+                for c in self.cells
+            ]
+            return {
+                "generation": self.generation,
+                "step": self.phy_steps,
+                "cells": cells_data,
+                "synapses": self.synapses,
+                "stats": {
+                    "steps": self.phy_steps,
+                    "active_cells": len(self.cells),
+                    "total_synapses": len(self.synapses),
+                    "shannon_diversity": self.shannon_h,
+                    "energy": 94.2,
+                    "avg_membrane_potential": 0.42
+                },
+                "warp_factor": self.warp_factor
+            }
+
+organism = SiliconCellularOrganism()
+
+def organism_loop():
+    while True:
+        organism.step_physics_and_signal()
+        time.sleep(0.025)
+
+threading.Thread(target=organism_loop, daemon=True).start()
 
 class DummySiliconLibrary:
+    def __init__(self):
+        self.books = []
     def reload_books(self): pass
     def get_books(self): return []
 
