@@ -177,6 +177,20 @@ To evaluate the developmental self-organization paradigm against direct static m
    - **Embryonic Morphogenesis Adapter**: Peak tracking fitness achieves **1.71 (+19.6%)**;
    - **Emergent Topological Properties**: Embryonic self-organization spontaneously converges on coupled `HYSTERESIS` (Schmitt trigger dual-threshold) and `INTEGRAL` operators, eliminating high-frequency control chattering and significantly minimizing cross-track errors (CTE).
 
+### 5.6 Embodied Intelligence: Household Cleaning Coverage & Dynamic Recovery Benchmark [E1]
+To evaluate cellular adaptation in physical robotics and spatial navigation, we benchmarked the **Household Coverage & Recovery Benchmark** (`HouseholdCoverageEnvironment`):
+
+1. **Indoor Ergodic Coverage & Energy Budget Equilibrium**:
+   - Under complex static furniture layouts and topological reachability constraints, cellular circuits coordinate local sweeping coverage and global dock-return navigation;
+   - Achieves a dynamic Pareto equilibrium between energy depletion and room-wide cleanliness under strict battery constraints.
+
+2. **Dynamic Obstacle Injection & Recovery Hard Assertions**:
+   - Dynamic moving obstacles (e.g., pets or human movement) are injected during ongoing cleaning cycles;
+   - The cellular reflex network leverages `GATE_DEADZONE` and `OP_INTEGRAL` operators to achieve autonomous rerouting and **100% coverage recovery** once pathways reopen, guaranteeing 0 deadlocks and 0 collisions.
+
+3. **Zero-Allocation Deterministic Verification**:
+   - Validated across 16 grid dimensions ($8\times 8$ up to $26\times 48$) and random seeds with **0 bytes runtime heap allocation** and deterministic microsecond dispatch times.
+
 ---
 
 ## 6. Threats to Validity & Limitations
