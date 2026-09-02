@@ -265,6 +265,86 @@
         .info-box strong {
             color: var(--text-main);
         }
+    
+        /* 独立常驻控制台 */
+        .control-deck {
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn-group-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 6px;
+        }
+
+        .btn-group-main {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 6px;
+        }
+
+        .warp-btn {
+            background: #111827;
+            border: 1px solid #1f2937;
+            color: var(--text-dim);
+            padding: 8px 0;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .warp-btn:hover {
+            color: var(--cyan-glow);
+            border-color: var(--cyan-glow);
+            background: rgba(0, 240, 255, 0.1);
+        }
+
+        .warp-btn.active {
+            background: rgba(0, 240, 255, 0.22);
+            color: var(--cyan-glow);
+            border-color: var(--cyan-glow);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.35);
+        }
+
+        .warp-btn.danger.active {
+            background: rgba(255, 183, 0, 0.25);
+            color: var(--amber-glow);
+            border-color: var(--amber-glow);
+            box-shadow: 0 0 14px rgba(255, 183, 0, 0.4);
+        }
+
+        .action-btn {
+            background: #151d2c;
+            border: 1px solid #283548;
+            color: var(--text-main);
+            padding: 7px 4px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+
+        .action-btn:hover {
+            border-color: var(--cyan-glow);
+            color: var(--cyan-glow);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+        }
+
+        .action-btn.primary {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--cyan-glow);
+            color: var(--cyan-glow);
+        }
+
     </style>
 </head>
 <body>
@@ -295,21 +375,39 @@
             <div class="canvas-container" id="canvas-wrap">
                 <canvas id="maze-canvas"></canvas>
             </div>
-            <div class="controls-overlay">
-                <button class="btn" id="btn-toggle">[PAUSE / RESUME]</button>
-                <button class="btn" id="btn-new-maze">[NEW_MAZE]</button>
-                <button class="btn" id="btn-step">[STEP_GEN]</button>
-                <span style="border-left:1px solid #283548;margin:0 2px;"></span>
-                <span style="font-size:10px;color:var(--text-dim);align-self:center;">速度:</span>
-                <button class="btn" onclick="setMazeWarp(1)" id="btn-w-1">1x</button>
-                <button class="btn btn-primary" onclick="setMazeWarp(5)" id="btn-w-5">5x 敏捷</button>
-                <button class="btn" onclick="setMazeWarp(20)" id="btn-w-20">20x 极速</button>
-                <button class="btn" onclick="setMazeWarp(50)" id="btn-w-50" style="color:var(--amber-glow);font-weight:bold;">50x 狂飙</button>
+            <div class="controls-overlay" style="border-color:rgba(0,240,255,0.3);background:rgba(10,16,28,0.92);">
+                <span style="color:var(--cyan-glow);font-size:10px;font-weight:bold;">[LIVE]</span>
+                <span style="font-size:10px;color:var(--text-dim);">24 智能体激光避障中</span>
+                <span style="border-left:1px solid #283548;margin:0 4px;"></span>
+                <span style="font-size:10px;color:var(--amber-glow);" id="hud-warp-label">曲率: 5x</span>
             </div>
         </div>
 
         <!-- 右侧遥测面板 -->
         <div class="sidebar">
+            <!-- 顶置控制台: 演化控制与时空曲率加速 -->
+            <div class="viewport-card" style="border-color:rgba(0,240,255,0.4);box-shadow:0 0 16px rgba(0,240,255,0.08);">
+                <div class="panel-header" style="background:rgba(0,240,255,0.08);">
+                    <span style="color:var(--cyan-glow);font-weight:bold;">[SIMULATION_WARP_DECK] // 动力学控制</span>
+                    <span class="badge" id="deck-cur-speed" style="color:var(--amber-glow);border-color:var(--amber-glow);">SPEED: 5x 敏捷</span>
+                </div>
+                <div class="control-deck">
+                    <!-- 运行控制按钮 -->
+                    <div class="btn-group-main">
+                        <button class="action-btn primary" id="btn-toggle">[PAUSE / RESUME]</button>
+                        <button class="action-btn" id="btn-new-maze">[GEN_MAZE]</button>
+                        <button class="action-btn" id="btn-step">[STEP_GEN]</button>
+                    </div>
+                    <!-- 四档曲率加速按钮 -->
+                    <div style="font-size:10px;color:var(--text-dim);margin-top:2px;">时空曲率演化加速 (WARP SPEED):</div>
+                    <div class="btn-group-row">
+                        <button class="warp-btn" onclick="setMazeWarp(1)" id="btn-w-1">1x 常规</button>
+                        <button class="warp-btn active" onclick="setMazeWarp(5)" id="btn-w-5">5x 敏捷</button>
+                        <button class="warp-btn" onclick="setMazeWarp(20)" id="btn-w-20">20x 极速</button>
+                        <button class="warp-btn danger" onclick="setMazeWarp(50)" id="btn-w-50">50x 狂飙</button>
+                    </div>
+                </div>
+            </div>
             <div class="viewport-card">
                 <div class="panel-header">
                     <span>[EVOLUTIONARY_TELEMETRY]</span>
@@ -643,9 +741,16 @@
 
         
         window.setMazeWarp = async function(speed) {
-            document.querySelectorAll('[id^="btn-w-"]').forEach(b => b.classList.remove('btn-primary'));
+            document.querySelectorAll('.warp-btn').forEach(b => b.classList.remove('active'));
             const activeBtn = document.getElementById('btn-w-' + speed);
-            if (activeBtn) activeBtn.classList.add('btn-primary');
+            if (activeBtn) activeBtn.classList.add('active');
+
+            const speedLabel = speed === 1 ? '1x 常规' : (speed === 5 ? '5x 敏捷' : (speed === 20 ? '20x 极速' : '50x 狂飙'));
+            const deckBadge = document.getElementById('deck-cur-speed');
+            if (deckBadge) deckBadge.textContent = `SPEED: ${speedLabel}`;
+            const hudWarp = document.getElementById('hud-warp-label');
+            if (hudWarp) hudWarp.textContent = `曲率: ${speed}x`;
+
             try {
                 await fetch('/api/maze/warp?speed=' + speed);
             } catch(e) {}
