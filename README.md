@@ -1,4 +1,4 @@
-# Kun-Cellular (鲲 · 形态发生计算图与人工生命底座)
+# Kun-Cellular (Kun 形态发生计算图与人工生命底座)
 
 [![CI](https://github.com/caixuf/kun-cellular/actions/workflows/ci.yml/badge.svg)](https://github.com/caixuf/kun-cellular/actions)
 ![C++20](https://img.shields.io/badge/C++-20-blue.svg)
@@ -8,7 +8,7 @@
 
 ---
 
-## 🌟 核心特性
+##  核心特性
 
 1. **零 GC 拓扑线性化编译 (Zero-GC Topology)**：
    - 胚胎通过力场自组织分化为数万至数百万细胞的有向图谱，通过 Kahn 算法线性化为平铺连续内存数组，消除动态内存分配，实现纳秒级（~150ns）至毫秒级确定性时延。
@@ -22,7 +22,7 @@
 
 ---
 
-## 📂 目录结构
+##  目录结构
 
 ```
 kun-cellular/
@@ -41,7 +41,7 @@ kun-cellular/
 
 ---
 
-## 🚀 快速开始
+##  快速开始
 
 ```bash
 mkdir build && cd build
@@ -52,5 +52,5 @@ ctest --output-on-failure
 
 ---
 
-## 📜 引用与协议
+##  引用与协议
 本项目采用 MIT 许可证。
