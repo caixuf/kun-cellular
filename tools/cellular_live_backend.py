@@ -604,14 +604,21 @@ silicon_library = SiliconLibraryManager()
 # ============================================================================
 
 
+
+# 预计算 8 邻域极角查找表 (消除每帧三角函数计算开销)
+MAZE_DIR_OFFSETS = [
+    (math.cos(a)*0.85, math.sin(a)*0.85, a) 
+    for a in [0, 0.785, 1.57, 2.356, 3.141, -2.356, -1.57, -0.785]
+]
+
 class LiveMazeSimulator:
     def __init__(self, width=21, height=21):
         self.width = width
         self.height = height
         self.generation = 1
         self.step_count = 0
-        self.max_steps = 320
-        self.warp_speed = 20 # 默认 20x 极速
+        self.max_steps = 300
+        self.warp_speed = 50 # 默认 50x 狂飙档位
         self.success_rate = 0.0
         self.champion_trail = []
         self.dist_field = []
@@ -651,10 +658,9 @@ class LiveMazeSimulator:
         self.compute_distance_field()
 
     def compute_distance_field(self):
-        # 预计算拓扑势能场 (BFS 到终点的真实网格最短步数)
         w, h = self.width, self.height
         gx, gy = int(self.goal[0]), int(self.goal[1])
-        self.dist_field = [999] * (w * h)
+        self.dist_field = [9999] * (w * h)
         self.dist_field[gy * w + gx] = 0
         q = [(gx, gy)]
         dx = [0, 0, 1, -1]
@@ -681,7 +687,7 @@ class LiveMazeSimulator:
                 "min_dist": 999.0,
                 "trail": [list(self.start)],
                 "rays": [1.0, 1.0, 1.0],
-                "bias": 1.0 if i % 2 == 0 else -1.0
+                "u_turn_lock": 0
             })
 
     def is_wall(self, x, y):
@@ -690,15 +696,14 @@ class LiveMazeSimulator:
             return True
         return self.grid[gy * self.width + gx] == 1
 
-    def cast_ray(self, sx, sy, ang, max_r=5.0):
-        step = 0.1
-        cur_r = 0.0
-        while cur_r < max_r:
-            cur_r += step
-            rx = sx + math.cos(ang) * cur_r
-            ry = sy + math.sin(ang) * cur_r
-            if self.is_wall(rx, ry):
-                return min(1.0, cur_r / max_r)
+    def cast_ray(self, sx, sy, ang, max_r=4.5):
+        ca, sa = math.cos(ang), math.sin(ang)
+        cur = 0.0
+        while cur < max_r:
+            cur += 0.28
+            gx, gy = int(sx + ca * cur), int(sy + sa * cur)
+            if gx < 0 or gx >= self.width or gy < 0 or gy >= self.height or self.grid[gy * self.width + gx] == 1:
+                return min(1.0, cur / max_r)
         return 1.0
 
     def step_physics(self):
@@ -713,16 +718,14 @@ class LiveMazeSimulator:
                     reached_count += 1
                     continue
 
-                # 1. 3路激光测距
+                # 1. 3路高速激光雷达
                 r_front = self.cast_ray(ag["x"], ag["y"], ag["theta"])
-                r_left = self.cast_ray(ag["x"], ag["y"], ag["theta"] - 0.785398)
-                r_right = self.cast_ray(ag["x"], ag["y"], ag["theta"] + 0.785398)
+                r_left = self.cast_ray(ag["x"], ag["y"], ag["theta"] - 0.785)
+                r_right = self.cast_ray(ag["x"], ag["y"], ag["theta"] + 0.785)
                 ag["rays"] = [r_front, r_left, r_right]
 
-                # 2. 终点距离检测
-                dx = gx - ag["x"]
-                dy = gy - ag["y"]
-                dist = math.hypot(dx, dy)
+                # 2. 终点距离
+                dist = math.hypot(gx - ag["x"], gy - ag["y"])
                 if dist < ag["min_dist"]:
                     ag["min_dist"] = dist
                 if dist < 0.8:
@@ -730,41 +733,35 @@ class LiveMazeSimulator:
                     reached_count += 1
                     continue
 
-                # 3. 经典死胡同 U 型掉头反射 (Cul-de-sac 180° U-Turn Reflection)
-                # 当正前方撞墙且两侧均受阻时, 触发迟滞掉头锁
+                # 3. 死胡同防卡 U 型掉头反射
                 if r_front < 0.18 and r_left < 0.28 and r_right < 0.28:
-                    ag["theta"] += math.pi + random.uniform(-0.2, 0.2)
-                    ag["u_turn_lock"] = 6 # 保持 6 步防回头保护
-                
-                if ag.get("u_turn_lock", 0) > 0:
+                    ag["theta"] += math.pi + random.uniform(-0.1, 0.1)
+                    ag["u_turn_lock"] = 8
+
+                if ag["u_turn_lock"] > 0:
                     ag["u_turn_lock"] -= 1
-                    speed = 0.30
+                    speed = 0.40
                     turn = 0.0
                 else:
-                    # 4. 拓扑势能场全局全局极小值搜索 (严格沿 BFS 梯度下降, 绝不贪心直扑欧式直线)
-                    cgx, cgy = max(0, min(w-1, int(ag["x"]))), max(0, min(h-1, int(ag["y"])))
+                    # 4. 查表法 O(1) 梯度方向搜索
                     best_ang = ag["theta"]
                     min_td = 9999
-
-                    # 探测周边可行走方向中的绝对最小拓扑步数
-                    for test_ang in [0, 0.523, 1.047, 1.57, 2.094, 2.618, 3.141, -2.618, -2.094, -1.57, -1.047, -0.523]:
-                        tx = ag["x"] + math.cos(test_ang) * 0.85
-                        ty = ag["y"] + math.sin(test_ang) * 0.85
-                        if not self.is_wall(tx, ty):
-                            tgx, tgy = int(tx), int(ty)
-                            td = self.dist_field[tgy * w + tgx] if (0 <= tgx < w and 0 <= tgy < h) else 9999
+                    for dx, dy, ang in MAZE_DIR_OFFSETS:
+                        tx, ty = ag["x"] + dx, ag["y"] + dy
+                        tgx, tgy = int(tx), int(ty)
+                        if 0 <= tgx < w and 0 <= tgy < h and self.grid[tgy * w + tgx] == 0:
+                            td = self.dist_field[tgy * w + tgx]
                             if td < min_td:
                                 min_td = td
-                                best_ang = test_ang
+                                best_ang = ang
 
                     diff_ang = (best_ang - ag["theta"] + math.pi) % (2 * math.pi) - math.pi
-
                     if r_front < 0.20:
                         turn = 0.85 if r_left > r_right else -0.85
-                        speed = 0.12
+                        speed = 0.15
                     else:
-                        turn = diff_ang * 0.55 + (0.22 if r_left < 0.22 else 0.0) - (0.22 if r_right < 0.22 else 0.0)
-                        speed = 0.38
+                        turn = diff_ang * 0.60 + (0.20 if r_left < 0.20 else 0.0) - (0.20 if r_right < 0.20 else 0.0)
+                        speed = 0.45
 
                 ag["theta"] += turn
                 nx = ag["x"] + math.cos(ag["theta"]) * speed
@@ -787,7 +784,7 @@ class LiveMazeSimulator:
         for ag in self.agents:
             base_fit = 30.0 - ag["min_dist"]
             if ag["goal"] == 1:
-                base_fit += 150.0
+                base_fit += 200.0
             ag["fit"] = base_fit
 
         self.agents.sort(key=lambda a: a["fit"], reverse=True)
@@ -830,7 +827,7 @@ def maze_loop():
     while True:
         for _ in range(live_maze.warp_speed):
             live_maze.step_physics()
-        time.sleep(0.008) # 120Hz 高频极速动力学
+        time.sleep(0.005) # 200Hz 极致微秒级循环
 
 threading.Thread(target=maze_loop, daemon=True).start()
 
