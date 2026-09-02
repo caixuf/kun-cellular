@@ -427,6 +427,10 @@
   }
   .tour-hud-actions {
     display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
   /* Windows 2-Level TreeView 样式 (Windows 经典二级树状菜单) */
   .win-tree {
     display: flex;
@@ -496,13 +500,17 @@
     align-items: center;
   }
   .tree-children {
-    display: none;
-    padding: 8px 10px 10px 22px;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    padding: 0 10px 0 22px;
     position: relative;
+    display: flex;
     flex-direction: column;
     gap: 8px;
     background: rgba(10, 15, 28, 0.75);
-    border-top: 1px solid rgba(56, 189, 248, 0.15);
+    border-top: 1px solid transparent;
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, padding 0.3s ease;
   }
   .tree-children::before {
     content: '';
@@ -514,7 +522,10 @@
     border-left: 1px dashed rgba(56, 189, 248, 0.35);
   }
   .tree-node.open .tree-children {
-    display: flex;
+    max-height: 600px;
+    opacity: 1;
+    padding: 8px 10px 10px 22px;
+    border-top-color: rgba(56, 189, 248, 0.15);
   }
   .tree-leaf {
     position: relative;
@@ -544,6 +555,15 @@
     border-color: var(--amber);
     background: rgba(251, 191, 36, 0.16);
     box-shadow: 0 0 16px rgba(251, 191, 36, 0.4);
+  }
+  .tree-active-badge {
+    color: var(--emerald);
+    font-weight: bold;
+    font-size: 9px;
+    background: rgba(52, 211, 153, 0.15);
+    border: 1px solid rgba(52, 211, 153, 0.4);
+    padding: 1px 5px;
+    border-radius: 3px;
   }
   .org-tag {
     font-size: 10px;
@@ -1869,22 +1889,22 @@ let clientWarpMultiplier = 1.0;
 
 window.setWarp = async function(speed) {
   // 1. 立即点亮当前档位按钮，消除迟滞感
-  ['w-1x','w-100x','w-1000x','w-max'].forEach(id => {
-    const btn = document.getElementById(id);
-    if(btn) {
-      btn.style.borderColor = 'var(--line)';
-      btn.style.background = 'rgba(30,41,59,.6)';
-      btn.style.boxShadow = 'none';
-    }
+  const speedKey = (speed === 'unlimited' || speed === 'max') ? 'max' : speed;
+  ['1x', '100x', '1000x', 'max'].forEach(k => {
+    ['hw-', 'qw-'].forEach(prefix => {
+      const btn = document.getElementById(prefix + k);
+      if (btn) {
+        btn.classList.remove('active');
+      }
+    });
   });
   
-  const activeId = speed === '1x' ? 'w-1x' : speed === '100x' ? 'w-100x' : speed === '1000x' ? 'w-1000x' : 'w-max';
-  const activeBtn = document.getElementById(activeId);
-  if(activeBtn) {
-    activeBtn.style.borderColor = speed === 'unlimited' || speed === 'max' ? 'var(--crimson)' : 'var(--cyan)';
-    activeBtn.style.background = speed === 'unlimited' || speed === 'max' ? 'rgba(244,63,94,.35)' : 'rgba(56,189,248,.25)';
-    activeBtn.style.boxShadow = speed === 'unlimited' || speed === 'max' ? '0 0 12px rgba(244,63,94,.5)' : '0 0 12px rgba(56,189,248,.5)';
-  }
+  ['hw-', 'qw-'].forEach(prefix => {
+    const activeBtn = document.getElementById(prefix + speedKey);
+    if (activeBtn) {
+      activeBtn.classList.add('active');
+    }
+  });
 
   // 2. 客户端前向模拟提速
   if(speed === '1x') clientWarpMultiplier = 1.0;
@@ -1892,7 +1912,8 @@ window.setWarp = async function(speed) {
   else if(speed === '1000x') clientWarpMultiplier = 8.0;
   else clientWarpMultiplier = 18.0;
 
-  document.getElementById('st-warp').textContent = speed;
+  const stWarpEl = document.getElementById('st-warp');
+  if (stWarpEl) stWarpEl.textContent = speed;
   log(` 演化时空曲率已切至: ${speed} (物理脉冲加速 x${clientWarpMultiplier.toFixed(1)})`, true);
 
   // 3. 通知后端提速
