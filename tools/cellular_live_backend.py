@@ -83,6 +83,16 @@ class LiveOrganism:
             ]
             self.compile_topology()
 
+    
+    def set_warp(self, speed):
+        with self.lock:
+            self.warp_mode = speed
+            if speed == "1x": self.warp_factor = 1
+            elif speed == "100x": self.warp_factor = 25
+            elif speed == "1000x": self.warp_factor = 100
+            elif speed == "unlimited" or speed == "max": self.warp_factor = 500
+            return self.warp_mode
+
     def load_mature_preset(self):
         with self.lock:
             self.generation = 384
@@ -324,8 +334,13 @@ def simulation_worker():
             px += (random.random() - 0.5) * 4.0
             spread += 0.5
 
-        organism.step_forward([px, vol, spread, ttc])
-        time.sleep(0.025) # 40 Hz 物理与信号更新
+        steps = organism.warp_factor
+        for _ in range(steps):
+            organism.step_forward([px, vol, spread, ttc])
+        if steps > 1:
+            with organism.lock:
+                organism.generation += max(1, steps // 20)
+        time.sleep(0.025)
 
 sim_thread = threading.Thread(target=simulation_worker, daemon=True)
 sim_thread.start()
@@ -342,6 +357,20 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         super().__init__(*args, directory=FRONTEND_DIR, **kwargs)
 
     def do_GET(self):
+        
+        if self.path.startswith("/api/control/warp") or self.path.startswith("/api/warp"):
+            speed = "1x"
+            if "speed=" in self.path:
+                speed = self.path.split("speed=")[1].split("&")[0]
+            mode = organism.set_warp(speed)
+            body = json.dumps({"status": "ok", "warp_speed": mode, "warp_factor": organism.warp_factor}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if self.path == "/api/state":
             data = organism.get_state_snapshot()
             body = json.dumps(data).encode("utf-8")
@@ -378,6 +407,10 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         super().do_GET()
+
+    
+    def do_POST(self):
+        self.do_GET()
 
     def log_message(self, format, *args):
         # 静默常规静态文件 GET 日志，保持终端清爽

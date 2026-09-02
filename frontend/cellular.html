@@ -531,87 +531,226 @@ function getFamilyHaloMaterial(fam) {
   return mat;
 }
 
+
+/* ============================================================
+ * 4.1 生物拟真计算结构 (Living Neuromorphic Cellular Tissue)
+ * ============================================================ */
+
 class CellView {
   constructor(cell){
     this.cell = cell;
     this.targetX = cell.x || 0;
     this.targetY = cell.y || 0;
+    this.targetZ = cell.z || 0;
     this.curX = this.targetX;
     this.curY = this.targetY;
+    this.curZ = this.targetZ;
+    this.phase = (cell.id * 0.785) % (Math.PI * 2);
+    
     const fam = FAMILY(cell.type);
-    this.mesh = new THREE.Mesh(sphereGeo, getFamilyMeshMaterial(fam));
-    this.halo = new THREE.Sprite(getFamilyHaloMaterial(fam));
-    this.halo.scale.set(36, 36, 1);
-    scene.add(this.mesh, this.halo);
+    const col = FAMILY_COLOR[fam] || 0x38bdf8;
+    
+    // 1. 细胞双层脂质质膜 (Outer Lipid Bilayer Membrane - Breathing Halo)
+    const haloMat = new THREE.SpriteMaterial({
+      map: GLOW,
+      color: col,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      opacity: 0.4
+    });
+    this.membrane = new THREE.Sprite(haloMat);
+    this.membrane.scale.set(42, 42, 1);
 
+    // 2. 细胞质基质与细胞核中枢 (Soma Cytoplasm & Dense Core Karyon)
+    const coreMat = new THREE.MeshBasicMaterial({ color: col });
+    this.nucleus = new THREE.Mesh(new THREE.SphereGeometry(6, 16, 16), coreMat);
+
+    // 3. 内部代谢微粒光晕 (Organelle ATP Shimmer)
+    const organelleMat = new THREE.SpriteMaterial({
+      map: GLOW,
+      color: 0xffffff,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      opacity: 0.6
+    });
+    this.organelle = new THREE.Sprite(organelleMat);
+    this.organelle.scale.set(12, 12, 1);
+
+    // 4. 生物原语全息浮动标签
     const lm = new THREE.SpriteMaterial({ map: getLabelTexture(cell.type), transparent: true, depthWrite: false });
     this.labelMat = lm;
     this.label = new THREE.Sprite(lm);
     this.label.scale.set(52, 13, 1);
-    scene.add(this.label);
+
+    this.group = new THREE.Group();
+    this.group.add(this.membrane);
+    this.group.add(this.nucleus);
+    this.group.add(this.organelle);
+    this.group.add(this.label);
+    scene.add(this.group);
   }
+
   updateCell(cell){
     this.cell = cell;
     this.targetX = cell.x;
     this.targetY = cell.y;
+    this.targetZ = cell.z || 0;
   }
-  update(){
+
+  update(time, warpMultiplier = 1){
     const c = this.cell;
     this.curX += (this.targetX - this.curX) * 0.25;
     this.curY += (this.targetY - this.curY) * 0.25;
-    this.mesh.position.set(this.curX, this.curY, 0);
-    this.halo.position.set(this.curX, this.curY, 0);
-    this.label.position.set(this.curX, this.curY - 14, 0);
-    const s = 0.8 + (c.glow || 0) * 0.8;
-    this.mesh.scale.set(s, s, s);
-    this.halo.material.opacity = 0.12 + (c.glow || 0) * 0.85;
-    const hs = 30 + (c.glow || 0) * 40;
-    this.halo.scale.set(hs, hs, 1);
+    this.curZ += (this.targetZ - this.curZ) * 0.25;
+    this.group.position.set(this.curX, this.curY, this.curZ);
+    this.label.position.set(0, -16, 0);
+
+    // 生物节律自然呼吸波动 (Biological Cellular Breathing Rhythm)
+    const breath = Math.sin(time * 2.2 + this.phase) * 0.15;
+    const actIntensity = Math.min(1.5, Math.abs(c.out || 0) + (c.glow || 0));
+    
+    // 质膜呼吸胀缩
+    const memScale = (36 + breath * 12) * (1.0 + actIntensity * 0.45);
+    this.membrane.scale.set(memScale, memScale, 1);
+    this.membrane.material.opacity = 0.25 + actIntensity * 0.65;
+
+    // 细胞核能量激化
+    const nScale = 1.0 + actIntensity * 0.6;
+    this.nucleus.scale.set(nScale, nScale, nScale);
+
+    // 细胞器微粒闪烁
+    const orgScale = (10 + Math.sin(time * 6.0 + this.phase) * 4) * (0.8 + actIntensity);
+    this.organelle.scale.set(orgScale, orgScale, 1);
+    this.organelle.material.opacity = 0.4 + actIntensity * 0.55;
   }
+
   dispose(){
-    scene.remove(this.mesh, this.halo, this.label);
+    scene.remove(this.group);
     if(this.labelMat) this.labelMat.dispose();
   }
 }
 
 class SynapseView {
   constructor(syn, org){
-    this.syn = syn; this.org = org;
-    this.geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
-    this.lineMat = new THREE.LineBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.55 });
+    this.syn = syn;
+    this.org = org;
+    this.numSegments = 16;
+    
+    // 1. 神经纤维/髓鞘 3D 曲线几何体 (Curved Axon / Myelin Sheath Fiber)
+    this.curvePoints = new Float32Array((this.numSegments + 1) * 3);
+    this.geo = new THREE.BufferGeometry();
+    this.geo.setAttribute('position', new THREE.BufferAttribute(this.curvePoints, 3));
+    
+    this.lineMat = new THREE.LineBasicMaterial({
+      color: 0x38bdf8,
+      transparent: true,
+      opacity: 0.6,
+      blending: THREE.AdditiveBlending
+    });
     this.line = new THREE.Line(this.geo, this.lineMat);
-    this.photonMat = new THREE.SpriteMaterial({ map: GLOW, color: 0x7dd3fc, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
-    this.photon = new THREE.Sprite(this.photonMat);
-    this.photon.scale.set(14, 14, 1);
-    scene.add(this.line, this.photon);
+
+    // 2. 突触递质囊泡流 (Action Potential Neurotransmitter Vesicle Pulses)
+    this.photonMat1 = new THREE.SpriteMaterial({ map: GLOW, color: 0x38bdf8, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    this.photonMat2 = new THREE.SpriteMaterial({ map: GLOW, color: 0xa855f7, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    this.photon1 = new THREE.Sprite(this.photonMat1);
+    this.photon2 = new THREE.Sprite(this.photonMat2);
+    this.photon1.scale.set(16, 16, 1);
+    this.photon2.scale.set(12, 12, 1);
+
+    // 3. 突触末梢膨大纽扣 (Synaptic Bouton / Terminal Swelling)
+    this.boutonMat = new THREE.SpriteMaterial({ map: GLOW, color: 0x38bdf8, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
+    this.bouton = new THREE.Sprite(this.boutonMat);
+    this.bouton.scale.set(20, 20, 1);
+
+    this.group = new THREE.Group();
+    this.group.add(this.line);
+    this.group.add(this.photon1);
+    this.group.add(this.photon2);
+    this.group.add(this.bouton);
+    scene.add(this.group);
+
+    this.flowT1 = Math.random();
+    this.flowT2 = (this.flowT1 + 0.5) % 1.0;
   }
+
   updateSyn(syn, org){
     this.syn = syn;
     this.org = org;
   }
-  update(){
+
+  update(time, warpMultiplier = 1){
     const byId = new Map(this.org.cells.map(c => [c.id, c]));
     const a = byId.get(this.syn.from), b = byId.get(this.syn.to);
-    if(!a || !b || !this.syn.active){ this.line.visible = false; this.photon.visible = false; return; }
-    this.line.visible = true;
+    if(!a || !b || !this.syn.active){
+      this.group.visible = false;
+      return;
+    }
+    this.group.visible = true;
+
+    // 二次贝塞尔曲线有机弯曲计算 (Natural Biological Axon Curvature)
+    const p0 = new THREE.Vector3(a.x, a.y, a.z || 0);
+    const p2 = new THREE.Vector3(b.x, b.y, b.z || 0);
+    
+    // 正交扰动产生生理弯曲
+    const mid = new THREE.Vector3().addVectors(p0, p2).multiplyScalar(0.5);
+    const dist = p0.distanceTo(p2);
+    const arcHeight = Math.min(25, dist * 0.18);
+    const norm = new THREE.Vector3(-(p2.y - p0.y), (p2.x - p0.x), (p2.z - p0.z)).normalize();
+    const p1 = mid.add(norm.multiplyScalar(arcHeight * ((this.syn.port === 0) ? 1 : -1)));
+
+    const curve = new THREE.QuadraticBezierCurve3(p0, p1, p2);
+    const pts = curve.getPoints(this.numSegments);
     const pos = this.geo.attributes.position;
-    pos.setXYZ(0, a.x, a.y, 0); pos.setXYZ(1, b.x, b.y, 0);
+    for(let i = 0; i <= this.numSegments; i++){
+      pos.setXYZ(i, pts[i].x, pts[i].y, pts[i].z);
+    }
     pos.needsUpdate = true;
-    const hot = Math.abs(this.syn.w || 0) > 0.6;
-    this.lineMat.color.setHex(hot ? 0x38bdf8 : 0x334155);
-    this.lineMat.opacity = hot ? 0.8 : 0.35;
-    if(this.syn.photon >= 0){
-      this.photon.visible = true;
-      this.photon.position.set(a.x + (b.x - a.x) * this.syn.photon, a.y + (b.y - a.y) * this.syn.photon, 0);
-    } else this.photon.visible = false;
+
+    // 纤维颜色随权重动态调整
+    const w = this.syn.w || 1.0;
+    const hot = Math.abs(w) > 0.6;
+    this.lineMat.color.setHex(w >= 0 ? (hot ? 0x38bdf8 : 0x0284c7) : (hot ? 0xf43f5e : 0xbe123c));
+    this.lineMat.opacity = 0.4 + Math.min(0.5, Math.abs(w) * 0.4);
+
+    // 动作电位囊泡沿神经纤维流动
+    const speed = (0.012 + Math.min(0.04, Math.abs(w) * 0.025)) * warpMultiplier;
+    this.flowT1 = (this.flowT1 + speed) % 1.0;
+    this.flowT2 = (this.flowT2 + speed * 1.1) % 1.0;
+
+    const pt1 = curve.getPoint(this.flowT1);
+    const pt2 = curve.getPoint(this.flowT2);
+    this.photon1.position.copy(pt1);
+    this.photon2.position.copy(pt2);
+    
+    const pScale1 = (12 + Math.sin(this.flowT1 * Math.PI) * 10) * (0.8 + Math.abs(w) * 0.5);
+    this.photon1.scale.set(pScale1, pScale1, 1);
+    this.photon1.material.opacity = 0.3 + Math.sin(this.flowT1 * Math.PI) * 0.7;
+
+    const pScale2 = (10 + Math.sin(this.flowT2 * Math.PI) * 8) * (0.8 + Math.abs(w) * 0.5);
+    this.photon2.scale.set(pScale2, pScale2, 1);
+    this.photon2.material.opacity = 0.25 + Math.sin(this.flowT2 * Math.PI) * 0.6;
+
+    // 突触终端小体贴合在目标细胞质膜接触点上
+    this.bouton.position.copy(p2);
+    const boutonFlash = (1.0 - Math.min(1.0, this.flowT1)) * (a.glow || 0.2);
+    const bScale = 14 + boutonFlash * 22;
+    this.bouton.scale.set(bScale, bScale, 1);
+    this.bouton.material.opacity = 0.3 + boutonFlash * 0.7;
+    this.bouton.material.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);
   }
+
   dispose(){
-    scene.remove(this.line, this.photon);
+    scene.remove(this.group);
     if(this.geo) this.geo.dispose();
     if(this.lineMat) this.lineMat.dispose();
-    if(this.photonMat) this.photonMat.dispose();
+    if(this.photonMat1) this.photonMat1.dispose();
+    if(this.photonMat2) this.photonMat2.dispose();
+    if(this.boutonMat) this.boutonMat.dispose();
   }
 }
+
 
 /* ============================================================
  * 5. 生命周期管理 + 增量差异化渲染池 (Diffing Pool)
@@ -798,20 +937,44 @@ async function syncServerChampion() {
 syncServerChampion();
 setInterval(syncServerChampion, 500);
 
+
+let clientWarpMultiplier = 1.0;
+
 window.setWarp = async function(speed) {
+  // 1. 立即点亮当前档位按钮，消除迟滞感
+  ['w-1x','w-100x','w-1000x','w-max'].forEach(id => {
+    const btn = document.getElementById(id);
+    if(btn) {
+      btn.style.borderColor = 'var(--line)';
+      btn.style.background = 'rgba(30,41,59,.6)';
+      btn.style.boxShadow = 'none';
+    }
+  });
+  
+  const activeId = speed === '1x' ? 'w-1x' : speed === '100x' ? 'w-100x' : speed === '1000x' ? 'w-1000x' : 'w-max';
+  const activeBtn = document.getElementById(activeId);
+  if(activeBtn) {
+    activeBtn.style.borderColor = speed === 'unlimited' || speed === 'max' ? 'var(--crimson)' : 'var(--cyan)';
+    activeBtn.style.background = speed === 'unlimited' || speed === 'max' ? 'rgba(244,63,94,.35)' : 'rgba(56,189,248,.25)';
+    activeBtn.style.boxShadow = speed === 'unlimited' || speed === 'max' ? '0 0 12px rgba(244,63,94,.5)' : '0 0 12px rgba(56,189,248,.5)';
+  }
+
+  // 2. 客户端前向模拟提速
+  if(speed === '1x') clientWarpMultiplier = 1.0;
+  else if(speed === '100x') clientWarpMultiplier = 3.5;
+  else if(speed === '1000x') clientWarpMultiplier = 8.0;
+  else clientWarpMultiplier = 18.0;
+
+  document.getElementById('st-warp').textContent = speed;
+  log(` 演化时空曲率已切至: ${speed} (物理脉冲加速 x${clientWarpMultiplier.toFixed(1)})`, true);
+
+  // 3. 通知后端提速
   try {
-    const r = await fetch('/api/control/warp?speed=' + speed, { method: 'POST' });
-    const j = await r.json();
-    document.getElementById('st-warp').textContent = j.warp_speed || speed;
-    log(` 演化时空曲率已调节至: ${j.warp_speed || speed}`, true);
-    ['w-1x','w-100x','w-1000x','w-max'].forEach(id => {
-      const btn = document.getElementById(id);
-      if(btn) btn.style.borderColor = 'var(--line)';
-    });
-    const activeBtn = speed === '1x' ? 'w-1x' : speed === '100x' ? 'w-100x' : speed === '1000x' ? 'w-1000x' : 'w-max';
-    if(document.getElementById(activeBtn)) document.getElementById(activeBtn).style.borderColor = 'var(--cyan)';
-  } catch(e) { console.error(e); }
+    fetch('/api/control/warp?speed=' + speed, { method: 'POST' }).catch(() => {});
+    fetch('/api/warp?speed=' + speed).catch(() => {});
+  } catch(e) {}
 };
+
 
 window.setStress = async function(level) {
   fetch("/api/stress?level=" + level).catch(() => {});
@@ -1242,8 +1405,8 @@ function animate(){
   camera.lookAt(0,0,0);
 
   if(currentLOD === 'organ') {
-    for(const v of views.cells) v.update();
-    for(const v of views.syns) v.update();
+    for(const v of views.cells) v.update(now * 0.001, clientWarpMultiplier);
+    for(const v of views.syns) v.update(now * 0.001, clientWarpMultiplier);
   } else if(lodPointsMesh && lodPointsMesh.visible) {
     lodPointsMesh.rotation.y += dt * 0.08;
     lodPointsMesh.rotation.x += dt * 0.03;
