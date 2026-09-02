@@ -453,25 +453,22 @@
     align-items: center;
     cursor: pointer;
     background: linear-gradient(90deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.85));
-    border-bottom: 1px solid transparent;
-    transition: all 0.2s;
-    user-select: none;
+  .organism-header .chevron {
+    transition: transform 0.25s ease;
+    display: inline-block;
+    font-size: 10px;
+    color: var(--cyan);
   }
-  .organism-header:hover {
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.2), rgba(30, 41, 59, 0.9));
-  }
-  .organism-group.open .organism-header {
-    border-bottom-color: rgba(56, 189, 248, 0.35);
-    background: linear-gradient(90deg, rgba(56, 189, 248, 0.18), rgba(15, 23, 42, 0.9));
+  .organism-group.open .organism-header .chevron {
+    transform: rotate(90deg);
+    color: var(--amber);
   }
   .organism-books {
     display: none;
-    padding: 10px 8px;
+    padding: 10px;
     flex-direction: column;
     gap: 8px;
     background: rgba(10, 15, 28, 0.6);
-    max-height: 280px;
-    overflow-y: auto;
   }
   .organism-group.open .organism-books {
     display: flex;
@@ -1919,7 +1916,7 @@ async function pollLibrary() {
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
                 <span style="color:var(--cyan);font-size:10px;font-family:var(--font-mono);">${cellDesc} · ${(org.books||[]).length} 册</span>
-                <span style="color:var(--text-dim);font-size:9px;">▼</span>
+                <span class="chevron" style="font-size:9px;">▶</span>
               </div>
             </div>
             <div class="organism-books">
