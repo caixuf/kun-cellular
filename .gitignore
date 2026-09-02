@@ -11,5 +11,9 @@ __pycache__/
 *.pyc
 .cache/
 .vscode/
-.idea/
 Testing/
+runs/
+*.pt
+*.bin
+*.tmp
+checkpoints/vehicle_cortex_champion.json
