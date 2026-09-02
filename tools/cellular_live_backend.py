@@ -135,12 +135,12 @@ class SdscGenome:
                 self.synapses.append((f, t, random.choice([-1, 1])))
 
     def forward(self, cte, psi_err, curv, speed):
-        """拓扑前向传导：按受体→隐层→效应顺序激发"""
-        # 注入传感器数值到受体细胞
-        self.cells[0].output = cte
-        self.cells[1].output = psi_err
-        self.cells[2].output = curv
-        self.cells[3].output = speed / 5.0    # 归一化
+        """拓扑前向传导：规范化输入受体并按受体→隐层→效应拓扑前向激发"""
+        # 归一化输入至 [-1.0, 1.0] 灵敏动态区间
+        self.cells[0].output = max(-1.0, min(1.0, cte))
+        self.cells[1].output = max(-1.0, min(1.0, psi_err))
+        self.cells[2].output = max(0.0, min(1.0, curv))
+        self.cells[3].output = max(0.0, min(1.0, speed))
 
         # 收集每个细胞的输入（来自突触）
         inputs_map = {c.cell_id: [] for c in self.cells}
@@ -161,15 +161,15 @@ class SdscGenome:
         return steer_raw, speed_raw
 
     def mutate(self):
-        """形态变异：突触重连、原语类型替换、细胞增殖/凋亡"""
+        """形态发生变异：突触重连、原语类型替换、增益微调、细胞增殖/凋亡"""
         child = SdscGenome.__new__(SdscGenome)
         child.receptors = list(self.receptors)
         child.effectors = list(self.effectors)
         child.hidden_types = list(self.hidden_types)
         child.synapses = list(self.synapses)
 
-        # 1. 原语类型点突变（20% 概率）
-        if random.random() < 0.20 and child.hidden_types:
+        # 1. 原语类型点突变（25% 概率）
+        if random.random() < 0.25 and child.hidden_types:
             idx = random.randrange(len(child.hidden_types))
             child.hidden_types[idx] = random.choice(HIDDEN_PRIMITIVES)
 
@@ -203,6 +203,10 @@ class SdscGenome:
             child.hidden_types.pop(random.randrange(len(child.hidden_types)))
 
         child.build_cells()
+        # 7. 细胞内在放大增益高斯扰动
+        for c in child.cells:
+            if random.random() < 0.35:
+                c.gain *= random.uniform(0.85, 1.18)
         return child
 
 
@@ -312,14 +316,19 @@ class LiveVehicleSimulator:
             heading_err = (road_theta - self.theta + math.pi) % math.tau - math.pi
             curv = self.get_max_curvature_ahead(self.s)
 
-            # 3. 硅基细胞 DAG 前向传导（真正的 SDSCC 推演，非硬编码公式）
+            # 3. 硅基细胞 DAG 前向传导（真正的 SDSCC 推演，无硬编码黑盒参数）
             genome = self.population[self.current_agent]
-            steer_raw, speed_raw = genome.forward(signed_cte, heading_err, curv, self.v)
+            cte_norm = signed_cte / (self.road_width * 0.5)
+            heading_norm = heading_err / (math.pi * 0.5)
+            curv_norm = min(1.0, curv * 50.0)
+            speed_norm = self.v / 5.0
+            steer_raw, speed_raw = genome.forward(cte_norm, heading_norm, curv_norm, speed_norm)
 
-            # 4. 将细胞输出映射到物理控制量
-            steer_target = max(-0.45, min(0.45, steer_raw))
+            # 4. 将细胞效应器输出映射到物理执行机构
+            steer_target = max(-0.45, min(0.45, steer_raw * 0.45))
             self.delta += (steer_target - self.delta) * 0.30
-            target_v = max(1.2, 4.2 * (0.5 - speed_raw * 0.5))  # speed 细胞输出越高→制动
+            # 速度受控于效应器细胞 (输出正向激活即进行急弯预瞄制动)
+            target_v = max(1.5, 4.2 - max(0.0, speed_raw) * 2.7)
             self.v += (target_v - self.v) * 0.12
 
             # 5. 阿克曼运动学积分
