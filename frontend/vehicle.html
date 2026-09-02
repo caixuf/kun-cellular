@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>微观免疫防线：巨噬细胞吞噬与抗原追猎沙盒 // SDSCC Immune</title>
+    <title>真实阿克曼车辆运动学与车道保持沙盒 // SDSCC Vehicle Kinematics</title>
     <style>
         :root {
             --bg-base: #06090e;
@@ -45,7 +45,7 @@
             font-size: 13px;
             font-weight: 700;
             letter-spacing: 0.5px;
-            color: var(--purple-glow);
+            color: var(--emerald-glow);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -56,10 +56,10 @@
             align-items: center;
             gap: 6px;
             background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(168, 85, 247, 0.5);
+            border: 1px solid rgba(16, 185, 129, 0.5);
             border-radius: 6px;
             padding: 3px 10px;
-            box-shadow: 0 0 14px rgba(168, 85, 247, 0.2);
+            box-shadow: 0 0 14px rgba(16, 185, 129, 0.2);
         }
 
         .nav-btn {
@@ -76,12 +76,12 @@
             font-family: inherit;
         }
 
-        .nav-btn:hover { color: var(--purple-glow); border-color: var(--purple-glow); }
+        .nav-btn:hover { color: var(--emerald-glow); border-color: var(--emerald-glow); }
         .nav-btn.active {
-            background: rgba(168, 85, 247, 0.25);
-            color: var(--purple-glow);
-            border-color: var(--purple-glow);
-            box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
+            background: rgba(16, 185, 129, 0.25);
+            color: var(--emerald-glow);
+            border-color: var(--emerald-glow);
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
         }
 
         .nav-links { display: flex; gap: 6px; }
@@ -129,9 +129,9 @@
 
         canvas { display: block; }
 
-        .immune-top-bar {
+        .veh-top-bar {
             background: rgba(13, 18, 29, 0.95);
-            border-bottom: 1px solid rgba(168, 85, 247, 0.4);
+            border-bottom: 1px solid rgba(16, 185, 129, 0.4);
             padding: 8px 16px;
             display: flex;
             align-items: center;
@@ -162,10 +162,10 @@
 
         .stat-label { font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
         .stat-val { font-size: 16px; font-weight: 700; color: var(--text-main); }
-        .stat-val.purple { color: var(--purple-glow); }
-        .stat-val.rose { color: var(--rose-glow); }
         .stat-val.emerald { color: var(--emerald-glow); }
+        .stat-val.cyan { color: var(--cyan-glow); }
         .stat-val.amber { color: var(--amber-glow); }
+        .stat-val.rose { color: var(--rose-glow); }
 
         .chart-box { height: 150px; padding: 10px; position: relative; }
         .info-box {
@@ -182,17 +182,17 @@
 
     <header>
         <div class="brand">
-            <span>[IMMUNE_DEFENSE]</span>
+            <span>[VEHICLE_KINEMATICS]</span>
             <span style="color:var(--text-dim);">//</span>
-            <span style="color:var(--text-main);">巨噬细胞吞噬与抗原追猎</span>
+            <span style="color:var(--text-main);">阿克曼运动学与车道线控制</span>
         </div>
 
         <div class="warp-bar">
-            <span style="color:var(--purple-glow);font-weight:bold;font-size:12px;">[WARP_ACCELERATOR]:</span>
-            <button class="nav-btn" onclick="setImmuneWarp(1)" id="hw-1">1x 常规</button>
-            <button class="nav-btn active" onclick="setImmuneWarp(5)" id="hw-5">5x 敏捷</button>
-            <button class="nav-btn" onclick="setImmuneWarp(20)" id="hw-20">20x 极速</button>
-            <button class="nav-btn" onclick="setImmuneWarp(50)" id="hw-50" style="color:var(--amber-glow);font-weight:bold;">50x 狂飙</button>
+            <span style="color:var(--emerald-glow);font-weight:bold;font-size:12px;">[WARP_ACCELERATOR]:</span>
+            <button class="nav-btn" onclick="setVehWarp(1)" id="hw-1">1x 常规</button>
+            <button class="nav-btn active" onclick="setVehWarp(5)" id="hw-5">5x 敏捷</button>
+            <button class="nav-btn" onclick="setVehWarp(20)" id="hw-20">20x 极速</button>
+            <button class="nav-btn" onclick="setVehWarp(50)" id="hw-50" style="color:var(--amber-glow);font-weight:bold;">50x 狂飙</button>
         </div>
 
         <div class="nav-links">
@@ -201,41 +201,41 @@
     <a href="maze.html" class="nav-btn">具身迷宫</a>
     <a href="ecosystem.html" class="nav-btn" style="color:var(--rose-glow);">红皇后生态</a>
     <a href="locomotion.html" class="nav-btn" style="color:var(--amber-glow);">软体步态</a>
-    <a href="immune.html" class="nav-btn active" style="color:var(--purple-glow);">免疫防线</a>
+    <a href="immune.html" class="nav-btn" style="color:var(--purple-glow);">免疫防线</a>
     <a href="slingshot.html" class="nav-btn" style="color:var(--cyan-glow);">三体引力</a>
-    <a href="vehicle.html" class="nav-btn" style="color:var(--emerald-glow);">车辆控制</a>
+    <a href="vehicle.html" class="nav-btn active" style="color:var(--emerald-glow);">车辆控制</a>
         </div>
     </header>
 
     <main>
         <div class="viewport-card">
             <div class="panel-header">
-                <span>[2D_MICROSCOPIC_MATRIX] // CELLULAR_IMMUNE_PHAGOCYTOSIS</span>
-                <span style="color:var(--purple-glow);" id="hud-status">STATUS: HUNTING_PATHOGENS</span>
+                <span>[2D_ASPHALT_CIRCUIT] // ACKERMANN_BICYCLE_MODEL</span>
+                <span style="color:var(--emerald-glow);" id="hud-status">STATUS: AUTONOMOUS_CRUISING</span>
             </div>
             
-            <div class="immune-top-bar">
+            <div class="veh-top-bar">
                 <div style="display:flex;gap:8px;align-items:center;">
                     <button class="nav-btn" id="btn-toggle" onclick="toggleSim()">[PAUSE / RESUME]</button>
-                    <button class="nav-btn" onclick="resetImmune()">[INJECT_NEW_VIRUS]</button>
+                    <button class="nav-btn" onclick="resetVeh()">[RESET_FLEET]</button>
                 </div>
                 <div style="font-size:11px;color:var(--text-dim);">
-                    <span style="color:var(--purple-glow);">● 巨噬免疫卫士 (Macrophage)</span> &nbsp;|&nbsp;
-                    <span style="color:var(--rose-glow);">* 异变病毒颗粒 (Pathogen)</span> &nbsp;|&nbsp;
-                    <span style="color:rgba(168,85,247,0.2);">○ 化学趋化感知场</span>
+                    <span style="color:var(--cyan-glow);">■ 自动驾驶车队</span> &nbsp;|&nbsp;
+                    <span style="color:var(--amber-glow);">■ 巡航慢速前车</span> &nbsp;|&nbsp;
+                    <span style="color:rgba(255,255,255,0.4);">┆ 虚线车道中心线</span>
                 </div>
             </div>
 
             <div class="canvas-container" id="canvas-wrap">
-                <canvas id="immune-canvas"></canvas>
+                <canvas id="veh-canvas"></canvas>
             </div>
         </div>
 
         <div class="sidebar">
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[IMMUNE_CLEARANCE_METRICS]</span>
-                    <span style="color:var(--purple-glow);">PHAGOCYTOSIS</span>
+                    <span>[CHAMPION_TELEMETRY]</span>
+                    <span style="color:var(--emerald-glow);">STANLEY_ACC</span>
                 </div>
                 <div class="stat-grid">
                     <div class="stat-box">
@@ -243,45 +243,45 @@
                         <div class="stat-val amber" id="stat-gen">GEN-1</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">CYCLE_STEPS</div>
-                        <div class="stat-val" id="stat-steps">0 / 300</div>
+                        <div class="stat-label">CRUISE_SPEED</div>
+                        <div class="stat-val emerald" id="stat-speed">0.0 km/h</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">CLEARANCE_RATE</div>
-                        <div class="stat-val emerald" id="stat-clear">0.0%</div>
+                        <div class="stat-label">STEERING_ANGLE</div>
+                        <div class="stat-val cyan" id="stat-steer">0.0 deg</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">PATHOGENS_LEFT</div>
-                        <div class="stat-val rose" id="stat-left">40 / 40</div>
+                        <div class="stat-label">LATERAL_CTE</div>
+                        <div class="stat-val rose" id="stat-cte">0.0 px</div>
                     </div>
                 </div>
             </div>
 
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[VIRAL_CLEARANCE_CURVE]</span>
-                    <span style="color:var(--emerald-glow);">ANTIBODY_EFFICACY</span>
+                    <span>[LATERAL_ERROR_PROGRESSION]</span>
+                    <span style="color:var(--emerald-glow);">LANE_KEEPING</span>
                 </div>
                 <div class="chart-box">
                     <canvas id="chart-canvas" width="340" height="130"></canvas>
                 </div>
                 <div class="info-box">
-                    <strong>[细胞免疫吞噬与抗体演化]：</strong><br>
-                    巨噬卫士利用表面化学趋化受体感知病毒浓度梯度，伸出流动变形伪足实施精准追猎与胞吞消化，清除率随代际演化迅速攀升。
+                    <strong>[真实阿克曼车辆运动学]：</strong><br>
+                    基于轴距差分微分方程（Kinematic Bicycle ODE），硅基控制器实时解算横向偏差（CTE）与前向曲率，自发从出轨冲出公路演化出丝滑巡线与防追尾刹车。
                 </div>
             </div>
         </div>
     </main>
 
     <script>
-        const canvas = document.getElementById("immune-canvas");
+        const canvas = document.getElementById("veh-canvas");
         const ctx = canvas.getContext("2d");
         const chartCanvas = document.getElementById("chart-canvas");
         const chartCtx = chartCanvas.getContext("2d");
         const wrap = document.getElementById("canvas-wrap");
 
         let isRunning = true;
-        let immuneState = null;
+        let vehState = null;
 
         function resize() {
             canvas.width = wrap.clientWidth;
@@ -290,55 +290,56 @@
         window.addEventListener("resize", resize);
         resize();
 
-        window.setImmuneWarp = async function(speed) {
+        window.setVehWarp = async function(speed) {
             document.querySelectorAll('[id^="hw-"]').forEach(b => b.classList.remove("active"));
             const btn = document.getElementById("hw-" + speed);
             if (btn) btn.classList.add("active");
             try {
-                await fetch("/api/immune/warp?speed=" + speed);
+                await fetch("/api/vehicle/warp?speed=" + speed);
             } catch(e) {}
         };
 
-        window.resetImmune = async function() {
+        window.resetVeh = async function() {
             try {
-                await fetch("/api/immune/reset");
+                await fetch("/api/vehicle/reset");
             } catch(e) {}
         };
 
         window.toggleSim = function() {
             isRunning = !isRunning;
-            document.getElementById("hud-status").innerText = isRunning ? "STATUS: HUNTING_PATHOGENS" : "STATUS: PAUSED";
+            document.getElementById("hud-status").innerText = isRunning ? "STATUS: AUTONOMOUS_CRUISING" : "STATUS: PAUSED";
         };
 
-        async function fetchImmuneState() {
+        async function fetchVehState() {
             if (!isRunning) return;
             try {
-                const res = await fetch("/api/immune/status");
+                const res = await fetch("/api/vehicle/status");
                 if (res.ok) {
-                    immuneState = await res.json();
+                    vehState = await res.json();
                     updateUI();
                 }
             } catch(e) {}
         }
 
         function updateUI() {
-            if (!immuneState) return;
-            document.getElementById("stat-gen").innerText = `GEN-${immuneState.generation}`;
-            document.getElementById("stat-steps").innerText = `${immuneState.step_count} / ${immuneState.max_steps || 300}`;
-            document.getElementById("stat-clear").innerText = `${immuneState.clearance_rate}%`;
-            document.getElementById("stat-left").innerText = `${immuneState.pathogens_alive} / ${immuneState.total_pathogens}`;
+            if (!vehState) return;
+            document.getElementById("stat-gen").innerText = `GEN-${vehState.generation}`;
+            const champ = vehState.champion || {};
+            document.getElementById("stat-speed").innerText = `${champ.v || 0.0} km/h`;
+            document.getElementById("stat-steer").innerText = `${champ.delta || 0.0} deg`;
+            document.getElementById("stat-cte").innerText = `${champ.cte || 0.0} px`;
             drawChart();
         }
 
         function drawChart() {
-            if (!immuneState) return;
+            if (!vehState) return;
             const w = chartCanvas.width;
             const h = chartCanvas.height;
             chartCtx.fillStyle = "#030712";
             chartCtx.fillRect(0, 0, w, h);
 
-            const clears = immuneState.history_clearance || [];
-            if (clears.length < 2) return;
+            const ctes = vehState.history_cte || [];
+            if (ctes.length < 2) return;
 
             chartCtx.strokeStyle = "#1e293b";
             chartCtx.lineWidth = 1;
@@ -346,12 +347,12 @@
             chartCtx.moveTo(0, h/2); chartCtx.lineTo(w, h/2);
             chartCtx.stroke();
 
-            chartCtx.strokeStyle = "#a855f7";
+            chartCtx.strokeStyle = "#10b981";
             chartCtx.lineWidth = 2;
             chartCtx.beginPath();
-            clears.forEach((val, i) => {
-                const x = (i / (clears.length - 1)) * w;
-                const y = h - (val / 100.0) * (h - 20) - 10;
+            ctes.forEach((val, i) => {
+                const x = (i / (ctes.length - 1)) * w;
+                const y = Math.max(10, Math.min(h - 10, (val / 30.0) * (h - 20)));
                 if (i === 0) chartCtx.moveTo(x, y);
                 else chartCtx.lineTo(x, y);
             });
@@ -360,7 +361,7 @@
 
         function render() {
             requestAnimationFrame(render);
-            if (!immuneState) return;
+            if (!vehState) return;
 
             const scaleX = canvas.width / 800;
             const scaleY = canvas.height / 600;
@@ -368,69 +369,105 @@
             ctx.fillStyle = "#030712";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 1. 绘制变异病毒 (Pathogens)
-            (immuneState.pathogens || []).forEach(p => {
-                if (!p.alive) return;
-                const px = p.x * scaleX;
-                const py = p.y * scaleY;
-                ctx.fillStyle = p.type === 0 ? "#f43f5e" : (p.type === 1 ? "#fbbf24" : "#ec4899");
-                ctx.shadowColor = ctx.fillStyle;
-                ctx.shadowBlur = 8;
+            const track = vehState.track || [];
+            if (track.length > 2) {
+                // 1. 绘制沥青公路路面
+                ctx.strokeStyle = "#1e293b";
+                ctx.lineWidth = 44 * scaleX;
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
                 ctx.beginPath();
-                ctx.arc(px, py, 4.0, 0, Math.PI * 2);
-                ctx.fill();
-
-                // 病毒表面突刺
-                ctx.strokeStyle = ctx.fillStyle;
-                ctx.lineWidth = 1.5;
-                for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
-                    ctx.beginPath();
-                    ctx.moveTo(px + Math.cos(a) * 3, py + Math.sin(a) * 3);
-                    ctx.lineTo(px + Math.cos(a) * 7, py + Math.sin(a) * 7);
-                    ctx.stroke();
-                }
-            });
-            ctx.shadowBlur = 0;
-
-            // 2. 绘制巨噬免疫细胞 (Macrophage with Pseudopods)
-            (immuneState.macrophages || []).forEach(m => {
-                const px = m.x * scaleX;
-                const py = m.y * scaleY;
-                const r = m.radius * scaleX;
-
-                // 化学感应光圈
-                ctx.strokeStyle = "rgba(168, 85, 247, 0.15)";
-                ctx.lineWidth = 1;
-                ctx.beginPath();
-                ctx.arc(px, py, m.chem_r * scaleX, 0, Math.PI * 2);
+                track.forEach((pt, i) => {
+                    const x = pt[0] * scaleX;
+                    const y = pt[1] * scaleY;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                });
+                ctx.closePath();
                 ctx.stroke();
 
-                // 巨噬细胞流动质膜
-                ctx.fillStyle = "rgba(168, 85, 247, 0.85)";
-                ctx.shadowColor = "#a855f7";
-                ctx.shadowBlur = 12;
+                // 2. 绘制白色虚线车道中心线
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 8]);
                 ctx.beginPath();
-                for (let a = 0; a < Math.PI * 2; a += 0.2) {
-                    const noise = Math.sin(a * 5 + Date.now() * 0.005) * 2.5;
-                    const cr = r + noise;
-                    const x = px + Math.cos(a) * cr;
-                    const y = py + Math.sin(a) * cr;
-                    if (a === 0) ctx.moveTo(x, y);
+                track.forEach((pt, i) => {
+                    const x = pt[0] * scaleX;
+                    const y = pt[1] * scaleY;
+                    if (i === 0) ctx.moveTo(x, y);
                     else ctx.lineTo(x, y);
-                }
+                });
+                ctx.closePath();
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            // 3. 绘制前向慢速前车 (Amber Lead Car)
+            const lead = vehState.lead_car;
+            if (lead) {
+                const lx = lead.x * scaleX;
+                const ly = lead.y * scaleY;
+                ctx.save();
+                ctx.translate(lx, ly);
+                ctx.rotate(lead.theta);
+
+                ctx.fillStyle = "#fbbf24";
+                ctx.shadowColor = "#fbbf24";
+                ctx.shadowBlur = 8;
+                ctx.fillRect(-10, -5, 20, 10);
+
+                // 刹车尾灯
+                ctx.fillStyle = "#f43f5e";
+                ctx.fillRect(-11, -4, 2, 2);
+                ctx.fillRect(-11, 2, 2, 2);
+                ctx.restore();
+                ctx.shadowBlur = 0;
+            }
+
+            // 4. 绘制自动驾驶车队 (Cyan Autonomous Vehicles with Headlight Beams)
+            (vehState.vehicles || []).forEach(v => {
+                if (!v.alive) return;
+                const vx = v.x * scaleX;
+                const vy = v.y * scaleY;
+                ctx.save();
+                ctx.translate(vx, vy);
+                ctx.rotate(v.theta);
+
+                // 前照灯光束
+                ctx.fillStyle = "rgba(0, 240, 255, 0.08)";
+                ctx.beginPath();
+                ctx.moveTo(12, 0);
+                ctx.arc(12, 0, 45 * scaleX, -0.35, 0.35);
                 ctx.closePath();
                 ctx.fill();
 
-                // 细胞核
-                ctx.fillStyle = "#ffffff";
-                ctx.beginPath();
-                ctx.arc(px, py, r * 0.35, 0, Math.PI * 2);
-                ctx.fill();
+                // 车身 (Cyan)
+                ctx.fillStyle = "#00f0ff";
+                ctx.shadowColor = "#00f0ff";
+                ctx.shadowBlur = 6;
+                ctx.fillRect(-10, -5, 20, 10);
+
+                // 前轮阿克曼偏转角 (Front Steering Wheels)
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 2;
+                ctx.save();
+                ctx.translate(8, -6);
+                ctx.rotate(v.delta);
+                ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(3, 0); ctx.stroke();
+                ctx.restore();
+
+                ctx.save();
+                ctx.translate(8, 6);
+                ctx.rotate(v.delta);
+                ctx.beginPath(); ctx.moveTo(-3, 0); ctx.lineTo(3, 0); ctx.stroke();
+                ctx.restore();
+
+                ctx.restore();
+                ctx.shadowBlur = 0;
             });
-            ctx.shadowBlur = 0;
         }
 
-        setInterval(fetchImmuneState, 30);
+        setInterval(fetchVehState, 30);
         requestAnimationFrame(render);
     </script>
 </body>

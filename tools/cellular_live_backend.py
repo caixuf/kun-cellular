@@ -1080,6 +1080,244 @@ def slingshot_loop():
 threading.Thread(target=slingshot_loop, daemon=True).start()
 
 
+
+# ============================================================================
+# 0.13 真实车辆运动学与车道保持/ACC自适应巡航引擎 (Kinematic Bicycle Vehicle Engine)
+# ============================================================================
+
+class LiveVehicleSimulator:
+    def __init__(self, width=800, height=600):
+        self.width = width
+        self.height = height
+        self.generation = 1
+        self.step_count = 0
+        self.max_steps = 360
+        self.warp_speed = 5
+        self.lock = threading.RLock()
+        self.history_cte = []
+        self.init_circuit()
+        self.init_population(16)
+
+    def init_circuit(self):
+        # 构建闭环多曲率 S 弯赛道/公路中心线
+        self.track = []
+        num_pts = 120
+        cx, cy = 400.0, 300.0
+        rx, ry = 300.0, 200.0
+        for i in range(num_pts):
+            t = (i / num_pts) * math.tau
+            # 利萨茹/椭圆 S 弯调制
+            x = cx + rx * math.cos(t)
+            y = cy + ry * math.sin(t) + math.sin(t * 3) * 35.0
+            self.track.append((x, y))
+
+        # 慢速前车 (Lead Vehicle)
+        self.lead_car_idx = 40
+        self.lead_car = {"x": self.track[40][0], "y": self.track[40][1], "theta": 0.0, "v": 2.2}
+
+    def init_population(self, size=16):
+        with self.lock:
+            self.population = []
+            for i in range(size):
+                p0 = self.track[0]
+                p1 = self.track[1]
+                init_theta = math.atan2(p1[1] - p0[1], p1[0] - p0[0])
+                self.population.append({
+                    "id": i,
+                    "x": p0[0] + random.uniform(-4.0, 4.0),
+                    "y": p0[1] + random.uniform(-4.0, 4.0),
+                    "theta": init_theta + random.uniform(-0.1, 0.1),
+                    "v": 0.0,
+                    "delta": 0.0, # 前轮转角
+                    "track_idx": 0,
+                    "laps": 0,
+                    "cte": 0.0,
+                    "alive": True,
+                    "trail": [],
+                    # 车辆控制神经基因组: [CTE横向误差增益, 航向角误差增益, 前向曲率前馈增益, ACC跟车距离权重, 目标车速]
+                    "genes": [
+                        random.uniform(0.04, 0.18),  # k_cte
+                        random.uniform(0.6, 1.8),    # k_heading
+                        random.uniform(0.2, 1.2),    # k_curvature
+                        random.uniform(0.02, 0.08),  # k_acc
+                        random.uniform(4.5, 7.5)     # target_v
+                    ]
+                })
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            dt = 0.05
+            L = 22.0 # 轴距 (Wheelbase)
+            track_len = len(self.track)
+
+            # 1. 慢速前车沿赛道巡航
+            self.lead_car_idx = (self.lead_car_idx + 0.35) % track_len
+            idx_int = int(self.lead_car_idx)
+            nxt_int = (idx_int + 1) % track_len
+            p_curr = self.track[idx_int]
+            p_next = self.track[nxt_int]
+            frac = self.lead_car_idx - idx_int
+            self.lead_car["x"] = p_curr[0] + (p_next[0] - p_curr[0]) * frac
+            self.lead_car["y"] = p_curr[1] + (p_next[1] - p_curr[1]) * frac
+            self.lead_car["theta"] = math.atan2(p_next[1] - p_curr[1], p_next[0] - p_curr[0])
+
+            # 2. 硅基智能驾驶车队阿克曼动力学推演
+            for veh in self.population:
+                if not veh["alive"]: continue
+
+                # 寻找赛道最近投影点
+                min_d = 9999.0
+                best_idx = veh["track_idx"]
+                for offset in range(-3, 8):
+                    check_idx = (veh["track_idx"] + offset) % track_len
+                    pt = self.track[check_idx]
+                    d = math.hypot(pt[0] - veh["x"], pt[1] - veh["y"])
+                    if d < min_d:
+                        min_d = d
+                        best_idx = check_idx
+                veh["track_idx"] = best_idx
+                veh["cte"] = min_d
+
+                # 赛道切线方向与曲率
+                pt_curr = self.track[best_idx]
+                pt_look = self.track[(best_idx + 4) % track_len]
+                target_heading = math.atan2(pt_look[1] - pt_curr[1], pt_look[0] - pt_curr[0])
+                heading_err = (target_heading - veh["theta"] + math.pi) % math.tau - math.pi
+
+                # 横向偏移方向 (带符号 CTE)
+                cross = (pt_look[0] - pt_curr[0]) * (veh["y"] - pt_curr[1]) - (pt_look[1] - pt_curr[1]) * (veh["x"] - pt_curr[0])
+                signed_cte = min_d if cross > 0 else -min_d
+
+                # 前向毫米波雷达测距
+                dx_lead = self.lead_car["x"] - veh["x"]
+                dy_lead = self.lead_car["y"] - veh["y"]
+                d_lead = math.hypot(dx_lead, dy_lead)
+                radar_ang = (math.atan2(dy_lead, dx_lead) - veh["theta"] + math.pi) % math.tau - math.pi
+                front_obstacle_dist = d_lead if abs(radar_ang) < 0.4 else 999.0
+
+                # 硅基阿克曼运动学控制前向:
+                # 转向控制: Stanley / 神经形态前馈混合
+                raw_delta = -veh["genes"][0] * signed_cte + veh["genes"][1] * heading_err
+                veh["delta"] = max(-0.55, min(0.55, raw_delta))
+
+                # 纵向速度控制: 目标巡航车速 + ACC 雷达防追尾
+                target_speed = veh["genes"][4]
+                if front_obstacle_dist < 60.0:
+                    # 触发 ACC 自动跟车制动
+                    accel = -veh["genes"][3] * (60.0 - front_obstacle_dist) * 0.4
+                else:
+                    accel = (target_speed - veh["v"]) * 0.3
+                
+                accel = max(-4.0, min(2.5, accel))
+                veh["v"] = max(0.0, min(10.0, veh["v"] + accel * dt))
+
+                # 阿克曼自行车模型微分方程 (Kinematic Bicycle ODE)
+                # beta = arctan(0.5 * tan(delta))
+                beta = math.atan(0.5 * math.tan(veh["delta"]))
+                veh["x"] += veh["v"] * math.cos(veh["theta"] + beta)
+                veh["y"] += veh["v"] * math.sin(veh["theta"] + beta)
+                veh["theta"] += (veh["v"] / L) * math.cos(beta) * math.tan(veh["delta"])
+
+                # 冲出赛道判定 (偏离超过 45 像素判为出轨)
+                if min_d > 45.0 or (front_obstacle_dist < 12.0 and abs(radar_ang) < 0.3):
+                    veh["alive"] = False
+
+                if self.step_count % 3 == 0 and len(veh["trail"]) < 80:
+                    veh["trail"].append([round(veh["x"], 1), round(veh["y"], 1)])
+
+            if self.step_count >= self.max_steps:
+                self.evolve_vehicles()
+
+    def evolve_vehicles(self):
+        alive_vehs = [v for v in self.population if v["alive"]]
+        avg_cte = sum(v["cte"] for v in self.population) / len(self.population)
+        self.history_cte.append(round(avg_cte, 2))
+        if len(self.history_cte) > 30:
+            self.history_cte.pop(0)
+
+        # 适应度函数: 行驶里程 + 巡航速度 - 横向偏差惩罚
+        for v in self.population:
+            progress = v["track_idx"] * 10.0 + (500.0 if v["alive"] else 0.0)
+            v["fitness"] = progress + v["v"] * 20.0 - v["cte"] * 8.0
+
+        self.population.sort(key=lambda v: v["fitness"], reverse=True)
+        top_vehs = self.population[:4]
+        new_pop = []
+
+        for i in range(len(self.population)):
+            parent = random.choice(top_vehs)
+            child_genes = [g + (random.gauss(0, 0.05) if random.random() < 0.3 else 0.0) for g in parent["genes"]]
+            p0 = self.track[0]
+            p1 = self.track[1]
+            init_theta = math.atan2(p1[1] - p0[1], p1[0] - p0[0])
+            new_pop.append({
+                "id": i,
+                "x": p0[0] + random.uniform(-4.0, 4.0),
+                "y": p0[1] + random.uniform(-4.0, 4.0),
+                "theta": init_theta + random.uniform(-0.1, 0.1),
+                "v": 0.0,
+                "delta": 0.0,
+                "track_idx": 0,
+                "laps": 0,
+                "cte": 0.0,
+                "alive": True,
+                "trail": [],
+                "genes": child_genes
+            })
+
+        self.population = new_pop
+        self.generation += 1
+        self.step_count = 0
+
+    def get_snapshot(self):
+        with self.lock:
+            champ = self.population[0] if self.population else None
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "max_steps": self.max_steps,
+                "track": [[round(pt[0], 1), round(pt[1], 1)] for pt in self.track],
+                "lead_car": {
+                    "x": round(self.lead_car["x"], 1),
+                    "y": round(self.lead_car["y"], 1),
+                    "theta": round(self.lead_car["theta"], 2),
+                    "v": self.lead_car["v"]
+                },
+                "champion": {
+                    "x": round(champ["x"], 1) if champ else 0.0,
+                    "y": round(champ["y"], 1) if champ else 0.0,
+                    "theta": round(champ["theta"], 2) if champ else 0.0,
+                    "v": round(champ["v"] * 10.0, 1) if champ else 0.0, # 标定为 km/h
+                    "delta": round(math.degrees(champ["delta"]), 1) if champ else 0.0,
+                    "cte": round(champ["cte"], 1) if champ else 0.0
+                },
+                "vehicles": [
+                    {
+                        "id": v["id"],
+                        "x": round(v["x"], 1),
+                        "y": round(v["y"], 1),
+                        "theta": round(v["theta"], 2),
+                        "delta": round(v["delta"], 2),
+                        "alive": v["alive"],
+                        "trail": v["trail"]
+                    }
+                    for v in self.population
+                ],
+                "history_cte": list(self.history_cte)
+            }
+
+live_veh = LiveVehicleSimulator()
+
+def veh_loop():
+    while True:
+        for _ in range(live_veh.warp_speed):
+            live_veh.step_physics()
+        time.sleep(0.016)
+
+threading.Thread(target=veh_loop, daemon=True).start()
+
+
 class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=FRONTEND_DIR, **kwargs)
@@ -1162,6 +1400,45 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         # 三体引力弹弓端点
+                # 真实阿克曼车辆运动学与车道线控制端点
+        if self.path.startswith("/api/vehicle/status"):
+            body = json.dumps(live_veh.get_snapshot()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/vehicle/reset"):
+            live_veh.init_circuit()
+            live_veh.init_population(16)
+            live_veh.generation = 1
+            live_veh.step_count = 0
+            body = json.dumps({"status": "ok", "msg": "Vehicle simulation reset"}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/vehicle/warp"):
+            try:
+                import urllib.parse
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                speed = int(qs.get("speed", ["5"])[0])
+                live_veh.warp_speed = max(1, min(50, speed))
+            except Exception:
+                live_veh.warp_speed = 5
+            body = json.dumps({"status": "ok", "warp_speed": live_veh.warp_speed}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if self.path.startswith("/api/slingshot/status"):
             body = json.dumps(live_slingshot.get_snapshot()).encode("utf-8")
             self.send_response(200)
