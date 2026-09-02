@@ -337,10 +337,11 @@
       <span>算力尺度与渲染模式 (LOD)</span>
       <span class="card-title-badge" id="st-pipe">Organ</span>
     </div>
-    <div class="btn-grid-3">
-      <button id="lod-organ" class="btn-ctrl active" onclick="switchLOD('organ')">微观器官 (128)</button>
-      <button id="lod-10k" class="btn-ctrl" onclick="switchLOD('10k')">皮层柱 (1万)</button>
-      <button id="lod-1m" class="btn-ctrl" onclick="switchLOD('1m')" style="color:var(--purple)">宏观百万 (1M)</button>
+    <div class="btn-grid-4">
+      <button id="lod-organ" class="btn-ctrl active" onclick="switchLOD('organ')">器官(30)</button>
+      <button id="lod-1k" class="btn-ctrl" onclick="switchLOD('1k')" style="color:var(--emerald);font-weight:bold;">千元皮层(1k)</button>
+      <button id="lod-10k" class="btn-ctrl" onclick="switchLOD('10k')">流形(1万)</button>
+      <button id="lod-1m" class="btn-ctrl" onclick="switchLOD('1m')" style="color:var(--purple)">百万星系(1M)</button>
     </div>
     <div class="kv"><span>GPU 批处理 Draw Calls</span><b id="st-draws">1</b></div>
   </div>
@@ -972,8 +973,8 @@ class SynapseView {
   }
 
   update(time, warpMultiplier = 1){
-    const byId = new Map(this.org.cells.map(c => [c.id, c]));
-    const a = byId.get(this.syn.from), b = byId.get(this.syn.to);
+    if(!this.org.cellMap) this.org.cellMap = new Map(this.org.cells.map(c => [c.id, c]));
+    const a = this.org.cellMap.get(this.syn.from), b = this.org.cellMap.get(this.syn.to);
     if(!a || !b || !this.syn.active){
       this.group.visible = false;
       return;
@@ -1107,6 +1108,7 @@ function rebuildViews(){
     }
   }
 
+  org.cellMap = new Map(org.cells.map(c => [c.id, c]));
   views.cells = Array.from(cellViewsMap.values());
   views.syns = Array.from(synViewsMap.values());
 }
@@ -1180,9 +1182,9 @@ function marketTick(){
 }
 
 /* 自动形态发生: 每 14s 一次自发性分裂 */
-setInterval(()=>{ if(!paused){ mitosis(org); rebuildViews(); } }, 14000);
+setInterval(()=>{ if(!paused && !serverOnline){ mitosis(org); rebuildViews(); } }, 14000);
 /* 每 5 个分裂后自我净化一次 */
-setInterval(()=>{ if(!paused && org.cells.length>16) apoptosis(org), rebuildViews(); }, 42000);
+setInterval(()=>{ if(!paused && !serverOnline && org.cells.length>16) apoptosis(org), rebuildViews(); }, 42000);
 
 const _bind = (id, fn) => { const el = document.getElementById(id); if(el) el.onclick = fn; };
 _bind('b-mito', ()=>{ mitosis(org); rebuildViews(); });
@@ -1310,8 +1312,8 @@ async function pollIslands() {
     const r = await fetch('/api/islands/status', { signal: AbortSignal.timeout(2000) });
     const j = await r.json();
     if(j.warp_mode) document.getElementById('st-warp').textContent = j.warp_mode;
-    if(j.total_generations != null) document.getElementById('st-total-gens').textContent = j.total_generations.toLocaleString();
-    if(j.total_migrations != null) document.getElementById('st-total-mig').textContent = j.total_migrations + ' 次';
+    if(j.total_generations != null) const elTg = document.getElementById('st-total-gens'); if(elTg) elTg.textContent = j.total_generations.toLocaleString();
+    if(j.total_migrations != null) const elTm = document.getElementById('st-total-mig'); if(elTm) elTm.textContent = j.total_migrations + ' 次';
     
     if(j.islands && j.islands.length) {
       const html = j.islands.map(isl => {
@@ -1375,12 +1377,13 @@ async function pollBiosphere(){
     const r = await fetch('/api/biosphere/status', { signal: AbortSignal.timeout(5000) });
     const j = await r.json();
     bioStep = j.step;
-    document.getElementById('bio-step').textContent = `step ${j.step}`;
-    document.getElementById('bio-shannon').textContent = (j.shannon_diversity ?? 0).toFixed(2);
-    document.getElementById('bio-prod').textContent = j.niche_counts?.producers ?? 0;
-    document.getElementById('bio-herb').textContent = j.niche_counts?.herbivores ?? 0;
-    document.getElementById('bio-pred').textContent = j.niche_counts?.predators ?? 0;
-    document.getElementById('bio-deco').textContent = j.niche_counts?.decomposers ?? 0;
+    const _setT = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+    _setT('bio-step', `step ${j.step}`);
+    _setT('bio-shannon', (j.shannon_diversity ?? 0).toFixed(2));
+    _setT('bio-prod', j.niche_counts?.producers ?? 0);
+    _setT('bio-herb', j.niche_counts?.herbivores ?? 0);
+    _setT('bio-pred', j.niche_counts?.predators ?? 0);
+    _setT('bio-deco', j.niche_counts?.decomposers ?? 0);
     document.getElementById('bio-biomes').innerHTML = (j.biomes||[]).map(b=>{
       const tag = b.climate.startsWith('Spring')?'[SPRING]':b.climate.startsWith('Summer')?'[SUMMER]':b.climate.startsWith('Autumn')?'[AUTUMN]':'[WINTER]';
       const pct = Math.min(100, b.nutrient/12);
@@ -1571,33 +1574,43 @@ window.loadPreset = function(type) {
 
 window.switchLOD = function(mode) {
   currentLOD = mode;
-  document.getElementById('lod-organ').style.borderColor = mode==='organ'?'var(--cyan)':'var(--line)';
-  document.getElementById('lod-10k').style.borderColor = mode==='10k'?'var(--cyan)':'var(--line)';
-  document.getElementById('lod-1m').style.borderColor = mode==='1m'?'var(--purple)':'var(--line)';
+  const setBtn = (id, active) => { const el = document.getElementById(id); if(el) el.classList.toggle("active", active); };
+  setBtn("lod-organ", mode === "organ");
+  setBtn("lod-1k", mode === "1k");
+  setBtn("lod-10k", mode === "10k");
+  setBtn("lod-1m", mode === "1m");
 
-  if(mode === 'organ') {
+  if(mode === "organ") {
     if(lodPointsMesh) lodPointsMesh.visible = false;
     for(const v of views.cells) { v.group.visible = true; }
     for(const v of views.syns) { v.group.visible = true; }
-    document.getElementById('st-pipe').textContent = 'DOM/Sprite Organ';
-    document.getElementById('st-draws').textContent = views.cells.length * 3;
-    log(' 切换至: 本能器官微观视图 (15~100 细胞全细节)');
-  } else if(mode === '10k') {
+    document.getElementById("st-pipe").textContent = "DOM/Sprite Organ";
+    document.getElementById("st-draws").textContent = views.cells.length * 3;
+    log(" 切换至: 本能器官微观视图 (15~100 细胞全细节)");
+  } else if(mode === "1k") {
+    if(lodPointsMesh) lodPointsMesh.visible = false;
+    for(const v of views.cells) { v.group.visible = true; }
+    for(const v of views.syns) { v.group.visible = true; }
+    document.getElementById("st-pipe").textContent = "3D Cortical Column (1k Real Cells)";
+    document.getElementById("st-draws").textContent = views.cells.length * 2;
+    loadPreset("adas");
+    log(" 切换至: 1,000 细胞真实大脑皮层柱 (真实 PyTorch 权重三维空间映射)");
+  } else if(mode === "10k") {
     initLODCloud(10000);
     lodPointsMesh.visible = true;
     for(const v of views.cells) { v.group.visible = false; }
     for(const v of views.syns) { v.group.visible = false; }
-    document.getElementById('st-pipe').textContent = 'GPU Points 10k Instanced';
-    document.getElementById('st-draws').textContent = '1 (单批次)';
-    log(' 切换至: 10,000 细胞皮层柱 (GPU 单批次点云零压渲染)');
-  } else if(mode === '1m') {
-    initLODCloud(35000); // 渲染 35,000 个宏观代表粒子，映射 1,000,000 细胞宏观形态，确保 60 FPS 零卡顿
+    document.getElementById("st-pipe").textContent = "GPU Points 10k Instanced";
+    document.getElementById("st-draws").textContent = "1 (单批次)";
+    log(" 切换至: 10,000 细胞皮层柱 (GPU 单批次点云零压渲染)");
+  } else if(mode === "1m") {
+    initLODCloud(35000);
     lodPointsMesh.visible = true;
     for(const v of views.cells) { v.group.visible = false; }
     for(const v of views.syns) { v.group.visible = false; }
-    document.getElementById('st-pipe').textContent = 'GPU Points 1M LOD Cluster';
-    document.getElementById('st-draws').textContent = '1 (单批次)';
-    log(' 切换至: 1,000,000 细胞宏观心智流形 (分层 LOD 动态聚合，0 显存溢出)');
+    document.getElementById("st-pipe").textContent = "GPU Points 1M LOD Cluster";
+    document.getElementById("st-draws").textContent = "1 (单批次)";
+    log(" 切换至: 1,000,000 细胞宏观心智流形 (分层 LOD 动态聚合，0 显存溢出)");
   }
 };
 

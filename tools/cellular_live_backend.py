@@ -60,40 +60,28 @@ class LiveOrganism:
     def load_seed_preset(self):
         with self.lock:
             self.generation = 0
-            self.phy_steps = 0
             self.cells = [
-                {"id": 0, "type": "SENSE0", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -120.0, "y": -40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
-                {"id": 1, "type": "SENSE1", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -120.0, "y": 40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
-                {"id": 2, "type": "EMA", "p1": 0.05, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -40.0, "y": -30.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
-                {"id": 3, "type": "EMA", "p1": 0.20, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -40.0, "y": 30.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
-                {"id": 4, "type": "SUB", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 30.0, "y": 0.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 0, "type": "SENSE0", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -200.0, "y": -60.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 1, "type": "SENSE1", "p1": 1.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -200.0, "y": 60.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 2, "type": "EMA", "p1": 0.05, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -100.0, "y": -40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 3, "type": "EMA", "p1": 0.20, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": -100.0, "y": 40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 4, "type": "SUB", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 0.0, "y": 0.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
                 {"id": 5, "type": "HYST", "p1": 0.01, "p2": -0.01, "s": 0.0, "out": 0.0, "acts": 0, "x": 80.0, "y": 0.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
-                {"id": 6, "type": "ACT_POS", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 140.0, "y": -40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
-                {"id": 7, "type": "ACT_NEG", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 140.0, "y": 40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
-                {"id": 8, "type": "ACT_LOCK", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 140.0, "y": 100.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0}
+                {"id": 6, "type": "ACT_POS", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 180.0, "y": -40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 7, "type": "ACT_NEG", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 180.0, "y": 40.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0},
+                {"id": 8, "type": "ACT_LOCK", "p1": 0.0, "p2": 0.0, "s": 0.0, "out": 0.0, "acts": 0, "x": 180.0, "y": 100.0, "z": 0.0, "vx": 0.0, "vy": 0.0, "vz": 0.0}
             ]
             self.synapses = [
                 {"from": 0, "to": 2, "port": 0, "w": 1.0, "active": True},
                 {"from": 0, "to": 3, "port": 0, "w": 1.0, "active": True},
                 {"from": 3, "to": 4, "port": 0, "w": 1.0, "active": True},
-                {"from": 2, "to": 4, "port": 1, "w": 1.0, "active": True},
+                {"from": 2, "to": 4, "port": 1, "w": -1.0, "active": True},
                 {"from": 4, "to": 5, "port": 0, "w": 1.0, "active": True},
                 {"from": 5, "to": 6, "port": 0, "w": 1.0, "active": True},
                 {"from": 5, "to": 7, "port": 0, "w": -1.0, "active": True}
             ]
             self.compile_topology()
 
-    
-    def set_warp(self, speed):
-        with self.lock:
-            self.warp_mode = speed
-            if speed == "1x": self.warp_factor = 1
-            elif speed == "100x": self.warp_factor = 25
-            elif speed == "1000x": self.warp_factor = 100
-            elif speed == "unlimited" or speed == "max": self.warp_factor = 500
-            return self.warp_mode
-
-    
     def load_real_champion_preset(self):
         ckpt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "checkpoints", "real_trained_champion.json")
         if os.path.exists(ckpt_path):
@@ -101,15 +89,21 @@ class LiveOrganism:
                 ckpt = json.load(f)
             with self.lock:
                 self.generation = ckpt.get("train_generations", 30)
-                self.cells = ckpt.get("cells", self.cells)
+                loaded_cells = ckpt.get("cells", self.cells)
+                for c in loaded_cells:
+                    c.setdefault("vx", 0.0)
+                    c.setdefault("vy", 0.0)
+                    c.setdefault("vz", 0.0)
+                    c.setdefault("acts", 0)
+                    c.setdefault("glow", 0.0)
+                self.cells = loaded_cells
                 self.synapses = ckpt.get("synapses", self.synapses)
                 self.compile_topology()
                 print(f"[*] 成功加载真实演化训练冠军模型: {len(self.cells)} 细胞 / {len(self.synapses)} 突触")
                 return True
         return False
 
-    
-    def load_adas_1m_preset(self):
+    def load_adas_1m_preset(self, count=1000):
         ckpt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runs", "adas_million_champion.pt")
         if os.path.exists(ckpt_path):
             try:
@@ -117,40 +111,59 @@ class LiveOrganism:
                 data = torch.load(ckpt_path, map_location="cpu")
                 with self.lock:
                     self.generation = 1000
-                    # 提取前 40 个核心代表性因果细胞子图映射到 3D 视图，宏观 1M 挂载到 GPU 点云
-                    types_arr = data["types"][:40].tolist()
-                    weights_arr = data["champion_weights"][:40].tolist()
-                    params_arr = data["champion_params"][:40].tolist()
+                    n = min(count, int(data.get("n_cells", 1000000)))
+                    types_arr = data["types"][:n].tolist()
+                    weights_arr = data["champion_weights"][:n].tolist()
+                    params_arr = data["champion_params"][:n].tolist()
+                    syn_src_arr = data["syn_src"][:n].tolist() if "syn_src" in data else []
                     
                     self.cells = []
-                    for i, t_val in enumerate(types_arr):
+                    golden_angle = 2.39996323
+                    layers = 10
+                    cells_per_layer = max(1, n // layers)
+                    
+                    for i in range(n):
+                        t_val = types_arr[i]
                         t_name = CELL_TYPES.get(t_val % 34, "EMA")
                         if i < 4: t_name = f"SENSE{i}"
-                        elif i >= len(types_arr) - 4: t_name = ["ACT_POS", "ACT_NEG", "ACT_RESET", "ACT_LOCK"][i - (len(types_arr) - 4)]
+                        elif i >= n - 4: t_name = ["ACT_POS", "ACT_NEG", "ACT_RESET", "ACT_LOCK"][i - (n - 4)]
+                        
+                        layer_idx = i // cells_per_layer
+                        y = -140.0 + (layer_idx * (280.0 / layers)) + (i % 3) * 6.0
+                        r = 30.0 + math.sqrt((i % cells_per_layer) / cells_per_layer) * 180.0
+                        theta = i * golden_angle
+                        x = r * math.cos(theta)
+                        z = r * math.sin(theta)
+                        
+                        p1 = round(float(params_arr[i][0]), 3) if i < len(params_arr) else 0.1
+                        p2 = round(float(params_arr[i][1]), 3) if i < len(params_arr) else 0.0
                         
                         self.cells.append({
                             "id": i,
                             "type": t_name,
-                            "p1": round(float(params_arr[i][0]), 3),
-                            "p2": round(float(params_arr[i][1]), 3),
+                            "p1": p1, "p2": p2,
                             "s": 0.0, "out": 0.0, "acts": 0,
-                            "x": -220.0 + (440.0 * i / len(types_arr)),
-                            "y": round((float(weights_arr[i][0]) * 100.0) % 160.0 - 80.0, 1),
-                            "z": round((float(weights_arr[i][1]) * 40.0) % 60.0 - 30.0, 1),
+                            "x": round(x, 1),
+                            "y": round(y, 1),
+                            "z": round(z, 1),
                             "vx": 0.0, "vy": 0.0, "vz": 0.0
                         })
                     
                     self.synapses = []
-                    for i in range(len(self.cells) - 1):
-                        self.synapses.append({
-                            "from": i,
-                            "to": min(len(self.cells) - 1, i + 1 + (i % 3)),
-                            "port": i % 2,
-                            "w": round(float(weights_arr[i][0]), 3),
-                            "active": True
-                        })
+                    for i in range(n):
+                        w0 = float(weights_arr[i][0]) if i < len(weights_arr) else 1.0
+                        w1 = float(weights_arr[i][1]) if i < len(weights_arr) else -1.0
+                        
+                        src0 = syn_src_arr[i][0] % n if i < len(syn_src_arr) else max(0, i - 1)
+                        src1 = syn_src_arr[i][1] % n if i < len(syn_src_arr) else max(0, i - 2)
+                        
+                        if src0 != i:
+                            self.synapses.append({"from": src0, "to": i, "port": 0, "w": round(w0, 3), "active": True})
+                        if src1 != i and len(self.synapses) < n * 2:
+                            self.synapses.append({"from": src1, "to": i, "port": 1, "w": round(w1, 3), "active": True})
+                            
                     self.compile_topology()
-                    print(f"[*] 成功加载 ADAS 百万级冠军模型 (adas_million_champion.pt, 1,000,000 细胞 / 2,000,000 突触)")
+                    print(f"[*] 成功全量载入 ADAS 百万级皮层微区真实权重: {len(self.cells)} 真实细胞 / {len(self.synapses)} 条真实突触")
                     return True
             except Exception as e:
                 print(f"[!] 加载 ADAS 1M 模型失败: {e}")
@@ -639,7 +652,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        if self.path.startswith("/api/stress"):
+        if self.path.startswith("/api/control/stress") or self.path.startswith("/api/stress"):
             organism.stress_mode = ("on" in self.path or "extreme" in self.path)
             body = json.dumps({"status": "ok", "stress": organism.stress_mode}).encode("utf-8")
             self.send_response(200)
