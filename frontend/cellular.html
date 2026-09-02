@@ -1367,130 +1367,60 @@ let lodPointsMesh = null;
 let lodPositions = null;
 let lodColors = null;
 
-// 基于真实生命体几何拓扑的 3D 宏观点云发生器 (Organism-Specific Topology Point Cloud)
-let currentLODOrgId = 'apex_generalist_prime';
-
-function initLODCloud(count = 30000, organismId = currentSelectedOrgId) {
-  currentLODOrgId = organismId;
+// 基于真实突触邻接拓扑的力导向 3D 点云映射 (Raw Graph Adjacency Force Embedding)
+function initLODCloud(count = 30000) {
   if(lodPointsMesh) { scene.remove(lodPointsMesh); lodPointsMesh.geometry.dispose(); lodPointsMesh.material.dispose(); }
   const geo = new THREE.BufferGeometry();
   lodPositions = new Float32Array(count * 3);
   lodColors = new Float32Array(count * 3);
 
+  const nCells = (org && org.cells && org.cells.length) ? org.cells.length : 1;
+  const synList = (org && org.syns && org.syns.length) ? org.syns : [];
+  const cellsMap = new Map();
+  if (org && org.cells) {
+    for (const c of org.cells) cellsMap.set(c.id, c);
+  }
+
+  // 1. 遍历点云粒子，100% 依据真实拓扑图结构采样
   for(let i = 0; i < count; ++i) {
     let px = 0, py = 0, pz = 0;
     let colHex = 0x38bdf8;
 
-    if (organismId === 'embodied_kinematic_beast') {
-      // 具身运动兽: 脊椎 + 4 条向外向下伸展的粗壮四肢 + 头部 + 尾部
-      const part = Math.random();
-      if (part < 0.25) {
-        // 脊柱
-        const t = (Math.random() - 0.5) * 360.0;
-        px = (Math.random() - 0.5) * 24.0;
-        py = 20.0 + (Math.random() - 0.5) * 24.0;
-        pz = t;
-        colHex = 0xf59e0b; // 琥珀脊髓
-      } else if (part < 0.85) {
-        // 四肢 (4 个象限延伸)
-        const limbIdx = Math.floor(Math.random() * 4);
-        const limbAngles = [Math.PI/4, 3*Math.PI/4, 5*Math.PI/4, 7*Math.PI/4];
-        const ang = limbAngles[limbIdx];
-        const dist = 30.0 + Math.random() * 190.0;
-        const legProgress = dist / 220.0;
-        px = dist * Math.cos(ang) + (Math.random() - 0.5) * 25.0;
-        py = 20.0 - legProgress * 150.0 + (Math.random() - 0.5) * 20.0;
-        pz = (limbIdx < 2 ? 110.0 : -110.0) + (Math.random() - 0.5) * 30.0;
-        colHex = 0x10b981; // 运动肌群绿
-      } else {
-        // 头部与尾部
-        const isHead = Math.random() < 0.6;
-        pz = isHead ? 210.0 + Math.random() * 60.0 : -200.0 - Math.random() * 70.0;
-        px = (Math.random() - 0.5) * (isHead ? 50.0 : 20.0);
-        py = (isHead ? 50.0 : 10.0) + (Math.random() - 0.5) * 30.0;
-        colHex = isHead ? 0x38bdf8 : 0x64748b;
-      }
-    } else if (organismId === 'micro_defense_symbiosis') {
-      // 免疫球: 紧密核心球体 + 8 条粗壮辐射状向外探出的受体触须
-      const isTentacle = (i % 5 === 0);
-      if (!isTentacle) {
-        // 致密核心球体 (r in 10 ~ 80)
-        const phi = Math.acos(1 - 2 * Math.random());
-        const theta = Math.random() * Math.PI * 2;
-        const r = Math.pow(Math.random(), 0.6) * 85.0;
-        px = r * Math.sin(phi) * Math.cos(theta);
-        py = r * Math.sin(phi) * Math.sin(theta);
-        pz = r * Math.cos(phi);
-        colHex = 0xa855f7; // 核心紫
-      } else {
-        // 8 个向外的触角射线
-        const tentacleIdx = i % 8;
-        const tPhi = Math.acos(1 - 2 * ((tentacleIdx + 0.5) / 8));
-        const tTheta = Math.PI * (1 + Math.sqrt(5)) * tentacleIdx;
-        const rayDist = 80.0 + Math.random() * 170.0;
-        px = rayDist * Math.sin(tPhi) * Math.cos(tTheta) + (Math.random() - 0.5) * 16.0;
-        py = rayDist * Math.sin(tPhi) * Math.sin(tTheta) + (Math.random() - 0.5) * 16.0;
-        pz = rayDist * Math.cos(tPhi) + (Math.random() - 0.5) * 16.0;
-        colHex = 0xf43f5e; // 受体抗原红
-      }
-    } else if (organismId === 'celestial_chaos_integrator') {
-      // 三体引力环: 3 个相互倾斜交错的巨大轨道圆环 + 中央重力奇点
-      if (Math.random() < 0.08) {
-        // 中央引力奇点
-        const r = Math.random() * 25.0;
-        const theta = Math.random() * Math.PI * 2;
-        px = r * Math.cos(theta);
-        py = (Math.random() - 0.5) * 20.0;
-        pz = r * Math.sin(theta);
-        colHex = 0xfbbf24; // 太阳金
-      } else {
-        const ringIdx = i % 3;
-        const ringIncls = [0.0, Math.PI / 3, 2 * Math.PI / 3];
-        const incl = ringIncls[ringIdx];
-        const theta = Math.random() * Math.PI * 2;
-        const r = 160.0 + Math.random() * 80.0;
-        const x0 = r * Math.cos(theta);
-        const y0 = (Math.random() - 0.5) * 16.0;
-        const z0 = r * Math.sin(theta);
-        px = x0;
-        py = y0 * Math.cos(incl) - z0 * Math.sin(incl);
-        pz = y0 * Math.sin(incl) + z0 * Math.cos(incl);
-        colHex = ringIdx === 0 ? 0x38bdf8 : ringIdx === 1 ? 0xa855f7 : 0x34d399;
-      }
+    // 40% 点采样于真实元胞核周围 (Cell Soma Gaussian Manifold)
+    // 60% 点采样于真实突触轴突轴线与二次贝塞尔流形 (Axon Synaptic Pathway)
+    const isAxon = (synList.length > 0) && (Math.random() < 0.65);
+
+    if (isAxon) {
+      const syn = synList[Math.floor(Math.random() * synList.length)];
+      const cFrom = cellsMap.get(syn.from) || org.cells[0];
+      const cTo = cellsMap.get(syn.to) || org.cells[Math.min(1, nCells - 1)];
+
+      const t = Math.random();
+      // 二次贝塞尔流向：中点带突触拱起力矩
+      const midX = (cFrom.x + cTo.x) * 0.5 + (Math.sin(syn.from * 3.1 + syn.to * 1.7)) * 14.0;
+      const midY = (cFrom.y + cTo.y) * 0.5 + (Math.cos(syn.from * 2.3 + syn.to * 4.1)) * 14.0;
+      const midZ = (cFrom.z + cTo.z) * 0.5 + (Math.sin(syn.from * 1.9 + syn.to * 2.8)) * 14.0;
+
+      const oneMinusT = 1.0 - t;
+      px = oneMinusT * oneMinusT * cFrom.x + 2.0 * oneMinusT * t * midX + t * t * cTo.x + (Math.random() - 0.5) * 8.0;
+      py = oneMinusT * oneMinusT * cFrom.y + 2.0 * oneMinusT * t * midY + t * t * cTo.y + (Math.random() - 0.5) * 8.0;
+      pz = oneMinusT * oneMinusT * cFrom.z + 2.0 * oneMinusT * t * midZ + t * t * cTo.z + (Math.random() - 0.5) * 8.0;
+
+      const fam = FAMILY(cTo.type);
+      colHex = FAMILY_COLOR[fam] || 0x38bdf8;
     } else {
-      // Apex 通才全脑: 明显的左右双半球大脑皮层 (Left x < -30, Right x > 30) + 脑沟纹理 + 胼胝体桥
-      const isBridge = (i % 25 === 0);
-      if (isBridge) {
-        // 中央胼胝体神经桥
-        px = (Math.random() - 0.5) * 80.0;
-        py = -20.0 + (Math.random() - 0.5) * 30.0;
-        pz = (Math.random() - 0.5) * 100.0;
-        colHex = 0xfbbf24; // 黄金桥接通道
-      } else {
-        const isRightLobe = (i % 2 === 0);
-        const centerX = isRightLobe ? 110.0 : -110.0;
-        const u = Math.random();
-        const phi = Math.acos(1 - 2 * Math.random());
-        const theta = Math.random() * Math.PI * 2;
-        // 椭球脑叶
-        const rx = 80.0 * Math.pow(u, 0.5);
-        const ry = 95.0 * Math.pow(u, 0.5);
-        const rz = 120.0 * Math.pow(u, 0.5);
-        
-        px = centerX + rx * Math.sin(phi) * Math.cos(theta);
-        py = ry * Math.sin(phi) * Math.sin(theta);
-        pz = rz * Math.cos(phi);
+      const c = org.cells[Math.floor(Math.random() * nCells)];
+      const u = Math.random();
+      const phi = Math.acos(1 - 2 * Math.random());
+      const theta = Math.random() * Math.PI * 2;
+      const r = 2.0 + Math.pow(u, 0.4) * (18.0 + (c.glow || 0) * 10.0);
 
-        // 脑回脑沟波动纹理
-        const sulcus = Math.sin(px * 0.08) * Math.cos(py * 0.08) * 12.0;
-        px += sulcus; py += sulcus;
+      px = c.x + r * Math.sin(phi) * Math.cos(theta);
+      py = c.y + r * Math.sin(phi) * Math.sin(theta);
+      pz = c.z + r * Math.cos(phi);
 
-        const opType = i % 24;
-        if(opType < 6) colHex = 0x38bdf8;
-        else if(opType < 14) colHex = 0x34d399;
-        else if(opType < 20) colHex = 0xa855f7;
-        else colHex = 0xf43f5e;
-      }
+      const fam = FAMILY(c.type);
+      colHex = FAMILY_COLOR[fam] || 0x38bdf8;
     }
 
     lodPositions[i*3] = px;
@@ -1507,7 +1437,7 @@ function initLODCloud(count = 30000, organismId = currentSelectedOrgId) {
   geo.setAttribute("color", new THREE.BufferAttribute(lodColors, 3));
 
   const mat = new THREE.PointsMaterial({
-    size: 4.5,
+    size: 4.2,
     vertexColors: true,
     map: GLOW,
     transparent: true,
@@ -2492,7 +2422,8 @@ function updateFromBackendState(data) {
     }
     compile(org);
     rebuildViews();
-    log(`[GROWTH] 形态发生重构: ${data.organism_id || 'SDSCC'} (${org.cells.length} 细胞 / ${org.syns.length} 突触)`, true);
+    initLODCloud(30000);
+    log(`[GROWTH] 拓扑力导向点云重构: ${data.organism_id || 'SDSCC'} (${org.cells.length} 细胞 / ${org.syns.length} 突触)`, true);
   }
 
   // 1. 节流更新 DOM 文本指标
@@ -2809,9 +2740,7 @@ window.selectOrganism = async function(organismId, organismName) {
     const data = await res.json();
     if(data.status === 'ok') {
       log(`[形态重构成功] 后端已切换至【${data.result.name}】！物理细胞: ${data.result.cells_count} 个，突触: ${data.result.synapses_count} 条，宏观: ${data.result.macro_cells.toLocaleString()} 细胞`, true);
-      // 立即生成对应形态的 30,000 粒子宏观点云 (双脑半球/四足兽/免疫球/三体环)
-      initLODCloud(30000, organismId);
-      // 立即拉取物理状态并平滑更新 3D 舞台
+      // 立即拉取物理状态，触发真实的拓扑力导向点云重构与平滑更新
       await syncBackendState();
     }
   } catch(e) {
