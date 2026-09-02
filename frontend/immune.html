@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>红皇后捕食者-猎物生态协同演化沙盒 // SDSCC Ecosystem</title>
+    <title>微观免疫防线：巨噬细胞吞噬与抗原追猎沙盒 // SDSCC Immune</title>
     <style>
         :root {
             --bg-base: #06090e;
@@ -19,12 +19,7 @@
             --font-mono: "JetBrains Mono", Consolas, monospace;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             background-color: var(--bg-base);
             color: var(--text-main);
@@ -50,7 +45,7 @@
             font-size: 13px;
             font-weight: 700;
             letter-spacing: 0.5px;
-            color: var(--rose-glow);
+            color: var(--purple-glow);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -61,10 +56,10 @@
             align-items: center;
             gap: 6px;
             background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(244, 63, 94, 0.5);
+            border: 1px solid rgba(168, 85, 247, 0.5);
             border-radius: 6px;
             padding: 3px 10px;
-            box-shadow: 0 0 14px rgba(244, 63, 94, 0.2);
+            box-shadow: 0 0 14px rgba(168, 85, 247, 0.2);
         }
 
         .nav-btn {
@@ -81,22 +76,15 @@
             font-family: inherit;
         }
 
-        .nav-btn:hover {
-            color: var(--rose-glow);
-            border-color: var(--rose-glow);
-        }
-
+        .nav-btn:hover { color: var(--purple-glow); border-color: var(--purple-glow); }
         .nav-btn.active {
-            background: rgba(244, 63, 94, 0.25);
-            color: var(--rose-glow);
-            border-color: var(--rose-glow);
-            box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
+            background: rgba(168, 85, 247, 0.25);
+            color: var(--purple-glow);
+            border-color: var(--purple-glow);
+            box-shadow: 0 0 10px rgba(168, 85, 247, 0.4);
         }
 
-        .nav-links {
-            display: flex;
-            gap: 6px;
-        }
+        .nav-links { display: flex; gap: 6px; }
 
         main {
             flex: 1;
@@ -139,13 +127,11 @@
             align-items: center;
         }
 
-        canvas {
-            display: block;
-        }
+        canvas { display: block; }
 
-        .eco-top-bar {
+        .immune-top-bar {
             background: rgba(13, 18, 29, 0.95);
-            border-bottom: 1px solid rgba(244, 63, 94, 0.4);
+            border-bottom: 1px solid rgba(168, 85, 247, 0.4);
             padding: 8px 16px;
             display: flex;
             align-items: center;
@@ -174,29 +160,14 @@
             padding: 8px;
         }
 
-        .stat-label {
-            font-size: 10px;
-            color: var(--text-dim);
-            margin-bottom: 4px;
-        }
-
-        .stat-val {
-            font-size: 16px;
-            font-weight: 700;
-            color: var(--text-main);
-        }
-
+        .stat-label { font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
+        .stat-val { font-size: 16px; font-weight: 700; color: var(--text-main); }
+        .stat-val.purple { color: var(--purple-glow); }
         .stat-val.rose { color: var(--rose-glow); }
-        .stat-val.cyan { color: var(--cyan-glow); }
         .stat-val.emerald { color: var(--emerald-glow); }
         .stat-val.amber { color: var(--amber-glow); }
 
-        .chart-box {
-            height: 150px;
-            padding: 10px;
-            position: relative;
-        }
-
+        .chart-box { height: 150px; padding: 10px; position: relative; }
         .info-box {
             padding: 10px 12px;
             font-size: 11px;
@@ -211,59 +182,59 @@
 
     <header>
         <div class="brand">
-            <span>[RED_QUEEN_ECOSYSTEM]</span>
+            <span>[IMMUNE_DEFENSE]</span>
             <span style="color:var(--text-dim);">//</span>
-            <span style="color:var(--text-main);">捕食者-猎物双轨协同演化</span>
+            <span style="color:var(--text-main);">巨噬细胞吞噬与抗原追猎</span>
         </div>
 
         <div class="warp-bar">
-            <span style="color:var(--rose-glow);font-weight:bold;font-size:12px;">[WARP_ACCELERATOR]:</span>
-            <button class="nav-btn" onclick="setEcoWarp(1)" id="hw-1">1x 常规</button>
-            <button class="nav-btn active" onclick="setEcoWarp(5)" id="hw-5">5x 敏捷</button>
-            <button class="nav-btn" onclick="setEcoWarp(20)" id="hw-20">20x 极速</button>
-            <button class="nav-btn" onclick="setEcoWarp(50)" id="hw-50" style="color:var(--amber-glow);font-weight:bold;">50x 狂飙</button>
+            <span style="color:var(--purple-glow);font-weight:bold;font-size:12px;">[WARP_ACCELERATOR]:</span>
+            <button class="nav-btn" onclick="setImmuneWarp(1)" id="hw-1">1x 常规</button>
+            <button class="nav-btn active" onclick="setImmuneWarp(5)" id="hw-5">5x 敏捷</button>
+            <button class="nav-btn" onclick="setImmuneWarp(20)" id="hw-20">20x 极速</button>
+            <button class="nav-btn" onclick="setImmuneWarp(50)" id="hw-50" style="color:var(--amber-glow);font-weight:bold;">50x 狂飙</button>
         </div>
 
-                <div class="nav-links">
+        <div class="nav-links">
             <a href="index.html" class="nav-btn">工作台</a>
             <a href="cellular.html" class="nav-btn">3D全息力场</a>
             <a href="maze.html" class="nav-btn">具身迷宫</a>
-            <a href="ecosystem.html" class="nav-btn active" style="color:var(--rose-glow);">红皇后生态</a>
-            <a href="locomotion.html" class="nav-btn" style="color:var(--amber-glow);">软体步态</a>
-            <a href="immune.html" class="nav-btn" style="color:var(--purple-glow);">免疫防线</a>
-            <a href="slingshot.html" class="nav-btn" style="color:var(--cyan-glow);">三体引力</a>
+            <a href="ecosystem.html" class="nav-btn">红皇后生态</a>
+            <a href="locomotion.html" class="nav-btn">软体步态</a>
+            <a href="immune.html" class="nav-btn active">免疫防线</a>
+            <a href="slingshot.html" class="nav-btn">三体引力</a>
         </div>
     </header>
 
     <main>
         <div class="viewport-card">
             <div class="panel-header">
-                <span>[2D_CONTINUOUS_ARENA] // RED_QUEEN_COEVOLUTION</span>
-                <span style="color:var(--rose-glow);" id="hud-status">STATUS: COEVOLVING</span>
+                <span>[2D_MICROSCOPIC_MATRIX] // CELLULAR_IMMUNE_PHAGOCYTOSIS</span>
+                <span style="color:var(--purple-glow);" id="hud-status">STATUS: HUNTING_PATHOGENS</span>
             </div>
             
-            <div class="eco-top-bar">
+            <div class="immune-top-bar">
                 <div style="display:flex;gap:8px;align-items:center;">
                     <button class="nav-btn" id="btn-toggle" onclick="toggleSim()">[PAUSE / RESUME]</button>
-                    <button class="nav-btn" onclick="resetEco()">[RESET_ECOSYSTEM]</button>
+                    <button class="nav-btn" onclick="resetImmune()">[INJECT_NEW_VIRUS]</button>
                 </div>
                 <div style="font-size:11px;color:var(--text-dim);">
-                    <span style="color:var(--cyan-glow);">■ 草食猎物 (Prey)</span> &nbsp;|&nbsp;
-                    <span style="color:var(--rose-glow);">■ 肉食捕食者 (Predator)</span> &nbsp;|&nbsp;
-                    <span style="color:var(--emerald-glow);">● 能量植物 (Flora)</span>
+                    <span style="color:var(--purple-glow);">● 巨噬免疫卫士 (Macrophage)</span> &nbsp;|&nbsp;
+                    <span style="color:var(--rose-glow);">* 异变病毒颗粒 (Pathogen)</span> &nbsp;|&nbsp;
+                    <span style="color:rgba(168,85,247,0.2);">○ 化学趋化感知场</span>
                 </div>
             </div>
 
             <div class="canvas-container" id="canvas-wrap">
-                <canvas id="eco-canvas"></canvas>
+                <canvas id="immune-canvas"></canvas>
             </div>
         </div>
 
         <div class="sidebar">
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[POPULATION_METRICS]</span>
-                    <span style="color:var(--cyan-glow);">LOTKA_VOLTERRA</span>
+                    <span>[IMMUNE_CLEARANCE_METRICS]</span>
+                    <span style="color:var(--purple-glow);">PHAGOCYTOSIS</span>
                 </div>
                 <div class="stat-grid">
                     <div class="stat-box">
@@ -272,44 +243,44 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">CYCLE_STEPS</div>
-                        <div class="stat-val" id="stat-steps">0 / 360</div>
+                        <div class="stat-val" id="stat-steps">0 / 300</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">ALIVE_PREY</div>
-                        <div class="stat-val cyan" id="stat-prey">36 / 36</div>
+                        <div class="stat-label">CLEARANCE_RATE</div>
+                        <div class="stat-val emerald" id="stat-clear">0.0%</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">TOTAL_HUNTS</div>
-                        <div class="stat-val rose" id="stat-hunts">0 HUNTS</div>
+                        <div class="stat-label">PATHOGENS_LEFT</div>
+                        <div class="stat-val rose" id="stat-left">40 / 40</div>
                     </div>
                 </div>
             </div>
 
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[POPULATION_DYNAMICS_CHART]</span>
-                    <span style="color:var(--emerald-glow);">PREY_VS_PREDATOR</span>
+                    <span>[VIRAL_CLEARANCE_CURVE]</span>
+                    <span style="color:var(--emerald-glow);">ANTIBODY_EFFICACY</span>
                 </div>
                 <div class="chart-box">
                     <canvas id="chart-canvas" width="340" height="130"></canvas>
                 </div>
                 <div class="info-box">
-                    <strong>[红皇后假说动力学]：</strong><br>
-                    草食细胞演化出敏捷躲避与鸟群凝聚（Flocking），逼迫肉食捕食者演化出协同包夹与爆发冲刺。两者的军备竞赛永不停止。
+                    <strong>[细胞免疫吞噬与抗体演化]：</strong><br>
+                    巨噬卫士利用表面化学趋化受体感知病毒浓度梯度，伸出流动变形伪足实施精准追猎与胞吞消化，清除率随代际演化迅速攀升。
                 </div>
             </div>
         </div>
     </main>
 
     <script>
-        const canvas = document.getElementById("eco-canvas");
+        const canvas = document.getElementById("immune-canvas");
         const ctx = canvas.getContext("2d");
         const chartCanvas = document.getElementById("chart-canvas");
         const chartCtx = chartCanvas.getContext("2d");
         const wrap = document.getElementById("canvas-wrap");
 
         let isRunning = true;
-        let ecoState = null;
+        let immuneState = null;
 
         function resize() {
             canvas.width = wrap.clientWidth;
@@ -318,56 +289,55 @@
         window.addEventListener("resize", resize);
         resize();
 
-        window.setEcoWarp = async function(speed) {
+        window.setImmuneWarp = async function(speed) {
             document.querySelectorAll('[id^="hw-"]').forEach(b => b.classList.remove("active"));
             const btn = document.getElementById("hw-" + speed);
             if (btn) btn.classList.add("active");
             try {
-                await fetch("/api/eco/warp?speed=" + speed);
+                await fetch("/api/immune/warp?speed=" + speed);
             } catch(e) {}
         };
 
-        window.resetEco = async function() {
+        window.resetImmune = async function() {
             try {
-                await fetch("/api/eco/reset");
+                await fetch("/api/immune/reset");
             } catch(e) {}
         };
 
         window.toggleSim = function() {
             isRunning = !isRunning;
-            document.getElementById("hud-status").innerText = isRunning ? "STATUS: COEVOLVING" : "STATUS: PAUSED";
+            document.getElementById("hud-status").innerText = isRunning ? "STATUS: HUNTING_PATHOGENS" : "STATUS: PAUSED";
         };
 
-        async function fetchEcoState() {
+        async function fetchImmuneState() {
             if (!isRunning) return;
             try {
-                const res = await fetch("/api/eco/status");
+                const res = await fetch("/api/immune/status");
                 if (res.ok) {
-                    ecoState = await res.json();
+                    immuneState = await res.json();
                     updateUI();
                 }
             } catch(e) {}
         }
 
         function updateUI() {
-            if (!ecoState) return;
-            document.getElementById("stat-gen").innerText = `GEN-${ecoState.generation}`;
-            document.getElementById("stat-steps").innerText = `${ecoState.step_count} / ${ecoState.max_steps || 360}`;
-            document.getElementById("stat-prey").innerText = `${ecoState.prey_alive} / ${ecoState.total_prey}`;
-            document.getElementById("stat-hunts").innerText = `${ecoState.total_hunts} HUNTS`;
+            if (!immuneState) return;
+            document.getElementById("stat-gen").innerText = `GEN-${immuneState.generation}`;
+            document.getElementById("stat-steps").innerText = `${immuneState.step_count} / ${immuneState.max_steps || 300}`;
+            document.getElementById("stat-clear").innerText = `${immuneState.clearance_rate}%`;
+            document.getElementById("stat-left").innerText = `${immuneState.pathogens_alive} / ${immuneState.total_pathogens}`;
             drawChart();
         }
 
         function drawChart() {
-            if (!ecoState) return;
+            if (!immuneState) return;
             const w = chartCanvas.width;
             const h = chartCanvas.height;
             chartCtx.fillStyle = "#030712";
             chartCtx.fillRect(0, 0, w, h);
 
-            const preys = ecoState.history_prey || [];
-            const preds = ecoState.history_pred || [];
-            if (preys.length < 2) return;
+            const clears = immuneState.history_clearance || [];
+            if (clears.length < 2) return;
 
             chartCtx.strokeStyle = "#1e293b";
             chartCtx.lineWidth = 1;
@@ -375,23 +345,12 @@
             chartCtx.moveTo(0, h/2); chartCtx.lineTo(w, h/2);
             chartCtx.stroke();
 
-            chartCtx.strokeStyle = "#00f0ff";
+            chartCtx.strokeStyle = "#a855f7";
             chartCtx.lineWidth = 2;
             chartCtx.beginPath();
-            preys.forEach((val, i) => {
-                const x = (i / (preys.length - 1)) * w;
-                const y = h - (val / 36.0) * (h - 20) - 10;
-                if (i === 0) chartCtx.moveTo(x, y);
-                else chartCtx.lineTo(x, y);
-            });
-            chartCtx.stroke();
-
-            chartCtx.strokeStyle = "#f43f5e";
-            chartCtx.lineWidth = 2;
-            chartCtx.beginPath();
-            preds.forEach((val, i) => {
-                const x = (i / (preds.length - 1)) * w;
-                const y = h - (val / 36.0) * (h - 20) - 10;
+            clears.forEach((val, i) => {
+                const x = (i / (clears.length - 1)) * w;
+                const y = h - (val / 100.0) * (h - 20) - 10;
                 if (i === 0) chartCtx.moveTo(x, y);
                 else chartCtx.lineTo(x, y);
             });
@@ -400,7 +359,7 @@
 
         function render() {
             requestAnimationFrame(render);
-            if (!ecoState) return;
+            if (!immuneState) return;
 
             const scaleX = canvas.width / 800;
             const scaleY = canvas.height / 600;
@@ -408,68 +367,69 @@
             ctx.fillStyle = "#030712";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            (ecoState.food || []).forEach(f => {
-                ctx.fillStyle = "#10b981";
-                ctx.shadowColor = "#10b981";
-                ctx.shadowBlur = 8;
-                ctx.beginPath();
-                ctx.arc(f.x * scaleX, f.y * scaleY, 3.5, 0, Math.PI * 2);
-                ctx.fill();
-            });
-            ctx.shadowBlur = 0;
-
-            (ecoState.prey || []).forEach(p => {
+            // 1. 绘制变异病毒 (Pathogens)
+            (immuneState.pathogens || []).forEach(p => {
                 if (!p.alive) return;
                 const px = p.x * scaleX;
                 const py = p.y * scaleY;
-                ctx.save();
-                ctx.translate(px, py);
-                ctx.rotate(p.theta);
-
-                ctx.fillStyle = "#00f0ff";
-                ctx.shadowColor = "#00f0ff";
-                ctx.shadowBlur = 6;
+                ctx.fillStyle = p.type === 0 ? "#f43f5e" : (p.type === 1 ? "#fbbf24" : "#ec4899");
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.shadowBlur = 8;
                 ctx.beginPath();
-                ctx.moveTo(7, 0);
-                ctx.lineTo(-5, -4);
-                ctx.lineTo(-3, 0);
-                ctx.lineTo(-5, 4);
-                ctx.closePath();
+                ctx.arc(px, py, 4.0, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.restore();
+
+                // 病毒表面突刺
+                ctx.strokeStyle = ctx.fillStyle;
+                ctx.lineWidth = 1.5;
+                for (let a = 0; a < Math.PI * 2; a += Math.PI / 3) {
+                    ctx.beginPath();
+                    ctx.moveTo(px + Math.cos(a) * 3, py + Math.sin(a) * 3);
+                    ctx.lineTo(px + Math.cos(a) * 7, py + Math.sin(a) * 7);
+                    ctx.stroke();
+                }
             });
             ctx.shadowBlur = 0;
 
-            (ecoState.predators || []).forEach(pred => {
-                const px = pred.x * scaleX;
-                const py = pred.y * scaleY;
-                ctx.save();
-                ctx.translate(px, py);
-                ctx.rotate(pred.theta);
+            // 2. 绘制巨噬免疫细胞 (Macrophage with Pseudopods)
+            (immuneState.macrophages || []).forEach(m => {
+                const px = m.x * scaleX;
+                const py = m.y * scaleY;
+                const r = m.radius * scaleX;
 
-                ctx.fillStyle = "rgba(244, 63, 94, 0.08)";
+                // 化学感应光圈
+                ctx.strokeStyle = "rgba(168, 85, 247, 0.15)";
+                ctx.lineWidth = 1;
                 ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.arc(0, 0, 70 * scaleX, -0.4, 0.4);
+                ctx.arc(px, py, m.chem_r * scaleX, 0, Math.PI * 2);
+                ctx.stroke();
+
+                // 巨噬细胞流动质膜
+                ctx.fillStyle = "rgba(168, 85, 247, 0.85)";
+                ctx.shadowColor = "#a855f7";
+                ctx.shadowBlur = 12;
+                ctx.beginPath();
+                for (let a = 0; a < Math.PI * 2; a += 0.2) {
+                    const noise = Math.sin(a * 5 + Date.now() * 0.005) * 2.5;
+                    const cr = r + noise;
+                    const x = px + Math.cos(a) * cr;
+                    const y = py + Math.sin(a) * cr;
+                    if (a === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
                 ctx.closePath();
                 ctx.fill();
 
-                ctx.fillStyle = "#f43f5e";
-                ctx.shadowColor = "#f43f5e";
-                ctx.shadowBlur = 10;
+                // 细胞核
+                ctx.fillStyle = "#ffffff";
                 ctx.beginPath();
-                ctx.moveTo(10, 0);
-                ctx.lineTo(-7, -6);
-                ctx.lineTo(-4, 0);
-                ctx.lineTo(-7, 6);
-                ctx.closePath();
+                ctx.arc(px, py, r * 0.35, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.restore();
             });
             ctx.shadowBlur = 0;
         }
 
-        setInterval(fetchEcoState, 30);
+        setInterval(fetchImmuneState, 30);
         requestAnimationFrame(render);
     </script>
 </body>

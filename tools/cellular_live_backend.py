@@ -44,7 +44,7 @@ class LiveMazeSimulator:
         self.success_rate = 0.0
         self.last_success_rate = 0.0
         self.champion_trail = []
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.generate_maze()
         self.init_population(24)
 
@@ -267,7 +267,7 @@ class LiveLocomotionSimulator:
         self.step_count = 0
         self.max_steps = 300
         self.warp_speed = 5
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.history_dist = []
         self.init_population(20)
 
@@ -419,18 +419,18 @@ class LiveLocomotionSimulator:
 
     def get_snapshot(self):
         with self.lock:
-            champ = self.champion
+            champ = self.population[0] if self.population else None
             return {
                 "generation": self.generation,
                 "step_count": self.step_count,
                 "max_steps": self.max_steps,
-                "best_distance": round(champ["fitness"], 1) if champ else 0.0,
+                "best_distance": round(max(c["max_x"] - 140.0 for c in self.population), 1) if self.population else 0.0,
                 "champion": {
-                    "nodes": [{"x": round(n["x"], 1), "y": round(n["y"], 1)} for n in champ["nodes"]],
+                    "nodes": [{"x": round(n["x"], 1), "y": round(n["y"], 1)} for n in champ["nodes"]] if champ else [],
                     "muscles": [
                         {"n1": m["n1"], "n2": m["n2"], "amp": round(m["amp"], 1), "freq": round(m["freq"], 2)}
                         for m in champ["muscles"]
-                    ]
+                    ] if champ else []
                 },
                 "history_dist": list(self.history_dist)
             }
@@ -457,7 +457,7 @@ class LiveEcosystemSimulator:
         self.step_count = 0
         self.max_steps = 360
         self.warp_speed = 5
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
         self.food = []
         self.prey = []
         self.predators = []
@@ -699,6 +699,387 @@ threading.Thread(target=eco_loop, daemon=True).start()
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
+
+# ============================================================================
+# 0.11 微观免疫防线：巨噬细胞吞噬与抗原追猎动力学引擎 (Immune Phagocytosis Engine)
+# ============================================================================
+
+class LiveImmuneSimulator:
+    def __init__(self, width=800, height=600):
+        self.width = width
+        self.height = height
+        self.generation = 1
+        self.step_count = 0
+        self.max_steps = 300
+        self.warp_speed = 5
+        self.lock = threading.RLock()
+        self.pathogens = []
+        self.macrophages = []
+        self.history_clearance = []
+        self.init_microenvironment()
+
+    def init_microenvironment(self):
+        with self.lock:
+            # 1. 异变病毒病原体 (Pathogens, 40 颗)
+            self.pathogens = []
+            for i in range(40):
+                self.pathogens.append({
+                    "id": i,
+                    "x": random.uniform(40, self.width - 40),
+                    "y": random.uniform(40, self.height - 40),
+                    "vx": random.uniform(-1.2, 1.2),
+                    "vy": random.uniform(-1.2, 1.2),
+                    "alive": True,
+                    "mut_type": random.choice([0, 1, 2]) # 0: 脂质包膜, 1: 棘突蛋白, 2: 变异株
+                })
+
+            # 2. 巨噬/T细胞宿主免疫卫士 (Macrophages, 12 只)
+            self.macrophages = []
+            for i in range(12):
+                self.macrophages.append({
+                    "id": i,
+                    "x": random.uniform(80, self.width - 80),
+                    "y": random.uniform(80, self.height - 80),
+                    "theta": random.uniform(0, math.tau),
+                    "pseudopods": 6, # 伪足数
+                    "radius": 14.0,
+                    "phagocytosed": 0,
+                    # 免疫基因组: [化学趋化感知半径, 伪足伸缩强度, 吞噬速度, 抗体亲和力]
+                    "genes": [
+                        random.uniform(140.0, 260.0), # chemotaxis_radius
+                        random.uniform(4.0, 10.0),    # pseudopod_amp
+                        random.uniform(2.8, 4.5),     # speed
+                        random.uniform(0.8, 2.0)      # affinity
+                    ]
+                })
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            
+            # 1. 病毒扩散与布朗运动
+            for pat in self.pathogens:
+                if not pat["alive"]: continue
+                pat["vx"] += random.uniform(-0.2, 0.2)
+                pat["vy"] += random.uniform(-0.2, 0.2)
+                pat["vx"] = max(-2.0, min(2.0, pat["vx"]))
+                pat["vy"] = max(-2.0, min(2.0, pat["vy"]))
+                pat["x"] = max(10, min(self.width - 10, pat["x"] + pat["vx"]))
+                pat["y"] = max(10, min(self.height - 10, pat["y"] + pat["vy"]))
+
+            # 2. 免疫细胞化学趋化性追踪与伪足吞噬
+            for mac in self.macrophages:
+                r_chem = mac["genes"][0]
+                closest_p = None
+                closest_d = 9999.0
+                
+                for pat in self.pathogens:
+                    if not pat["alive"]: continue
+                    d = math.hypot(pat["x"] - mac["x"], pat["y"] - mac["y"])
+                    if d < r_chem and d < closest_d:
+                        closest_d = d
+                        closest_p = pat
+
+                if closest_p:
+                    target_theta = math.atan2(closest_p["y"] - mac["y"], closest_p["x"] - mac["x"])
+                    diff = (target_theta - mac["theta"] + math.pi) % math.tau - math.pi
+                    mac["theta"] += diff * 0.25
+                    spd = mac["genes"][2]
+
+                    # 吞噬距离检测 (Phagocytosis)
+                    if closest_d < (mac["radius"] + 6.0):
+                        closest_p["alive"] = False
+                        mac["phagocytosed"] += 1
+                        mac["radius"] = min(22.0, mac["radius"] + 0.4)
+                else:
+                    mac["theta"] += random.uniform(-0.15, 0.15)
+                    spd = mac["genes"][2] * 0.55
+
+                mac["x"] = max(20, min(self.width - 20, mac["x"] + math.cos(mac["theta"]) * spd))
+                mac["y"] = max(20, min(self.height - 20, mac["y"] + math.sin(mac["theta"]) * spd))
+
+            alive_pathogens = sum(1 for p in self.pathogens if p["alive"])
+            if self.step_count >= self.max_steps or alive_pathogens == 0:
+                self.evolve_immunity()
+
+    def evolve_immunity(self):
+        alive_count = sum(1 for p in self.pathogens if p["alive"])
+        cleared_rate = (40 - alive_count) / 40.0
+        self.history_clearance.append(round(cleared_rate * 100.0, 1))
+        if len(self.history_clearance) > 30:
+            self.history_clearance.pop(0)
+
+        for m in self.macrophages:
+            m["fitness"] = m["phagocytosed"] * 30.0 + m["genes"][3] * 10.0
+        self.macrophages.sort(key=lambda m: m["fitness"], reverse=True)
+        top_macs = self.macrophages[:4]
+        new_macs = []
+
+        for i in range(len(self.macrophages)):
+            parent = random.choice(top_macs)
+            child_genes = [g + (random.gauss(0, 0.1) if random.random() < 0.35 else 0.0) for g in parent["genes"]]
+            new_macs.append({
+                "id": i,
+                "x": random.uniform(80, self.width - 80),
+                "y": random.uniform(80, self.height - 80),
+                "theta": random.uniform(0, math.tau),
+                "pseudopods": 6,
+                "radius": 14.0,
+                "phagocytosed": 0,
+                "genes": child_genes
+            })
+        self.macrophages = new_macs
+
+        # 重新投放下一批变异病毒株
+        self.pathogens = []
+        for i in range(40):
+            self.pathogens.append({
+                "id": i,
+                "x": random.uniform(40, self.width - 40),
+                "y": random.uniform(40, self.height - 40),
+                "vx": random.uniform(-1.2, 1.2),
+                "vy": random.uniform(-1.2, 1.2),
+                "alive": True,
+                "mut_type": random.choice([0, 1, 2])
+            })
+        self.generation += 1
+        self.step_count = 0
+
+    def get_snapshot(self):
+        with self.lock:
+            alive_p = sum(1 for p in self.pathogens if p["alive"])
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "max_steps": self.max_steps,
+                "pathogens_alive": alive_p,
+                "total_pathogens": len(self.pathogens),
+                "total_phagocytosed": 40 - alive_p,
+                "clearance_rate": round((40 - alive_p) / 40.0 * 100.0, 1),
+                "pathogens": [
+                    {"id": p["id"], "x": round(p["x"], 1), "y": round(p["y"], 1), "alive": p["alive"], "type": p["mut_type"]}
+                    for p in self.pathogens
+                ],
+                "macrophages": [
+                    {
+                        "id": m["id"],
+                        "x": round(m["x"], 1),
+                        "y": round(m["y"], 1),
+                        "theta": round(m["theta"], 2),
+                        "radius": round(m["radius"], 1),
+                        "phagocytosed": m["phagocytosed"],
+                        "chem_r": round(m["genes"][0], 1)
+                    }
+                    for m in self.macrophages
+                ],
+                "history_clearance": list(self.history_clearance)
+            }
+
+live_immune = LiveImmuneSimulator()
+
+def immune_loop():
+    while True:
+        for _ in range(live_immune.warp_speed):
+            live_immune.step_physics()
+        time.sleep(0.016)
+
+threading.Thread(target=immune_loop, daemon=True).start()
+
+# ============================================================================
+# 0.12 混沌三体引力弹膏深空导航动力学引擎 (Three-Body Slingshot Engine)
+# ============================================================================
+
+class LiveSlingshotSimulator:
+    def __init__(self, width=800, height=600):
+        self.width = width
+        self.height = height
+        self.generation = 1
+        self.step_count = 0
+        self.max_steps = 360
+        self.warp_speed = 5
+        self.lock = threading.RLock()
+        self.history_success = []
+        self.init_system()
+
+    def init_system(self):
+        with self.lock:
+            # 3 颗大质量恒星 (Three-Body Stars)
+            self.stars = [
+                {"x": 280.0, "y": 300.0, "vx": 0.0, "vy": 1.2, "m": 8000.0, "color": "#f43f5e"},
+                {"x": 520.0, "y": 300.0, "vx": 0.0, "vy": -1.2, "m": 8000.0, "color": "#fbbf24"},
+                {"x": 400.0, "y": 480.0, "vx": 1.0, "vy": 0.0, "m": 6000.0, "color": "#a855f7"}
+            ]
+            self.target_planet = {"x": 700.0, "y": 120.0, "r": 18.0}
+            
+            # 16 艘硅基自适应深空探测器 (Probes)
+            self.probes = []
+            for i in range(16):
+                self.probes.append({
+                    "id": i,
+                    "x": 100.0, "y": 500.0,
+                    "vx": random.uniform(1.8, 3.2),
+                    "vy": random.uniform(-3.2, -1.8),
+                    "alive": True,
+                    "reached": False,
+                    "fuel": 100.0,
+                    "trail": [[100.0, 500.0]],
+                    # 探测器控制基因: [引力梯度响应权重, 目标朝向权重, 轨道离心推力, 喷气阈值]
+                    "genes": [
+                        random.uniform(0.5, 2.5),
+                        random.uniform(1.0, 4.0),
+                        random.uniform(0.2, 1.5),
+                        random.uniform(0.1, 0.6)
+                    ]
+                })
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            dt = 0.06
+            G = 0.8
+            
+            # 1. 恒星牛顿混沌引力积分 (Runge-Kutta / Verlet)
+            for i in range(3):
+                s1 = self.stars[i]
+                for j in range(i + 1, 3):
+                    s2 = self.stars[j]
+                    dx = s2["x"] - s1["x"]
+                    dy = s2["y"] - s1["y"]
+                    d = math.hypot(dx, dy) + 10.0
+                    f = (G * s1["m"] * s2["m"]) / (d * d)
+                    fx = (dx / d) * f
+                    fy = (dy / d) * f
+                    s1["vx"] += (fx / s1["m"]) * dt
+                    s1["vy"] += (fy / s1["m"]) * dt
+                    s2["vx"] -= (fx / s2["m"]) * dt
+                    s2["vy"] -= (fy / s2["m"]) * dt
+
+            for s in self.stars:
+                s["x"] += s["vx"] * dt * 10.0
+                s["y"] += s["vy"] * dt * 10.0
+
+            # 2. 探测器在混沌三体场中的引力弹弓与微喷推演
+            tx, ty = self.target_planet["x"], self.target_planet["y"]
+            reached_count = 0
+
+            for p in self.probes:
+                if not p["alive"]: continue
+                if p["reached"]:
+                    reached_count += 1
+                    continue
+
+                # 三体恒星万有引力叠加
+                total_gx, total_gy = 0.0, 0.0
+                crashed = False
+                for s in self.stars:
+                    dx = s["x"] - p["x"]
+                    dy = s["y"] - p["y"]
+                    d = math.hypot(dx, dy)
+                    if d < 15.0: # 坠毁在恒星表面
+                        crashed = True
+                        break
+                    f = (G * s["m"]) / (d * d + 100.0)
+                    total_gx += (dx / d) * f
+                    total_gy += (dy / d) * f
+
+                if crashed:
+                    p["alive"] = False
+                    continue
+
+                # 探测器自主神经喷气推力 (Micro-Thruster Control)
+                dx_t = tx - p["x"]
+                dy_t = ty - p["y"]
+                d_target = math.hypot(dx_t, dy_t)
+                
+                if d_target < self.target_planet["r"]:
+                    p["reached"] = True
+                    reached_count += 1
+                    continue
+
+                # 基因组驱动的自适应喷气
+                thrust_x = (dx_t / d_target) * p["genes"][1] * 0.15
+                thrust_y = (dy_t / d_target) * p["genes"][1] * 0.15
+                
+                p["vx"] += (total_gx * p["genes"][0] + thrust_x) * dt
+                p["vy"] += (total_gy * p["genes"][0] + thrust_y) * dt
+                
+                p["x"] += p["vx"] * dt * 8.0
+                p["y"] += p["vy"] * dt * 8.0
+                
+                if self.step_count % 3 == 0 and len(p["trail"]) < 120:
+                    p["trail"].append([round(p["x"], 1), round(p["y"], 1)])
+
+            if self.step_count >= self.max_steps or reached_count == len(self.probes):
+                self.evolve_slingshot()
+
+    def evolve_slingshot(self):
+        tx, ty = self.target_planet["x"], self.target_planet["y"]
+        reached_count = sum(1 for p in self.probes if p["reached"])
+        self.history_success.append(round(reached_count / len(self.probes) * 100.0, 1))
+        if len(self.history_success) > 30:
+            self.history_success.pop(0)
+
+        for p in self.probes:
+            min_d = min(math.hypot(tx - pt[0], ty - pt[1]) for pt in p["trail"]) if p["trail"] else 999.0
+            p["fitness"] = (800.0 - min_d) + (500.0 if p["reached"] else 0.0)
+            
+        self.probes.sort(key=lambda p: p["fitness"], reverse=True)
+        top_probes = self.probes[:4]
+        new_probes = []
+        
+        for i in range(len(self.probes)):
+            parent = random.choice(top_probes)
+            child_genes = [g + (random.gauss(0, 0.1) if random.random() < 0.35 else 0.0) for g in parent["genes"]]
+            new_probes.append({
+                "id": i,
+                "x": 100.0, "y": 500.0,
+                "vx": random.uniform(1.8, 3.2),
+                "vy": random.uniform(-3.2, -1.8),
+                "alive": True,
+                "reached": False,
+                "fuel": 100.0,
+                "trail": [[100.0, 500.0]],
+                "genes": child_genes
+            })
+        self.probes = new_probes
+        self.generation += 1
+        self.step_count = 0
+        self.init_system()
+
+    def get_snapshot(self):
+        with self.lock:
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "max_steps": self.max_steps,
+                "success_rate": round(sum(1 for p in self.probes if p["reached"]) / len(self.probes) * 100.0, 1),
+                "stars": [{"x": round(s["x"], 1), "y": round(s["y"], 1), "color": s["color"]} for s in self.stars],
+                "target": self.target_planet,
+                "probes": [
+                    {
+                        "id": p["id"],
+                        "x": round(p["x"], 1),
+                        "y": round(p["y"], 1),
+                        "alive": p["alive"],
+                        "reached": p["reached"],
+                        "trail": p["trail"]
+                    }
+                    for p in self.probes
+                ],
+                "history_success": list(self.history_success)
+            }
+
+live_slingshot = LiveSlingshotSimulator()
+
+def slingshot_loop():
+    while True:
+        for _ in range(live_slingshot.warp_speed):
+            live_slingshot.step_physics()
+        time.sleep(0.016)
+
+threading.Thread(target=slingshot_loop, daemon=True).start()
+
+
 class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=FRONTEND_DIR, **kwargs)
@@ -735,6 +1116,82 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
                         size_mb = round(os.path.getsize(fpath) / (1024 * 1024), 2)
                         ckpts.append({"name": fname, "size_mb": size_mb})
             body = json.dumps({"status": "ok", "checkpoints": ckpts}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+                # 免疫防线端点
+        if self.path.startswith("/api/immune/status"):
+            body = json.dumps(live_immune.get_snapshot()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/immune/reset"):
+            live_immune.init_microenvironment()
+            live_immune.generation = 1
+            live_immune.step_count = 0
+            body = json.dumps({"status": "ok", "msg": "Immune reset"}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/immune/warp"):
+            try:
+                import urllib.parse
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                speed = int(qs.get("speed", ["5"])[0])
+                live_immune.warp_speed = max(1, min(50, speed))
+            except Exception:
+                live_immune.warp_speed = 5
+            body = json.dumps({"status": "ok", "warp_speed": live_immune.warp_speed}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # 三体引力弹弓端点
+        if self.path.startswith("/api/slingshot/status"):
+            body = json.dumps(live_slingshot.get_snapshot()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/slingshot/reset"):
+            live_slingshot.init_system()
+            live_slingshot.generation = 1
+            live_slingshot.step_count = 0
+            body = json.dumps({"status": "ok", "msg": "Slingshot reset"}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/slingshot/warp"):
+            try:
+                import urllib.parse
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                speed = int(qs.get("speed", ["5"])[0])
+                live_slingshot.warp_speed = max(1, min(50, speed))
+            except Exception:
+                live_slingshot.warp_speed = 5
+            body = json.dumps({"status": "ok", "warp_speed": live_slingshot.warp_speed}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
