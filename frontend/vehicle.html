@@ -236,6 +236,7 @@
                 <div style="display:flex;gap:8px;align-items:center;">
                     <button class="nav-btn" id="btn-toggle" onclick="toggleSim()">[PAUSE / RESUME]</button>
                     <button class="nav-btn" onclick="resetVeh()">[RESET_POSITION]</button>
+                    <button class="nav-btn" onclick="fastEvolve(50)" style="background:rgba(16,185,129,0.3); border-color:var(--emerald-glow); color:var(--emerald-glow); font-weight:bold;">[⚡ 极速超演化 +50代]</button>
                 </div>
                 <div style="font-size:11px;color:var(--text-dim);">
                     <span style="color:#00f0ff;">■ 自主巡航车辆 (真实在地图上行驶移动)</span> &nbsp;|&nbsp;
@@ -393,6 +394,19 @@
             try {
                 await fetch("/api/vehicle/reset");
             } catch(e) {}
+        };
+
+        window.fastEvolve = async function(gens) {
+            const hud = document.getElementById("hud-status");
+            if (hud) hud.innerText = `STATUS: FAST_EVOLVING (+${gens} GENS)...`;
+            try {
+                const res = await fetch("/api/vehicle/train_fast?generations=" + gens);
+                const data = await res.json();
+                if (hud) hud.innerText = `STATUS: EVOLVED +${gens} GENS (FITNESS: ${data.result.champion_fitness})`;
+                fetchVehState();
+            } catch(e) {
+                if (hud) hud.innerText = "STATUS: AUTONOMOUS_CRUISING";
+            }
         };
 
         window.toggleSim = function() {
