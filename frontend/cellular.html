@@ -833,12 +833,12 @@
   </div>
 
   <!-- 卡片 2: 硅基生命体与文化典籍 (核心流形选择坞) -->
-  <div class="card" id="card-library" style="flex: 1; min-height: 280px;">
-    <div class="card-title">
+  <div class="card" id="card-library" style="flex: 1; min-height: 220px; display: flex; flex-direction: column;">
+    <div class="card-title" style="flex-shrink: 0;">
       <span>硅基生命体与典籍 (Organisms & Books)</span>
       <span class="card-title-badge" id="st-total-books">4 大生命体 / 9 册典籍</span>
     </div>
-    <div id="library-shelf" style="display:flex;flex-direction:column;gap:8px;max-height:460px;overflow-y:auto;font-size:10px;padding-right:4px;">
+    <div id="library-shelf" style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; font-size: 10px; padding-right: 4px;">
     </div>
   </div>
 
@@ -1961,6 +1961,7 @@ pollIslands();
 
 let currentSelectedOrgId = 'apex_generalist_prime';
 let currentHighlightedBookId = null;
+let libraryInitialRenderDone = false;
 
 window.toggleTreeNode = function(orgId) {
   const node = document.getElementById('org-node-' + orgId);
@@ -1979,20 +1980,19 @@ async function pollLibrary() {
       const elB = document.getElementById('st-total-books');
       if(elB) elB.textContent = `${j.organisms.length} 大生命体 / ${j.total_books || 9} 册典籍`;
       const shelf = document.getElementById('library-shelf');
-      if(shelf) {
-        // 保持用户当前的展开状态
-        const openNodes = new Set();
-        shelf.querySelectorAll('.tree-node.open').forEach(g => openNodes.add(g.dataset.orgId));
-        if(openNodes.size === 0) openNodes.add(j.organisms[0].organism_id);
+      
+      // 仅在首次或显式请求时全量渲染 DOM，坚决杜绝定时器无意义重建 DOM 导致的失焦和滚动跳变
+      if(shelf && !libraryInitialRenderDone) {
+        libraryInitialRenderDone = true;
 
         shelf.innerHTML = `<div class="win-tree">` + j.organisms.map((org, idx) => {
-          const isOpen = openNodes.has(org.organism_id) ? "open" : "";
+          const isOpen = idx === 0 ? "open" : "";
           const isSelected = org.organism_id === currentSelectedOrgId ? "selected" : "";
           const cellDesc = org.total_cells >= 100000000 ? '1亿细胞' : org.total_cells >= 10000000 ? '1000万细胞' : ((org.total_cells/10000).toFixed(0)+'万细胞');
 
           const booksHtml = (org.books || []).map(b => {
             const isLeafActive = b.book_id === currentHighlightedBookId ? "active-leaf" : "";
-            return `<div class="tree-leaf ${isLeafActive}" onclick="event.stopPropagation(); highlightBookSubcircuit('${b.book_id}', '${b.title || b.book_id}', '${org.name}')">
+            return `<div class="tree-leaf ${isLeafActive}" data-book-id="${b.book_id}" onclick="event.stopPropagation(); highlightBookSubcircuit('${b.book_id}', '${b.title || b.book_id}', '${org.name}')">
               <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
                 <span>《${b.title || b.book_id}》</span>
                 <span style="color:#fbbf24;font-size:10px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:4px;border:1px solid rgba(251,191,36,0.3);">★ ${b.impact_score || 9.5}</span>
@@ -2019,7 +2019,7 @@ async function pollLibrary() {
                 </div>
                 <div style="display:flex;align-items:center;gap:6px;">
                   <span style="color:var(--cyan);font-size:10px;font-family:var(--font-mono);">${cellDesc}</span>
-                  ${isSelected ? '<span style="color:var(--emerald);font-weight:bold;font-size:9px;">[ACTIVE]</span>' : ''}
+                  <span class="tree-active-badge" style="display:${isSelected ? 'inline-block' : 'none'};">[ACTIVE]</span>
                 </div>
               </div>
             </div>
@@ -2032,7 +2032,6 @@ async function pollLibrary() {
     }
   } catch(e) {}
 }
-setInterval(pollLibrary, 4000);
 pollLibrary();
 
 
@@ -2666,10 +2665,12 @@ window.selectOrganism = async function(organismId, organismName) {
   currentSelectedOrgId = organismId;
   log(`[生命体切换] 正在向后端下达指令，切换至【${organismName}】的全息 3D 拓扑结构...`, true);
 
-  // 1. 设置前端激活高亮
+  // 1. 设置前端激活高亮 (纯 DOM 类切换，零闪烁)
   document.querySelectorAll('.tree-node').forEach(n => {
-    n.classList.remove('selected');
-    if(n.dataset.orgId === organismId) n.classList.add('selected');
+    const isCurrent = n.dataset.orgId === organismId;
+    n.classList.toggle('selected', isCurrent);
+    const badge = n.querySelector('.tree-active-badge');
+    if(badge) badge.style.display = isCurrent ? 'inline-block' : 'none';
   });
 
   // 2. 真实通知后端重构拓扑
@@ -2678,17 +2679,14 @@ window.selectOrganism = async function(organismId, organismName) {
     const data = await res.json();
     if(data.status === 'ok') {
       log(`[形态重构成功] 后端已切换至【${data.result.name}】！物理细胞: ${data.result.cells_count} 个，突触: ${data.result.synapses_count} 条，宏观: ${data.result.macro_cells.toLocaleString()} 细胞`, true);
-      // 立即拉取物理状态并更新 3D 视角
+      // 立即拉取物理状态并平滑更新 3D 舞台
       await syncBackendState();
     }
   } catch(e) {
     console.error("切换生命体失败:", e);
   }
 
-  // 3. 复位视角并触发全脑脉冲
-  window.setCameraPreset('front');
-  pollLibrary();
-
+  // 3. 触发全脑脉冲 (保持用户当前旋转视距不变，杜绝生硬跳变)
   for (const v of views.syns) {
     v.lineMat.color.setHex(0x38bdf8);
     v.lineMat.opacity = 0.85;
@@ -2707,7 +2705,11 @@ window.highlightBookSubcircuit = function(bookId, title, organismName) {
   currentHighlightedBookId = bookId;
   const orgTitle = organismName ? `【${organismName}】体内` : '';
   log(`[典籍回路点亮] 正在精准点亮 ${orgTitle}《${title || bookId}》的特定细胞簇与突触通路！`, true);
-  pollLibrary();
+  
+  // 纯 DOM 类切换锁定当前高亮卡片
+  document.querySelectorAll('.tree-leaf').forEach(leaf => {
+    leaf.classList.toggle('active-leaf', leaf.dataset.bookId === bookId);
+  });
 
   // 1. 确定该典籍对应的特定细胞簇与突触特征色彩
   let targetCells = [];
