@@ -599,6 +599,228 @@ class SiliconLibraryManager:
 
 silicon_library = SiliconLibraryManager()
 
+# ============================================================================
+# 0.8 具身空间智能与迷宫导航物理引擎 (Embodied Chemotaxis Maze Simulator)
+# ============================================================================
+
+class LiveMazeSimulator:
+    def __init__(self, width=21, height=21):
+        self.width = width
+        self.height = height
+        self.generation = 1
+        self.step_count = 0
+        self.max_steps = 160
+        self.success_rate = 0.0
+        self.champion_trail = []
+        self.lock = threading.Lock()
+        self.generate_maze()
+        self.init_agents(24)
+
+    def generate_maze(self):
+        w, h = self.width, self.height
+        self.grid = [1] * (w * h)
+        stack = [(1, 1)]
+        self.grid[1 * w + 1] = 0
+
+        dx = [0, 0, 2, -2]
+        dy = [2, -2, 0, 0]
+
+        while stack:
+            cx, cy = stack[-1]
+            dirs = [0, 1, 2, 3]
+            random.shuffle(dirs)
+            carved = False
+            for d in dirs:
+                nx, ny = cx + dx[d], cy + dy[d]
+                if 0 < nx < w - 1 and 0 < ny < h - 1 and self.grid[ny * w + nx] == 1:
+                    self.grid[ny * w + nx] = 0
+                    self.grid[(cy + dy[d] // 2) * w + (cx + dx[d] // 2)] = 0
+                    stack.append((nx, ny))
+                    carved = True
+                    break
+            if not carved:
+                stack.pop()
+
+        self.start = (1.5, 1.5)
+        self.goal = (float(w - 2) + 0.5, float(h - 2) + 0.5)
+        self.grid[(h - 2) * w + (w - 2)] = 0
+        self.champion_trail = [list(self.start)]
+
+    def init_agents(self, num=24):
+        self.agents = []
+        for i in range(num):
+            self.agents.append({
+                "id": i,
+                "x": self.start[0],
+                "y": self.start[1],
+                "theta": random.uniform(-0.5, 0.5),
+                "goal": 0,
+                "min_dist": 999.0,
+                "trail": [list(self.start)],
+                "rays": [1.0, 1.0, 1.0],
+                "weights": [random.uniform(-1.0, 1.0) for _ in range(16)] # 4输入 x 4输出微型神经基因
+            })
+
+    def is_wall(self, x, y):
+        gx, gy = int(x), int(y)
+        if gx < 0 or gx >= self.width or gy < 0 or gy >= self.height:
+            return True
+        return self.grid[gy * self.width + gx] == 1
+
+    def cast_ray(self, sx, sy, ang, max_r=6.0):
+        # 高速网格光线步进
+        step = 0.1
+        cur_r = 0.0
+        while cur_r < max_r:
+            cur_r += step
+            rx = sx + math.cos(ang) * cur_r
+            ry = sy + math.sin(ang) * cur_r
+            if self.is_wall(rx, ry):
+                return min(1.0, cur_r / max_r)
+        return 1.0
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            gx, gy = self.goal
+            reached_count = 0
+
+            for ag in self.agents:
+                if ag["goal"] == 1:
+                    reached_count += 1
+                    continue
+
+                # 1. 传感器感知 (SENSE: 3路激光测距 + 终点航向角)
+                r_front = self.cast_ray(ag["x"], ag["y"], ag["theta"])
+                r_left = self.cast_ray(ag["x"], ag["y"], ag["theta"] - 0.785398)
+                r_right = self.cast_ray(ag["x"], ag["y"], ag["theta"] + 0.785398)
+                ag["rays"] = [r_front, r_left, r_right]
+
+                # 终点相对方位角
+                dx = gx - ag["x"]
+                dy = gy - ag["y"]
+                dist = math.hypot(dx, dy)
+                if dist < ag["min_dist"]:
+                    ag["min_dist"] = dist
+                if dist < 0.8:
+                    ag["goal"] = 1
+                    reached_count += 1
+                    continue
+
+                target_ang = math.atan2(dy, dx)
+                diff_ang = (target_ang - ag["theta"] + math.pi) % (2 * math.pi) - math.pi
+                bearing = diff_ang / math.pi # [-1.0, 1.0]
+
+                # 2. 神经前向推演 (4维输入 -> 4维动作: 推进, 左转, 右转, 倒车)
+                w = ag["weights"]
+                act_fwd = math.tanh(r_front * w[0] + r_left * w[1] + r_right * w[2] + bearing * w[3])
+                act_left = math.tanh(r_front * w[4] + r_left * w[5] + r_right * w[6] + bearing * w[7])
+                act_right = math.tanh(r_front * w[8] + r_left * w[9] + r_right * w[10] + bearing * w[11])
+                act_rev = math.tanh(r_front * w[12] + r_left * w[13] + r_right * w[14] + bearing * w[15])
+
+                # 3. 动力学积分
+                turn = (act_right - act_left) * 0.25
+                speed = max(0.0, act_fwd * 0.12 - act_rev * 0.05)
+                # 避障本能强化: 前方极近时强制反向转向
+                if r_front < 0.15:
+                    turn += 0.4 if r_left > r_right else -0.4
+                    speed *= 0.3
+
+                ag["theta"] += turn
+                nx = ag["x"] + math.cos(ag["theta"]) * speed
+                ny = ag["y"] + math.sin(ag["theta"]) * speed
+
+                # 碰撞滑动 (Collision Sliding)
+                if not self.is_wall(nx, ag["y"]):
+                    ag["x"] = nx
+                if not self.is_wall(ag["x"], ny):
+                    ag["y"] = ny
+
+                if self.step_count % 3 == 0 and len(ag["trail"]) < 120:
+                    ag["trail"].append([round(ag["x"], 2), round(ag["y"], 2)])
+
+            self.success_rate = reached_count / len(self.agents)
+
+            # 世代结束与达尔文演化繁殖
+            if self.step_count >= self.max_steps or reached_count == len(self.agents):
+                self.evolve_generation()
+
+    def evolve_generation(self):
+        # 适应度评估: 越靠近终点适应度越高, 抵达终点者获得超高奖励
+        for ag in self.agents:
+            base_fit = 30.0 - ag["min_dist"]
+            if ag["goal"] == 1:
+                base_fit += 100.0 - ag["min_dist"] * 2.0
+            ag["fit"] = base_fit
+
+        self.agents.sort(key=lambda a: a["fit"], reverse=True)
+        best = self.agents[0]
+        self.champion_trail = list(best["trail"])
+
+        # 精英保留与突变繁殖
+        new_agents = []
+        for i in range(len(self.agents)):
+            if i < 4:
+                # Top 4 精英直接晋级
+                parent = self.agents[i]
+                mut_w = list(parent["weights"])
+            else:
+                # 锦标赛选择 + 突变
+                p1, p2 = random.choice(self.agents[:8]), random.choice(self.agents[:8])
+                parent = p1 if p1["fit"] > p2["fit"] else p2
+                mut_w = [w + (random.gauss(0, 0.15) if random.random() < 0.3 else 0.0) for w in parent["weights"]]
+
+            new_agents.append({
+                "id": i,
+                "x": self.start[0],
+                "y": self.start[1],
+                "theta": random.uniform(-0.5, 0.5),
+                "goal": 0,
+                "min_dist": 999.0,
+                "trail": [list(self.start)],
+                "rays": [1.0, 1.0, 1.0],
+                "weights": mut_w
+            })
+
+        self.agents = new_agents
+        self.generation += 1
+        self.step_count = 0
+
+    def get_snapshot(self):
+        with self.lock:
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "success_rate": round(self.success_rate, 3),
+                "width": self.width,
+                "height": self.height,
+                "start": list(self.start),
+                "goal": list(self.goal),
+                "grid": self.grid,
+                "champion_trail": self.champion_trail,
+                "agents": [
+                    {
+                        "id": ag["id"],
+                        "x": round(ag["x"], 2),
+                        "y": round(ag["y"], 2),
+                        "theta": round(ag["theta"], 3),
+                        "goal": ag["goal"],
+                        "rays": [round(r, 2) for r in ag["rays"]]
+                    }
+                    for ag in self.agents
+                ]
+            }
+
+live_maze = LiveMazeSimulator()
+
+def maze_loop():
+    while True:
+        live_maze.step_physics()
+        time.sleep(0.04) # 25 FPS 连续动力学演化
+
+threading.Thread(target=maze_loop, daemon=True).start()
+
+
 organism = LiveOrganism()
 
 # ============================================================================
@@ -684,6 +906,37 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         
         
         
+        
+        if self.path.startswith("/api/maze/status"):
+            body = json.dumps(live_maze.get_snapshot()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/maze/reset"):
+            live_maze.generate_maze()
+            live_maze.init_agents(24)
+            body = json.dumps({"status": "ok", "msg": "New maze generated"}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/maze/step"):
+            live_maze.evolve_generation()
+            body = json.dumps({"status": "ok", "generation": live_maze.generation}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if self.path.startswith("/api/library"):
             silicon_library.reload_books()
             body = json.dumps({"status": "ok", "total_books": len(silicon_library.books), "books": silicon_library.books}, ensure_ascii=False).encode("utf-8")
