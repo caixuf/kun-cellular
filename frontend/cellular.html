@@ -2648,33 +2648,30 @@ function animate(){
   );
   camera.lookAt(currentLookAt);
 
-  // 2. Smootherstep 驱动的无级 LOD 渐变
+  // 2. Smootherstep 驱动的无级 LOD 渐变 (保留宏观高密背景流形，杜绝放大时点云被突兀清空)
   const macroAlpha = smootherstep(300, 560, camR);
   const microAlpha = 1.0 - smootherstep(320, 580, camR);
 
   if (lodPointsMesh && lodPointsMesh.material) {
-    lodPointsMesh.material.opacity = macroAlpha * 0.92;
-    lodPointsMesh.visible = (macroAlpha > 0.01);
-    if (lodPointsMesh.visible) {
-      lodPointsMesh.rotation.y += dt * 0.035;
-    }
+    // 关键优化：拉近镜头时，宏观点云绝不粗暴清空，而是保持柔和发光的介观/微观背景细胞质胶体 (Cytoplasmic Matrix Fog)
+    // 使得近景下前景微观细胞与后景百万细胞流形自然共存，真正呈现“显微镜潜入密集组织”的真实纵深感！
+    const pointCloudAlpha = Math.max(0.35, macroAlpha);
+    lodPointsMesh.material.opacity = pointCloudAlpha * 0.88;
+    lodPointsMesh.visible = true;
+    lodPointsMesh.rotation.y += dt * 0.025;
   }
 
   // 3. 微观实体网格弹性缩放与淡入淡出 (Scale-In / Scale-Out Bloom)
-  const meshScale = 0.35 + microAlpha * 0.65;
+  const meshScale = 0.45 + microAlpha * 0.55;
   for (const v of views.cells) {
-    v.group.visible = (microAlpha > 0.01);
-    if (v.group.visible) {
-      v.group.scale.set(meshScale, meshScale, meshScale);
-      v.membrane.material.opacity = microAlpha * 0.45;
-    }
+    v.group.visible = true;
+    v.group.scale.set(meshScale, meshScale, meshScale);
+    v.membrane.material.opacity = 0.25 + microAlpha * 0.45;
     v.update(now * 0.001, clientWarpMultiplier);
   }
   for (const v of views.syns) {
-    v.group.visible = (microAlpha > 0.01);
-    if (v.group.visible) {
-      v.lineMat.opacity = microAlpha * 0.65;
-    }
+    v.group.visible = true;
+    v.lineMat.opacity = 0.2 + microAlpha * 0.65;
     v.update(now * 0.001, clientWarpMultiplier);
   }
 
