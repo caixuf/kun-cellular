@@ -351,15 +351,24 @@ class LiveVehicleSimulator:
 
     def init_track(self):
         self.track_points = []
-        for i in range(180):
-            s_i = (i / 180) * (math.tau / 0.0025)
+        num_pts = 360
+        for i in range(num_pts):
+            s_i = (i / num_pts) * (math.tau / 0.0025)
             x, y, theta = self.get_track_point(s_i)
-            self.track_points.append({"s": round(s_i, 1), "x": round(x, 1), "y": round(y, 1), "theta": round(theta, 3)})
+            _, _, theta_next = self.get_track_point(s_i + 12.0)
+            curv = abs((theta_next - theta + math.pi) % math.tau - math.pi) / 12.0
+            self.track_points.append({
+                "s": round(s_i, 1),
+                "x": round(x, 1),
+                "y": round(y, 1),
+                "theta": round(theta, 3),
+                "curv": round(curv, 4)
+            })
 
     def init_vehicle(self):
         x0, y0, theta0 = self.get_track_point(0.0)
         self.x, self.y, self.theta = x0, y0, theta0
-        self.v = 2.0
+        self.v = 4.8
         self.delta = 0.0
         self.s = 0.0
         self.cte = 0.0
@@ -370,22 +379,6 @@ class LiveVehicleSimulator:
 
     def next_agent(self):
         with self.lock:
-            steps = max(1, self.agent_lap_steps)
-            fitness = steps / (1.0 + self.agent_cum_cte / steps)
-            self.fitness_log.append(round(fitness, 1))
-            if len(self.fitness_log) > 20:
-                self.fitness_log.pop(0)
-            if fitness > self.champion_fitness:
-                self.champion_fitness = fitness
-                self.champion_genome = self.population[self.current_agent]
-                self.champion_trail = list(self.trail)
-            self.current_agent = (self.current_agent + 1) % len(self.population)
-            if self.current_agent == 0:
-                self.generation += 1
-                if self.champion_genome:
-                    self.population[0] = self.champion_genome
-                    for i in range(1, len(self.population)):
-                        self.population[i] = self.champion_genome.mutate()
             self.init_vehicle()
 
     def step_physics(self):
@@ -393,64 +386,61 @@ class LiveVehicleSimulator:
             self.step_count += 1
             self.agent_lap_steps += 1
             dt = 0.04
-            L = 16.0
+            L = 18.0
+            road_half_w = 23.0
 
-            # 1. 局部高分辨率欧氏距离投影
-            best_s, best_dist = self.s, float("inf")
-            for ds in range(-15, 25):
-                probe_s = self.s + ds * 5.0
-                px, py, _ = self.get_track_point(probe_s)
-                d = (self.x - px)**2 + (self.y - py)**2
-                if d < best_dist:
-                    best_dist, best_s = d, probe_s
-            self.s = best_s
+            # 1. 寻找最近赛道点与预瞄点
+            best_idx = 0
+            best_d = float("inf")
+            for idx, pt in enumerate(self.track_points):
+                d = (self.x - pt["x"])**2 + (self.y - pt["y"])**2
+                if d < best_d:
+                    best_d = d
+                    best_idx = idx
 
-            # 2. 空间几何特征提取
-            cx, cy, road_theta = self.get_track_point(self.s)
-            dx = self.x - cx
-            dy = self.y - cy
-            signed_cte = math.cos(road_theta) * dy - math.sin(road_theta) * dx
+            curr_pt = self.track_points[best_idx]
+            look_idx = (best_idx + 14) % len(self.track_points)
+            look_pt = self.track_points[look_idx]
+
+            cx_b = curr_pt["x"]
+            cy_b = curr_pt["y"]
+            theta_b = curr_pt["theta"]
+            curv_b = curr_pt.get("curv", 0.02)
+            theta_far = look_pt["theta"]
+
+            dx_b = self.x - cx_b
+            dy_b = self.y - cy_b
+            signed_cte = math.cos(theta_b) * dy_b - math.sin(theta_b) * dx_b
             self.cte = abs(signed_cte)
-            self.agent_cum_cte += self.cte
-            heading_err = (road_theta - self.theta + math.pi) % math.tau - math.pi
-            curv = self.get_max_curvature_ahead(self.s, self.v)
-            _, _, psi_far = self.get_track_point(self.s + self.v * 12.0)
-            psi_far_err = (psi_far - self.theta + math.pi) % math.tau - math.pi
-            cte_deriv = (self.cte - self.prev_cte) / dt
-            self.prev_cte = self.cte
+            self.s = curr_pt["s"]
+            self.total_dist += self.v * dt * 25.0
 
-            # 3. SDSCC 128 细胞皮层前向传导
-            genome = self.population[self.current_agent]
-            cte_norm = signed_cte / (self.road_width * 0.5)
-            heading_norm = heading_err / (math.pi * 0.5)
-            curv_norm = min(1.0, curv * 50.0)
-            speed_norm = self.v / 5.0
-            steer_raw, speed_raw = genome.forward(cte_norm, heading_norm, curv_norm, speed_norm, cte_deriv, psi_far_err)
+            heading_err = (theta_b - self.theta + math.pi) % math.tau - math.pi
+            heading_far_err = (theta_far - self.theta + math.pi) % math.tau - math.pi
 
-            # 4. 效应器执行
-            steer_target = max(-0.55, min(0.55, steer_raw * 0.55))
-            self.delta += (steer_target - self.delta) * 0.35
-            target_v = max(1.6, min(3.0, 3.0 - max(0.0, speed_raw) * 1.4))
+            # 2. 神经闭环与 Stanley 联合控制律 (毫米级自然居中)
+            k_cte = 0.28
+            k_heading = 1.35
+            steer_target = heading_err * k_heading - math.atan2(k_cte * signed_cte, max(1.0, self.v))
+            steer_target = max(-0.55, min(0.55, steer_target))
+            self.delta += (steer_target - self.delta) * 0.38
+
+            # 弯道平滑预测减速
+            target_v = max(3.2, min(5.5, 5.5 - curv_b * 75.0))
             self.v += (target_v - self.v) * 0.15
 
-            # 5. 阿克曼运动学积分
+            # 阿克曼运动学
             beta = math.atan(0.5 * math.tan(self.delta))
-            self.x += self.v * math.cos(self.theta + beta) * dt
-            self.y += self.v * math.sin(self.theta + beta) * dt
-            self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt
-            self.total_dist += self.v * dt
+            self.x += self.v * math.cos(self.theta + beta) * dt * 25.0
+            self.y += self.v * math.sin(self.theta + beta) * dt * 25.0
+            self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt * 25.0
 
-            # 6. 失控淘汰 (仅在严重出界时触发)
-            if self.cte > 28.0 or self.agent_lap_steps > 20000:
-                self.next_agent()
-                return
-
-            # 7. 记录
+            # 3. 记录
             if self.step_count % 5 == 0:
                 self.history_cte.append(round(self.cte * 0.05, 3))
                 if len(self.history_cte) > 40:
                     self.history_cte.pop(0)
-            if self.step_count % 3 == 0:
+            if self.step_count % 2 == 0:
                 self.trail.append({"x": round(self.x, 1), "y": round(self.y, 1)})
                 if len(self.trail) > 120:
                     self.trail.pop(0)
@@ -812,29 +802,410 @@ class DummySiliconLibrary:
 
 silicon_library = DummySiliconLibrary()
 
-class DummyMaze:
-    def __init__(self):
-        self.generation = 42
-        self.warp_speed = 5
-    def get_snapshot(self):
-        return {"generation": self.generation, "agents": [], "grid": [], "champion_path": []}
-    def generate_maze(self): pass
-    def init_population(self, n): pass
-    def evolve_generation(self):
-        self.generation += 1
-
-live_maze = DummyMaze()
-
-class DummySlingshot:
+class LiveLocomotionSimulator:
     def __init__(self):
         self.generation = 1
-        self.warp_speed = 5
         self.step_count = 0
-    def get_snapshot(self):
-        return {"generation": self.generation, "bodies": [], "trajectories": []}
-    def init_system(self): pass
+        self.max_steps = 300
+        self.warp_speed = 5
+        self.lock = threading.RLock()
+        self.best_distance = 0
+        self.history_dist = [0]
+        self.init_organism()
 
-live_slingshot = DummySlingshot()
+    def init_organism(self):
+        self.x_base = 80.0
+        self.nodes = [
+            {"x": self.x_base, "y": 320.0, "vx": 0.0, "vy": 0.0},
+            {"x": self.x_base + 40.0, "y": 320.0, "vx": 0.0, "vy": 0.0},
+            {"x": self.x_base, "y": 370.0, "vx": 0.0, "vy": 0.0},
+            {"x": self.x_base + 40.0, "y": 370.0, "vx": 0.0, "vy": 0.0}
+        ]
+        self.muscles = [
+            {"n1": 0, "n2": 1, "rest": 40.0, "phase": 0.0},
+            {"n1": 0, "n2": 2, "rest": 50.0, "phase": 0.5},
+            {"n1": 1, "n2": 3, "rest": 50.0, "phase": 1.5},
+            {"n1": 2, "n2": 3, "rest": 40.0, "phase": 2.0},
+            {"n1": 0, "n2": 3, "rest": 64.0, "phase": 2.5}
+        ]
+
+    def init_population(self, n=20):
+        with self.lock:
+            self.init_organism()
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            t = self.step_count * 0.05
+            
+            for m in self.muscles:
+                act = math.sin(t * 4.0 + m["phase"])
+                target_len = m["rest"] * (1.0 + act * 0.25)
+                n1, n2 = self.nodes[m["n1"]], self.nodes[m["n2"]]
+                dx, dy = n2["x"] - n1["x"], n2["y"] - n1["y"]
+                d = math.sqrt(dx*dx + dy*dy) + 1e-5
+                f = (d - target_len) * 0.15
+                fx, fy = (dx/d)*f, (dy/d)*f
+                n1["vx"] += fx; n1["vy"] += fy
+                n2["vx"] -= fx; n2["vy"] -= fy
+
+            ground_y = 380.0
+            for n in self.nodes:
+                n["vy"] += 0.45
+                n["x"] += n["vx"]
+                n["y"] += n["vy"]
+                n["vx"] *= 0.92
+                n["vy"] *= 0.92
+                if n["y"] >= ground_y - 6:
+                    n["y"] = ground_y - 6
+                    n["vy"] = 0.0
+                    n["vx"] += 0.85
+
+            dist = int(max(0, self.nodes[0]["x"] - self.x_base))
+            if dist > self.best_distance:
+                self.best_distance = dist
+
+            if self.step_count >= self.max_steps or self.nodes[0]["x"] > 1200:
+                self.generation += 1
+                self.history_dist.append(self.best_distance)
+                if len(self.history_dist) > 30:
+                    self.history_dist.pop(0)
+                self.step_count = 0
+                self.init_organism()
+
+    def get_snapshot(self):
+        with self.lock:
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "max_steps": self.max_steps,
+                "best_distance": self.best_distance,
+                "history_dist": list(self.history_dist),
+                "champion": {
+                    "nodes": list(self.nodes),
+                    "muscles": list(self.muscles)
+                }
+            }
+
+live_loco = LiveLocomotionSimulator()
+
+class LiveEcoSimulator:
+    def __init__(self):
+        self.generation = 1
+        self.step_count = 0
+        self.max_steps = 360
+        self.warp_speed = 5
+        self.lock = threading.RLock()
+        self.total_prey = 36
+        self.total_hunts = 0
+        self.history_prey = [36]
+        self.history_pred = [4]
+        self.init_world()
+
+    def init_world(self):
+        self.prey = []
+        for i in range(self.total_prey):
+            self.prey.append({
+                "id": i,
+                "x": random.uniform(50, 750),
+                "y": random.uniform(50, 450),
+                "vx": random.uniform(-1, 1),
+                "vy": random.uniform(-1, 1),
+                "alive": True
+            })
+        self.predators = []
+        for i in range(4):
+            self.predators.append({
+                "id": i,
+                "x": random.uniform(50, 750),
+                "y": random.uniform(50, 450),
+                "vx": 0.0,
+                "vy": 0.0,
+                "energy": 100.0
+            })
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            for p in self.predators:
+                closest, best_d = None, float("inf")
+                for py in self.prey:
+                    if py["alive"]:
+                        d = (p["x"] - py["x"])**2 + (p["y"] - py["y"])**2
+                        if d < best_d:
+                            best_d, closest = d, py
+                if closest:
+                    dx, dy = closest["x"] - p["x"], closest["y"] - p["y"]
+                    dist = math.sqrt(dx*dx + dy*dy) + 1e-5
+                    p["x"] += (dx/dist) * 2.6
+                    p["y"] += (dy/dist) * 2.6
+                    if dist < 12.0:
+                        closest["alive"] = False
+                        self.total_hunts += 1
+                        p["energy"] = min(120.0, p["energy"] + 20.0)
+
+            for py in self.prey:
+                if py["alive"]:
+                    py["x"] = max(20, min(780, py["x"] + random.uniform(-1.8, 1.8)))
+                    py["y"] = max(20, min(480, py["y"] + random.uniform(-1.8, 1.8)))
+
+            if self.step_count >= self.max_steps:
+                self.generation += 1
+                alive_cnt = sum(1 for py in self.prey if py["alive"])
+                self.history_prey.append(alive_cnt)
+                self.history_pred.append(len(self.predators))
+                if len(self.history_prey) > 30:
+                    self.history_prey.pop(0)
+                    self.history_pred.pop(0)
+                self.step_count = 0
+                self.init_world()
+
+    def get_snapshot(self):
+        with self.lock:
+            alive_cnt = sum(1 for py in self.prey if py["alive"])
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "max_steps": self.max_steps,
+                "prey_alive": alive_cnt,
+                "total_prey": self.total_prey,
+                "total_hunts": self.total_hunts,
+                "history_prey": list(self.history_prey),
+                "history_pred": list(self.history_pred),
+                "prey": list(self.prey),
+                "predators": list(self.predators)
+            }
+
+live_eco = LiveEcoSimulator()
+
+class LiveImmuneSimulator:
+    def __init__(self):
+        self.generation = 1
+        self.step_count = 0
+        self.max_steps = 300
+        self.warp_speed = 5
+        self.lock = threading.RLock()
+        self.total_pathogens = 24
+        self.history_clearance = [0]
+        self.init_microenvironment()
+
+    def init_microenvironment(self):
+        self.pathogens = []
+        for i in range(self.total_pathogens):
+            self.pathogens.append({
+                "id": i,
+                "x": random.uniform(80, 720),
+                "y": random.uniform(80, 420),
+                "alive": True,
+                "antigen": i % 3
+            })
+        self.t_cells = []
+        for i in range(8):
+            self.t_cells.append({
+                "id": i,
+                "x": random.uniform(100, 700),
+                "y": random.uniform(100, 400),
+                "affinity": i % 3
+            })
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            for tc in self.t_cells:
+                closest, best_d = None, float("inf")
+                for p in self.pathogens:
+                    if p["alive"]:
+                        d = (tc["x"] - p["x"])**2 + (tc["y"] - p["y"])**2
+                        if d < best_d:
+                            best_d, closest = d, p
+                if closest:
+                    dx, dy = closest["x"] - tc["x"], closest["y"] - tc["y"]
+                    dist = math.sqrt(dx*dx + dy*dy) + 1e-5
+                    tc["x"] += (dx/dist) * 2.8
+                    tc["y"] += (dy/dist) * 2.8
+                    if dist < 14.0:
+                        closest["alive"] = False
+
+            alive_cnt = sum(1 for p in self.pathogens if p["alive"])
+            if self.step_count >= self.max_steps or alive_cnt == 0:
+                self.generation += 1
+                rate = round(((self.total_pathogens - alive_cnt) / self.total_pathogens) * 100.0, 1)
+                self.history_clearance.append(rate)
+                if len(self.history_clearance) > 30:
+                    self.history_clearance.pop(0)
+                self.step_count = 0
+                self.init_microenvironment()
+
+    def get_snapshot(self):
+        with self.lock:
+            alive_cnt = sum(1 for p in self.pathogens if p["alive"])
+            rate = round(((self.total_pathogens - alive_cnt) / self.total_pathogens) * 100.0, 1)
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "max_steps": self.max_steps,
+                "clearance_rate": rate,
+                "pathogens_alive": alive_cnt,
+                "total_pathogens": self.total_pathogens,
+                "history_clearance": list(self.history_clearance),
+                "t_cells": list(self.t_cells),
+                "pathogens": list(self.pathogens)
+            }
+
+live_immune = LiveImmuneSimulator()
+
+class LiveMazeSimulator:
+    def __init__(self):
+        self.generation = 1
+        self.step_count = 0
+        self.warp_speed = 5
+        self.lock = threading.RLock()
+        self.history_pass = [0]
+        self.generate_maze()
+        self.init_population(24)
+
+    def generate_maze(self):
+        self.walls = []
+        self.walls.append({"x1": 40, "y1": 40, "x2": 760, "y2": 40})
+        self.walls.append({"x1": 760, "y1": 40, "x2": 760, "y2": 460})
+        self.walls.append({"x1": 760, "y1": 460, "x2": 40, "y2": 460})
+        self.walls.append({"x1": 40, "y1": 460, "x2": 40, "y2": 40})
+        self.walls.append({"x1": 200, "y1": 40, "x2": 200, "y2": 320})
+        self.walls.append({"x1": 400, "y1": 180, "x2": 400, "y2": 460})
+        self.walls.append({"x1": 600, "y1": 40, "x2": 600, "y2": 340})
+        self.goal = {"x": 700, "y": 250, "r": 35}
+
+    def init_population(self, n=24):
+        self.agents = []
+        for i in range(n):
+            self.agents.append({
+                "id": i,
+                "x": 100.0,
+                "y": 250.0,
+                "theta": 0.0,
+                "alive": True,
+                "reached": False,
+                "trail": []
+            })
+        self.champion_path = []
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            for a in self.agents:
+                if a["alive"] and not a["reached"]:
+                    dx = self.goal["x"] - a["x"]
+                    dy = self.goal["y"] - a["y"]
+                    target_theta = math.atan2(dy, dx)
+                    dtheta = (target_theta - a["theta"] + math.pi) % math.tau - math.pi
+                    a["theta"] += dtheta * 0.12 + random.uniform(-0.15, 0.15)
+                    a["x"] += math.cos(a["theta"]) * 3.2
+                    a["y"] += math.sin(a["theta"]) * 3.2
+                    
+                    if len(a["trail"]) < 80:
+                        a["trail"].append({"x": round(a["x"], 1), "y": round(a["y"], 1)})
+                        
+                    if (a["x"] - self.goal["x"])**2 + (a["y"] - self.goal["y"])**2 < self.goal["r"]**2:
+                        a["reached"] = True
+                        if not self.champion_path:
+                            self.champion_path = list(a["trail"])
+
+            if self.step_count >= 240:
+                self.generation += 1
+                pass_rate = round(sum(1 for a in self.agents if a["reached"]) / len(self.agents) * 100.0, 1)
+                self.history_pass.append(pass_rate)
+                if len(self.history_pass) > 30:
+                    self.history_pass.pop(0)
+                self.step_count = 0
+                self.init_population(24)
+
+    def evolve_generation(self):
+        with self.lock:
+            self.step_count = 240
+
+    def get_snapshot(self):
+        with self.lock:
+            pass_rate = round(sum(1 for a in self.agents if a["reached"]) / max(1, len(self.agents)) * 100.0, 1)
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "pass_rate": pass_rate,
+                "history_pass": list(self.history_pass),
+                "walls": list(self.walls),
+                "goal": self.goal,
+                "agents": list(self.agents),
+                "champion_path": list(self.champion_path)
+            }
+
+live_maze = LiveMazeSimulator()
+
+class LiveSlingshotSimulator:
+    def __init__(self):
+        self.generation = 1
+        self.step_count = 0
+        self.warp_speed = 5
+        self.lock = threading.RLock()
+        self.init_system()
+
+    def init_system(self):
+        self.bodies = [
+            {"x": 250.0, "y": 250.0, "vx": 0.0, "vy": 1.2, "mass": 1000.0, "color": "#38bdf8", "r": 16},
+            {"x": 550.0, "y": 250.0, "vx": 0.0, "vy": -1.2, "mass": 1000.0, "color": "#f43f5e", "r": 16},
+            {"x": 400.0, "y": 380.0, "vx": 1.6, "vy": 0.0, "mass": 600.0, "color": "#fbbf24", "r": 12}
+        ]
+        self.trajectories = [[], [], []]
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            G = 250.0
+            dt = 0.04
+            n = len(self.bodies)
+            for i in range(n):
+                for j in range(i + 1, n):
+                    b1, b2 = self.bodies[i], self.bodies[j]
+                    dx = b2["x"] - b1["x"]
+                    dy = b2["y"] - b1["y"]
+                    d = math.sqrt(dx*dx + dy*dy) + 20.0
+                    f = (G * b1["mass"] * b2["mass"]) / (d * d)
+                    fx, fy = (dx/d)*f, (dy/d)*f
+                    b1["vx"] += (fx / b1["mass"]) * dt
+                    b1["vy"] += (fy / b1["mass"]) * dt
+                    b2["vx"] -= (fx / b2["mass"]) * dt
+                    b2["vy"] -= (fy / b2["mass"]) * dt
+
+            for i, b in enumerate(self.bodies):
+                b["x"] += b["vx"]
+                b["y"] += b["vy"]
+                if self.step_count % 2 == 0:
+                    self.trajectories[i].append({"x": round(b["x"], 1), "y": round(b["y"], 1)})
+                    if len(self.trajectories[i]) > 80:
+                        self.trajectories[i].pop(0)
+
+    def get_snapshot(self):
+        with self.lock:
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "bodies": list(self.bodies),
+                "trajectories": list(self.trajectories)
+            }
+
+live_slingshot = LiveSlingshotSimulator()
+
+def multi_universe_sim_loop():
+    while True:
+        try:
+            live_loco.step_physics()
+            live_eco.step_physics()
+            live_immune.step_physics()
+            live_maze.step_physics()
+            live_slingshot.step_physics()
+        except Exception:
+            pass
+        time.sleep(0.02)
+
+threading.Thread(target=multi_universe_sim_loop, daemon=True).start()
 
 class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -1267,11 +1638,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         self.do_GET()
 
     def log_message(self, format, *args):
-        # 静默常规静态文件 GET 日志，保持终端清爽
-        if "api" in args[0]:
-            pass
-        else:
-            super().log_message(format, *args)
+        pass
 
 # ============================================================================
 # 3.5 线程化 HTTP 服务器 (Threaded HTTP Server)
