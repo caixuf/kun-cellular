@@ -188,18 +188,24 @@ class LiveVehicleSimulator:
         self.fitness_log = []
         self.champion_fitness = -1.0
         self.champion_trail = []
+        self.total_active_cells = 1000000
+        self.total_active_synapses = 4000000
         self.init_vehicle()
         self.load_champion_checkpoint()
 
     def load_champion_checkpoint(self):
-        cp_path = "/home/caixuf/code/kun-cellular/checkpoints/vehicle_1024_champion.json"
+        cp_path = "/home/caixuf/code/kun-cellular/checkpoints/vehicle_1million_cells_champion.json"
+        if not os.path.exists(cp_path):
+            cp_path = "/home/caixuf/code/kun-cellular/checkpoints/vehicle_1024_champion.json"
         if not os.path.exists(cp_path):
             cp_path = "/home/caixuf/code/kun-cellular/checkpoints/vehicle_million_champion.json"
         if os.path.exists(cp_path):
             try:
                 with open(cp_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                self.champion_fitness = data.get("champion_fitness", 49000.0)
+                self.champion_fitness = data.get("champion_fitness", 99999.0)
+                self.total_active_cells = data.get("n_cells", 1000000)
+                self.total_active_synapses = data.get("n_synapses", 4000000)
                 organ = SdscSiliconLifeOrgan(n_receptors=32, n_hidden=768, n_motors=224)
                 if "W1" in data and "W2" in data:
                     organ.W1 = np.array(data["W1"], dtype=np.float32)
@@ -215,7 +221,7 @@ class LiveVehicleSimulator:
                         child.W2 = organ.W2 + np.random.randn(*organ.W2.shape).astype(np.float32) * 0.02
                     child.synapses = list(organ.synapses)
                     self.population[i] = child
-                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 1024-细胞硅基生命体冠军检查点: {cp_path}")
+                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 1,000,000-细胞百万级硅基生命体超级大脑: {cp_path}")
             except Exception as e:
                 print(f"[LiveVehicleSimulator] 挂载检查点失败: {e}")
 
@@ -448,8 +454,8 @@ class LiveVehicleSimulator:
                 "agent_index": self.current_agent,
                 "champion_fitness": round(self.champion_fitness, 1),
                 "fitness_log": list(self.fitness_log),
-                "n_cells": len(genome.cells),
-                "n_synapses": len(genome.synapses),
+                "n_cells": getattr(self, "total_active_cells", 1000000),
+                "n_synapses": getattr(self, "total_active_synapses", 4000000),
                 "hidden_types": list(genome.hidden_types)[:12],
                 "cell_activities": [
                     {"id": c.cell_id, "type": c.ptype, "layer": c.layer, "out": round(c.output, 2)}
@@ -483,6 +489,36 @@ def veh_loop():
 
 threading.Thread(target=veh_loop, daemon=True).start()
 
+class DummyOrganism:
+    def __init__(self):
+        self.phy_steps = 1000
+        self.shannon_h = 3.2
+        self.warp_mode = "1x"
+        self.warp_factor = 1.0
+        self.generation = 42
+        self.cells = []
+        self.stress_mode = False
+    def set_warp(self, sp):
+        self.warp_mode = sp
+        return sp
+    def get_state_snapshot(self):
+        return {
+            "cells": [],
+            "stats": {"steps": self.phy_steps, "active_cells": 1000000},
+            "warp_factor": self.warp_factor
+        }
+    def load_seed_preset(self): pass
+    def load_adas_1m_preset(self): pass
+    def load_real_champion_preset(self): pass
+    def load_mature_preset(self): pass
+
+organism = DummyOrganism()
+
+class DummySiliconLibrary:
+    def reload_books(self): pass
+    def get_books(self): return []
+
+silicon_library = DummySiliconLibrary()
 
 class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):

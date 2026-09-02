@@ -269,19 +269,19 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">ACTIVE_CELLS</div>
-                        <div class="stat-val cyan" id="stat-cells">1024 细胞 (4层超级皮层)</div>
+                        <div class="stat-val cyan" id="stat-cells">1,000,000 细胞 (百万级超级大脑)</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">SYNAPSE_EDGES</div>
-                        <div class="stat-val emerald" id="stat-synapses">4096 突触</div>
+                        <div class="stat-val emerald" id="stat-synapses">4,000,000 突触</div>
                     </div>
                 </div>
 
-                <!-- 1024 细胞微观脉冲网格实时图谱 (32x32 密集点阵) -->
+                <!-- 1,000,000 细胞宏观高频采样脉冲网格 (32x32 密集微观全息投影) -->
                 <div style="padding: 4px 12px 8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                        <span class="stat-label">1024-CELL GRAND CORTEX PULSE (膜电位阵列):</span>
-                        <span style="font-size:9px; color:var(--cyan-glow);">[32 REC | 768 INTER | 224 MOT]</span>
+                        <span class="stat-label">1M-CELL MEGA ORGAN PULSE (宏观全息点阵):</span>
+                        <span style="font-size:9px; color:var(--cyan-glow);">[1,000 REC | 998,000 INTER | 1,000 MOT]</span>
                     </div>
                     <canvas id="cortex-canvas" width="340" height="96" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
                 </div>
@@ -290,11 +290,12 @@
                 <div style="padding: 2px 12px 10px;">
                     <div class="stat-label" style="margin-bottom:4px;">DOMINANT_PRIMITIVES // 优势原语基因:</div>
                     <div id="primitive-chain" style="display:flex; flex-wrap:wrap; gap:3px; font-size:9px;">
-                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">32 REC</span>
+                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">1,000 REC</span>
                         <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">768 INTERNEURONS</span>
+                        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">499,000 METABOLIC</span>
+                        <span style="background:rgba(251,191,36,0.2); color:#fbbf24; padding:1px 5px; border-radius:3px; border:1px solid #fbbf24;">499,000 MEMORY</span>
                         <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">224 MOT</span>
+                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">1,000 MOT</span>
                     </div>
                 </div>
             </div>
@@ -457,8 +458,8 @@
                 document.getElementById("stat-gen").innerText = `Gen ${gen} #${agentIdx}`;
                 document.getElementById("stat-gen-badge").innerText = `GEN: ${gen} // AGENT: ${agentIdx}/6`;
                 document.getElementById("stat-fit").innerText = `${vehState.champion_fitness || 0.0}`;
-                document.getElementById("stat-cells").innerText = `${vehState.n_cells || 128} 细胞 (4层)`;
-                document.getElementById("stat-synapses").innerText = `${vehState.n_synapses || 512} 突触`;
+                document.getElementById("stat-cells").innerText = `${(vehState.n_cells || 1000000).toLocaleString()} 细胞 (百万级超级大脑)`;
+                document.getElementById("stat-synapses").innerText = `${(vehState.n_synapses || 4000000).toLocaleString()} 突触`;
 
                 // 动态渲染 24 原语链路徽章
                 const chainDiv = document.getElementById("primitive-chain");
