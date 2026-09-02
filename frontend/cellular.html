@@ -1336,6 +1336,21 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.getElementById('stage').appendChild(renderer.domElement);
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
 
+/* PBR 生物全息照明系统 (Bio-Fluorescent Dynamic Lighting) */
+const ambientLight = new THREE.AmbientLight(0x0e1726, 1.6);
+scene.add(ambientLight);
+
+const dirLight1 = new THREE.DirectionalLight(0x38bdf8, 1.8);
+dirLight1.position.set(350, 500, 400);
+scene.add(dirLight1);
+
+const dirLight2 = new THREE.DirectionalLight(0xf43f5e, 1.2);
+dirLight2.position.set(-350, -400, -300);
+scene.add(dirLight2);
+
+const cellPointLight = new THREE.PointLight(0x00f0ff, 1.6, 1200);
+scene.add(cellPointLight);
+
 /* ============================================================
  * 2. 增强型 3D 动力学相机控制器 (Momentum Lerp, Zoom-to-Cursor, Double-Click Focus)
  * ============================================================ */
@@ -1563,7 +1578,7 @@ function getFamilyHaloMaterial(fam) {
 
 
 /* ============================================================
- * 4.1 生物拟真计算结构 (Living Neuromorphic Cellular Tissue)
+ * 4.1 生物拟真 3D 多层细胞计算结构 (Living Neuromorphic 3D Cellular Tissue)
  * ============================================================ */
 
 class CellView {
@@ -1576,48 +1591,94 @@ class CellView {
     this.curY = this.targetY;
     this.curZ = this.targetZ;
     this.phase = (cell.id * 0.785) % (Math.PI * 2);
+    this.shockwaveRadius = 1.0;
     
     const fam = FAMILY(cell.type);
     const col = FAMILY_COLOR[fam] || 0x38bdf8;
     
-    // 1. 细胞双层脂质质膜 (Outer Lipid Bilayer Membrane - Breathing Halo)
+    // 1. 3D 半透明双脂质细胞质膜 (3D Translucent Lipid Bilayer Shell)
+    const membraneGeo = new THREE.IcosahedronGeometry(13, 3);
+    const membraneMat = new THREE.MeshStandardMaterial({
+      color: col,
+      roughness: 0.18,
+      metalness: 0.08,
+      transparent: true,
+      opacity: 0.68,
+      emissive: col,
+      emissiveIntensity: 0.28,
+      depthWrite: false
+    });
+    this.membraneMesh = new THREE.Mesh(membraneGeo, membraneMat);
+
+    // 2. 外层生物发光晕 (Bioluminescent Diffuse Halo)
     const haloMat = new THREE.SpriteMaterial({
       map: GLOW,
       color: col,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      opacity: 0.4
+      opacity: 0.45
     });
     this.membrane = new THREE.Sprite(haloMat);
-    this.membrane.scale.set(42, 42, 1);
+    this.membrane.scale.set(48, 48, 1);
 
-    // 2. 细胞质基质与细胞核中枢 (Soma Cytoplasm & Dense Core Karyon)
-    const coreMat = new THREE.MeshBasicMaterial({ color: col });
-    this.nucleus = new THREE.Mesh(new THREE.SphereGeometry(6, 16, 16), coreMat);
-
-    // 3. 内部代谢微粒光晕 (Organelle ATP Shimmer)
-    const organelleMat = new THREE.SpriteMaterial({
-      map: GLOW,
+    // 3. 细胞核中枢与致密核仁 (Dense High-Energy Karyon Core & Nucleolus)
+    const coreGeo = new THREE.SphereGeometry(6.5, 20, 20);
+    const coreMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      opacity: 0.6
+      emissive: col,
+      emissiveIntensity: 1.4,
+      roughness: 0.1,
+      metalness: 0.2
     });
-    this.organelle = new THREE.Sprite(organelleMat);
-    this.organelle.scale.set(12, 12, 1);
+    this.nucleus = new THREE.Mesh(coreGeo, coreMat);
 
-    // 4. 生物原语全息浮动标签
+    // 4. 围绕细胞核公转的 3 颗线粒体/能量细胞器 (Orbiting Mitochondria Organelles)
+    this.organelles = [];
+    const orgGeo = new THREE.SphereGeometry(2.2, 12, 12);
+    for (let k = 0; k < 3; ++k) {
+      const orgMat = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: col,
+        emissiveIntensity: 1.8,
+        roughness: 0.1
+      });
+      const orgMesh = new THREE.Mesh(orgGeo, orgMat);
+      this.organelles.push({
+        mesh: orgMesh,
+        orbitR: 9.5 + k * 1.5,
+        speed: 2.2 + k * 0.8,
+        tilt: (k * Math.PI) / 3
+      });
+    }
+
+    // 5. 动作电位电离冲击波圆环 (Action Potential Ion Shockwave Ring)
+    const ringGeo = new THREE.RingGeometry(9, 14, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: col,
+      transparent: true,
+      opacity: 0.0,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.shockwaveRing = new THREE.Mesh(ringGeo, ringMat);
+    this.shockwaveRing.rotation.x = Math.PI / 2;
+
+    // 6. 生物原语全息浮动标签
     const lm = new THREE.SpriteMaterial({ map: getLabelTexture(cell.type), transparent: true, depthWrite: false });
     this.labelMat = lm;
     this.label = new THREE.Sprite(lm);
     this.label.scale.set(52, 13, 1);
 
     this.group = new THREE.Group();
+    this.group.add(this.membraneMesh);
     this.group.add(this.membrane);
     this.group.add(this.nucleus);
-    this.group.add(this.organelle);
+    this.group.add(this.shockwaveRing);
+    for (const org of this.organelles) {
+      this.group.add(org.mesh);
+    }
     this.group.add(this.label);
     scene.add(this.group);
   }
@@ -1635,30 +1696,68 @@ class CellView {
     this.curY += (this.targetY - this.curY) * 0.25;
     this.curZ += (this.targetZ - this.curZ) * 0.25;
     this.group.position.set(this.curX, this.curY, this.curZ);
-    this.label.position.set(0, -16, 0);
+    this.label.position.set(0, -18, 0);
 
     // 生物节律自然呼吸波动 (Biological Cellular Breathing Rhythm)
-    const breath = Math.sin(time * 2.2 + this.phase) * 0.15;
-    const actIntensity = Math.min(1.5, Math.abs(c.out || 0) + (c.glow || 0));
+    const breath = Math.sin(time * 2.2 + this.phase) * 0.12;
+    const actIntensity = Math.min(2.0, Math.abs(c.out || 0) + (c.glow || 0));
     
-    // 质膜呼吸胀缩
-    const memScale = (36 + breath * 12) * (1.0 + actIntensity * 0.45);
-    this.membrane.scale.set(memScale, memScale, 1);
-    this.membrane.material.opacity = 0.25 + actIntensity * 0.65;
+    // 1. 3D 胶质质膜呼吸形变与发光增强
+    const memScale = (1.0 + breath) * (1.0 + actIntensity * 0.35);
+    this.membraneMesh.scale.set(memScale, memScale, memScale);
+    this.membraneMesh.rotation.y += 0.008;
+    this.membraneMesh.rotation.x += 0.005;
+    this.membraneMesh.material.emissiveIntensity = 0.25 + actIntensity * 1.5;
+    this.membraneMesh.material.opacity = 0.55 + Math.min(0.35, actIntensity * 0.4);
 
-    // 细胞核能量激化
-    const nScale = 1.0 + actIntensity * 0.6;
+    // 2. 最外层氛围光晕
+    const haloScale = (44 + breath * 14) * (1.0 + actIntensity * 0.4);
+    this.membrane.scale.set(haloScale, haloScale, 1);
+    this.membrane.material.opacity = 0.25 + actIntensity * 0.55;
+
+    // 3. 细胞核高能电位激化
+    const nScale = 1.0 + actIntensity * 0.5;
     this.nucleus.scale.set(nScale, nScale, nScale);
+    this.nucleus.material.emissiveIntensity = 1.2 + actIntensity * 2.5;
 
-    // 细胞器微粒闪烁
-    const orgScale = (10 + Math.sin(time * 6.0 + this.phase) * 4) * (0.8 + actIntensity);
-    this.organelle.scale.set(orgScale, orgScale, 1);
-    this.organelle.material.opacity = 0.4 + actIntensity * 0.55;
+    // 4. 线粒体能量颗粒多倾角三维公转
+    for (let k = 0; k < this.organelles.length; ++k) {
+      const org = this.organelles[k];
+      const ang = time * org.speed + this.phase + (k * Math.PI * 2) / 3;
+      const ox = Math.cos(ang) * org.orbitR;
+      const oy = Math.sin(ang) * org.orbitR * Math.cos(org.tilt);
+      const oz = Math.sin(ang) * org.orbitR * Math.sin(org.tilt);
+      org.mesh.position.set(ox, oy, oz);
+      org.mesh.material.emissiveIntensity = 1.2 + Math.sin(time * 6.0 + k) * 0.8 + actIntensity * 1.5;
+    }
+
+    // 5. 动作电位放电冲击波环扩散 (Ion Wave Pulse Burst)
+    if (Math.abs(c.out || 0) > 0.35) {
+      this.shockwaveRadius += 0.08;
+      if (this.shockwaveRadius > 3.2) this.shockwaveRadius = 1.0;
+      const ringScale = this.shockwaveRadius;
+      this.shockwaveRing.scale.set(ringScale, ringScale, ringScale);
+      this.shockwaveRing.material.opacity = Math.max(0.0, (3.2 - this.shockwaveRadius) * 0.4);
+      this.shockwaveRing.visible = true;
+    } else {
+      this.shockwaveRadius = 1.0;
+      this.shockwaveRing.visible = false;
+    }
   }
 
   dispose(){
     scene.remove(this.group);
     if(this.labelMat) this.labelMat.dispose();
+    if(this.membraneMesh.geometry) this.membraneMesh.geometry.dispose();
+    if(this.membraneMesh.material) this.membraneMesh.material.dispose();
+    if(this.nucleus.geometry) this.nucleus.geometry.dispose();
+    if(this.nucleus.material) this.nucleus.material.dispose();
+    if(this.shockwaveRing.geometry) this.shockwaveRing.geometry.dispose();
+    if(this.shockwaveRing.material) this.shockwaveRing.material.dispose();
+    for (const org of this.organelles) {
+      if(org.mesh.geometry) org.mesh.geometry.dispose();
+      if(org.mesh.material) org.mesh.material.dispose();
+    }
   }
 }
 
