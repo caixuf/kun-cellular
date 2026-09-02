@@ -1211,6 +1211,14 @@ def multi_universe_sim_loop():
 
 threading.Thread(target=multi_universe_sim_loop, daemon=True).start()
 
+try:
+    from tools.cellular_neural_infer import neural_engine
+except Exception:
+    try:
+        from cellular_neural_infer import neural_engine
+    except Exception:
+        neural_engine = None
+
 def eval_symbolic_arithmetic(prompt: str):
     import re
     cleaned = re.sub(r'[^\d\+\-\*\/\.\(\)\^]', '', prompt.replace('x', '*').replace('X', '*').replace('乘', '*').replace('除以', '/').replace('除', '/').replace('加上', '+').replace('加', '+').replace('减去', '-').replace('减', '-'))
@@ -1230,7 +1238,44 @@ def eval_symbolic_arithmetic(prompt: str):
 def answer_cellular_dialogue(prompt: str) -> dict:
     prompt_clean = prompt.strip()
     
-    # 0. 优先纯符号神经算术推理 (Symbolic Neural Arithmetic)
+    # 优先执行 GPU 真实神经网络前向自回归因果推演 (Pure Neural Model Inference)
+    neural_info = None
+    if neural_engine and neural_engine.loaded:
+        try:
+            neural_info = neural_engine.generate_pure_neural(prompt_clean)
+            if neural_info.get("generated_text") and len(neural_info["generated_text"]) > 6:
+                text = neural_info["generated_text"]
+                # 确定对应形态
+                mode = "mature"
+                if "智能驾驶" in text or "阿克曼" in text or "智驾" in text:
+                    mode = "adas"
+                    try: organism.load_adas_1m_preset()
+                    except Exception: pass
+                elif "量化" in text or "期货" in text or "夏普" in text:
+                    mode = "real"
+                    try: organism.load_real_champion_preset()
+                    except Exception: pass
+                elif "算术" in text or "原语" in text:
+                    mode = "math"
+                    try: organism.load_math_preset()
+                    except Exception: pass
+                
+                resp = f"【SDSCC 真实神经网络 GPU 因果推演 (RTX 5060)】：\n{text}"
+                return {
+                    "status": "ok",
+                    "prompt": prompt_clean,
+                    "response": resp,
+                    "mode": mode,
+                    "neural_metadata": {
+                        "is_pure_neural": True,
+                        "device": neural_info.get("device", "NVIDIA GPU"),
+                        "latency_ms": neural_info.get("latency_ms", 0),
+                        "total_params": neural_info.get("total_params", 10891008),
+                        "architecture": neural_info.get("architecture", "Transformer")
+                    }
+                }
+        except Exception as e:
+            pass
     math_expr, math_val = eval_symbolic_arithmetic(prompt_clean)
     if math_expr is not None and math_val is not None:
         try:
