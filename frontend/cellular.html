@@ -464,19 +464,17 @@
     </div>
   </div>
 
-  <!-- 卡片 3: 算力尺度 LOD -->
+  <!-- 卡片 3: 视距自适应显微镜 (Dynamic Semantic Zoom) -->
   <div class="card">
     <div class="card-title">
-      <span>算力尺度与渲染模式 (LOD)</span>
-      <span class="card-title-badge" id="st-pipe">Organ</span>
+      <span>视距自适应显微镜</span>
+      <span class="card-title-badge" id="st-pipe" style="color:var(--cyan);">微观器官 3D</span>
     </div>
-    <div class="btn-grid-4">
-      <button id="lod-organ" class="btn-ctrl active" onclick="switchLOD('organ')" data-tip="lod-organ">器官(30)</button>
-      <button id="lod-1k" class="btn-ctrl" onclick="switchLOD('1k')" style="color:var(--emerald);font-weight:bold;">千元皮层(1k)</button>
-      <button id="lod-10k" class="btn-ctrl" onclick="switchLOD('10k')">流形(1万)</button>
-      <button id="lod-1m" class="btn-ctrl" onclick="switchLOD('1m')" style="color:var(--purple)" data-tip="lod-1m">百万星系(1M)</button>
+    <div style="font-size:10px;color:var(--text-dim);line-height:1.5;">
+      滚轮拉远俯瞰<b>6大分布式脑区星系</b>，滚轮拉近无缝钻入<b>微观单神经元脉冲</b>。
     </div>
-    <div class="kv"><span>GPU 批处理 Draw Calls</span><b id="st-draws">1</b></div>
+    <div class="kv" style="margin-top:2px;"><span>当前视距 (Distance)</span><b id="st-cam-r" style="color:var(--amber)">560 单位</b></div>
+    <div class="kv"><span>GPU 单批次吞吐</span><b style="color:var(--emerald)">30,000 点元 (1 DrawCall)</b></div>
   </div>
 
   <!-- 卡片 4: 演化加速曲率 -->
@@ -1288,6 +1286,7 @@ function rebuildViews(){
   views.syns = Array.from(synViewsMap.values());
 }
 rebuildViews();
+initLODCloud(30000);
 
 let paused = false, lastPrice = 3620, realPrice = null, tickTimer = 0, mitoTimer = 0;
 let totalActs = 0;
@@ -1723,35 +1722,67 @@ let lodPointsMesh = null;
 let lodPositions = null;
 let lodColors = null;
 
+
+// 6 大分布式脑区皮层中枢 (Distributed Cortical Lobes & Neural Tracts)
+const BRAIN_LOBES = [
+  { name: "感知叶 (Sensory Lobe)", cx: -200, cy: -20, cz: 0, r: 80, col: 0x38bdf8 },
+  { name: "联想记忆柱 (Memory Association)", cx: -90, cy: 90, cz: 20, r: 75, col: 0x34d399 },
+  { name: "前额门控中枢 (Frontal Gating)", cx: 60, cy: 40, cz: -10, r: 80, col: 0xa855f7 },
+  { name: "运动效应中心 (Motor Effector)", cx: 200, cy: -20, cz: 0, r: 75, col: 0xf43f5e },
+  { name: "深层边缘核团 (Limbic Core)", cx: 0, cy: -100, cz: 30, r: 65, col: 0xfbbf24 },
+  { name: "跨叶神经投射纤维 (Axonal Tracts)", cx: 0, cy: 0, cz: 0, r: 240, col: 0x60a5fa }
+];
+
 function initLODCloud(count) {
   if(lodPointsMesh) { scene.remove(lodPointsMesh); lodPointsMesh.geometry.dispose(); lodPointsMesh.material.dispose(); }
   const geo = new THREE.BufferGeometry();
   lodPositions = new Float32Array(count * 3);
   lodColors = new Float32Array(count * 3);
 
-  for(let i=0; i<count; ++i){
-    const r = 80 + Math.cbrt(Math.random()) * 260;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(Math.random() * 2 - 1);
-    lodPositions[i*3] = r * Math.sin(phi) * Math.cos(theta);
-    lodPositions[i*3+1] = r * Math.sin(phi) * Math.sin(theta);
-    lodPositions[i*3+2] = r * Math.cos(phi);
+  for(let i = 0; i < count; ++i) {
+    const lobeIdx = i % BRAIN_LOBES.length;
+    const lobe = BRAIN_LOBES[lobeIdx];
+    
+    // 分布式皮层柱空间排布 (非单一球体聚合，而是真实的分布式脑叶与神经投射纤维)
+    let px, py, pz;
+    if(lobeIdx === 5) {
+      // 跨区白质纤维束流
+      const t = Math.random();
+      const srcLobe = BRAIN_LOBES[i % 5];
+      const dstLobe = BRAIN_LOBES[(i + 1) % 5];
+      px = srcLobe.cx * (1 - t) + dstLobe.cx * t + (Math.random() - 0.5) * 25;
+      py = srcLobe.cy * (1 - t) + dstLobe.cy * t + (Math.random() - 0.5) * 25;
+      pz = srcLobe.cz * (1 - t) + dstLobe.cz * t + (Math.random() - 0.5) * 25;
+    } else {
+      const r = Math.cbrt(Math.random()) * lobe.r;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      px = lobe.cx + r * Math.sin(phi) * Math.cos(theta);
+      py = lobe.cy + r * Math.sin(phi) * Math.sin(theta);
+      pz = lobe.cz + r * Math.cos(phi);
+    }
 
-    const fam = i % 5;
-    const col = new THREE.Color(fam===0?0x22d3ee : fam===1?0x34d399 : fam===2?0xa78bfa : fam===3?0xfbbf24 : 0xf43f5e);
-    lodColors[i*3] = col.r;
-    lodColors[i*3+1] = col.g;
-    lodColors[i*3+2] = col.b;
+    lodPositions[i*3] = px;
+    lodPositions[i*3+1] = py;
+    lodPositions[i*3+2] = pz;
+
+    const baseCol = new THREE.Color(lobe.col);
+    // 随机微扰色阶
+    baseCol.offsetHSL((Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.1, (Math.random() - 0.5) * 0.1);
+    lodColors[i*3] = baseCol.r;
+    lodColors[i*3+1] = baseCol.g;
+    lodColors[i*3+2] = baseCol.b;
   }
 
-  geo.setAttribute('position', new THREE.BufferAttribute(lodPositions, 3));
-  geo.setAttribute('color', new THREE.BufferAttribute(lodColors, 3));
+  geo.setAttribute("position", new THREE.BufferAttribute(lodPositions, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(lodColors, 3));
 
   const mat = new THREE.PointsMaterial({
-    size: currentLOD==='1m' ? 3.5 : 5.0,
+    size: 4.5,
     vertexColors: true,
     map: GLOW,
     transparent: true,
+    opacity: 0.85,
     blending: THREE.AdditiveBlending,
     depthWrite: false
   });
@@ -1759,6 +1790,7 @@ function initLODCloud(count) {
   lodPointsMesh = new THREE.Points(geo, mat);
   scene.add(lodPointsMesh);
 }
+
 
 
 window.loadPreset = function(type) {
@@ -1987,13 +2019,33 @@ function animate(){
     camR*Math.sin(camPhi)*Math.cos(camTheta));
   camera.lookAt(0,0,0);
 
-  if(currentLOD === 'organ') {
-    for(const v of views.cells) v.update(now * 0.001, clientWarpMultiplier);
-    for(const v of views.syns) v.update(now * 0.001, clientWarpMultiplier);
-  } else if(lodPointsMesh && lodPointsMesh.visible) {
-    lodPointsMesh.rotation.y += dt * 0.08;
-    lodPointsMesh.rotation.x += dt * 0.03;
+  // 视距驱动的无级语义缩放 (Continuous Semantic Zoom & Distance-Driven LOD)
+  // 当滚轮拉远 (camR > 500) 时呈现百万点云分布式脑叶星系；当滚轮拉近 (camR < 360) 时无缝淡出点云，展现微观单神经元物理脉冲
+  const macroAlpha = Math.max(0.0, Math.min(1.0, (camR - 340) / 180));
+  const microAlpha = 1.0 - macroAlpha;
+
+  if (lodPointsMesh) {
+    lodPointsMesh.material.opacity = macroAlpha * 0.85;
+    lodPointsMesh.visible = (macroAlpha > 0.02);
+    if (lodPointsMesh.visible) {
+      lodPointsMesh.rotation.y += dt * 0.04;
+    }
   }
+
+  for (const v of views.cells) {
+    v.group.visible = (microAlpha > 0.02);
+    v.update(now * 0.001, clientWarpMultiplier);
+  }
+  for (const v of views.syns) {
+    v.group.visible = (microAlpha > 0.02);
+    v.update(now * 0.001, clientWarpMultiplier);
+  }
+
+  const scaleText = camR > 500 ? "宏观百万分布式脑区流形" : camR < 360 ? "微观单神经元物理力场" : "介观皮层柱过渡带";
+  const elScale = document.getElementById("st-pipe");
+  if (elScale) elScale.textContent = scaleText;
+  const elCamR = document.getElementById("st-cam-r");
+  if (elCamR) elCamR.textContent = `${Math.round(camR)} 单位`;
 
   if(bioLayerVisible){
     const t = clock.elapsedTime;
