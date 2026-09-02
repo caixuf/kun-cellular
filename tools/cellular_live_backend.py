@@ -685,6 +685,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         
         
         if self.path.startswith("/api/library"):
+            silicon_library.reload_books()
             body = json.dumps({"status": "ok", "total_books": len(silicon_library.books), "books": silicon_library.books}, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")

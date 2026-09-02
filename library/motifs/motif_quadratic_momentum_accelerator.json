@@ -1,0 +1,22 @@
+{
+  "book_id": "motif_quadratic_momentum_accelerator",
+  "title": "非线性二次积分势能加速器",
+  "discovered_at_gen": 156,
+  "author_deme": "Island-1 (Momentum)",
+  "crisis_context": "Strong Trend Continuation Phase",
+  "citations": 19,
+  "impact_score": 9.1,
+  "causal_subgraph": {
+    "cells": [
+      {"type": "DIFF", "p1": 0.0, "p2": 0.0},
+      {"type": "QUADRATIC", "p1": 0.0, "p2": 0.0},
+      {"type": "INTEGRAL", "p1": 0.02, "p2": 0.0},
+      {"type": "ACT_POS", "p1": 0.0, "p2": 0.0}
+    ],
+    "synapses": [
+      {"from_idx": 0, "to_idx": 1, "port": 0, "w": 1.1},
+      {"from_idx": 1, "to_idx": 2, "port": 0, "w": 1.4},
+      {"from_idx": 2, "to_idx": 3, "port": 0, "w": 1.25}
+    ]
+  }
+}

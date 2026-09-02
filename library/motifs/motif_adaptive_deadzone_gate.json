@@ -1,0 +1,22 @@
+{
+  "book_id": "motif_adaptive_deadzone_gate",
+  "title": "自适应死区逻辑与交叉抑制门控",
+  "discovered_at_gen": 240,
+  "author_deme": "Island-4 (Anti-Chop)",
+  "crisis_context": "Mean-Reverting Chop Market",
+  "citations": 25,
+  "impact_score": 9.3,
+  "causal_subgraph": {
+    "cells": [
+      {"type": "ABS", "p1": 0.0, "p2": 0.0},
+      {"type": "DEADZONE", "p1": 0.02, "p2": 0.0},
+      {"type": "INHIB", "p1": 0.0, "p2": 0.0},
+      {"type": "ACT_NEG", "p1": 0.0, "p2": 0.0}
+    ],
+    "synapses": [
+      {"from_idx": 0, "to_idx": 1, "port": 0, "w": 1.0},
+      {"from_idx": 1, "to_idx": 2, "port": 0, "w": 1.2},
+      {"from_idx": 2, "to_idx": 3, "port": 0, "w": 1.5}
+    ]
+  }
+}
