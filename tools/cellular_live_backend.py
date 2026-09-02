@@ -1485,22 +1485,8 @@ def answer_cellular_dialogue(prompt: str) -> dict:
             neural_info = neural_engine.generate_pure_neural(prompt_clean)
             if neural_info.get("generated_text") and len(neural_info["generated_text"]) > 6:
                 text = neural_info["generated_text"]
-                # 确定对应形态
                 mode = "mature"
-                if "智能驾驶" in text or "阿克曼" in text or "智驾" in text:
-                    mode = "adas"
-                    try: organism.load_adas_1m_preset()
-                    except Exception: pass
-                elif "量化" in text or "期货" in text or "夏普" in text:
-                    mode = "real"
-                    try: organism.load_real_champion_preset()
-                    except Exception: pass
-                elif "算术" in text or "原语" in text:
-                    mode = "math"
-                    try: organism.load_math_preset()
-                    except Exception: pass
-                
-                resp = f"【SDSCC 真实神经网络 GPU 因果推演 (RTX 5060)】：\n{text}"
+                resp = f"【SDSCC 亿级离散因果自回归模型 GPU 推演 (RTX 5060)】：\n{text}"
                 return {
                     "status": "ok",
                     "prompt": prompt_clean,

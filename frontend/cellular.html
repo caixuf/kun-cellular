@@ -1832,16 +1832,18 @@ function marketTick(){
     const a = byId.get(s.from);
     if(a && Math.abs(a.out)>1e-6) s.photon = Math.random()*0.15;
   }
-  // HUD
+  // HUD 状态更新 (若在线则由 40Hz /api/state 统一驱动，杜绝闪烁)
   document.getElementById('px').textContent = lastPrice.toFixed(1);
   document.getElementById('px-src').textContent = realPrice ? '(真实行情)' : '(合成游走)';
-  document.getElementById('st-gen').textContent = org.generation;
-  const cCount = window.currentPresetCells || (window.__serverMacroCells || 10891008);
-  const sCount = window.currentPresetSyns || (window.__serverMacroSyns || 43564032);
-  document.getElementById('st-cells').textContent = cCount.toLocaleString();
-  document.getElementById('st-syn').textContent = sCount.toLocaleString();
+  if (!serverOnline) {
+    document.getElementById('st-gen').textContent = org.generation;
+    const cCount = window.currentPresetCells || 10891008;
+    const sCount = window.currentPresetSyns || 43564032;
+    document.getElementById('st-cells').textContent = cCount.toLocaleString();
+    document.getElementById('st-syn').textContent = sCount.toLocaleString();
+    document.getElementById('st-phys').textContent = org.phySteps;
+  }
   document.getElementById('st-act').textContent = totalActs;
-  document.getElementById('st-phys').textContent = org.phySteps;
   const set = (id,v)=> document.getElementById(id).textContent = v.toFixed(2);
   set('v-buy', actions.buy); set('v-sell', actions.sell);
   document.getElementById('v-immune').textContent = actions.immune ? '熔断!' : '—';
@@ -1873,64 +1875,6 @@ _bind('b-rad', e=>{
 });
 _bind('b-pause', e=>{ paused=!paused; e.target.textContent = paused?'[RESUME] 继续':'[PAUSE] 暂停'; });
 _bind('b-reset', ()=>{ org = seedOrganism(); compile(org); rebuildViews(); log('[RESET] 重置为种子形态生物 Genesis-0', true); });
-
-/* 尝试从守护进程获取真实冠军有机体快照做坐标水合 (后台持续演化, 前端毫秒级实时同步观察) */
-async function syncServerChampion() {
-  try{
-    const r = await fetch('/api/cellular/organism', { signal: AbortSignal.timeout(2000) });
-    const j = await r.json();
-    if(j.cells && j.cells.length && (!org || j.generation !== org.generation || j.cells.length !== org.cells.length || Math.abs((j.thought_energy||0) - (org.thought_energy||0)) > 1e-4)){
-      const adaptedSyns = (j.synapses || j.syns || []).map(s => ({
-        from: s.from,
-        to: s.to,
-        port: s.port || 0,
-        w: s.weight !== undefined ? s.weight : (s.w || 1.0),
-        active: s.active !== undefined ? s.active : true,
-        photon: s.photon_pos || -1.0,
-        recurrent: s.recurrent || false,
-        hebb_rate: s.hebb_rate || 0.005
-      }));
-      const adaptedCells = j.cells.map(c => ({
-        id: c.id,
-        type: c.type,
-        param1: c.param1 || 0,
-        param2: c.param2 || 0,
-        x: c.x || 0,
-        y: c.y || 0,
-        z: c.z || 0,
-        vx: 0, vy: 0, vz: 0,
-        out: c.output || 0,
-        prev: 0, state: 0, aux: 0,
-        latch: false,
-        acts: c.activations || 0,
-        glow: c.glow || 0
-      }));
-
-      org = {
-        organism_id: j.organism_id || 1,
-        generation: j.generation || 0,
-        lineage: j.lineage || 'Apex',
-        fitness: j.fitness || 0,
-        thought_energy: j.thought_energy || 0,
-        cells: adaptedCells,
-        syns: adaptedSyns,
-        order: [],
-        phySteps: 0
-      };
-
-      compile(org);
-      rebuildViews();
-      document.getElementById('st-gen').textContent = org.generation;
-      const cCount = j.macro_cells || (window.currentPresetCells || 10891008);
-      const sCount = j.macro_synapses || (window.currentPresetSyns || 43564032);
-      document.getElementById('st-cells').textContent = cCount.toLocaleString();
-      document.getElementById('st-syn').textContent = sCount.toLocaleString();
-      log(`[SYNC] 同步后台冠军生物: ${org.lineage} · Gen ${org.generation} (${cCount.toLocaleString()} 活跃细胞 / ${sCount.toLocaleString()} 突触)`, true);
-    }
-  }catch(e){ /* 离线使用客户端内嵌种子生物 */ }
-}
-syncServerChampion();
-setInterval(syncServerChampion, 500);
 
 
 let clientWarpMultiplier = 1.0;

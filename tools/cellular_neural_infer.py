@@ -40,17 +40,23 @@ class FastLanguageModel(nn.Module):
         return logits
 
 class NeuralInferenceEngine:
-    def __init__(self, ckpt_path="/home/caixuf/code/kun-cellular/checkpoints/cellular_language_neural_champion.pt"):
-        self.ckpt_path = ckpt_path
+    def __init__(self, ckpt_path=None):
+        if ckpt_path is None:
+            # 优先加载 85.85M (0.86 亿) 参数高阶因果自回归大模型
+            p100m = "/home/caixuf/code/kun-cellular/checkpoints/cellular_causal_100m_champion.pt"
+            p11m = "/home/caixuf/code/kun-cellular/checkpoints/cellular_language_neural_champion.pt"
+            self.ckpt_path = p100m if os.path.exists(p100m) else p11m
+        else:
+            self.ckpt_path = ckpt_path
         self.loaded = False
         self.load_model()
 
     def load_model(self):
         if not os.path.exists(self.ckpt_path):
-            print(f"[NeuralInferenceEngine] Checkpoint not found: {self.ckpt_path}")
+            print(f"[CausalManifoldEngine] Checkpoint not found: {self.ckpt_path}")
             return
             
-        print(f"[NeuralInferenceEngine] 正在将真实神经网络语言模型加载至 {device}...")
+        print(f"[CausalManifoldEngine] 正在将离散因果自回归模型加载至 {device}...")
         ckpt = torch.load(self.ckpt_path, map_location=device)
         self.vocab_size = ckpt["vocab_size"]
         self.char_to_ix = ckpt["char_to_ix"]
@@ -63,18 +69,19 @@ class NeuralInferenceEngine:
             n_heads=ckpt["n_heads"]
         ).to(device)
         
-        self.model.load_state_dict(ckpt["state_dict"])
+        state_dict = ckpt.get("model_state", ckpt.get("state_dict", {}))
+        self.model.load_state_dict(state_dict)
         self.model.eval()
         self.loaded = True
         self.total_params = sum(p.numel() for p in self.model.parameters())
-        print(f"[NeuralInferenceEngine] 真实神经网络已就绪！参数量: {self.total_params:,} | 设备: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
+        print(f"[CausalManifoldEngine] 离散因果自回归模型已就绪！参数量: {self.total_params:,} ({self.total_params/1e6:.2f}M) | 设备: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
 
     @torch.no_grad()
     def generate_pure_neural(self, prompt, max_tokens=140, temperature=0.15):
         if not self.loaded:
             return {
                 "is_neural": False,
-                "response": "神经网络模型未就绪。"
+                "response": "因果模型未就绪。"
             }
             
         # 1. 字符 Token 映射 (去除多余尾缀标点，与训练语料契合)
