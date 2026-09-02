@@ -2807,18 +2807,20 @@ window.highlightBookSubcircuit = function(bookId, title, organismName) {
 
   const targetSet = new Set(targetCells);
 
-  // 2. 将非目标细胞暗化 (Dimming)，将目标细胞强力高光点亮 (Spotlighting)
+  // 2. 将非目标细胞保留清晰可见基准透明度 (0.40)，将目标细胞强力高光点亮 (0.95)
   for (const v of views.cells) {
     if (targetSet.has(v.cell.id)) {
       v.membrane.material.color.setHex(targetColor);
       v.membrane.material.opacity = 0.95;
       v.cell.glow = 1.0;
     } else {
-      v.membrane.material.opacity = 0.12;
+      const fam = FAMILY(v.cell.type);
+      v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
+      v.membrane.material.opacity = 0.40;
     }
   }
 
-  // 3. 将属于目标回路的突触轴突全速爆发金光动作电位
+  // 3. 将属于目标回路的突触轴突全速爆发金光动作电位，非目标突触保留可见底色 (0.35)
   for (const v of views.syns) {
     const isTarget = targetSet.has(v.syn.from) || targetSet.has(v.syn.to);
     if (isTarget) {
@@ -2827,7 +2829,7 @@ window.highlightBookSubcircuit = function(bookId, title, organismName) {
       v.photon1.material.color.setHex(0xfbbf24);
       v.photon2.material.color.setHex(targetColor);
     } else {
-      v.lineMat.opacity = 0.08;
+      v.lineMat.opacity = 0.35;
     }
   }
 

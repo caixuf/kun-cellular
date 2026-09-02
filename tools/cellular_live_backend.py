@@ -495,6 +495,9 @@ class PhysicalCell3D:
         self.x = x
         self.y = y
         self.z = z
+        self.base_x = x
+        self.base_y = y
+        self.base_z = z
         self.state = 0.0
         self.out = 0.0
         self.acts = 0
@@ -516,42 +519,47 @@ class SiliconCellularOrganism:
         self.init_cells()
         
     def init_cells(self):
-        """构建真实生物形态学三维椭球体生命体流形 (Prolate Spheroid Organism)"""
+        """构建真实生物形态学三维双半球生命体流形 (Dual-Hemisphere Cerebrum Organism)"""
         self.cells = []
         self.synapses = []
         n_cells = 96
         golden_ratio = (1 + math.sqrt(5)) / 2
         
-        # 椭球体三轴半长 (a: 250, b: 175, c: 125 黄金生物椭球比例)
-        a_semi, b_semi, c_semi = 250.0, 175.0, 125.0
-
+        # 对称双大脑半球 (Left 48 cells, Right 48 cells)
         for i in range(n_cells):
-            theta = 2 * math.pi * i / golden_ratio
-            phi = math.acos(1 - 2 * (i + 0.5) / n_cells)
-            # 径向分层分布：40% 核心核质，60% 外层双层呼吸质膜
-            radial_scale = random.uniform(0.45, 0.70) if i < 24 else random.uniform(0.85, 1.05)
+            is_right = (i >= 48)
+            local_i = i if not is_right else i - 48
+            center_x = 115.0 if is_right else -115.0
             
-            x = a_semi * math.sin(phi) * math.cos(theta) * radial_scale
-            y = b_semi * math.sin(phi) * math.sin(theta) * radial_scale
-            z = c_semi * math.cos(phi) * radial_scale
+            # 斐波那契球面均匀采样 (Fibonacci Sphere Uniform Lattice)
+            phi = math.acos(1 - 2 * (local_i + 0.5) / 48)
+            theta = 2 * math.pi * local_i / golden_ratio
             
-            # 生物功能极化分区
-            if x < -100:
-                ptype = "SUM" if i % 2 == 0 else "AMPLIFY" # 感知极
-            elif x > 100:
-                ptype = "AMPLIFY" if i % 2 == 0 else "THRESHOLD" # 效应极
-            elif abs(z) > 70:
-                ptype = "DAMPER" if i % 2 == 0 else "CLIP" # 极顶阻尼门控
+            rx, ry, rz = 90.0, 110.0, 130.0
+            radial_scale = random.uniform(0.75, 1.05)
+            
+            x = center_x + rx * math.sin(phi) * math.cos(theta) * radial_scale
+            y = ry * math.sin(phi) * math.sin(theta) * radial_scale
+            z = rz * math.cos(phi) * radial_scale
+            
+            # 功能原语分区
+            if local_i < 8:
+                ptype = "SUM" # 感知受体
+            elif local_i < 20:
+                ptype = "INTEGRATE" # 代谢积分
+            elif local_i < 32:
+                ptype = "AMPLIFY" if local_i % 2 == 0 else "DAMPER" # 特征增强与阻尼
+            elif local_i < 42:
+                ptype = "THRESHOLD" if local_i % 2 == 0 else "CLIP" # 门控中枢
             else:
-                ptype = "INTEGRATE" if i % 2 == 0 else "INVERT" # 中间代谢积分
+                ptype = "ACT_POS" if is_right else "ACT_NEG" # 效应动作
                 
             self.cells.append(PhysicalCell3D(i, ptype, x, y, z))
             
-        # 380+ 条高阶流形空间贝塞尔轴突连接
+        # 突触连接构建：半球内局部邻近突触 + 跨半球中央胼胝体桥接突触
         for i in range(n_cells):
-            # 优先连接空间邻近与极性协同细胞
-            dists = []
             ci = self.cells[i]
+            dists = []
             for j in range(n_cells):
                 if i != j:
                     cj = self.cells[j]
@@ -559,40 +567,35 @@ class SiliconCellularOrganism:
                     dists.append((d, j))
             dists.sort(key=lambda x: x[0])
             
-            # 连接最近的 3 个局部细胞 + 1 个长程突触
+            # 半球内连接最近 3 个神经元
             for _, target in dists[:3]:
-                w = random.choice([-1.0, 1.0]) * random.uniform(0.8, 2.0)
+                w = random.choice([-1.0, 1.0]) * random.uniform(0.8, 1.8)
                 self.synapses.append({"from": i, "to": target, "weight": round(w, 2)})
-            if random.random() < 0.40 and len(dists) > 5:
-                _, long_target = random.choice(dists[5:15])
-                w = random.choice([-1.0, 1.0]) * random.uniform(0.5, 1.5)
-                self.synapses.append({"from": i, "to": long_target, "weight": round(w, 2)})
+                
+            # 跨半球对称胼胝体桥接突触 (Corpus Callosum Commisural Synapses)
+            if i < 48:
+                sym_target = i + 48
+                self.synapses.append({"from": i, "to": sym_target, "weight": 1.4})
+                self.synapses.append({"from": sym_target, "to": i, "weight": 1.4})
 
     def step_physics_and_signal(self):
         with self.lock:
             self.phy_steps += 1
             t = self.phy_steps * 0.04
-            
-            a_semi, b_semi, c_semi = 250.0, 175.0, 125.0
             golden_ratio = (1 + math.sqrt(5)) / 2
             n_cells = len(self.cells)
             
             for i, c in enumerate(self.cells):
-                # 真实生物椭球体表面呼吸振荡动力学
-                theta = 2 * math.pi * i / golden_ratio
-                phi = math.acos(1 - 2 * (i + 0.5) / max(1, n_cells))
-                radial_base = 0.55 if i < 24 else 0.95
+                # 真实三维对称呼吸微动
+                local_i = i if (i < 48 or n_cells != 96) else i - 48
+                phi = math.acos(1 - 2 * (local_i + 0.5) / max(1, 48 if n_cells == 96 else n_cells))
+                theta = 2 * math.pi * local_i / golden_ratio
                 
-                # 空间波动方程叠加
-                breath = 1.0 + 0.06 * math.sin(t * 1.5 + phi * 2.0) + 0.04 * math.cos(t * 0.9 + theta)
-                
-                target_x = a_semi * math.sin(phi) * math.cos(theta) * radial_base * breath
-                target_y = b_semi * math.sin(phi) * math.sin(theta) * radial_base * breath
-                target_z = c_semi * math.cos(phi) * radial_base * breath
-                
-                c.x += (target_x - c.x) * 0.08
-                c.y += (target_y - c.y) * 0.08
-                c.z += (target_z - c.z) * 0.08
+                breath = 1.0 + 0.03 * math.sin(t * 1.5 + phi * 2.0) + 0.02 * math.cos(t * 0.9 + theta)
+                if hasattr(c, 'base_x'):
+                    c.x += (c.base_x * breath - c.x) * 0.08
+                    c.y += (c.base_y * breath - c.y) * 0.08
+                    c.z += (c.base_z * breath - c.z) * 0.08
                 
                 # 24 离散原语代谢电位激活动力学
                 stimulus = math.sin(t * 2.2 + i * 0.35) * math.cos(t * 0.8 + phi)
