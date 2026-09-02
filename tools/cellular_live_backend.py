@@ -975,6 +975,7 @@ class SiliconCellularOrganism:
                 "red_queen_pressure": getattr(self, "red_queen_pressure", 1.0),
                 "cells": cells_data,
                 "synapses": self.synapses,
+                "syns": self.synapses,
                 "stats": {
                     "steps": self.phy_steps,
                     "active_cells": getattr(self, "macro_cells", 100000000),
