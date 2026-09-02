@@ -901,6 +901,272 @@ sim_thread.start()
 class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
     daemon_threads = True
 
+
+# ============================================================================
+# 0.9 红皇后捕食者-猎物双轨协同演化动力学引擎 (Red Queen Co-Evolution Engine)
+# ============================================================================
+
+class LiveEcosystemSimulator:
+    def __init__(self, width=800, height=600):
+        self.width = width
+        self.height = height
+        self.generation = 1
+        self.step_count = 0
+        self.max_steps = 360
+        self.warp_speed = 5
+        self.lock = threading.Lock()
+        self.food = []
+        self.prey = []
+        self.predators = []
+        self.history_prey = []
+        self.history_pred = []
+        self.init_world()
+
+    def init_world(self):
+        with self.lock:
+            # 1. 生成环境能量草料 (Food Plants)
+            self.food = [
+                {"x": random.uniform(40, self.width - 40), "y": random.uniform(40, self.height - 40)}
+                for _ in range(50)
+            ]
+            
+            # 2. 生成草食猎物种群 (Prey Population, 36 只)
+            self.prey = []
+            for i in range(36):
+                self.prey.append({
+                    "id": i,
+                    "x": random.uniform(60, self.width - 60),
+                    "y": random.uniform(60, self.height - 60),
+                    "theta": random.uniform(0, math.tau),
+                    "energy": 100.0,
+                    "alive": True,
+                    "eaten": 0,
+                    # 猎物基因: [捕食者回避权重, 食物趋化权重, 鸟群凝聚权重, 最大速度]
+                    "genes": [
+                        random.uniform(1.0, 3.5),   # w_flee
+                        random.uniform(0.5, 2.0),   # w_food
+                        random.uniform(0.2, 1.2),   # w_flock
+                        random.uniform(2.5, 4.2)    # max_speed
+                    ]
+                })
+
+            # 3. 生成肉食捕食者种群 (Predator Population, 8 只)
+            self.predators = []
+            for i in range(8):
+                self.predators.append({
+                    "id": i,
+                    "x": random.uniform(20, self.width - 20),
+                    "y": random.uniform(20, self.height - 20),
+                    "theta": random.uniform(0, math.tau),
+                    "energy": 120.0,
+                    "hunts": 0,
+                    # 捕食者基因: [猎物追捕权重, 伏击偏置, 爆发冲刺速度, 视线距离]
+                    "genes": [
+                        random.uniform(1.2, 3.0),   # w_chase
+                        random.uniform(0.1, 0.8),   # w_ambush
+                        random.uniform(3.0, 5.2),   # max_speed
+                        random.uniform(120.0, 220.0)# sight_range
+                    ]
+                })
+
+    def step_physics(self):
+        with self.lock:
+            self.step_count += 1
+            
+            # 1. 猎物动力学 (Prey Dynamics)
+            for p in self.prey:
+                if not p["alive"]:
+                    continue
+                p["energy"] -= 0.15
+                if p["energy"] <= 0:
+                    p["alive"] = False
+                    continue
+
+                # 感知最近捕食者 (Flee Force)
+                flee_fx, flee_fy = 0.0, 0.0
+                for pred in self.predators:
+                    dx = p["x"] - pred["x"]
+                    dy = p["y"] - pred["y"]
+                    d = math.hypot(dx, dy)
+                    if d < 120.0 and d > 0.01:
+                        flee_fx += (dx / d) * (120.0 - d) * p["genes"][0]
+                        flee_fy += (dy / d) * (120.0 - d) * p["genes"][0]
+
+                # 感知最近食物 (Food Attraction)
+                food_fx, food_fy = 0.0, 0.0
+                closest_f_dist = 9999.0
+                closest_f = None
+                for f in self.food:
+                    d = math.hypot(f["x"] - p["x"], f["y"] - p["y"])
+                    if d < closest_f_dist:
+                        closest_f_dist = d
+                        closest_f = f
+                if closest_f and closest_f_dist < 180.0:
+                    food_fx = ((closest_f["x"] - p["x"]) / closest_f_dist) * p["genes"][1] * 20.0
+                    food_fy = ((closest_f["y"] - p["y"]) / closest_f_dist) * p["genes"][1] * 20.0
+                    if closest_f_dist < 12.0:
+                        p["energy"] += 45.0
+                        p["eaten"] += 1
+                        closest_f["x"] = random.uniform(40, self.width - 40)
+                        closest_f["y"] = random.uniform(40, self.height - 40)
+
+                # 综合合力
+                total_fx = flee_fx + food_fx
+                total_fy = flee_fy + food_fy
+                if abs(total_fx) > 0.01 or abs(total_fy) > 0.01:
+                    target_theta = math.atan2(total_fy, total_fx)
+                    diff = (target_theta - p["theta"] + math.pi) % math.tau - math.pi
+                    p["theta"] += diff * 0.25
+
+                spd = p["genes"][3]
+                p["x"] = max(10, min(self.width - 10, p["x"] + math.cos(p["theta"]) * spd))
+                p["y"] = max(10, min(self.height - 10, p["y"] + math.sin(p["theta"]) * spd))
+
+            # 2. 捕食者动力学 (Predator Dynamics)
+            for pred in self.predators:
+                pred["energy"] -= 0.25
+                sight = pred["genes"][3]
+                
+                # 寻找视野内最近存活猎物
+                closest_prey = None
+                closest_p_dist = 9999.0
+                for p in self.prey:
+                    if not p["alive"]: continue
+                    d = math.hypot(p["x"] - pred["x"], p["y"] - pred["y"])
+                    if d < sight and d < closest_p_dist:
+                        closest_p_dist = d
+                        closest_prey = p
+
+                if closest_prey:
+                    target_theta = math.atan2(closest_prey["y"] - pred["y"], closest_prey["x"] - pred["x"])
+                    diff = (target_theta - pred["theta"] + math.pi) % math.tau - math.pi
+                    pred["theta"] += diff * 0.20
+                    spd = pred["genes"][2] * 1.15 # 冲刺速度
+                    
+                    if closest_p_dist < 14.0: # 成功捕杀
+                        closest_prey["alive"] = False
+                        pred["energy"] += 60.0
+                        pred["hunts"] += 1
+                else:
+                    pred["theta"] += random.uniform(-0.1, 0.1)
+                    spd = pred["genes"][2] * 0.65 # 巡逻游弋
+
+                pred["x"] = max(10, min(self.width - 10, pred["x"] + math.cos(pred["theta"]) * spd))
+                pred["y"] = max(10, min(self.height - 10, pred["y"] + math.sin(pred["theta"]) * spd))
+
+            # 3. 周期代际演化结算
+            alive_prey_count = sum(1 for p in self.prey if p["alive"])
+            if self.step_count >= self.max_steps or alive_prey_count == 0:
+                self.evolve_ecosystem()
+
+    def evolve_ecosystem(self):
+        # 1. 记录种群历史
+        alive_count = sum(1 for p in self.prey if p["alive"])
+        total_hunts = sum(pred["hunts"] for pred in self.predators)
+        self.history_prey.append(alive_count)
+        self.history_pred.append(total_hunts)
+        if len(self.history_prey) > 30:
+            self.history_prey.pop(0)
+            self.history_pred.pop(0)
+
+        # 2. 猎物种群自然演化 (生存越久、吃草越多的基因胜出)
+        for p in self.prey:
+            p["fitness"] = p["eaten"] * 25.0 + (100.0 if p["alive"] else 0.0) + p["energy"] * 0.2
+        self.prey.sort(key=lambda p: p["fitness"], reverse=True)
+        top_prey = self.prey[:10]
+        new_prey = []
+        for i in range(len(self.prey)):
+            parent = random.choice(top_prey)
+            child_genes = [g + (random.gauss(0, 0.1) if random.random() < 0.3 else 0.0) for g in parent["genes"]]
+            new_prey.append({
+                "id": i,
+                "x": random.uniform(60, self.width - 60),
+                "y": random.uniform(60, self.height - 60),
+                "theta": random.uniform(0, math.tau),
+                "energy": 100.0,
+                "alive": True,
+                "eaten": 0,
+                "genes": child_genes
+            })
+        self.prey = new_prey
+
+        # 3. 捕食者种群演化 (捕食数量越多的基因胜出)
+        for pred in self.predators:
+            pred["fitness"] = pred["hunts"] * 40.0 + pred["energy"] * 0.2
+        self.predators.sort(key=lambda p: p["fitness"], reverse=True)
+        top_pred = self.predators[:3]
+        new_preds = []
+        for i in range(len(self.predators)):
+            parent = random.choice(top_pred)
+            child_genes = [g + (random.gauss(0, 0.1) if random.random() < 0.3 else 0.0) for g in parent["genes"]]
+            new_preds.append({
+                "id": i,
+                "x": random.uniform(20, self.width - 20),
+                "y": random.uniform(20, self.height - 20),
+                "theta": random.uniform(0, math.tau),
+                "energy": 120.0,
+                "hunts": 0,
+                "genes": child_genes
+            })
+        self.predators = new_preds
+
+        # 重置环境食物
+        self.food = [
+            {"x": random.uniform(40, self.width - 40), "y": random.uniform(40, self.height - 40)}
+            for _ in range(50)
+        ]
+        self.generation += 1
+        self.step_count = 0
+
+    def get_snapshot(self):
+        with self.lock:
+            return {
+                "generation": self.generation,
+                "step_count": self.step_count,
+                "max_steps": self.max_steps,
+                "prey_alive": sum(1 for p in self.prey if p["alive"]),
+                "total_prey": len(self.prey),
+                "total_predators": len(self.predators),
+                "total_hunts": sum(p["hunts"] for p in self.predators),
+                "food": [{"x": round(f["x"], 1), "y": round(f["y"], 1)} for f in self.food],
+                "prey": [
+                    {
+                        "id": p["id"],
+                        "x": round(p["x"], 1),
+                        "y": round(p["y"], 1),
+                        "theta": round(p["theta"], 2),
+                        "alive": p["alive"],
+                        "energy": round(p["energy"], 1),
+                        "speed": round(p["genes"][3], 2)
+                    }
+                    for p in self.prey
+                ],
+                "predators": [
+                    {
+                        "id": pred["id"],
+                        "x": round(pred["x"], 1),
+                        "y": round(pred["y"], 1),
+                        "theta": round(pred["theta"], 2),
+                        "hunts": pred["hunts"],
+                        "energy": round(pred["energy"], 1),
+                        "speed": round(pred["genes"][2], 2)
+                    }
+                    for pred in self.predators
+                ],
+                "history_prey": list(self.history_prey),
+                "history_pred": list(self.history_pred)
+            }
+
+live_eco = LiveEcosystemSimulator()
+
+def eco_loop():
+    while True:
+        for _ in range(live_eco.warp_speed):
+            live_eco.step_physics()
+        time.sleep(0.016)
+
+threading.Thread(target=eco_loop, daemon=True).start()
+
 class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=FRONTEND_DIR, **kwargs)
@@ -944,10 +1210,43 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        
-        
-        
-        
+        if self.path.startswith("/api/eco/status"):
+            body = json.dumps(live_eco.get_snapshot()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/eco/reset"):
+            live_eco.init_world()
+            live_eco.generation = 1
+            live_eco.step_count = 0
+            body = json.dumps({"status": "ok", "msg": "Ecosystem reset"}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/eco/warp"):
+            try:
+                import urllib.parse
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                speed = int(qs.get("speed", ["5"])[0])
+                live_eco.warp_speed = max(1, min(50, speed))
+            except Exception:
+                live_eco.warp_speed = 5
+            body = json.dumps({"status": "ok", "warp_speed": live_eco.warp_speed}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if self.path.startswith("/api/maze/status"):
             body = json.dumps(live_maze.get_snapshot()).encode("utf-8")
             self.send_response(200)

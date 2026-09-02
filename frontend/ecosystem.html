@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>红皇后捕食者-猎物生态协同演化沙盒 // SDSCC Ecosystem</title>
+    <style>
+        :root {
+            --bg-base: #06090e;
+            --panel-bg: rgba(13, 18, 29, 0.92);
+            --border: #1e293b;
+            --cyan-glow: #00f0ff;
+            --rose-glow: #f43f5e;
+            --amber-glow: #fbbf24;
+            --emerald-glow: #10b981;
+            --purple-glow: #a855f7;
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --font-mono: "JetBrains Mono", Consolas, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background: rgba(10, 15, 26, 0.98);
+            border-bottom: 1px solid var(--border);
+            padding: 0 16px;
+            height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 100;
+        }
+
+        .brand {
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: var(--rose-glow);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .warp-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(15, 23, 42, 0.95);
+            border: 1px solid rgba(244, 63, 94, 0.5);
+            border-radius: 6px;
+            padding: 3px 10px;
+            box-shadow: 0 0 14px rgba(244, 63, 94, 0.2);
+        }
+
+        .nav-btn {
+            background: #111827;
+            border: 1px solid #1f2937;
+            color: var(--text-dim);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .nav-btn:hover {
+            color: var(--rose-glow);
+            border-color: var(--rose-glow);
+        }
+
+        .nav-btn.active {
+            background: rgba(244, 63, 94, 0.25);
+            color: var(--rose-glow);
+            border-color: var(--rose-glow);
+            box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 6px;
+        }
+
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 12px;
+            padding: 12px;
+            overflow: hidden;
+            height: calc(100vh - 48px);
+        }
+
+        .viewport-card {
+            background: var(--panel-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel-header {
+            padding: 8px 12px;
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            background: #030712;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .eco-top-bar {
+            background: rgba(13, 18, 29, 0.95);
+            border-bottom: 1px solid rgba(244, 63, 94, 0.4);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 50;
+        }
+
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            overflow-y: auto;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            padding: 12px;
+        }
+
+        .stat-box {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 8px;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-dim);
+            margin-bottom: 4px;
+        }
+
+        .stat-val {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        .stat-val.rose { color: var(--rose-glow); }
+        .stat-val.cyan { color: var(--cyan-glow); }
+        .stat-val.emerald { color: var(--emerald-glow); }
+        .stat-val.amber { color: var(--amber-glow); }
+
+        .chart-box {
+            height: 150px;
+            padding: 10px;
+            position: relative;
+        }
+
+        .info-box {
+            padding: 10px 12px;
+            font-size: 11px;
+            line-height: 1.5;
+            color: var(--text-dim);
+            border-top: 1px solid var(--border);
+            background: rgba(10, 15, 26, 0.5);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="brand">
+            <span>[RED_QUEEN_ECOSYSTEM]</span>
+            <span style="color:var(--text-dim);">//</span>
+            <span style="color:var(--text-main);">捕食者-猎物双轨协同演化</span>
+        </div>
+
+        <div class="warp-bar">
+            <span style="color:var(--rose-glow);font-weight:bold;font-size:12px;">[WARP_ACCELERATOR]:</span>
+            <button class="nav-btn" onclick="setEcoWarp(1)" id="hw-1">1x 常规</button>
+            <button class="nav-btn active" onclick="setEcoWarp(5)" id="hw-5">5x 敏捷</button>
+            <button class="nav-btn" onclick="setEcoWarp(20)" id="hw-20">20x 极速</button>
+            <button class="nav-btn" onclick="setEcoWarp(50)" id="hw-50" style="color:var(--amber-glow);font-weight:bold;">50x 狂飙</button>
+        </div>
+
+        <div class="nav-links">
+            <a href="index.html" class="nav-btn">工作台</a>
+            <a href="cellular.html" class="nav-btn">3D全息力场</a>
+            <a href="maze.html" class="nav-btn">具身迷宫</a>
+            <a href="ecosystem.html" class="nav-btn active">红皇后生态</a>
+        </div>
+    </header>
+
+    <main>
+        <div class="viewport-card">
+            <div class="panel-header">
+                <span>[2D_CONTINUOUS_ARENA] // RED_QUEEN_COEVOLUTION</span>
+                <span style="color:var(--rose-glow);" id="hud-status">STATUS: COEVOLVING</span>
+            </div>
+            
+            <div class="eco-top-bar">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button class="nav-btn" id="btn-toggle" onclick="toggleSim()">[PAUSE / RESUME]</button>
+                    <button class="nav-btn" onclick="resetEco()">[RESET_ECOSYSTEM]</button>
+                </div>
+                <div style="font-size:11px;color:var(--text-dim);">
+                    <span style="color:var(--cyan-glow);">■ 草食猎物 (Prey)</span> &nbsp;|&nbsp;
+                    <span style="color:var(--rose-glow);">■ 肉食捕食者 (Predator)</span> &nbsp;|&nbsp;
+                    <span style="color:var(--emerald-glow);">● 能量植物 (Flora)</span>
+                </div>
+            </div>
+
+            <div class="canvas-container" id="canvas-wrap">
+                <canvas id="eco-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <div class="viewport-card">
+                <div class="panel-header">
+                    <span>[POPULATION_METRICS]</span>
+                    <span style="color:var(--cyan-glow);">LOTKA_VOLTERRA</span>
+                </div>
+                <div class="stat-grid">
+                    <div class="stat-box">
+                        <div class="stat-label">GENERATION</div>
+                        <div class="stat-val amber" id="stat-gen">GEN-1</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">CYCLE_STEPS</div>
+                        <div class="stat-val" id="stat-steps">0 / 360</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">ALIVE_PREY</div>
+                        <div class="stat-val cyan" id="stat-prey">36 / 36</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-label">TOTAL_HUNTS</div>
+                        <div class="stat-val rose" id="stat-hunts">0 HUNTS</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="viewport-card">
+                <div class="panel-header">
+                    <span>[POPULATION_DYNAMICS_CHART]</span>
+                    <span style="color:var(--emerald-glow);">PREY_VS_PREDATOR</span>
+                </div>
+                <div class="chart-box">
+                    <canvas id="chart-canvas" width="340" height="130"></canvas>
+                </div>
+                <div class="info-box">
+                    <strong>[红皇后假说动力学]：</strong><br>
+                    草食细胞演化出敏捷躲避与鸟群凝聚（Flocking），逼迫肉食捕食者演化出协同包夹与爆发冲刺。两者的军备竞赛永不停止。
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const canvas = document.getElementById("eco-canvas");
+        const ctx = canvas.getContext("2d");
+        const chartCanvas = document.getElementById("chart-canvas");
+        const chartCtx = chartCanvas.getContext("2d");
+        const wrap = document.getElementById("canvas-wrap");
+
+        let isRunning = true;
+        let ecoState = null;
+
+        function resize() {
+            canvas.width = wrap.clientWidth;
+            canvas.height = wrap.clientHeight;
+        }
+        window.addEventListener("resize", resize);
+        resize();
+
+        window.setEcoWarp = async function(speed) {
+            document.querySelectorAll('[id^="hw-"]').forEach(b => b.classList.remove("active"));
+            const btn = document.getElementById("hw-" + speed);
+            if (btn) btn.classList.add("active");
+            try {
+                await fetch("/api/eco/warp?speed=" + speed);
+            } catch(e) {}
+        };
+
+        window.resetEco = async function() {
+            try {
+                await fetch("/api/eco/reset");
+            } catch(e) {}
+        };
+
+        window.toggleSim = function() {
+            isRunning = !isRunning;
+            document.getElementById("hud-status").innerText = isRunning ? "STATUS: COEVOLVING" : "STATUS: PAUSED";
+        };
+
+        async function fetchEcoState() {
+            if (!isRunning) return;
+            try {
+                const res = await fetch("/api/eco/status");
+                if (res.ok) {
+                    ecoState = await res.json();
+                    updateUI();
+                }
+            } catch(e) {}
+        }
+
+        function updateUI() {
+            if (!ecoState) return;
+            document.getElementById("stat-gen").innerText = `GEN-${ecoState.generation}`;
+            document.getElementById("stat-steps").innerText = `${ecoState.step_count} / ${ecoState.max_steps || 360}`;
+            document.getElementById("stat-prey").innerText = `${ecoState.prey_alive} / ${ecoState.total_prey}`;
+            document.getElementById("stat-hunts").innerText = `${ecoState.total_hunts} HUNTS`;
+            drawChart();
+        }
+
+        function drawChart() {
+            if (!ecoState) return;
+            const w = chartCanvas.width;
+            const h = chartCanvas.height;
+            chartCtx.fillStyle = "#030712";
+            chartCtx.fillRect(0, 0, w, h);
+
+            const preys = ecoState.history_prey || [];
+            const preds = ecoState.history_pred || [];
+            if (preys.length < 2) return;
+
+            chartCtx.strokeStyle = "#1e293b";
+            chartCtx.lineWidth = 1;
+            chartCtx.beginPath();
+            chartCtx.moveTo(0, h/2); chartCtx.lineTo(w, h/2);
+            chartCtx.stroke();
+
+            chartCtx.strokeStyle = "#00f0ff";
+            chartCtx.lineWidth = 2;
+            chartCtx.beginPath();
+            preys.forEach((val, i) => {
+                const x = (i / (preys.length - 1)) * w;
+                const y = h - (val / 36.0) * (h - 20) - 10;
+                if (i === 0) chartCtx.moveTo(x, y);
+                else chartCtx.lineTo(x, y);
+            });
+            chartCtx.stroke();
+
+            chartCtx.strokeStyle = "#f43f5e";
+            chartCtx.lineWidth = 2;
+            chartCtx.beginPath();
+            preds.forEach((val, i) => {
+                const x = (i / (preds.length - 1)) * w;
+                const y = h - (val / 36.0) * (h - 20) - 10;
+                if (i === 0) chartCtx.moveTo(x, y);
+                else chartCtx.lineTo(x, y);
+            });
+            chartCtx.stroke();
+        }
+
+        function render() {
+            requestAnimationFrame(render);
+            if (!ecoState) return;
+
+            const scaleX = canvas.width / 800;
+            const scaleY = canvas.height / 600;
+
+            ctx.fillStyle = "#030712";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            (ecoState.food || []).forEach(f => {
+                ctx.fillStyle = "#10b981";
+                ctx.shadowColor = "#10b981";
+                ctx.shadowBlur = 8;
+                ctx.beginPath();
+                ctx.arc(f.x * scaleX, f.y * scaleY, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.shadowBlur = 0;
+
+            (ecoState.prey || []).forEach(p => {
+                if (!p.alive) return;
+                const px = p.x * scaleX;
+                const py = p.y * scaleY;
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(p.theta);
+
+                ctx.fillStyle = "#00f0ff";
+                ctx.shadowColor = "#00f0ff";
+                ctx.shadowBlur = 6;
+                ctx.beginPath();
+                ctx.moveTo(7, 0);
+                ctx.lineTo(-5, -4);
+                ctx.lineTo(-3, 0);
+                ctx.lineTo(-5, 4);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            });
+            ctx.shadowBlur = 0;
+
+            (ecoState.predators || []).forEach(pred => {
+                const px = pred.x * scaleX;
+                const py = pred.y * scaleY;
+                ctx.save();
+                ctx.translate(px, py);
+                ctx.rotate(pred.theta);
+
+                ctx.fillStyle = "rgba(244, 63, 94, 0.08)";
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, 70 * scaleX, -0.4, 0.4);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = "#f43f5e";
+                ctx.shadowColor = "#f43f5e";
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.moveTo(10, 0);
+                ctx.lineTo(-7, -6);
+                ctx.lineTo(-4, 0);
+                ctx.lineTo(-7, 6);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+            });
+            ctx.shadowBlur = 0;
+        }
+
+        setInterval(fetchEcoState, 30);
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>
