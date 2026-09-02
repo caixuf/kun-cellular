@@ -29,9 +29,182 @@ PORT = 8833
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 
 
-## ============================================================================
-# 0.13 神经演化车辆控制器 (Neuroevolution Vehicle Controller - True Darwin Evolution)
 # ============================================================================
+# 0.13 硅基细胞计算机车辆控制器 (SDSCC Vehicle Controller - True 24-Primitive DAG Evolution)
+# 基因组编码 DAG 拓扑结构（哪些原语、如何连接），而非浮点参数向量
+# ============================================================================
+
+# SDSCC 24 种原语分类（用于车辆控制的子集）
+SDSCC_PRIMITIVES = {
+    # 感知受体层 (Receptor Layer) - 固定输入，不参与演化
+    "RECEPTOR_CTE":   "receptor",   # 横向偏差传感器
+    "RECEPTOR_PSI":   "receptor",   # 航向误差传感器
+    "RECEPTOR_CURV":  "receptor",   # 前向曲率传感器
+    "RECEPTOR_SPEED": "receptor",   # 车速传感器
+    # 代谢运算层 (Metabolic Layer) - 隐层原语，可演化
+    "SUM":       "hidden",  # 加权求和
+    "INTEGRATE": "hidden",  # 泄漏积分器
+    "AMPLIFY":   "hidden",  # 增益放大
+    "INVERT":    "hidden",  # 极性反转
+    "THRESHOLD": "hidden",  # 施密特触发阈值
+    "DAMPER":    "hidden",  # 指数平滑阻尼
+    "CLIP":      "hidden",  # 饱和限幅
+    "ABS":       "hidden",  # 绝对值
+    # 效应动作层 (Effector Layer) - 固定输出，不参与演化
+    "EFFECTOR_STEER": "effector",   # 转向指令输出
+    "EFFECTOR_SPEED": "effector",   # 速度指令输出
+}
+HIDDEN_PRIMITIVES = [k for k, v in SDSCC_PRIMITIVES.items() if v == "hidden"]
+
+class SdscCell:
+    """单个 SDSCC 计算细胞：持有原语类型与内部状态"""
+    def __init__(self, cell_id, ptype):
+        self.cell_id = cell_id
+        self.ptype = ptype
+        self.state = 0.0       # 积分器/阻尼器内部状态
+        self.output = 0.0
+        self.gain = random.uniform(0.5, 2.5)    # 可遗传增益参数
+
+    def forward(self, inputs):
+        x = sum(inputs) if inputs else 0.0
+        if   self.ptype == "SUM":       self.output = math.tanh(x * self.gain)
+        elif self.ptype == "INTEGRATE": self.state = self.state * 0.88 + x * 0.12; self.output = self.state
+        elif self.ptype == "AMPLIFY":   self.output = math.tanh(x * self.gain * 2.0)
+        elif self.ptype == "INVERT":    self.output = -math.tanh(x * self.gain)
+        elif self.ptype == "THRESHOLD": self.output = 1.0 if x > 0.3 else (-1.0 if x < -0.3 else self.output)
+        elif self.ptype == "DAMPER":    self.state = self.state * 0.72 + x * 0.28; self.output = self.state
+        elif self.ptype == "CLIP":      self.output = max(-1.0, min(1.0, x * self.gain))
+        elif self.ptype == "ABS":       self.output = abs(math.tanh(x * self.gain))
+        else:                           self.output = x
+        return self.output
+
+class SdscGenome:
+    """
+    SDSCC 拓扑基因组：
+    - 固定4个受体输入细胞 (CTE, PSI, CURV, SPEED)
+    - 演化的隐层细胞 3~7 个（原语类型可变异）
+    - 固定2个效应输出细胞 (STEER, SPEED_CMD)
+    - 基因组 = 突触连接表 [(from_id, to_id, polarity)]
+    """
+    def __init__(self):
+        self.receptors = ["RECEPTOR_CTE", "RECEPTOR_PSI", "RECEPTOR_CURV", "RECEPTOR_SPEED"]
+        self.effectors = ["EFFECTOR_STEER", "EFFECTOR_SPEED"]
+        # 隐层细胞随机初始化
+        n_hidden = random.randint(3, 6)
+        self.hidden_types = [random.choice(HIDDEN_PRIMITIVES) for _ in range(n_hidden)]
+        # 构建细胞列表（ID 分配：0~3 受体, 4~4+n-1 隐层, 最后2个效应）
+        self.build_cells()
+        # 随机初始化突触连接（受体→隐层, 隐层→隐层, 隐层→效应）
+        self.synapses = []
+        self.random_synapses()
+
+    def build_cells(self):
+        self.cells = []
+        for i, ptype in enumerate(self.receptors):
+            self.cells.append(SdscCell(i, ptype))
+        n_r = len(self.receptors)
+        for i, ptype in enumerate(self.hidden_types):
+            self.cells.append(SdscCell(n_r + i, ptype))
+        n_h = len(self.hidden_types)
+        for i, ptype in enumerate(self.effectors):
+            self.cells.append(SdscCell(n_r + n_h + i, ptype))
+        self.n_receptor = len(self.receptors)
+        self.n_hidden = n_h
+        self.n_effector = len(self.effectors)
+        self.steer_id = n_r + n_h
+        self.speed_id = n_r + n_h + 1
+
+    def random_synapses(self):
+        """在受体→隐层→效应之间建立随机稀疏连接"""
+        r_ids = list(range(self.n_receptor))
+        h_ids = list(range(self.n_receptor, self.n_receptor + self.n_hidden))
+        e_ids = [self.steer_id, self.speed_id]
+        # 受体→隐层（每个受体至少连一个隐层细胞）
+        for r in r_ids:
+            for h in random.sample(h_ids, min(2, len(h_ids))):
+                self.synapses.append((r, h, random.choice([-1, 1])))
+        # 隐层→效应（至少保证每个效应被连接）
+        for e in e_ids:
+            h = random.choice(h_ids)
+            self.synapses.append((h, e, random.choice([-1, 1])))
+        # 额外随机稀疏连接
+        for _ in range(random.randint(2, 5)):
+            f = random.choice(r_ids + h_ids)
+            t = random.choice(h_ids + e_ids)
+            if f != t:
+                self.synapses.append((f, t, random.choice([-1, 1])))
+
+    def forward(self, cte, psi_err, curv, speed):
+        """拓扑前向传导：按受体→隐层→效应顺序激发"""
+        # 注入传感器数值到受体细胞
+        self.cells[0].output = cte
+        self.cells[1].output = psi_err
+        self.cells[2].output = curv
+        self.cells[3].output = speed / 5.0    # 归一化
+
+        # 收集每个细胞的输入（来自突触）
+        inputs_map = {c.cell_id: [] for c in self.cells}
+        for (f, t, pol) in self.synapses:
+            if 0 <= f < len(self.cells) and 0 <= t < len(self.cells):
+                inputs_map[self.cells[t].cell_id].append(
+                    self.cells[f].output * pol
+                )
+
+        # 按隐层→效应顺序前向激发
+        n_r = self.n_receptor
+        for i in range(n_r, len(self.cells)):
+            c = self.cells[i]
+            c.forward(inputs_map[c.cell_id])
+
+        steer_raw = self.cells[self.steer_id].output
+        speed_raw = self.cells[self.speed_id].output
+        return steer_raw, speed_raw
+
+    def mutate(self):
+        """形态变异：突触重连、原语类型替换、细胞增殖/凋亡"""
+        child = SdscGenome.__new__(SdscGenome)
+        child.receptors = list(self.receptors)
+        child.effectors = list(self.effectors)
+        child.hidden_types = list(self.hidden_types)
+        child.synapses = list(self.synapses)
+
+        # 1. 原语类型点突变（20% 概率）
+        if random.random() < 0.20 and child.hidden_types:
+            idx = random.randrange(len(child.hidden_types))
+            child.hidden_types[idx] = random.choice(HIDDEN_PRIMITIVES)
+
+        # 2. 突触极性翻转（30% 概率）
+        if random.random() < 0.30 and child.synapses:
+            idx = random.randrange(len(child.synapses))
+            f, t, p = child.synapses[idx]
+            child.synapses[idx] = (f, t, -p)
+
+        # 3. 新突触添加（30% 概率）
+        if random.random() < 0.30:
+            n_r = len(child.receptors)
+            n_h = len(child.hidden_types)
+            n_e = len(child.effectors)
+            all_ids = list(range(n_r + n_h + n_e))
+            f = random.choice(all_ids[:n_r + n_h])
+            t = random.choice(all_ids[n_r:])
+            if f != t:
+                child.synapses.append((f, t, random.choice([-1, 1])))
+
+        # 4. 突触凋亡（15% 概率）
+        if random.random() < 0.15 and len(child.synapses) > 3:
+            child.synapses.pop(random.randrange(len(child.synapses)))
+
+        # 5. 细胞增殖（15% 概率，最多7个隐层细胞）
+        if random.random() < 0.15 and len(child.hidden_types) < 7:
+            child.hidden_types.append(random.choice(HIDDEN_PRIMITIVES))
+
+        # 6. 细胞凋亡（10% 概率，至少保留2个隐层细胞）
+        if random.random() < 0.10 and len(child.hidden_types) > 2:
+            child.hidden_types.pop(random.randrange(len(child.hidden_types)))
+
+        child.build_cells()
+        return child
+
 
 class LiveVehicleSimulator:
     def __init__(self):
@@ -42,8 +215,8 @@ class LiveVehicleSimulator:
         self.history_cte = []
         self.road_width = 46.0
         self.init_track()
-        # 演化种群：每个个体的基因组编码控制器全部参数
-        self.population = [self.random_genome() for _ in range(6)]
+        # 种群：6 个 SDSCC DAG 拓扑基因组
+        self.population = [SdscGenome() for _ in range(6)]
         self.current_agent = 0
         self.agent_lap_steps = 0
         self.agent_cum_cte = 0.0
@@ -51,65 +224,36 @@ class LiveVehicleSimulator:
         self.champion_genome = None
         self.champion_fitness = -1.0
         self.champion_trail = []
-        self.init_vehicle(self.population[0])
-
-    def random_genome(self):
-        """基因组编码 7 维控制参数（全部可遗传、可变异）"""
-        return {
-            "k_heading":        random.uniform(0.6, 1.6),
-            "k_cte":            random.uniform(0.08, 0.30),
-            "steer_limit":      random.uniform(0.28, 0.50),
-            "steer_lag":        random.uniform(0.18, 0.45),
-            "speed_max":        random.uniform(2.5, 5.0),
-            "brake_gain":       random.uniform(30.0, 90.0),
-            "lookahead_factor": random.uniform(3.0, 7.0),
-        }
-
-    def mutate(self, genome):
-        """高斯变异：50% 概率对每个维度施加 ±18% 随机扰动"""
-        child = {}
-        for k, v in genome.items():
-            child[k] = v * random.uniform(0.82, 1.18) if random.random() < 0.5 else v
-        return child
+        self.init_vehicle()
 
     def get_track_point(self, s):
-        """闭环多曲率 S 弯公路中心线（解析方程，与前端完全一致）"""
         cx, cy = 400.0, 300.0
         t = (s * 0.0025) % math.tau
         x = cx + math.cos(t) * 280.0 + math.sin(t * 2.0) * 80.0
         y = cy + math.sin(t) * 190.0 + math.cos(t * 3.0) * 35.0
         dx = -math.sin(t) * 280.0 + math.cos(t * 2.0) * 160.0
         dy =  math.cos(t) * 190.0 - math.sin(t * 3.0) * 105.0
-        theta = math.atan2(dy, dx)
-        return x, y, theta
+        return x, y, math.atan2(dy, dx)
 
-    def get_max_curvature_ahead(self, s, genome):
-        """多点前向曲率采样：在 3 个前瞻距离处估算最大曲率，实现急弯提前制动"""
-        laf = genome["lookahead_factor"]
+    def get_max_curvature_ahead(self, s):
         v = max(0.5, self.v)
-        probes = [laf * v, laf * v * 1.8, laf * v * 3.2]
-        max_curv = 0.0
-        _, _, theta_ref = self.get_track_point(s)
+        probes = [v * 4, v * 8, v * 14]
+        max_curv, _, _, theta0 = 0.0, 0, 0, self.get_track_point(s)[2]
         for ds in probes:
-            _, _, theta_n = self.get_track_point(s + ds)
-            dtheta = abs((theta_n - theta_ref + math.pi) % math.tau - math.pi)
-            curv = dtheta / max(ds, 1.0)
+            _, _, theta1 = self.get_track_point(s + ds)
+            curv = abs((theta1 - theta0 + math.pi) % math.tau - math.pi) / max(ds, 1.0)
             max_curv = max(max_curv, curv)
-            theta_ref = theta_n
+            theta0 = theta1
         return max_curv
 
     def init_track(self):
         self.track_points = []
-        num_pts = 180
-        for i in range(num_pts):
-            s_i = (i / num_pts) * (math.tau / 0.0025)
+        for i in range(180):
+            s_i = (i / 180) * (math.tau / 0.0025)
             x, y, theta = self.get_track_point(s_i)
-            self.track_points.append({
-                "s": round(s_i, 1), "x": round(x, 1),
-                "y": round(y, 1), "theta": round(theta, 3)
-            })
+            self.track_points.append({"s": round(s_i, 1), "x": round(x, 1), "y": round(y, 1), "theta": round(theta, 3)})
 
-    def init_vehicle(self, genome):
+    def init_vehicle(self):
         x0, y0, theta0 = self.get_track_point(0.0)
         self.x, self.y, self.theta = x0, y0, theta0
         self.v = 2.0
@@ -122,28 +266,24 @@ class LiveVehicleSimulator:
         self.agent_cum_cte = 0.0
 
     def next_agent(self):
-        """个体评估 → 锦标赛选择 → 变异繁殖 → 换代"""
         with self.lock:
             steps = max(1, self.agent_lap_steps)
             fitness = steps / (1.0 + self.agent_cum_cte / steps)
             self.fitness_log.append(round(fitness, 1))
             if len(self.fitness_log) > 20:
                 self.fitness_log.pop(0)
-
             if fitness > self.champion_fitness:
                 self.champion_fitness = fitness
-                self.champion_genome = dict(self.population[self.current_agent])
+                self.champion_genome = self.population[self.current_agent]
                 self.champion_trail = list(self.trail)
-
             self.current_agent = (self.current_agent + 1) % len(self.population)
             if self.current_agent == 0:
                 self.generation += 1
                 if self.champion_genome:
-                    self.population[0] = dict(self.champion_genome)
+                    self.population[0] = self.champion_genome
                     for i in range(1, len(self.population)):
-                        self.population[i] = self.mutate(self.champion_genome)
-
-            self.init_vehicle(self.population[self.current_agent])
+                        self.population[i] = self.champion_genome.mutate()
+            self.init_vehicle()
 
     def step_physics(self):
         with self.lock:
@@ -151,61 +291,54 @@ class LiveVehicleSimulator:
             self.agent_lap_steps += 1
             dt = 0.04
             L = 24.0
-            genome = self.population[self.current_agent]
 
-            # 1. 最近点投影重新锁定 s（防止脱耦导致控制失稳）
+            # 1. 最近点投影锁定 s
             best_s, best_dist = self.s, float("inf")
-            for ds_step in range(-3, 18):
-                probe_s = self.s + ds_step * 8.0
+            for ds in range(-3, 18):
+                probe_s = self.s + ds * 8.0
                 px, py, _ = self.get_track_point(probe_s)
                 d = math.hypot(self.x - px, self.y - py)
                 if d < best_dist:
                     best_dist, best_s = d, probe_s
             self.s = best_s
 
-            # 2. 当前中心线参考点
-            center_x, center_y, road_theta = self.get_track_point(self.s)
-
-            # 3. 带符号横向偏差 CTE
-            dx = self.x - center_x
-            dy = self.y - center_y
+            # 2. 参考点与传感器数据
+            cx, cy, road_theta = self.get_track_point(self.s)
+            dx = self.x - cx
+            dy = self.y - cy
             signed_cte = math.cos(road_theta) * dy - math.sin(road_theta) * dx
             self.cte = abs(signed_cte)
             self.agent_cum_cte += self.cte
-
-            # 4. 航向误差 [-pi, pi]
             heading_err = (road_theta - self.theta + math.pi) % math.tau - math.pi
+            curv = self.get_max_curvature_ahead(self.s)
 
-            # 5. 基因组编码 Stanley 闭环控制律（控制增益全部来自基因组，非硬编码）
-            steer_target = (heading_err * genome["k_heading"]
-                            - math.atan2(genome["k_cte"] * signed_cte, max(0.4, self.v)))
-            steer_target = max(-genome["steer_limit"], min(genome["steer_limit"], steer_target))
-            self.delta += (steer_target - self.delta) * genome["steer_lag"]
+            # 3. 硅基细胞 DAG 前向传导（真正的 SDSCC 推演，非硬编码公式）
+            genome = self.population[self.current_agent]
+            steer_raw, speed_raw = genome.forward(signed_cte, heading_err, curv, self.v)
 
-            # 6. 多点前向曲率探测 → 急弯自适应制动（修复右下大弯出界）
-            max_curv = self.get_max_curvature_ahead(self.s, genome)
-            target_v = max(1.2, genome["speed_max"] - max_curv * genome["brake_gain"])
+            # 4. 将细胞输出映射到物理控制量
+            steer_target = max(-0.45, min(0.45, steer_raw))
+            self.delta += (steer_target - self.delta) * 0.30
+            target_v = max(1.2, 4.2 * (0.5 - speed_raw * 0.5))  # speed 细胞输出越高→制动
             self.v += (target_v - self.v) * 0.12
 
-            # 7. 阿克曼两轮自行车运动学积分
+            # 5. 阿克曼运动学积分
             beta = math.atan(0.5 * math.tan(self.delta))
             self.x += self.v * math.cos(self.theta + beta) * dt
             self.y += self.v * math.sin(self.theta + beta) * dt
             self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt
             self.total_dist += self.v * dt
 
-            # 8. 失控淘汰（偏出路面或超时，淘汰当前个体换下一个）
-            if self.cte > 28.0 or self.agent_lap_steps > 8000:
+            # 6. 失控淘汰
+            if self.cte > 28.0 or self.agent_lap_steps > 10000:
                 self.next_agent()
                 return
 
-            # 9. CTE 历史记录
+            # 7. 记录
             if self.step_count % 5 == 0:
                 self.history_cte.append(round(self.cte * 0.05, 3))
                 if len(self.history_cte) > 40:
                     self.history_cte.pop(0)
-
-            # 10. 车尾发光轨迹
             if self.step_count % 3 == 0:
                 self.trail.append({"x": round(self.x, 1), "y": round(self.y, 1)})
                 if len(self.trail) > 120:
@@ -213,11 +346,15 @@ class LiveVehicleSimulator:
 
     def get_snapshot(self):
         with self.lock:
+            genome = self.population[self.current_agent]
             return {
                 "generation": self.generation,
                 "agent_index": self.current_agent,
                 "champion_fitness": round(self.champion_fitness, 1),
                 "fitness_log": list(self.fitness_log),
+                "n_cells": len(genome.cells),
+                "n_synapses": len(genome.synapses),
+                "hidden_types": list(genome.hidden_types),
                 "step_count": self.step_count,
                 "total_dist_m": round(self.total_dist, 1),
                 "road_width": self.road_width,
@@ -245,7 +382,6 @@ def veh_loop():
         time.sleep(0.016)
 
 threading.Thread(target=veh_loop, daemon=True).start()
-
 
 
 class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
