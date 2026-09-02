@@ -2033,11 +2033,18 @@ function animate(){
     v.update(now * 0.001, clientWarpMultiplier);
   }
 
-  const scaleText = camR > 500 ? "百万拓扑因果流形" : camR < 360 ? "微观单神经元物理力场" : "介观皮层柱过渡带";
+  const scaleText = camR > 500 ? "宏观百万全量点云星系" : camR < 360 ? "微观单神经元全细节质膜" : "介观过渡带";
   const elScale = document.getElementById("st-pipe");
   if (elScale) elScale.textContent = scaleText;
   const elCamR = document.getElementById("st-cam-r");
   if (elCamR) elCamR.textContent = `${Math.round(camR)} 单位`;
+
+  const elFocal = document.getElementById("st-focal");
+  if (elFocal) {
+    if (camR > 500) elFocal.textContent = "全量宏观流形点云 (100万)";
+    else if (camR < 360) elFocal.textContent = `${org.cells.length} 核心因果细胞 (全细节)`;
+    else elFocal.textContent = "介观皮层柱局部环路";
+  }
 
   if(bioLayerVisible){
     const t = clock.elapsedTime;
