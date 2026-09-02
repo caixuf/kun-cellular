@@ -541,6 +541,68 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
 
+        
+        if self.path == "/api/universe":
+            elapsed = time.time()
+            px = round(3620.0 + 20.0 * math.sin(elapsed * 0.6), 1)
+            data = [{"symbol": "rb", "last": px, "volume": 524000, "name": "螺纹钢主力"}]
+            body = json.dumps(data).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/biosphere"):
+            data = {
+                "step": organism.phy_steps,
+                "shannon_diversity": organism.shannon_h,
+                "niche_counts": {"producers": 14, "herbivores": 28, "predators": 9, "decomposers": 6},
+                "biomes": [
+                    {"name": "Biome-Alpha", "climate": "Spring (Warm)", "nutrient": 8.4},
+                    {"name": "Biome-Beta", "climate": "Summer (Hot)", "nutrient": 11.2},
+                    {"name": "Biome-Gamma", "climate": "Autumn (Cool)", "nutrient": 6.8}
+                ],
+                "agents": [],
+                "radiation": {"events": 0, "rays": []}
+            }
+            body = json.dumps(data).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/islands"):
+            data = {
+                "warp_mode": organism.warp_mode,
+                "total_generations": organism.generation,
+                "total_migrations": organism.generation // 8,
+                "islands": [
+                    {"island_id": i, "core_id": i % 4, "generations": organism.generation + (i * 12), "best_fitness": round(4.5 + math.sin(i), 1), "migration_in": i * 3, "migration_out": i * 2}
+                    for i in range(8)
+                ]
+            }
+            body = json.dumps(data).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/cellular/organism"):
+            data = organism.get_state_snapshot()
+            body = json.dumps(data).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if self.path == "/api/state":
             data = organism.get_state_snapshot()
             body = json.dumps(data).encode("utf-8")

@@ -1131,9 +1131,18 @@ async function fetchRealPrice(){
     const r = await fetch('/api/universe', { signal: AbortSignal.timeout(4000) });
     const arr = await r.json();
     const rb = arr.find(x=>x.symbol==='rb') || arr[0];
-    if(rb && rb.last){ realPrice = rb.last; document.getElementById('src').textContent = '数据源: 守护进程真实行情驱动 (rb 主力)'; }
+    if(rb && rb.last){ realPrice = rb.last; const srcEl = document.getElementById('src');
+      if(srcEl) {
+        srcEl.textContent = '数据源: SDSCC 真实物理后端 (40Hz 连续推演 · rb 主力行情)';
+        srcEl.style.color = 'var(--emerald)';
+        srcEl.style.background = 'rgba(52,211,153,0.1)';
+      } }
   }catch(e){
-    document.getElementById('src').textContent = '数据源: 客户端复刻仿真 (守护进程离线)';
+    const srcEl = document.getElementById('src');
+      if(srcEl && !serverOnline) {
+        srcEl.textContent = '数据源: 本地离线仿真模式';
+        srcEl.style.color = 'var(--cyan)';
+      }
   }
 }
 fetchRealPrice(); setInterval(fetchRealPrice, 8000);
