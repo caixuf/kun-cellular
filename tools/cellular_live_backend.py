@@ -28,6 +28,16 @@ from socketserver import ThreadingMixIn
 
 PORT = 8833
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+BUSINESS_MANIFEST_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models", "business_lifeforms", "manifest.json")
+
+def load_business_lifeform_manifest():
+    if not os.path.exists(BUSINESS_MANIFEST_PATH):
+        return []
+    try:
+        with open(BUSINESS_MANIFEST_PATH, "r", encoding="utf-8") as f:
+            return json.load(f).get("lifeforms", []) or []
+    except Exception:
+        return []
 
 
 # ============================================================================
@@ -843,12 +853,108 @@ class SiliconCellularOrganism:
             self.macro_synapses = 1536
             self.init_cells()
 
+    def _express_business_lifeform(self, lf):
+        """把业务生命体冠军检查点表达为可切换的 3D 皮层拓扑（不改 24 原语底座）。"""
+        self.macro_cells = int(lf.get("cells_scale") or 10000000)
+        self.macro_synapses = self.macro_cells * 4
+        motif = lf.get("primitive_motif") or ["OP_EMA", "GATE_HYSTERESIS", "ACT_PRIMARY_POSITIVE"]
+        n_in = max(4, len(lf.get("input_signals") or []))
+        n_hid = 36
+        n_out = max(4, len(lf.get("action_outputs") or []))
+        type_map = {
+            "OP_EMA": "INTEGRATE", "OP_DIFF": "DAMPER", "OP_INTEGRAL": "INTEGRATE",
+            "OP_SUM": "SUM", "OP_SUB": "SUM", "OP_MULTIPLY": "AMPLIFY", "OP_RATIO": "AMPLIFY",
+            "OP_ABS": "THRESHOLD", "OP_DELAY_N": "DAMPER", "OP_OSCILLATOR": "OSCILLATOR",
+            "OP_QUADRATIC": "AMPLIFY", "GATE_THRESHOLD": "THRESHOLD", "GATE_HYSTERESIS": "THRESHOLD",
+            "GATE_AND": "SUM", "GATE_INHIBIT": "DAMPER", "GATE_DEADZONE": "THRESHOLD",
+            "GATE_MIN_MAX": "SUM", "ACT_PRIMARY_POSITIVE": "AMPLIFY",
+            "ACT_PRIMARY_NEGATIVE": "DAMPER", "ACT_DEFENSIVE_RESET": "THRESHOLD",
+            "ACT_IMMUNE_BLOCK": "THRESHOLD",
+        }
+        oid = lf.get("id", "")
+        cell_id = 0
+
+        def place(i, layer):
+            # 每个业务体用不同几何，切换时一眼能看出结构差
+            t = i * 0.37
+            if "ecg" in oid or "medical" in oid:
+                return (-160 + layer * 110, math.sin(i * 0.7) * 70, (i % 8) * 18 - 70)
+            if "battery" in oid or "bms" in oid:
+                return ((i % 6) * 28 - 70, layer * 55 - 80, (i // 6) * 28 - 50)
+            if "grid" in oid or "power" in oid:
+                return ((i % 8) * 32 - 110, (i // 8) * 28 - 40, layer * 40 - 40)
+            if "satellite" in oid or "adcs" in oid:
+                r, th = 90 + layer * 30, i * 0.52
+                return (r * math.cos(th), r * math.sin(th) * 0.4, r * math.sin(th) * 0.9)
+            if "drone" in oid:
+                return (math.sin(t) * (80 + layer * 20), math.cos(t * 1.3) * 70, math.sin(t * 0.7) * 90)
+            if "wafer" in oid or "etch" in oid or "semiconductor" in oid:
+                r, th = 30 + layer * 40, i * 0.41
+                return (r * math.cos(th), 8, r * math.sin(th))
+            if "dam" in oid or "hydro" in oid:
+                return (i * 6 - 90, 40 - (i * 0.15 - 10) ** 2 * 0.08 + layer * 18, layer * 25 - 30)
+            if "quantum" in oid or "qubit" in oid:
+                phi, th = (i % 12) / 12 * math.pi, i * 0.7
+                r = 50 + layer * 28
+                return (r * math.sin(phi) * math.cos(th), r * math.cos(phi), r * math.sin(phi) * math.sin(th))
+            if "sea" in oid or "submersible" in oid:
+                return (i * 8 - 120, math.sin(i * 0.3) * 18, layer * 36 - 40)
+            if "fusion" in oid or "tokamak" in oid:
+                th, r = i * 0.28, 70 + 18 * math.sin(i * 0.5)
+                return (r * math.cos(th), 22 * math.sin(i * 0.9) + layer * 12, r * math.sin(th))
+            if "train" in oid or "atc" in oid:
+                return (i * 9 - 140, layer * 40 - 40, math.sin(i * 0.2) * 12)
+            if "protein" in oid or "fold" in oid:
+                th = i * 0.45
+                return (28 * math.cos(th), i * 3.5 - 80, 28 * math.sin(th) + layer * 10)
+            return (-120 + layer * 90, (i % 7) * 22 - 70, (i // 7) * 22 - 40)
+
+        for i in range(n_in):
+            x, y, z = place(i, 0)
+            self.cells.append(PhysicalCell3D(cell_id, "SUM", x, y, z))
+            cell_id += 1
+        hid_start = cell_id
+        for i in range(n_hid):
+            ptype = type_map.get(motif[i % len(motif)], "INTEGRATE")
+            x, y, z = place(i, 1)
+            self.cells.append(PhysicalCell3D(cell_id, ptype, x, y, z))
+            cell_id += 1
+        out_start = cell_id
+        for i in range(n_out):
+            ptype = type_map.get(motif[-(i % len(motif)) - 1], "AMPLIFY")
+            x, y, z = place(i, 2)
+            self.cells.append(PhysicalCell3D(cell_id, ptype, x, y, z))
+            cell_id += 1
+
+        for i in range(n_in):
+            for j in range(hid_start, hid_start + n_hid):
+                if (i + j) % 3 == 0:
+                    self.synapses.append({"from": i, "to": j, "weight": round(random.uniform(0.6, 1.6), 2)})
+        for j in range(hid_start, hid_start + n_hid):
+            nxt = j + 1 if j + 1 < out_start else hid_start
+            self.synapses.append({"from": j, "to": nxt, "weight": 0.9 if (j % 5) else -0.7})
+            for k in range(out_start, out_start + n_out):
+                if (j + k) % 2 == 0:
+                    self.synapses.append({"from": j, "to": k, "weight": round(random.uniform(-1.2, 1.6), 2)})
+
     def load_organism_by_id(self, org_id):
         """根据生命体 ID 动态重构真实 3D 细胞与轴突拓扑"""
         with self.lock:
             self.current_organism_id = org_id
             self.cells = []
             self.synapses = []
+
+            biz = next((x for x in load_business_lifeform_manifest() if x.get("id") == org_id), None)
+            if biz:
+                self._express_business_lifeform(biz)
+                return {
+                    "organism_id": org_id,
+                    "name": biz.get("name", org_id),
+                    "macro_cells": self.macro_cells,
+                    "macro_synapses": self.macro_synapses,
+                    "cells_count": len(self.cells),
+                    "synapses_count": len(self.synapses)
+                }
 
             if org_id == "embodied_kinematic_beast":
                 # 具身物理运动演化生命体: 四足关节骨骼与中枢 CPG 脊椎
@@ -1174,6 +1280,23 @@ class DummySiliconLibrary:
                 ]
             }
         ]
+        for lf in load_business_lifeform_manifest():
+            motif = ", ".join(lf.get("primitive_motif") or [])
+            self.organisms.append({
+                "organism_id": lf.get("id"),
+                "name": lf.get("name"),
+                "tag": (lf.get("domain") or "业务")[:10],
+                "generation": 10,
+                "total_cells": lf.get("cells_scale", 10000000),
+                "description": lf.get("sample_dialogue") or "",
+                "books": [{
+                    "book_id": f"{lf.get('id')}_champion",
+                    "title": lf.get("name"),
+                    "citations": 12,
+                    "impact_score": round(9.4 + (lf.get("training_metadata") or {}).get("convergence_score", 0) * 0.5, 2),
+                    "description": f"{lf.get('domain','')} · 原语 {motif} · GPU { (lf.get('training_metadata') or {}).get('device','CUDA') }"
+                }]
+            })
         self.books = []
         for o in self.organisms:
             for b in o["books"]:

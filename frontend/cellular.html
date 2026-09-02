@@ -851,6 +851,7 @@
     <div id="src" style="font-size:10px;padding:4px 6px;border-radius:4px;background:rgba(56,189,248,.1);color:var(--cyan);margin-top:4px;">
       数据源: 连接中...
     </div>
+    <div style="font-size:9px;color:#64748b;margin-top:6px;line-height:1.45;">左键平移 · 右键/Alt旋转 · 滚轮深入光标处 · WASD 漫游 · 双击对焦</div>
   </div>
 
   <!-- 卡片 2: 硅基生命体与文化典籍 (核心流形选择坞) -->
@@ -1328,7 +1329,7 @@ function apoptosis(org){
  * ============================================================ */
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x04070d, 0.0016);
-const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 1, 4000);
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.2, 6000);
 camera.position.set(0, 0, 560);
 const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
@@ -1369,54 +1370,63 @@ let panDragging = false;
 
 renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
 
+function panCameraByPixels(dx, dy) {
+  const panScale = Math.max(0.05, targetCamR / 480);
+  const right = new THREE.Vector3();
+  const up = new THREE.Vector3();
+  camera.matrix.extractBasis(right, up, new THREE.Vector3());
+  targetLookAt.addScaledVector(right, -dx * panScale);
+  targetLookAt.addScaledVector(up, dy * panScale);
+}
+
 renderer.domElement.addEventListener('pointerdown', e => {
-  if (e.button === 0) { dragging = true; lx = e.clientX; ly = e.clientY; }
-  else if (e.button === 2 || e.button === 1) { panDragging = true; lx = e.clientX; ly = e.clientY; }
+  lx = e.clientX; ly = e.clientY;
+  const wantOrbit = e.button === 2 || e.altKey || e.ctrlKey;
+  if (e.button === 1 || e.button === 0 && !wantOrbit) panDragging = true;
+  else dragging = true;
+  renderer.domElement.setPointerCapture?.(e.pointerId);
 });
 addEventListener('pointerup', () => { dragging = false; panDragging = false; });
 addEventListener('pointermove', e => {
   mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
   mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  if (dragging) {
-    const dx = e.clientX - lx;
-    const dy = e.clientY - ly;
+  const dx = e.clientX - lx;
+  const dy = e.clientY - ly;
+  if (panDragging) {
+    panCameraByPixels(dx, dy);
+    lx = e.clientX; ly = e.clientY;
+  } else if (dragging) {
     targetTheta -= dx * 0.0045;
     targetPhi = Math.max(0.12, Math.min(Math.PI - 0.12, targetPhi - dy * 0.0045));
     lx = e.clientX; ly = e.clientY;
-  } else if (panDragging) {
-    const dx = e.clientX - lx;
-    const dy = e.clientY - ly;
-    const panScale = Math.max(0.08, (targetCamR / 700) * 0.85);
-    const right = new THREE.Vector3();
-    const up = new THREE.Vector3();
-    camera.matrix.extractBasis(right, up, new THREE.Vector3());
-    targetLookAt.addScaledVector(right, -dx * panScale);
-    targetLookAt.addScaledVector(up, dy * panScale);
-    lx = e.clientX; ly = e.clientY;
   }
+});
+addEventListener('keydown', e => {
+  if (['INPUT', 'TEXTAREA'].includes((e.target && e.target.tagName) || '')) return;
+  const step = Math.max(8, targetCamR * 0.045);
+  if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') panCameraByPixels(step, 0);
+  if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') panCameraByPixels(-step, 0);
+  if (e.key === 'w' || e.key === 'W' || e.key === 'ArrowUp') panCameraByPixels(0, step);
+  if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') panCameraByPixels(0, -step);
+  if (e.key === 'q' || e.key === 'Q') targetLookAt.y += step * 0.6;
+  if (e.key === 'e' || e.key === 'E') targetLookAt.y -= step * 0.6;
 });
 
 // 1. 真实城市切片级深入缩放 + 光标对焦点深度推进 (Zoom-to-Cursor Micro Navigation)
 renderer.domElement.addEventListener('wheel', e => {
   e.preventDefault();
-  const zoomFactor = Math.pow(1.0018, e.deltaY);
+  const zoomFactor = Math.pow(1.0024, e.deltaY);
   const oldCamR = targetCamR;
-  // 最小视距深入至 28 单位（单个细胞/局部组织占满整个屏幕，其余大脑完全延展至屏幕外）
-  targetCamR = Math.max(28, Math.min(1800, targetCamR * zoomFactor));
+  targetCamR = Math.max(10, Math.min(2200, targetCamR * zoomFactor));
 
-  // 滚轮拉近时，视心直接向鼠标悬停的局部脑区真实推进 (如同缩放卫星地图)
-  if (e.deltaY < 0) {
-    raycaster.setFromCamera(mouseNDC, camera);
-    const intersectPoint = new THREE.Vector3();
-    focalPlane.normal.copy(camera.getWorldDirection(new THREE.Vector3()).negate());
-    focalPlane.constant = -targetLookAt.dot(focalPlane.normal);
-    if (raycaster.ray.intersectPlane(focalPlane, intersectPoint)) {
-      const shiftRatio = Math.min(0.20, Math.max(0.04, 1.0 - (targetCamR / oldCamR)));
-      const shift = intersectPoint.sub(targetLookAt).multiplyScalar(shiftRatio);
-      targetLookAt.add(shift);
-    }
-  } else if (e.deltaY > 0 && targetCamR > 650) {
-    targetLookAt.lerp(new THREE.Vector3(0, 0, 0), 0.08);
+  raycaster.setFromCamera(mouseNDC, camera);
+  const intersectPoint = new THREE.Vector3();
+  focalPlane.normal.copy(camera.getWorldDirection(new THREE.Vector3()).negate());
+  focalPlane.constant = -targetLookAt.dot(focalPlane.normal);
+  if (raycaster.ray.intersectPlane(focalPlane, intersectPoint)) {
+    const toward = e.deltaY < 0 ? 0.42 : -0.18;
+    const shiftRatio = Math.max(0.06, Math.min(0.5, Math.abs(1.0 - (targetCamR / oldCamR)) * 2.4)) * Math.sign(toward);
+    targetLookAt.add(intersectPoint.sub(targetLookAt).multiplyScalar(Math.abs(shiftRatio) * (e.deltaY < 0 ? 1 : -0.35)));
   }
 }, { passive: false });
 
@@ -2182,9 +2192,9 @@ async function pollLibrary() {
       if(elB) elB.textContent = `${j.organisms.length} 大生命体 / ${j.total_books || 9} 册典籍`;
       const shelf = document.getElementById('library-shelf');
       
-      // 仅在首次或显式请求时全量渲染 DOM，坚决杜绝定时器无意义重建 DOM 导致的失焦和滚动跳变
-      if(shelf && !libraryInitialRenderDone) {
+      if(shelf && (!libraryInitialRenderDone || j.organisms.length !== window.__libCount)) {
         libraryInitialRenderDone = true;
+        window.__libCount = j.organisms.length;
 
         shelf.innerHTML = `<div class="win-tree">` + j.organisms.map((org, idx) => {
           const isOpen = idx === 0 ? "open" : "";
@@ -2236,6 +2246,7 @@ async function pollLibrary() {
   } catch(e) {}
 }
 pollLibrary();
+setInterval(pollLibrary, 5000);
 
 
 log('形态发生细胞全息观测台已启动 — 拖拽旋转 · 滚轮缩放', true);
