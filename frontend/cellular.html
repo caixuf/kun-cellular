@@ -431,6 +431,49 @@
     gap: 8px;
   }
 
+  /* 硅基生命体物种 -> 典籍层级折叠手风琴 */
+  .organism-group {
+    background: rgba(15, 23, 42, 0.75);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 6px;
+    margin-bottom: 6px;
+    overflow: hidden;
+    transition: all 0.2s;
+  }
+  .organism-header {
+    padding: 6px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    background: rgba(30, 41, 59, 0.6);
+    border-bottom: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .organism-header:hover {
+    background: rgba(56, 189, 248, 0.15);
+  }
+  .organism-group.open .organism-header {
+    border-bottom-color: rgba(56, 189, 248, 0.3);
+  }
+  .organism-books {
+    display: none;
+    padding: 6px 8px;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .organism-group.open .organism-books {
+    display: flex;
+  }
+  .org-tag {
+    font-size: 9px;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(168, 85, 247, 0.25);
+    color: var(--purple);
+    font-weight: bold;
+  }
+
   /* 图书馆卡片可点击高亮样式 */
   .book-card {
     background: rgba(15, 23, 42, 0.75);
@@ -715,13 +758,13 @@
     <div id="bio-biomes" style="font-size:9px;line-height:1.8;color:var(--text-dim);margin-top:4px;"></div>
   </div>
 
-    <!-- 卡片: 硅基文化图书馆 -->
+    <!-- 卡片: 硅基生命体与文化典籍 -->
   <div class="card" id="card-library">
     <div class="card-title">
-      <span>硅基文化图书馆 (The Library)</span>
-      <span class="card-title-badge" id="st-total-books">0 册名著</span>
+      <span>硅基生命体与典籍 (Organisms & Books)</span>
+      <span class="card-title-badge" id="st-total-books">4 大生命体 / 9 册典籍</span>
     </div>
-    <div id="library-shelf" style="display:flex;flex-direction:column;gap:5px;max-height:135px;overflow-y:auto;font-size:10px;">
+    <div id="library-shelf" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;font-size:10px;">
     </div>
   </div>
 
@@ -1787,24 +1830,61 @@ async function pollIslands() {
 setInterval(pollIslands, 1000);
 pollIslands();
 
+window.toggleOrganismGroup = function(groupId) {
+  const el = document.getElementById(groupId);
+  if(el) {
+    el.classList.toggle("open");
+  }
+};
+
 async function pollLibrary() {
   try {
     const r = await fetch('/api/library', { signal: AbortSignal.timeout(3000) });
     const j = await r.json();
-    if(j.books && j.books.length) {
+    if(j.organisms && j.organisms.length) {
       const elB = document.getElementById('st-total-books');
-      if(elB) elB.textContent = `${j.books.length} 册名著`;
+      if(elB) elB.textContent = `${j.organisms.length} 大生命体 / ${j.total_books || 9} 册典籍`;
       const shelf = document.getElementById('library-shelf');
       if(shelf) {
-        shelf.innerHTML = j.books.map(b => {
-          return `<div class="book-card" onclick="highlightBookCircuit('${b.book_id}', '${b.title || b.book_id}')">
-            <div style="display:flex;justify-content:space-between;color:var(--cyan);font-weight:bold;font-size:10px;">
-              <span>《${b.title || b.book_id}》</span>
-              <span style="color:var(--amber);">[SCORE: ${b.impact_score || 8.5}</span>
+        // 保持用户当前的展开/折叠状态
+        const openGroups = new Set();
+        shelf.querySelectorAll('.organism-group.open').forEach(g => openGroups.add(g.id));
+        if(openGroups.size === 0) openGroups.add('org-group-' + j.organisms[0].organism_id);
+
+        shelf.innerHTML = j.organisms.map((org, idx) => {
+          const groupId = `org-group-${org.organism_id}`;
+          const isOpen = openGroups.has(groupId) ? "open" : "";
+          const booksHtml = (org.books || []).map(b => {
+            return `<div class="book-card" onclick="event.stopPropagation(); highlightBookCircuit('${b.book_id}', '${b.title || b.book_id}', '${org.name}')">
+              <div style="display:flex;justify-content:space-between;color:var(--cyan);font-weight:bold;font-size:10px;">
+                <span>《${b.title || b.book_id}》</span>
+                <span style="color:var(--amber);">[★ ${b.impact_score || 9.5}]</span>
+              </div>
+              <div style="color:var(--text-dim);font-size:9px;margin-top:2px;line-height:1.3;">
+                ${b.description || ''}
+              </div>
+              <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:8px;margin-top:3px;">
+                <span style="color:var(--emerald);">引用: ${b.citations || 1} 次</span>
+                <span style="color:var(--purple);font-weight:bold;">[点击挂载回路]</span>
+              </div>
+            </div>`;
+          }).join('');
+
+          const cellDesc = org.total_cells >= 100000000 ? '1亿细胞' : org.total_cells >= 10000000 ? '1000万细胞' : ((org.total_cells/10000).toFixed(0)+'万细胞');
+
+          return `<div class="organism-group ${isOpen}" id="${groupId}">
+            <div class="organism-header" onclick="toggleOrganismGroup('${groupId}')">
+              <div>
+                <span style="color:#f8fafc;font-weight:bold;font-size:10px;">${org.name}</span>
+                <span class="org-tag" style="margin-left:4px;">${org.tag || '生命体'}</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <span style="color:var(--cyan);font-size:9px;">${cellDesc} · ${(org.books||[]).length} 册</span>
+                <span style="color:var(--text-dim);font-size:8px;">▼</span>
+              </div>
             </div>
-            <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:9px;margin-top:2px;">
-              <span>Gen ${b.discovered_at_gen} · ${b.author_deme || 'Origin'}</span>
-              <span style="color:var(--emerald);">引用: ${b.citations || 1}次 (点击高亮)</span>
+            <div class="organism-books">
+              ${booksHtml}
             </div>
           </div>`;
         }).join('');
@@ -2441,15 +2521,33 @@ function initTooltipEngine() {
   });
 }
 
-// 8.4 硅基文化图书馆点击回路联动高亮与生命体切换
-window.highlightBookCircuit = function(bookId, title) {
-  log(`[硅基生命体图书馆] 正在挂载并全息高亮生命体: 《${title || bookId}》`, true);
+// 8.4 硅基生命体与典籍点击回路联动高亮与脑区重构
+window.highlightBookCircuit = function(bookId, title, organismName) {
+  const orgTitle = organismName ? `【${organismName}】之` : '';
+  log(`[典籍挂载] 正在将 ${orgTitle}《${title || bookId}》重构载入 3D 计算流形！`, true);
+  
   if (bookId.includes("quant")) {
     window.loadPreset("real");
   } else if (bookId.includes("vehicle") || bookId.includes("adas")) {
     window.loadPreset("adas");
   } else if (bookId.includes("arithmetic") || bookId.includes("math")) {
     window.loadPreset("math");
+  } else if (bookId.includes("loco") || bookId.includes("cpg")) {
+    window.currentPresetCells = 5000000;
+    window.currentPresetSyns = 20000000;
+    window.loadPreset("mature");
+  } else if (bookId.includes("immune")) {
+    window.currentPresetCells = 3600000;
+    window.currentPresetSyns = 14400000;
+    window.loadPreset("mature");
+  } else if (bookId.includes("slingshot")) {
+    window.currentPresetCells = 1200000;
+    window.currentPresetSyns = 4800000;
+    window.loadPreset("mature");
+  } else if (bookId.includes("laokexia")) {
+    window.currentPresetCells = 1000000000;
+    window.currentPresetSyns = 4000000000;
+    window.loadPreset("mature");
   } else {
     window.loadPreset("mature");
   }

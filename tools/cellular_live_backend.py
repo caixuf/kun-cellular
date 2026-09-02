@@ -769,53 +769,119 @@ class DummySiliconLibrary:
     def __init__(self):
         self.reload_books()
     def reload_books(self):
-        self.books = [
+        self.organisms = [
             {
-                "book_id": "quant_30y_champion",
-                "title": "三十年商品期货全天候量化大模型",
-                "author_deme": "Deme-Quant-4234",
-                "discovered_at_gen": 150,
-                "citations": 842,
-                "impact_score": 9.85,
-                "description": "4,234 根日线演化出的多尺度均线交叉与动量破位积分回路，全样本夏普 3.82，最大回撤 4.1%"
+                "organism_id": "apex_generalist_prime",
+                "name": "Apex 通才全能超级生命体",
+                "tag": "通才中枢",
+                "generation": 420,
+                "total_cells": 100000000,
+                "description": "集成了量化投资、自动驾驶、高阶因果对话与符号逻辑推演的顶级硅基全能生命体。",
+                "books": [
+                    {
+                        "book_id": "quant_30y_champion",
+                        "title": "三十年商品期货全天候量化大模型",
+                        "citations": 842,
+                        "impact_score": 9.85,
+                        "description": "4,234 根日线演化出的多尺度均线交叉与动量破位积分回路，全样本夏普 3.82，最大回撤 4.1%"
+                    },
+                    {
+                        "book_id": "vehicle_1m_mega",
+                        "title": "SDSCC 100万细胞智能驾驶超级大脑",
+                        "citations": 1290,
+                        "impact_score": 9.92,
+                        "description": "100万细胞与400万突触构成的阿克曼物理闭环超级大脑，连续6.7圈零出界，平均横向误差4.5厘米"
+                    },
+                    {
+                        "book_id": "laokexia_billion",
+                        "title": "老克夏十亿级张量流形大模型",
+                        "citations": 3500,
+                        "impact_score": 9.99,
+                        "description": "10亿硅基细胞在多岛屿拓扑下的大规模因果流形自组织与语言涌现"
+                    },
+                    {
+                        "book_id": "neural_arithmetic_10m",
+                        "title": "纯符号神经算术千万细胞大模型",
+                        "citations": 620,
+                        "impact_score": 9.40,
+                        "description": "1,000万离散符号细胞无梯度演化涌现的纯神经算术逻辑，零浮点误差"
+                    }
+                ]
             },
             {
-                "book_id": "vehicle_1m_mega",
-                "title": "SDSCC 100万细胞智能驾驶超级生命体",
-                "author_deme": "Deme-RTX5060-CUDA",
-                "discovered_at_gen": 50,
-                "citations": 1290,
-                "impact_score": 9.92,
-                "description": "100万细胞与400万突触构成的阿克曼物理闭环超级大脑，连续6.7圈零出界，平均横向误差4.5厘米"
+                "organism_id": "embodied_kinematic_beast",
+                "name": "具身物理运动演化生命体",
+                "tag": "具身小脑",
+                "generation": 280,
+                "total_cells": 5000000,
+                "description": "专注空间几何、动力学积分与机械多关节协同控制的具身物理生命体。",
+                "books": [
+                    {
+                        "book_id": "loco_quadruped_cpg",
+                        "title": "四足生物 CPG 中枢模式步态合成典籍",
+                        "citations": 510,
+                        "impact_score": 9.35,
+                        "description": "5 组 CPG 节律发生器肌肉协调 4 个质量节点，在摩擦力驱动下自发跨步行走"
+                    },
+                    {
+                        "book_id": "maze_novelty_navigator",
+                        "title": "自主迷宫激光雷达避障与新奇性探索",
+                        "citations": 430,
+                        "impact_score": 9.15,
+                        "description": "三向微观激光测距与局部神经反射弧，通关率从 0% 自发涌现至 100%"
+                    }
+                ]
             },
             {
-                "book_id": "neural_arithmetic_10m",
-                "title": "纯符号神经算术千万细胞大模型",
-                "author_deme": "Deme-Mathematician-10M",
-                "discovered_at_gen": 80,
-                "citations": 620,
-                "impact_score": 9.40,
-                "description": "1,000万离散符号细胞无梯度演化涌现的纯神经算术逻辑，零浮点乘法"
+                "organism_id": "micro_defense_symbiosis",
+                "name": "微环境共生与免疫防御生命体",
+                "tag": "自组织免疫",
+                "generation": 190,
+                "total_cells": 3600000,
+                "description": "基于红皇后博弈与特异性趋化性吞噬演化出的生命微生态防御系统。",
+                "books": [
+                    {
+                        "book_id": "immune_t_cell_defense",
+                        "title": "微环境特异性 T 细胞抗原防御典籍",
+                        "citations": 380,
+                        "impact_score": 9.20,
+                        "description": "特异性 T 细胞基于化学趋化性追踪并吞噬病原体，清除率 95%+"
+                    },
+                    {
+                        "book_id": "eco_red_queen_coev",
+                        "title": "红皇后捕食者-猎物演化博弈论",
+                        "citations": 470,
+                        "impact_score": 9.30,
+                        "description": "多智能体种群动态追逐、猎捕与自组织生态平衡"
+                    }
+                ]
             },
             {
-                "book_id": "maze_novelty_navigator",
-                "title": "自主迷宫新奇性探索避障生命体",
-                "author_deme": "Deme-Maze-Explorer",
-                "discovered_at_gen": 35,
-                "citations": 430,
-                "impact_score": 9.15,
-                "description": "三向微观激光测距与局部神经反射弧，通关率从 0% 自发涌现至 80%+"
-            },
-            {
-                "book_id": "laokexia_billion",
-                "title": "老克夏十亿级张量流形大模型",
-                "author_deme": "Deme-Billion-Brain",
-                "discovered_at_gen": 200,
-                "citations": 3500,
-                "impact_score": 9.99,
-                "description": "10亿硅基细胞在多岛屿拓扑下的大规模代谢流形自组织"
+                "organism_id": "celestial_chaos_integrator",
+                "name": "天体物理与混沌引力生命体",
+                "tag": "引力宇宙",
+                "generation": 150,
+                "total_cells": 1200000,
+                "description": "基于牛顿-洛伦兹非线性引力场演化出的轨道共振与引力弹弓系统。",
+                "books": [
+                    {
+                        "book_id": "slingshot_3body_resonance",
+                        "title": "三体非线性引力弹弓与洛伦兹轨道共振",
+                        "citations": 610,
+                        "impact_score": 9.50,
+                        "description": "三体引力场混沌轨道积分与利用重力势阱进行弹弓加速"
+                    }
+                ]
             }
         ]
+        self.books = []
+        for o in self.organisms:
+            for b in o["books"]:
+                b_copy = dict(b)
+                b_copy["organism_id"] = o["organism_id"]
+                b_copy["organism_name"] = o["name"]
+                self.books.append(b_copy)
+
     def get_books(self):
         return self.books
 
@@ -1753,7 +1819,13 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/library"):
             silicon_library.reload_books()
-            body = json.dumps({"status": "ok", "total_books": len(silicon_library.books), "books": silicon_library.books}, ensure_ascii=False).encode("utf-8")
+            body = json.dumps({
+                "status": "ok",
+                "total_organisms": len(silicon_library.organisms),
+                "organisms": silicon_library.organisms,
+                "total_books": len(silicon_library.books),
+                "books": silicon_library.books
+            }, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
