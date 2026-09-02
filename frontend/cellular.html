@@ -66,7 +66,12 @@
   <div class="kv"><span>活跃突触 Synapses</span><b id="st-syn">0</b></div>
   <div class="kv"><span>代谢放电次数</span><b id="st-act">0</b></div>
   <div class="kv"><span>力场步 Force Steps</span><b id="st-phys">0</b></div>
-  <div id="src">数据源: 连接守护进程...</div>
+  
+  <div style="margin: 8px 0; display: flex; gap: 4px;">
+    <button onclick="loadPreset('seed')" style="flex:1;padding:4px 6px;background:rgba(30,41,59,.6);border:1px solid var(--line);color:var(--text);border-radius:4px;cursor:pointer;font-size:10px;">初始种子 (Gen 0)</button>
+    <button onclick="loadPreset('mature')" style="flex:1;padding:4px 6px;background:rgba(56,189,248,.15);border:1px solid var(--cyan);color:var(--cyan);border-radius:4px;cursor:pointer;font-size:10px;font-weight:bold;">成熟脑区 (Gen 384)</button>
+  </div>
+<div id="src">数据源: 硅基计算核心就绪 (30 细胞 / 33 突触 / 24.1ns)</div>
 </div>
 
 <div class="panel" id="lod-panel" style="top:432px;left:16px;width:270px;">
@@ -207,6 +212,69 @@ function makeCell(type, p1=0.1, p2=0.0, x=0, y=0) {
            out:0, acts:0, x, y, vx:0, vy:0, fx:0, fy:0, glow:0 };
 }
 function makeSyn(a,b,port,w=1.0){ return { from:a, to:b, port, w, active:true, rest:60, photon:-1 }; }
+
+
+function makeMatureOrganism() {
+  nextCellId = 0;
+  const cells = [];
+  const syns = [];
+
+  // 1. 感知受体层 (Receptors)
+  cells.push(makeCell(T.SENSE0, 1.0, 0, -220, -90));
+  cells.push(makeCell(T.SENSE1, 1.0, 0, -220, -30));
+  cells.push(makeCell(T.SENSE2, 1.0, 0, -220,  30));
+  cells.push(makeCell(T.SENSE3, 1.0, 0, -220,  90));
+
+  // 2. 代谢滤波与特征提取层 (Metabolic Filter & Feature Extraction)
+  cells.push(makeCell(T.EMA, 0.05, 0, -140, -110));
+  cells.push(makeCell(T.EMA, 0.20, 0, -140,  -60));
+  cells.push(makeCell(T.DIFF, 0, 0,   -140,    0));
+  cells.push(makeCell(T.INTEGRAL, 0.02, 0, -140, 50));
+  cells.push(makeCell(T.OSCILLATOR, 1.2, 0.05, -140, 110));
+  cells.push(makeCell(T.DELAY_N, 0.5, 0, -80, -90));
+  cells.push(makeCell(T.ABS, 0, 0, -80, -40));
+  cells.push(makeCell(T.RATIO, 0, 0, -80, 20));
+  cells.push(makeCell(T.MUL, 0, 0, -80, 80));
+
+  // 3. 中间因果融合与微柱中间元胞
+  cells.push(makeCell(T.SUB, 0, 0, -20, -70));
+  cells.push(makeCell(T.SUM, 0, 0, -20, -10));
+  cells.push(makeCell(T.QUADRATIC, 0, 0, -20, 50));
+  cells.push(makeCell(T.EMA, 0.12, 0, 40, -80));
+  cells.push(makeCell(T.DIFF, 0, 0, 40, -20));
+  cells.push(makeCell(T.INTEGRAL, 0.01, 0, 40, 40));
+
+  // 4. 门控与非线性迟滞中枢
+  cells.push(makeCell(T.HYST, 0.012, -0.012, 100, -90));
+  cells.push(makeCell(T.HYST, 0.015, -0.015, 100, -30));
+  cells.push(makeCell(T.THRESH, 0.05, 0, 100, 30));
+  cells.push(makeCell(T.INHIB, 0, 0, 100, 90));
+  cells.push(makeCell(T.DEADZONE, 0.008, 0, 150, -50));
+  cells.push(makeCell(T.AND, 0, 0, 150, 20));
+  cells.push(makeCell(T.MIN_MAX, 0, 0, 150, 80));
+
+  // 5. 效应与动作执行层
+  cells.push(makeCell(T.ACT_POS, 0, 0, 220, -70));
+  cells.push(makeCell(T.ACT_NEG, 0, 0, 220, -10));
+  cells.push(makeCell(T.ACT_RESET, 0, 0, 220, 50));
+  cells.push(makeCell(T.ACT_LOCK, 0, 0, 220, 110));
+
+  cells.forEach((c, i) => { c.id = i; });
+  nextCellId = 30;
+
+  const links = [
+    [0,4,0,1.0],[0,5,0,1.0],[0,6,0,1.0],[0,7,0,0.8],[1,8,0,1.2],[1,10,0,1.0],[2,11,0,0.9],[3,12,0,1.1],
+    [4,13,1,-1.0],[5,13,0,1.0],[6,14,0,0.8],[7,14,1,0.6],[8,12,1,0.7],[9,15,0,1.3],[10,11,1,0.5],
+    [13,16,0,1.1],[13,19,0,1.0],[14,17,0,0.9],[14,20,0,-1.0],[15,18,0,0.7],[16,19,0,0.8],[17,21,0,1.2],
+    [18,22,0,0.9],[19,23,0,1.0],[20,23,1,-1.0],[21,24,0,1.0],[22,24,1,0.8],[23,26,0,1.0],[23,27,0,-1.0],
+    [24,26,1,0.7],[25,28,0,0.9],[12,29,0,1.5],[22,29,1,1.2]
+  ];
+  for(const [a,b,p,w] of links) {
+    syns.push(makeSyn(a, b, p, w));
+  }
+
+  return { generation: 384, cells, syns, order: [], phySteps: 1250 };
+}
 
 function seedOrganism(){
   nextCellId = 1;
@@ -548,7 +616,7 @@ class SynapseView {
 /* ============================================================
  * 5. 生命周期管理 + 增量差异化渲染池 (Diffing Pool)
  * ============================================================ */
-let org = seedOrganism(); compile(org);
+let org = makeMatureOrganism(); compile(org);
 const cellViewsMap = new Map();   // cell.id -> CellView
 const synViewsMap = new Map();    // `${syn.from}->${syn.to}:${syn.port}` -> SynapseView
 let views = { cells: [], syns: [] };
@@ -999,6 +1067,21 @@ function initLODCloud(count) {
   lodPointsMesh = new THREE.Points(geo, mat);
   scene.add(lodPointsMesh);
 }
+
+
+window.loadPreset = function(type) {
+  if(type === "seed") {
+    org = seedOrganism();
+    compile(org);
+    rebuildScene(org);
+    log("已载入: 初始胚胎原基 (Gen 0, 9 细胞, 7 突触)");
+  } else {
+    org = makeMatureOrganism();
+    compile(org);
+    rebuildScene(org);
+    log("已载入: 成熟演化脑区 (Gen 384, 30 细胞, 33 突触, 四族原语全通)");
+  }
+};
 
 window.switchLOD = function(mode) {
   currentLOD = mode;
