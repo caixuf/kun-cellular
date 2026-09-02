@@ -248,6 +248,49 @@ class LiveOrganism:
         if not c_from or not c_to:
             return
 
+                # 15% 概率触发文化借阅 (Cultural Reading from Silicon Library)
+        if random.random() < 0.15 and len(self.cells) < 120:
+            book = silicon_library.get_random_book()
+            if book and "causal_subgraph" in book:
+                sub_cells = book["causal_subgraph"].get("cells", [])
+                sub_syns = book["causal_subgraph"].get("synapses", [])
+                if sub_cells:
+                    base_id = max(c["id"] for c in self.cells) + 1
+                    id_map = {}
+                    for idx, sc in enumerate(sub_cells):
+                        cid = base_id + idx
+                        id_map[idx] = cid
+                        self.cells.append({
+                            "id": cid,
+                            "type": sc["type"],
+                            "p1": sc.get("p1", 0.1),
+                            "p2": sc.get("p2", 0.0),
+                            "s": 0.0, "out": 0.0, "acts": 0,
+                            "x": round((random.random() - 0.5) * 160.0, 1),
+                            "y": round((random.random() - 0.5) * 140.0, 1),
+                            "z": round((random.random() - 0.5) * 40.0, 1),
+                            "vx": 0.0, "vy": 0.0, "vz": 0.0
+                        })
+                    for ss in sub_syns:
+                        f_idx = ss.get("from_idx", 0)
+                        t_idx = ss.get("to_idx", 0)
+                        if f_idx in id_map and t_idx in id_map:
+                            self.synapses.append({
+                                "from": id_map[f_idx],
+                                "to": id_map[t_idx],
+                                "port": ss.get("port", 0),
+                                "w": ss.get("w", 1.0),
+                                "active": True
+                            })
+                    # 将借阅子回路挂载到现有网络
+                    if len(self.cells) > len(sub_cells) + 2:
+                        parent_src = random.choice([c for c in self.cells if c["id"] < base_id])
+                        self.synapses.append({"from": parent_src["id"], "to": id_map[0], "port": 0, "w": 1.0, "active": True})
+                    self.compile_topology()
+                    print(f"[*] [文化传承] 成功借阅并嫁接书籍 《{book.get('title')}》 知识回路 (Citations: {book.get('citations')})")
+                    return
+
+        # 85% 概率走自然演化有丝分裂
         new_id = max(c["id"] for c in self.cells) + 1
         candidate_types = ["EMA", "DIFF", "INTEGRAL", "SUM", "SUB", "MUL", "RATIO", "ABS", "OSCILLATOR", "QUADRATIC", "THRESH", "HYST", "AND", "INHIB", "DEADZONE"]
         new_type = random.choice(candidate_types)
@@ -472,6 +515,90 @@ class LiveOrganism:
                 "synapses": self.synapses
             }
 
+
+# ============================================================================
+# 0.5 硅基文化图书馆与谱系总线 (Silicon Library & Phylogenetic Ledger)
+# ============================================================================
+
+LIBRARY_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "library", "motifs")
+LINEAGE_LOG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "checkpoints", "evolution_lineage.jsonl")
+
+class SiliconLibraryManager:
+    def __init__(self):
+        self.books = []
+        self.milestones = []
+        self.lock = threading.Lock()
+        self.reload_books()
+
+    def reload_books(self):
+        with self.lock:
+            self.books = []
+            if os.path.exists(LIBRARY_DIR):
+                for fname in sorted(os.listdir(LIBRARY_DIR)):
+                    if fname.endswith(".json"):
+                        fpath = os.path.join(LIBRARY_DIR, fname)
+                        try:
+                            with open(fpath, "r", encoding="utf-8") as f:
+                                self.books.append(json.load(f))
+                        except Exception as e:
+                            print(f"[!] 读取书籍失败 {fname}: {e}")
+
+    def record_milestone(self, gen, event_type, desc, cells_count, best_fit):
+        ms = {
+            "gen": gen,
+            "ts": round(time.time(), 2),
+            "event": event_type,
+            "desc": desc,
+            "cells": cells_count,
+            "fitness": best_fit
+        }
+        with self.lock:
+            self.milestones.append(ms)
+            if len(self.milestones) > 50:
+                self.milestones.pop(0)
+        try:
+            with open(LINEAGE_LOG_PATH, "a", encoding="utf-8") as f:
+                f.write(json.dumps(ms, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+
+    def crystallize_motif(self, gen, author_deme, title, cells_sub, synapses_sub, crisis="Natural Evolution"):
+        book_id = f"motif_gen{gen}_{int(time.time()) % 10000}"
+        book = {
+            "book_id": book_id,
+            "title": title,
+            "discovered_at_gen": gen,
+            "author_deme": author_deme,
+            "crisis_context": crisis,
+            "citations": 1,
+            "impact_score": round(7.0 + random.random() * 2.5, 1),
+            "causal_subgraph": {
+                "cells": cells_sub,
+                "synapses": synapses_sub
+            }
+        }
+        fpath = os.path.join(LIBRARY_DIR, f"{book_id}.json")
+        try:
+            with open(fpath, "w", encoding="utf-8") as f:
+                json.dump(book, f, indent=2, ensure_ascii=False)
+            with self.lock:
+                self.books.append(book)
+            print(f"[+] [文化结晶] 成功编撰新书入库: 《{title}》 (由 {author_deme} 在 Gen {gen} 发明)")
+            self.record_milestone(gen, "BOOK_CRYSTALLIZED", f"编撰入库: 《{title}》", len(cells_sub), 8.5)
+        except Exception as e:
+            print(f"[!] 结晶书籍失败: {e}")
+
+    def get_random_book(self):
+        with self.lock:
+            if not self.books: return None
+            # 按引用次数加权抽取
+            weights = [b.get("citations", 1) for b in self.books]
+            book = random.choices(self.books, weights=weights, k=1)[0]
+            book["citations"] = book.get("citations", 0) + 1
+            return book
+
+silicon_library = SiliconLibraryManager()
+
 organism = LiveOrganism()
 
 # ============================================================================
@@ -556,6 +683,25 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         
         
+        
+        if self.path.startswith("/api/library"):
+            body = json.dumps({"status": "ok", "total_books": len(silicon_library.books), "books": silicon_library.books}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/lineage"):
+            body = json.dumps({"status": "ok", "milestones": silicon_library.milestones}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if self.path == "/favicon.ico":
             self.send_response(204)
             self.end_headers()

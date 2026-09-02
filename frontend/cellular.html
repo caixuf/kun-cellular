@@ -404,6 +404,16 @@
     <div id="bio-biomes" style="font-size:9px;line-height:1.8;color:var(--text-dim);margin-top:4px;"></div>
   </div>
 
+    <!-- 卡片: 硅基文化图书馆 -->
+  <div class="card" id="card-library">
+    <div class="card-title">
+      <span>硅基文化图书馆 (The Library)</span>
+      <span class="card-title-badge" id="st-total-books">0 册名著</span>
+    </div>
+    <div id="library-shelf" style="display:flex;flex-direction:column;gap:5px;max-height:135px;overflow-y:auto;font-size:10px;">
+    </div>
+  </div>
+
   <!-- 卡片 3: 全息事件流终端 -->
   <div class="card" style="flex:1;">
     <div class="card-title">
@@ -1333,6 +1343,35 @@ async function pollIslands() {
 }
 setInterval(pollIslands, 1000);
 pollIslands();
+
+async function pollLibrary() {
+  try {
+    const r = await fetch('/api/library', { signal: AbortSignal.timeout(3000) });
+    const j = await r.json();
+    if(j.books && j.books.length) {
+      const elB = document.getElementById('st-total-books');
+      if(elB) elB.textContent = `${j.books.length} 册名著`;
+      const shelf = document.getElementById('library-shelf');
+      if(shelf) {
+        shelf.innerHTML = j.books.map(b => {
+          return `<div style="background:rgba(15,23,42,0.75);border:1px solid rgba(56,189,248,0.25);border-radius:5px;padding:5px 7px;">
+            <div style="display:flex;justify-content:space-between;color:var(--cyan);font-weight:bold;font-size:10px;">
+              <span>《${b.title || b.book_id}》</span>
+              <span style="color:var(--amber);">⭐ ${b.impact_score || 8.5}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:9px;margin-top:2px;">
+              <span>Gen ${b.discovered_at_gen} · ${b.author_deme || 'Origin'}</span>
+              <span style="color:var(--emerald);">引用: ${b.citations || 1}次</span>
+            </div>
+          </div>`;
+        }).join('');
+      }
+    }
+  } catch(e) {}
+}
+setInterval(pollLibrary, 4000);
+pollLibrary();
+
 
 log('形态发生细胞全息观测台已启动 — 拖拽旋转 · 滚轮缩放', true);
 

@@ -1,0 +1,22 @@
+{
+  "book_id": "motif_dual_ema_oscillator",
+  "title": "双相态双周期差分动量振荡器",
+  "discovered_at_gen": 84,
+  "author_deme": "Island-5 (Trend)",
+  "crisis_context": "High-Volatility Regime Shift",
+  "citations": 28,
+  "impact_score": 8.8,
+  "causal_subgraph": {
+    "cells": [
+      {"type": "EMA", "p1": 0.05, "p2": 0.0},
+      {"type": "EMA", "p1": 0.20, "p2": 0.0},
+      {"type": "SUB", "p1": 0.0, "p2": 0.0},
+      {"type": "ACT_POS", "p1": 0.0, "p2": 0.0}
+    ],
+    "synapses": [
+      {"from_idx": 0, "to_idx": 2, "port": 0, "w": 1.0},
+      {"from_idx": 1, "to_idx": 2, "port": 1, "w": -1.0},
+      {"from_idx": 2, "to_idx": 3, "port": 0, "w": 1.35}
+    ]
+  }
+}

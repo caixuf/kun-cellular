@@ -1,0 +1,20 @@
+{
+  "book_id": "motif_antifragile_hysteresis",
+  "title": "施密特非线性防抖与免疫熔断回路",
+  "discovered_at_gen": 38,
+  "author_deme": "Island-2 (Alpha)",
+  "crisis_context": "Flash Crash Stress Test",
+  "citations": 42,
+  "impact_score": 9.4,
+  "causal_subgraph": {
+    "cells": [
+      {"type": "DIFF", "p1": 0.0, "p2": 0.0},
+      {"type": "HYST", "p1": 0.015, "p2": -0.015},
+      {"type": "ACT_LOCK", "p1": 0.0, "p2": 0.0}
+    ],
+    "synapses": [
+      {"from_idx": 0, "to_idx": 1, "port": 0, "w": 1.25},
+      {"from_idx": 1, "to_idx": 2, "port": 0, "w": 1.50}
+    ]
+  }
+}
