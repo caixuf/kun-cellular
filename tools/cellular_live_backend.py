@@ -683,6 +683,12 @@ class SiliconCellularOrganism:
             t = self.phy_steps * 0.04
             golden_ratio = (1 + math.sqrt(5)) / 2
             n_cells = len(self.cells)
+            if n_cells == 0:
+                return
+            
+            # 动态核对 GPU 引擎节点规模
+            if self.gpu_engine.n_cells != n_cells:
+                self.gpu_engine.load_topology(self.cells, self.synapses)
             
             # GPU 融合张量加速计算 24 原语动力学 + 自由能 + STDP 塑性
             fe, flux, outs, states, preds, errors = self.gpu_engine.step_gpu(t, self.red_queen_pressure)
@@ -700,13 +706,14 @@ class SiliconCellularOrganism:
                     c.y += (c.base_y * breath - c.y) * 0.08
                     c.z += (c.base_z * breath - c.z) * 0.08
                 
-                c.out = float(outs[i])
-                c.state = float(states[i])
-                c.pred = float(preds[i])
-                c.error = float(errors[i])
-                if abs(c.out) > 0.2:
-                    c.acts += 1
-                    c.last_spike_t = t
+                if i < len(outs):
+                    c.out = float(outs[i])
+                    c.state = float(states[i])
+                    c.pred = float(preds[i])
+                    c.error = float(errors[i])
+                    if abs(c.out) > 0.2:
+                        c.acts += 1
+                        c.last_spike_t = t
 
     def set_warp(self, sp):
         self.warp_mode = sp
@@ -1397,85 +1404,145 @@ live_immune = LiveImmuneSimulator()
 
 class LiveMazeSimulator:
     def __init__(self):
+        self.width = 20
+        self.height = 20
         self.generation = 1
         self.step_count = 0
+        self.max_steps = 240
         self.warp_speed = 5
+        self.start = [2.5, 2.5]
+        self.goal = [17.5, 17.5]
         self.lock = threading.RLock()
-        self.history_pass = [0]
+        self.history_pass = [0.0]
+        self.champion_trail = []
         self.generate_maze()
         self.init_population(24)
 
     def generate_maze(self):
-        self.walls = []
-        self.walls.append({"x1": 40, "y1": 40, "x2": 760, "y2": 40})
-        self.walls.append({"x1": 760, "y1": 40, "x2": 760, "y2": 460})
-        self.walls.append({"x1": 760, "y1": 460, "x2": 40, "y2": 460})
-        self.walls.append({"x1": 40, "y1": 460, "x2": 40, "y2": 40})
-        self.walls.append({"x1": 200, "y1": 40, "x2": 200, "y2": 320})
-        self.walls.append({"x1": 400, "y1": 180, "x2": 400, "y2": 460})
-        self.walls.append({"x1": 600, "y1": 40, "x2": 600, "y2": 340})
-        self.goal = {"x": 700, "y": 250, "r": 35}
+        self.grid = [0] * (self.width * self.height)
+        # 边界墙
+        for x in range(self.width):
+            self.grid[0 * self.width + x] = 1
+            self.grid[(self.height - 1) * self.width + x] = 1
+        for y in range(self.height):
+            self.grid[y * self.width + 0] = 1
+            self.grid[y * self.width + (self.width - 1)] = 1
+            
+        # 内部欺骗性迷宫隔板 (Deceptive Obstacle Walls)
+        for y in range(3, 14):
+            self.grid[y * self.width + 6] = 1
+        for y in range(7, 18):
+            self.grid[y * self.width + 13] = 1
+        for x in range(6, 14):
+            self.grid[10 * self.width + x] = 1
 
     def init_population(self, n=24):
         self.agents = []
         for i in range(n):
             self.agents.append({
                 "id": i,
-                "x": 100.0,
-                "y": 250.0,
-                "theta": 0.0,
+                "x": 2.5 + random.uniform(-0.3, 0.3),
+                "y": 2.5 + random.uniform(-0.3, 0.3),
+                "theta": random.uniform(0, math.pi * 2),
+                "rays": [1.0, 1.0, 1.0],
+                "goal": 0,
                 "alive": True,
                 "reached": False,
                 "trail": []
             })
-        self.champion_path = []
+
+    def _cast_ray(self, x, y, theta, max_dist=6.0):
+        step = 0.2
+        dist = 0.0
+        while dist < max_dist:
+            dist += step
+            cx = int(x + math.cos(theta) * dist)
+            cy = int(y + math.sin(theta) * dist)
+            if cx < 0 or cx >= self.width or cy < 0 or cy >= self.height or self.grid[cy * self.width + cx] == 1:
+                return round(dist / max_dist, 3)
+        return 1.0
 
     def step_physics(self):
         with self.lock:
             self.step_count += 1
             for a in self.agents:
                 if a["alive"] and not a["reached"]:
-                    dx = self.goal["x"] - a["x"]
-                    dy = self.goal["y"] - a["y"]
-                    target_theta = math.atan2(dy, dx)
-                    dtheta = (target_theta - a["theta"] + math.pi) % math.tau - math.pi
-                    a["theta"] += dtheta * 0.12 + random.uniform(-0.15, 0.15)
-                    a["x"] += math.cos(a["theta"]) * 3.2
-                    a["y"] += math.sin(a["theta"]) * 3.2
-                    
-                    if len(a["trail"]) < 80:
-                        a["trail"].append({"x": round(a["x"], 1), "y": round(a["y"], 1)})
-                        
-                    if (a["x"] - self.goal["x"])**2 + (a["y"] - self.goal["y"])**2 < self.goal["r"]**2:
-                        a["reached"] = True
-                        if not self.champion_path:
-                            self.champion_path = list(a["trail"])
+                    # 3 束激光雷达测距
+                    r_front = self._cast_ray(a["x"], a["y"], a["theta"])
+                    r_left = self._cast_ray(a["x"], a["y"], a["theta"] - 0.785)
+                    r_right = self._cast_ray(a["x"], a["y"], a["theta"] + 0.785)
+                    a["rays"] = [r_front, r_left, r_right]
 
-            if self.step_count >= 240:
+                    # 趋化性目标方位吸引力
+                    dx = self.goal[0] - a["x"]
+                    dy = self.goal[1] - a["y"]
+                    goal_theta = math.atan2(dy, dx)
+                    goal_dtheta = (goal_theta - a["theta"] + math.pi) % math.tau - math.pi
+
+                    # 激光避障势场
+                    avoid_steer = (r_left - r_right) * 1.8
+                    if r_front < 0.25:
+                        avoid_steer += 1.5 if r_left > r_right else -1.5
+
+                    # 元胞转向控制律
+                    steer = goal_dtheta * 0.35 + avoid_steer * 0.65 + random.uniform(-0.1, 0.1)
+                    a["theta"] += max(-0.4, min(0.4, steer))
+                    
+                    spd = 0.22 if r_front > 0.3 else 0.08
+                    nx = a["x"] + math.cos(a["theta"]) * spd
+                    ny = a["y"] + math.sin(a["theta"]) * spd
+
+                    # 碰墙检测
+                    grid_x = int(nx)
+                    grid_y = int(ny)
+                    if 0 <= grid_x < self.width and 0 <= grid_y < self.height and self.grid[grid_y * self.width + grid_x] == 0:
+                        a["x"] = nx
+                        a["y"] = ny
+                    else:
+                        a["theta"] += random.choice([-1.2, 1.2])
+
+                    if self.step_count % 3 == 0 and len(a["trail"]) < 100:
+                        a["trail"].append([round(a["x"], 2), round(a["y"], 2)])
+
+                    # 到达终点判定
+                    if (a["x"] - self.goal[0])**2 + (a["y"] - self.goal[1])**2 < 1.44:
+                        a["reached"] = True
+                        a["goal"] = 1
+                        if not self.champion_trail or len(a["trail"]) < len(self.champion_trail):
+                            self.champion_trail = list(a["trail"])
+
+            if self.step_count >= self.max_steps:
                 self.generation += 1
-                pass_rate = round(sum(1 for a in self.agents if a["reached"]) / len(self.agents) * 100.0, 1)
-                self.history_pass.append(pass_rate)
-                if len(self.history_pass) > 30:
+                n_reached = sum(1 for a in self.agents if a["reached"])
+                rate = round(n_reached / len(self.agents), 3)
+                self.history_pass.append(rate)
+                if len(self.history_pass) > 40:
                     self.history_pass.pop(0)
                 self.step_count = 0
                 self.init_population(24)
 
     def evolve_generation(self):
         with self.lock:
-            self.step_count = 240
+            self.step_count = self.max_steps
 
     def get_snapshot(self):
         with self.lock:
-            pass_rate = round(sum(1 for a in self.agents if a["reached"]) / max(1, len(self.agents)) * 100.0, 1)
+            n_reached = sum(1 for a in self.agents if a["reached"])
+            rate = round(n_reached / max(1, len(self.agents)), 3)
             return {
                 "generation": self.generation,
                 "step_count": self.step_count,
-                "pass_rate": pass_rate,
-                "history_pass": list(self.history_pass),
-                "walls": list(self.walls),
-                "goal": self.goal,
+                "max_steps": self.max_steps,
+                "success_rate": rate,
+                "pass_rate": round(rate * 100, 1),
+                "width": self.width,
+                "height": self.height,
+                "grid": list(self.grid),
+                "start": list(self.start),
+                "goal": list(self.goal),
                 "agents": list(self.agents),
-                "champion_path": list(self.champion_path)
+                "champion_trail": list(self.champion_trail),
+                "history_pass": list(self.history_pass)
             }
 
 live_maze = LiveMazeSimulator()
@@ -1821,7 +1888,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         
         
                 # 软体步态端点
-        if self.path.startswith("/api/loco/status"):
+        if self.path.startswith("/api/loco/status") or self.path.startswith("/api/locomotion/status"):
             body = json.dumps(live_loco.get_snapshot()).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -1830,7 +1897,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        if self.path.startswith("/api/loco/reset"):
+        if self.path.startswith("/api/loco/reset") or self.path.startswith("/api/locomotion/reset"):
             live_loco.init_population(20)
             live_loco.generation = 1
             live_loco.step_count = 0
@@ -1842,7 +1909,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
 
-        if self.path.startswith("/api/loco/warp"):
+        if self.path.startswith("/api/loco/warp") or self.path.startswith("/api/locomotion/warp"):
             try:
                 import urllib.parse
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
