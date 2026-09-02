@@ -721,22 +721,10 @@ class SiliconCellularOrganism:
 
     def load_seed_preset(self):
         with self.lock:
-            self.macro_cells = 384
-            self.macro_synapses = 1536
-            self.cells = []
+            self.macro_cells = 1
+            self.macro_synapses = 0
+            self.cells = [PhysicalCell3D(0, "INTEGRATE", 0.0, 0.0, 0.0)]
             self.synapses = []
-            n_cells = 16
-            for i in range(n_cells):
-                theta = 2 * math.pi * i / n_cells
-                r = 120.0
-                x = r * math.cos(theta)
-                y = r * math.sin(theta)
-                z = random.uniform(-20, 20)
-                ptype = "INTEGRATE" if i % 2 == 0 else "AMPLIFY"
-                self.cells.append(PhysicalCell3D(i, ptype, x, y, z))
-            for i in range(n_cells):
-                nxt = (i + 1) % n_cells
-                self.synapses.append({"from": i, "to": nxt, "weight": 1.2})
 
     def load_real_champion_preset(self):
         """挂载真实商品期货 4234 根日线量化冠军大脑 (Quant Brain)"""
