@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>硅基细胞计算机全息工作台 · Silicon Cellular Computer Workbench</title>
+<style>
+  :root {
+    --bg: #030712;
+    --panel: #0f172a;
+    --border: #1e293b;
+    --cyan: #38bdf8;
+    --emerald: #34d399;
+    --purple: #a855f7;
+    --text: #f1f5f9;
+    --dim: #94a3b8;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 1.25rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(8px);
+  }
+  .brand { display: flex; align-items: center; gap: 0.75rem; }
+  .logo-badge {
+    width: 36px;
+    height: 36px;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    color: #000;
+  }
+  .brand-title { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.5px; }
+  .brand-sub { font-size: 0.75rem; color: var(--dim); }
+  
+  main {
+    flex: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem;
+    width: 100%;
+  }
+  .hero {
+    text-align: center;
+    margin-bottom: 3rem;
+  }
+  .hero h1 {
+    font-size: 2.2rem;
+    margin-bottom: 0.75rem;
+    background: linear-gradient(to right, var(--cyan), #818cf8, var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .hero p {
+    color: var(--dim);
+    font-size: 1.05rem;
+    max-width: 760px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2.5rem;
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .card:hover {
+    transform: translateY(-3px);
+    border-color: var(--cyan);
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+  }
+  .card-tag {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .tag-cyan { background: rgba(56, 189, 248, 0.15); color: var(--cyan); }
+  .tag-emerald { background: rgba(52, 211, 153, 0.15); color: var(--emerald); }
+  .tag-purple { background: rgba(168, 85, 247, 0.15); color: var(--purple); }
+
+  .card-title { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .card-desc { font-size: 0.9rem; color: var(--dim); line-height: 1.5; margin-bottom: 1.25rem; }
+  
+  .card-meta {
+    font-size: 0.8rem;
+    color: var(--dim);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 1.5rem;
+    padding: 0.75rem;
+    background: rgba(3, 7, 18, 0.5);
+    border-radius: 6px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--cyan), #2563eb);
+    color: #fff;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    padding: 0.75rem 1.25rem;
+    border-radius: 8px;
+    transition: opacity 0.2s;
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn-secondary {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-secondary:hover {
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--dim);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo-badge">SCC</div>
+    <div>
+      <div class="brand-title">KunCellular</div>
+      <div class="brand-sub">Software-Defined Silicon Cellular Computer</div>
+    </div>
+  </div>
+  <div style="font-size:0.85rem;color:var(--dim)">
+    C++20 Zero-GC Runtime | 24.1 ns Real-Time Execution
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <h1>硅基细胞计算机可视化工作台</h1>
+    <p>
+      基于三维兰纳-琼斯力敏自组织场、24 种算存一体动力学细胞与 Kahn 拓扑排序零 GC 编译器的非冯体系结构全息遥测环境。
+    </p>
+  </div>
+
+  <div class="grid">
+    <!-- 模块 1: 3D 细胞全息观测台 -->
+    <div class="card">
+      <div>
+        <div class="card-header">
+          <span class="card-tag tag-cyan">3D WebGL / Force-Field</span>
+        </div>
+        <div class="card-title">形态发生细胞全息观测台</div>
+        <div class="card-desc">
+          三维力场实时自组织、突触放电脉冲追踪、24 种细胞原语动态着色、8 岛多生境演化矩阵与红皇后对抗模拟。
+        </div>
+        <div class="card-meta">
+          <div>* 核心特性: 三维兰纳-琼斯势能场 + 突触弹簧阻尼</div>
+          <div>* 算力尺度: 本能器官 (15~100) / 皮层柱 (1万) / 宏观百万 (100万+)</div>
+          <div>* 时延指标: 单步 24.1 ns 确定性推理</div>
+        </div>
+      </div>
+      <a href="cellular.html" class="btn">进入全息观测台</a>
+    </div>
+
+    <!-- 模块 2: 具身迷宫导航与趋化性学习 -->
+    <div class="card">
+      <div>
+        <div class="card-header">
+          <span class="card-tag tag-emerald">Embodied / Chemotaxis</span>
+        </div>
+        <div class="card-title">具身迷宫导航与趋化性基准</div>
+        <div class="card-desc">
+          开放式物理空间导航、光线距离传感器射线投射、后天 Oja 突触塑性在线学习与空间记忆拓扑自发涌现。
+        </div>
+        <div class="card-meta">
+          <div>* 物理环境: 21x21 离散与连续混合迷宫沙盒</div>
+          <div>* 感知模态: 8 维射线测距 + 目标方位角 + 内部代谢电位</div>
+          <div>* 学习范式: 鲍德温表观遗传同化 (无全局梯度反传)</div>
+        </div>
+      </div>
+      <a href="maze.html" class="btn btn-secondary">进入迷宫学习基准</a>
+    </div>
+
+    <!-- 模块 3: 学术论文与架构规范 -->
+    <div class="card">
+      <div>
+        <div class="card-header">
+          <span class="card-tag tag-purple">Academic Papers & Specs</span>
+        </div>
+        <div class="card-title">核心理论论文与设计规范</div>
+        <div class="card-desc">
+          查看已完成的《软件定义硅基细胞计算机：自组织形态发生、胞间力场与亚微秒确定性图编译》中英文完整学术论文与演化路线图。
+        </div>
+        <div class="card-meta">
+          <div>* 中文论文: docs/morphogenetic_cellular_evolution_paper.zh.md</div>
+          <div>* 英文论文: docs/morphogenetic_cellular_evolution_paper.md</div>
+          <div>* 路线图: docs/2026-09-01-quantitative-cellular-evolution-roadmap.md</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:0.5rem">
+        <a href="https://github.com/caixuf/kun-cellular/blob/main/docs/morphogenetic_cellular_evolution_paper.zh.md" target="_blank" class="btn btn-secondary" style="flex:1">中文论文</a>
+        <a href="https://github.com/caixuf/kun-cellular/blob/main/docs/morphogenetic_cellular_evolution_paper.md" target="_blank" class="btn btn-secondary" style="flex:1">英文论文</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  KunCellular · Software-Defined Silicon Cellular Computer | MIT Licensed
+</footer>
+
+</body>
+</html>
