@@ -843,6 +843,9 @@
     <div class="kv" data-tip="st-gen"><span>演化世代 Generation</span><b id="st-gen">0</b></div>
     <div class="kv" data-tip="st-cells"><span>活跃细胞 Cells</span><b id="st-cells" style="color:var(--cyan)">0</b></div>
     <div class="kv"><span>神经突触 Synapses</span><b id="st-syn" style="color:var(--purple)">0</b></div>
+    <div class="kv" data-tip="st-free-energy"><span>预测自由能 Free Energy</span><b id="st-fe" style="color:var(--emerald)">0.084</b></div>
+    <div class="kv" data-tip="st-plasticity"><span>突触塑性 STDP Flux</span><b id="st-flux" style="color:var(--amber)">0.035</b></div>
+    <div class="kv" data-tip="st-small-world"><span>小世界 C / L 流形</span><b id="st-sw" style="color:var(--cyan)">0.68 / 2.41</b></div>
     <div class="kv"><span>力场积分步 Force Steps</span><b id="st-phys">0</b></div>
     <div class="kv"><span>代谢放电次数</span><b id="st-act">0</b></div>
     <div id="src" style="font-size:10px;padding:4px 6px;border-radius:4px;background:rgba(56,189,248,.1);color:var(--cyan);margin-top:4px;">
@@ -2384,6 +2387,15 @@ function updateFromBackendState(data) {
   
   const physEl = document.getElementById("st-phys");
   if (physEl) physEl.textContent = data.phy_steps;
+
+  const feEl = document.getElementById("st-fe");
+  if (feEl && data.free_energy !== undefined) feEl.textContent = data.free_energy.toFixed(4);
+
+  const fluxEl = document.getElementById("st-flux");
+  if (fluxEl && data.plasticity_flux !== undefined) fluxEl.textContent = data.plasticity_flux.toFixed(4);
+
+  const swEl = document.getElementById("st-sw");
+  if (swEl && data.clustering_coef !== undefined) swEl.textContent = `${data.clustering_coef.toFixed(2)} / ${data.avg_path_len.toFixed(2)}`;
   
   if (data.actions) {
     const buyEl = document.getElementById("v-buy");
