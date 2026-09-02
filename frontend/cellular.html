@@ -432,62 +432,87 @@
   }
 
   /* 硅基生命体物种 -> 典籍层级折叠手风琴 */
+  /* 硅基生命体物种 -> 典籍层级折叠手风琴 (Cyberpunk Glassmorphism) */
   .organism-group {
-    background: rgba(15, 23, 42, 0.75);
+    background: rgba(15, 23, 42, 0.85);
     border: 1px solid rgba(56, 189, 248, 0.25);
-    border-radius: 6px;
-    margin-bottom: 6px;
+    border-radius: 8px;
+    margin-bottom: 10px;
     overflow: hidden;
-    transition: all 0.2s;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+  .organism-group:hover {
+    border-color: rgba(56, 189, 248, 0.5);
+    box-shadow: 0 6px 20px rgba(56, 189, 248, 0.15);
   }
   .organism-header {
-    padding: 6px 10px;
+    padding: 10px 12px;
     display: flex;
     justify-content: space-between;
     align-items: center;
     cursor: pointer;
-    background: rgba(30, 41, 59, 0.6);
+    background: linear-gradient(90deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.85));
     border-bottom: 1px solid transparent;
-    transition: all 0.15s;
+    transition: all 0.2s;
+    user-select: none;
   }
   .organism-header:hover {
-    background: rgba(56, 189, 248, 0.15);
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.2), rgba(30, 41, 59, 0.9));
   }
   .organism-group.open .organism-header {
-    border-bottom-color: rgba(56, 189, 248, 0.3);
+    border-bottom-color: rgba(56, 189, 248, 0.35);
+    background: linear-gradient(90deg, rgba(56, 189, 248, 0.18), rgba(15, 23, 42, 0.9));
   }
   .organism-books {
     display: none;
-    padding: 6px 8px;
+    padding: 10px;
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
+    background: rgba(10, 15, 28, 0.6);
   }
   .organism-group.open .organism-books {
     display: flex;
   }
   .org-tag {
-    font-size: 9px;
-    padding: 1px 4px;
-    border-radius: 3px;
-    background: rgba(168, 85, 247, 0.25);
-    color: var(--purple);
-    font-weight: bold;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(168, 85, 247, 0.2);
+    border: 1px solid rgba(168, 85, 247, 0.4);
+    color: #c084fc;
+    font-weight: 600;
   }
 
-  /* 图书馆卡片可点击高亮样式 */
+  /* 典籍卡片样式 (Book Card Styling) */
   .book-card {
-    background: rgba(15, 23, 42, 0.75);
-    border: 1px solid rgba(56, 189, 248, 0.25);
-    border-radius: 5px;
-    padding: 6px 8px;
+    background: rgba(18, 26, 44, 0.85);
+    border: 1px solid rgba(56, 189, 248, 0.2);
+    border-radius: 6px;
+    padding: 10px 12px;
     cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  .book-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; bottom: 0; width: 3px;
+    background: var(--cyan);
+    opacity: 0.6;
     transition: all 0.2s;
   }
   .book-card:hover {
     border-color: var(--amber);
-    background: rgba(251, 191, 36, 0.12);
-    box-shadow: 0 0 10px rgba(251, 191, 36, 0.25);
-    transform: translateY(-1px);
+    background: rgba(251, 191, 36, 0.08);
+    box-shadow: 0 0 16px rgba(251, 191, 36, 0.2), inset 0 0 12px rgba(251, 191, 36, 0.05);
+    transform: translateY(-2px);
+  }
+  .book-card:hover::before {
+    background: var(--amber);
+    opacity: 1;
+    width: 4px;
   }
 
   /* 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) - 锚定在右侧栏左侧，决不遮挡侧边栏 */
@@ -673,21 +698,21 @@
     </div>
   </div>
 
-  <!-- 卡片 2: 硅基生命体与文化典籍 -->
-  <div class="card" id="card-library">
+  <!-- 卡片 2: 硅基生命体与文化典籍 (核心流形选择坞) -->
+  <div class="card" id="card-library" style="flex: 1; min-height: 280px;">
     <div class="card-title">
       <span>硅基生命体与典籍 (Organisms & Books)</span>
       <span class="card-title-badge" id="st-total-books">4 大生命体 / 9 册典籍</span>
     </div>
-    <div id="library-shelf" style="display:flex;flex-direction:column;gap:6px;max-height:220px;overflow-y:auto;font-size:10px;">
+    <div id="library-shelf" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;font-size:10px;padding-right:2px;">
     </div>
   </div>
 
-  <!-- 卡片 3: 模型预设与真实权重 -->
+  <!-- 卡片 3: 快速检查点预设载入 -->
   <div class="card">
     <div class="card-title">
-      <span>模型与检查点载入</span>
-      <span class="card-title-badge">Checkpoints</span>
+      <span>快速检查点载入</span>
+      <span class="card-title-badge">Presets</span>
     </div>
     <div class="btn-grid-4">
       <button class="btn-ctrl" onclick="loadPreset('seed')">种子(0)</button>
@@ -697,31 +722,13 @@
     </div>
   </div>
 
-  <!-- 卡片 4: 时空曲率演化加速 -->
-  <div class="card">
-    <div class="card-title">
-      <span>时空曲率演化加速</span>
-      <span class="card-title-badge" id="st-warp" style="color:var(--cyan)">1x</span>
-    </div>
-    <div class="btn-grid-4">
-      <button id="w-1x" class="btn-ctrl active" onclick="setWarp('1x')">1x 实时</button>
-      <button id="w-100x" class="btn-ctrl" onclick="setWarp('100x')">100x 快速</button>
-      <button id="w-1000x" class="btn-ctrl" onclick="setWarp('1000x')">1000x 涡轮</button>
-      <button id="w-max" class="btn-ctrl btn-danger" onclick="setWarp('unlimited')">MAX 超频</button>
-    </div>
-    <div style="display:flex;gap:4px;margin-top:4px;">
-      <button class="btn-ctrl btn-danger" onclick="setStress('extreme')" style="flex:1;">[对抗] 注入红皇后闪崩</button>
-      <button class="btn-ctrl" onclick="setStress('off')" style="flex:1;">恢复平稳</button>
-    </div>
-  </div>
-
-  <!-- 卡片 5: 多生境岛屿演化 -->
-  <div class="card" style="flex:1;min-height:120px;">
+  <!-- 卡片 4: 多生境岛屿演化 -->
+  <div class="card" style="min-height:110px;">
     <div class="card-title">
       <span>8 岛多生境演化拓扑 (Demes)</span>
       <span class="card-title-badge" id="st-total-mig">0 迁徙</span>
     </div>
-    <div id="islands-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;max-height:130px;overflow-y:auto;"></div>
+    <div id="islands-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;max-height:120px;overflow-y:auto;"></div>
   </div>
 </aside>
 
@@ -1843,16 +1850,16 @@ async function pollLibrary() {
           const isOpen = openGroups.has(groupId) ? "open" : "";
           const booksHtml = (org.books || []).map(b => {
             return `<div class="book-card" onclick="event.stopPropagation(); highlightBookSubcircuit('${b.book_id}', '${b.title || b.book_id}', '${org.name}')">
-              <div style="display:flex;justify-content:space-between;color:var(--cyan);font-weight:bold;font-size:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
                 <span>《${b.title || b.book_id}》</span>
-                <span style="color:var(--amber);">[★ ${b.impact_score || 9.5}]</span>
+                <span style="color:#fbbf24;font-size:10px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:4px;border:1px solid rgba(251,191,36,0.3);">★ ${b.impact_score || 9.5}</span>
               </div>
-              <div style="color:var(--text-dim);font-size:9px;margin-top:2px;line-height:1.3;">
+              <div style="color:#94a3b8;font-size:10px;margin-top:4px;line-height:1.4;">
                 ${b.description || ''}
               </div>
-              <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:8px;margin-top:3px;">
-                <span style="color:var(--emerald);">引用: ${b.citations || 1} 次</span>
-                <span style="color:var(--amber);font-weight:bold;">[点亮特定回路]</span>
+              <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:9px;margin-top:6px;padding-top:4px;border-top:1px solid rgba(56,189,248,0.1);">
+                <span style="color:#34d399;font-weight:600;">引用: ${b.citations || 1} 次</span>
+                <span style="color:#fbbf24;font-weight:700;background:rgba(251,191,36,0.12);padding:2px 8px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[点亮回路]</span>
               </div>
             </div>`;
           }).join('');
@@ -1862,12 +1869,12 @@ async function pollLibrary() {
           return `<div class="organism-group ${isOpen}" id="${groupId}">
             <div class="organism-header" onclick="selectOrganism('${org.organism_id}', '${org.name}', '${groupId}')">
               <div>
-                <span style="color:#f8fafc;font-weight:bold;font-size:10px;">${org.name}</span>
-                <span class="org-tag" style="margin-left:4px;">${org.tag || '生命体'}</span>
+                <span style="color:#f8fafc;font-weight:700;font-size:11px;">${org.name}</span>
+                <span class="org-tag" style="margin-left:6px;">${org.tag || '生命体'}</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
-                <span style="color:var(--cyan);font-size:9px;">${cellDesc} · ${(org.books||[]).length} 册</span>
-                <span style="color:var(--text-dim);font-size:8px;">[挂载/折叠]</span>
+                <span style="color:var(--cyan);font-size:10px;font-family:var(--font-mono);">${cellDesc} · ${(org.books||[]).length} 册</span>
+                <span style="color:var(--text-dim);font-size:9px;">▼</span>
               </div>
             </div>
             <div class="organism-books">
