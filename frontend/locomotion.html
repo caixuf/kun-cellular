@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>红皇后捕食者-猎物生态协同演化沙盒 // SDSCC Ecosystem</title>
+    <title>软体肌腱与多足步态形态发生沙盒 // SDSCC Locomotion</title>
     <style>
         :root {
             --bg-base: #06090e;
             --panel-bg: rgba(13, 18, 29, 0.92);
             --border: #1e293b;
             --cyan-glow: #00f0ff;
-            --rose-glow: #f43f5e;
             --amber-glow: #fbbf24;
             --emerald-glow: #10b981;
             --purple-glow: #a855f7;
@@ -50,7 +49,7 @@
             font-size: 13px;
             font-weight: 700;
             letter-spacing: 0.5px;
-            color: var(--rose-glow);
+            color: var(--amber-glow);
             display: flex;
             align-items: center;
             gap: 8px;
@@ -61,10 +60,10 @@
             align-items: center;
             gap: 6px;
             background: rgba(15, 23, 42, 0.95);
-            border: 1px solid rgba(244, 63, 94, 0.5);
+            border: 1px solid rgba(251, 191, 36, 0.5);
             border-radius: 6px;
             padding: 3px 10px;
-            box-shadow: 0 0 14px rgba(244, 63, 94, 0.2);
+            box-shadow: 0 0 14px rgba(251, 191, 36, 0.2);
         }
 
         .nav-btn {
@@ -82,15 +81,15 @@
         }
 
         .nav-btn:hover {
-            color: var(--rose-glow);
-            border-color: var(--rose-glow);
+            color: var(--amber-glow);
+            border-color: var(--amber-glow);
         }
 
         .nav-btn.active {
-            background: rgba(244, 63, 94, 0.25);
-            color: var(--rose-glow);
-            border-color: var(--rose-glow);
-            box-shadow: 0 0 10px rgba(244, 63, 94, 0.4);
+            background: rgba(251, 191, 36, 0.25);
+            color: var(--amber-glow);
+            border-color: var(--amber-glow);
+            box-shadow: 0 0 10px rgba(251, 191, 36, 0.4);
         }
 
         .nav-links {
@@ -143,9 +142,9 @@
             display: block;
         }
 
-        .eco-top-bar {
+        .loco-top-bar {
             background: rgba(13, 18, 29, 0.95);
-            border-bottom: 1px solid rgba(244, 63, 94, 0.4);
+            border-bottom: 1px solid rgba(251, 191, 36, 0.4);
             padding: 8px 16px;
             display: flex;
             align-items: center;
@@ -186,10 +185,10 @@
             color: var(--text-main);
         }
 
-        .stat-val.rose { color: var(--rose-glow); }
+        .stat-val.amber { color: var(--amber-glow); }
         .stat-val.cyan { color: var(--cyan-glow); }
         .stat-val.emerald { color: var(--emerald-glow); }
-        .stat-val.amber { color: var(--amber-glow); }
+        .stat-val.purple { color: var(--purple-glow); }
 
         .chart-box {
             height: 150px;
@@ -211,57 +210,57 @@
 
     <header>
         <div class="brand">
-            <span>[RED_QUEEN_ECOSYSTEM]</span>
+            <span>[SOFTBODY_LOCOMOTION]</span>
             <span style="color:var(--text-dim);">//</span>
-            <span style="color:var(--text-main);">捕食者-猎物双轨协同演化</span>
+            <span style="color:var(--text-main);">软体肌腱与多足步态形态发生</span>
         </div>
 
         <div class="warp-bar">
-            <span style="color:var(--rose-glow);font-weight:bold;font-size:12px;">[WARP_ACCELERATOR]:</span>
-            <button class="nav-btn" onclick="setEcoWarp(1)" id="hw-1">1x 常规</button>
-            <button class="nav-btn active" onclick="setEcoWarp(5)" id="hw-5">5x 敏捷</button>
-            <button class="nav-btn" onclick="setEcoWarp(20)" id="hw-20">20x 极速</button>
-            <button class="nav-btn" onclick="setEcoWarp(50)" id="hw-50" style="color:var(--amber-glow);font-weight:bold;">50x 狂飙</button>
+            <span style="color:var(--amber-glow);font-weight:bold;font-size:12px;">[WARP_ACCELERATOR]:</span>
+            <button class="nav-btn" onclick="setLocoWarp(1)" id="hw-1">1x 常规</button>
+            <button class="nav-btn active" onclick="setLocoWarp(5)" id="hw-5">5x 敏捷</button>
+            <button class="nav-btn" onclick="setLocoWarp(20)" id="hw-20">20x 极速</button>
+            <button class="nav-btn" onclick="setLocoWarp(50)" id="hw-50" style="color:var(--amber-glow);font-weight:bold;">50x 狂飙</button>
         </div>
 
         <div class="nav-links">
             <a href="index.html" class="nav-btn">工作台</a>
             <a href="cellular.html" class="nav-btn">3D全息力场</a>
             <a href="maze.html" class="nav-btn">具身迷宫</a>
-            <a href="ecosystem.html" class="nav-btn active" style="color:var(--rose-glow);">红皇后生态</a>
-            <a href="locomotion.html" class="nav-btn" style="color:var(--amber-glow);">软体步态</a>
+            <a href="ecosystem.html" class="nav-btn">红皇后生态</a>
+            <a href="locomotion.html" class="nav-btn active">软体步态</a>
         </div>
     </header>
 
     <main>
         <div class="viewport-card">
             <div class="panel-header">
-                <span>[2D_CONTINUOUS_ARENA] // RED_QUEEN_COEVOLUTION</span>
-                <span style="color:var(--rose-glow);" id="hud-status">STATUS: COEVOLVING</span>
+                <span>[2D_CONTINUOUS_TERRAIN] // MASS_SPRING_SOFTBODY</span>
+                <span style="color:var(--amber-glow);" id="hud-status">STATUS: EVOLVING_GAIT</span>
             </div>
             
-            <div class="eco-top-bar">
+            <div class="loco-top-bar">
                 <div style="display:flex;gap:8px;align-items:center;">
                     <button class="nav-btn" id="btn-toggle" onclick="toggleSim()">[PAUSE / RESUME]</button>
-                    <button class="nav-btn" onclick="resetEco()">[RESET_ECOSYSTEM]</button>
+                    <button class="nav-btn" onclick="resetLoco()">[RESET_POPULATION]</button>
                 </div>
                 <div style="font-size:11px;color:var(--text-dim);">
-                    <span style="color:var(--cyan-glow);">■ 草食猎物 (Prey)</span> &nbsp;|&nbsp;
-                    <span style="color:var(--rose-glow);">■ 肉食捕食者 (Predator)</span> &nbsp;|&nbsp;
-                    <span style="color:var(--emerald-glow);">● 能量植物 (Flora)</span>
+                    <span style="color:var(--amber-glow);">● 肌肉节律振荡质点</span> &nbsp;|&nbsp;
+                    <span style="color:var(--cyan-glow);">─ 弹性肌腱连杆</span> &nbsp;|&nbsp;
+                    <span style="color:var(--emerald-glow);">═ 摩擦力地面</span>
                 </div>
             </div>
 
             <div class="canvas-container" id="canvas-wrap">
-                <canvas id="eco-canvas"></canvas>
+                <canvas id="loco-canvas"></canvas>
             </div>
         </div>
 
         <div class="sidebar">
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[POPULATION_METRICS]</span>
-                    <span style="color:var(--cyan-glow);">LOTKA_VOLTERRA</span>
+                    <span>[GAIT_METRICS]</span>
+                    <span style="color:var(--amber-glow);">BIOMECHANICS</span>
                 </div>
                 <div class="stat-grid">
                     <div class="stat-box">
@@ -270,44 +269,44 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">CYCLE_STEPS</div>
-                        <div class="stat-val" id="stat-steps">0 / 360</div>
+                        <div class="stat-val" id="stat-steps">0 / 300</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">ALIVE_PREY</div>
-                        <div class="stat-val cyan" id="stat-prey">36 / 36</div>
+                        <div class="stat-label">MAX_DISTANCE</div>
+                        <div class="stat-val emerald" id="stat-dist">0.0 px</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">TOTAL_HUNTS</div>
-                        <div class="stat-val rose" id="stat-hunts">0 HUNTS</div>
+                        <div class="stat-label">GAIT_EFFICIENCY</div>
+                        <div class="stat-val cyan" id="stat-eff">HIGH</div>
                     </div>
                 </div>
             </div>
 
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[POPULATION_DYNAMICS_CHART]</span>
-                    <span style="color:var(--emerald-glow);">PREY_VS_PREDATOR</span>
+                    <span>[DISTANCE_PROGRESSION_CHART]</span>
+                    <span style="color:var(--emerald-glow);">HORIZONTAL_DISPLACEMENT</span>
                 </div>
                 <div class="chart-box">
                     <canvas id="chart-canvas" width="340" height="130"></canvas>
                 </div>
                 <div class="info-box">
-                    <strong>[红皇后假说动力学]：</strong><br>
-                    草食细胞演化出敏捷躲避与鸟群凝聚（Flocking），逼迫肉食捕食者演化出协同包夹与爆发冲刺。两者的军备竞赛永不停止。
+                    <strong>[生物力学步态涌现]：</strong><br>
+                    由 6 质点 8 根弹簧构成的四足软体结构，通过细胞节律振荡器（Oscillator）调谐收缩相位差，自发从乱抽搐演化出尺蠖蠕动与四足奔跑。
                 </div>
             </div>
         </div>
     </main>
 
     <script>
-        const canvas = document.getElementById("eco-canvas");
+        const canvas = document.getElementById("loco-canvas");
         const ctx = canvas.getContext("2d");
         const chartCanvas = document.getElementById("chart-canvas");
         const chartCtx = chartCanvas.getContext("2d");
         const wrap = document.getElementById("canvas-wrap");
 
         let isRunning = true;
-        let ecoState = null;
+        let locoState = null;
 
         function resize() {
             canvas.width = wrap.clientWidth;
@@ -316,56 +315,56 @@
         window.addEventListener("resize", resize);
         resize();
 
-        window.setEcoWarp = async function(speed) {
+        window.setLocoWarp = async function(speed) {
             document.querySelectorAll('[id^="hw-"]').forEach(b => b.classList.remove("active"));
             const btn = document.getElementById("hw-" + speed);
             if (btn) btn.classList.add("active");
             try {
-                await fetch("/api/eco/warp?speed=" + speed);
+                await fetch("/api/loco/warp?speed=" + speed);
             } catch(e) {}
         };
 
-        window.resetEco = async function() {
+        window.resetLoco = async function() {
             try {
-                await fetch("/api/eco/reset");
+                await fetch("/api/loco/reset");
             } catch(e) {}
         };
 
         window.toggleSim = function() {
             isRunning = !isRunning;
-            document.getElementById("hud-status").innerText = isRunning ? "STATUS: COEVOLVING" : "STATUS: PAUSED";
+            document.getElementById("hud-status").innerText = isRunning ? "STATUS: EVOLVING_GAIT" : "STATUS: PAUSED";
         };
 
-        async function fetchEcoState() {
+        async function fetchLocoState() {
             if (!isRunning) return;
             try {
-                const res = await fetch("/api/eco/status");
+                const res = await fetch("/api/loco/status");
                 if (res.ok) {
-                    ecoState = await res.json();
+                    locoState = await res.json();
                     updateUI();
                 }
             } catch(e) {}
         }
 
         function updateUI() {
-            if (!ecoState) return;
-            document.getElementById("stat-gen").innerText = `GEN-${ecoState.generation}`;
-            document.getElementById("stat-steps").innerText = `${ecoState.step_count} / ${ecoState.max_steps || 360}`;
-            document.getElementById("stat-prey").innerText = `${ecoState.prey_alive} / ${ecoState.total_prey}`;
-            document.getElementById("stat-hunts").innerText = `${ecoState.total_hunts} HUNTS`;
+            if (!locoState) return;
+            document.getElementById("stat-gen").innerText = `GEN-${locoState.generation}`;
+            document.getElementById("stat-steps").innerText = `${locoState.step_count} / ${locoState.max_steps || 300}`;
+            document.getElementById("stat-dist").innerText = `${locoState.best_distance} px`;
             drawChart();
         }
 
         function drawChart() {
-            if (!ecoState) return;
+            if (!locoState) return;
             const w = chartCanvas.width;
             const h = chartCanvas.height;
             chartCtx.fillStyle = "#030712";
             chartCtx.fillRect(0, 0, w, h);
 
-            const preys = ecoState.history_prey || [];
-            const preds = ecoState.history_pred || [];
-            if (preys.length < 2) return;
+            const dists = locoState.history_dist || [];
+            if (dists.length < 2) return;
+
+            const maxD = Math.max(200.0, ...dists);
 
             chartCtx.strokeStyle = "#1e293b";
             chartCtx.lineWidth = 1;
@@ -373,23 +372,12 @@
             chartCtx.moveTo(0, h/2); chartCtx.lineTo(w, h/2);
             chartCtx.stroke();
 
-            chartCtx.strokeStyle = "#00f0ff";
+            chartCtx.strokeStyle = "#fbbf24";
             chartCtx.lineWidth = 2;
             chartCtx.beginPath();
-            preys.forEach((val, i) => {
-                const x = (i / (preys.length - 1)) * w;
-                const y = h - (val / 36.0) * (h - 20) - 10;
-                if (i === 0) chartCtx.moveTo(x, y);
-                else chartCtx.lineTo(x, y);
-            });
-            chartCtx.stroke();
-
-            chartCtx.strokeStyle = "#f43f5e";
-            chartCtx.lineWidth = 2;
-            chartCtx.beginPath();
-            preds.forEach((val, i) => {
-                const x = (i / (preds.length - 1)) * w;
-                const y = h - (val / 36.0) * (h - 20) - 10;
+            dists.forEach((val, i) => {
+                const x = (i / (dists.length - 1)) * w;
+                const y = h - (val / maxD) * (h - 20) - 10;
                 if (i === 0) chartCtx.moveTo(x, y);
                 else chartCtx.lineTo(x, y);
             });
@@ -398,76 +386,59 @@
 
         function render() {
             requestAnimationFrame(render);
-            if (!ecoState) return;
-
-            const scaleX = canvas.width / 800;
-            const scaleY = canvas.height / 600;
+            if (!locoState) return;
 
             ctx.fillStyle = "#030712";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            (ecoState.food || []).forEach(f => {
-                ctx.fillStyle = "#10b981";
-                ctx.shadowColor = "#10b981";
-                ctx.shadowBlur = 8;
-                ctx.beginPath();
-                ctx.arc(f.x * scaleX, f.y * scaleY, 3.5, 0, Math.PI * 2);
-                ctx.fill();
+            const groundY = 380;
+            // 绘制地面
+            ctx.strokeStyle = "#10b981";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, groundY);
+            ctx.lineTo(canvas.width, groundY);
+            ctx.stroke();
+
+            // 地面标尺
+            ctx.fillStyle = "rgba(16, 185, 129, 0.2)";
+            for (let x = 0; x < canvas.width; x += 60) {
+                ctx.fillRect(x, groundY, 2, 8);
+            }
+
+            const champ = locoState.champion;
+            if (!champ) return;
+
+            const nodes = champ.nodes || [];
+            const muscles = champ.muscles || [];
+
+            // 绘制弹簧肌肉 (Cyan & Amber)
+            ctx.strokeStyle = "#00f0ff";
+            ctx.lineWidth = 4;
+            muscles.forEach(m => {
+                const n1 = nodes[m.n1];
+                const n2 = nodes[m.n2];
+                if (n1 && n2) {
+                    ctx.beginPath();
+                    ctx.moveTo(n1.x, n1.y);
+                    ctx.lineTo(n2.x, n2.y);
+                    ctx.stroke();
+                }
             });
-            ctx.shadowBlur = 0;
 
-            (ecoState.prey || []).forEach(p => {
-                if (!p.alive) return;
-                const px = p.x * scaleX;
-                const py = p.y * scaleY;
-                ctx.save();
-                ctx.translate(px, py);
-                ctx.rotate(p.theta);
-
-                ctx.fillStyle = "#00f0ff";
-                ctx.shadowColor = "#00f0ff";
-                ctx.shadowBlur = 6;
-                ctx.beginPath();
-                ctx.moveTo(7, 0);
-                ctx.lineTo(-5, -4);
-                ctx.lineTo(-3, 0);
-                ctx.lineTo(-5, 4);
-                ctx.closePath();
-                ctx.fill();
-                ctx.restore();
-            });
-            ctx.shadowBlur = 0;
-
-            (ecoState.predators || []).forEach(pred => {
-                const px = pred.x * scaleX;
-                const py = pred.y * scaleY;
-                ctx.save();
-                ctx.translate(px, py);
-                ctx.rotate(pred.theta);
-
-                ctx.fillStyle = "rgba(244, 63, 94, 0.08)";
-                ctx.beginPath();
-                ctx.moveTo(0, 0);
-                ctx.arc(0, 0, 70 * scaleX, -0.4, 0.4);
-                ctx.closePath();
-                ctx.fill();
-
-                ctx.fillStyle = "#f43f5e";
-                ctx.shadowColor = "#f43f5e";
+            // 绘制质点 (Amber Glowing Nodes)
+            nodes.forEach((n, idx) => {
+                ctx.fillStyle = idx === 0 ? "#f43f5e" : "#fbbf24";
+                ctx.shadowColor = ctx.fillStyle;
                 ctx.shadowBlur = 10;
                 ctx.beginPath();
-                ctx.moveTo(10, 0);
-                ctx.lineTo(-7, -6);
-                ctx.lineTo(-4, 0);
-                ctx.lineTo(-7, 6);
-                ctx.closePath();
+                ctx.arc(n.x, n.y, idx === 0 ? 8 : 6, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.restore();
             });
             ctx.shadowBlur = 0;
         }
 
-        setInterval(fetchEcoState, 30);
+        setInterval(fetchLocoState, 30);
         requestAnimationFrame(render);
     </script>
 </body>
