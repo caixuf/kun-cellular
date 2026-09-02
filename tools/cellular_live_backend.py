@@ -144,6 +144,89 @@ class LiveOrganism:
             self.synapses = [{"from": a, "to": b, "port": p, "w": w, "active": True} for a, b, p, w in links]
             self.compile_topology()
 
+    
+    def step_morphogenesis(self):
+        # 突触有丝分裂 (Synaptic Mitosis) 与形态发生增殖
+        if len(self.cells) >= 128:
+            # 达到脑区细胞容量上限后触发凋亡净化 (Apoptosis)
+            if random.random() < 0.3:
+                non_essential = [c for c in self.cells if not c["type"].startswith("SENSE") and not c["type"].startswith("ACT_")]
+                if len(non_essential) > 5:
+                    victim = random.choice(non_essential)
+                    self.cells = [c for c in self.cells if c["id"] != victim["id"]]
+                    self.synapses = [s for s in self.synapses if s["from"] != victim["id"] and s["to"] != victim["id"]]
+                    self.compile_topology()
+            return
+
+        if not self.synapses:
+            return
+
+        # 选取一条高活跃突触分裂
+        syn = random.choice(self.synapses)
+        if not syn.get("active", True):
+            return
+
+        by_id = {c["id"]: c for c in self.cells}
+        c_from = by_id.get(syn["from"])
+        c_to = by_id.get(syn["to"])
+        if not c_from or not c_to:
+            return
+
+        new_id = max(c["id"] for c in self.cells) + 1
+        candidate_types = ["EMA", "DIFF", "INTEGRAL", "SUM", "SUB", "MUL", "RATIO", "ABS", "OSCILLATOR", "QUADRATIC", "THRESH", "HYST", "AND", "INHIB", "DEADZONE"]
+        new_type = random.choice(candidate_types)
+        
+        mid_x = (c_from["x"] + c_to["x"]) * 0.5 + (random.random() - 0.5) * 20.0
+        mid_y = (c_from["y"] + c_to["y"]) * 0.5 + (random.random() - 0.5) * 20.0
+        mid_z = (c_from["z"] + c_to["z"]) * 0.5 + (random.random() - 0.5) * 20.0
+
+        new_cell = {
+            "id": new_id,
+            "type": new_type,
+            "p1": random.uniform(0.01, 0.5),
+            "p2": random.uniform(-0.1, 0.1),
+            "s": 0.0,
+            "out": 0.0,
+            "acts": 0,
+            "x": round(mid_x, 1),
+            "y": round(mid_y, 1),
+            "z": round(mid_z, 1),
+            "vx": 0.0,
+            "vy": 0.0,
+            "vz": 0.0
+        }
+        self.cells.append(new_cell)
+
+        # 突触分裂为两段
+        orig_to = syn["to"]
+        orig_port = syn.get("port", 0)
+        orig_w = syn.get("w", 1.0)
+        syn["to"] = new_id
+        syn["port"] = 0
+
+        new_syn = {
+            "from": new_id,
+            "to": orig_to,
+            "port": orig_port,
+            "w": orig_w * random.uniform(0.8, 1.2),
+            "active": True
+        }
+        self.synapses.append(new_syn)
+
+        # 偶发侧向联络突触
+        if random.random() < 0.4 and len(self.cells) > 5:
+            other = random.choice(self.cells)
+            if other["id"] != new_id and not other["type"].startswith("ACT_"):
+                self.synapses.append({
+                    "from": other["id"],
+                    "to": new_id,
+                    "port": 1,
+                    "w": random.uniform(-1.0, 1.0),
+                    "active": True
+                })
+
+        self.compile_topology()
+
     def compile_topology(self):
         by_id = {c["id"]: i for i, c in enumerate(self.cells)}
         indeg = {c["id"]: 0 for c in self.cells}
@@ -337,9 +420,15 @@ def simulation_worker():
         steps = organism.warp_factor
         for _ in range(steps):
             organism.step_forward([px, vol, spread, ttc])
-        if steps > 1:
-            with organism.lock:
+        with organism.lock:
+            if steps > 1:
                 organism.generation += max(1, steps // 20)
+            else:
+                organism.generation += 1
+
+            # 随世代演化自发增殖有丝分裂 (持续生长出新功能细胞)
+            if organism.generation % 12 == 0 or (steps > 1 and organism.generation % max(1, 200 // steps) == 0):
+                organism.step_morphogenesis()
         time.sleep(0.025)
 
 sim_thread = threading.Thread(target=simulation_worker, daemon=True)

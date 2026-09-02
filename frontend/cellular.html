@@ -452,8 +452,8 @@ function apoptosis(org){
   org.syns = org.syns.filter(s=> s.active && alive.has(s.from) && alive.has(s.to));
   compile(org);
   const removed = before - org.cells.length;
-  if(removed>0) log(`☠ 凋亡剪枝: ${removed} 个低影响力细胞被溶解`);
-  else log('☠ 凋亡剪枝: 无可溶解细胞 (拓扑已精简)');
+  if(removed>0) log(`[APOP] 凋亡剪枝: ${removed} 个低影响力细胞被溶解`);
+  else log('[APOP] 凋亡剪枝: 无可溶解细胞 (拓扑已精简)');
   return removed>0;
 }
 
@@ -632,16 +632,24 @@ class CellView {
   }
 }
 
+
+const _tmpP0 = new THREE.Vector3();
+const _tmpP1 = new THREE.Vector3();
+const _tmpP2 = new THREE.Vector3();
+const _tmpChord = new THREE.Vector3();
+const _tmpUp = new THREE.Vector3(0, 1, 0);
+const _tmpNorm = new THREE.Vector3();
+const _tmpPt = new THREE.Vector3();
+
 class SynapseView {
   constructor(syn, org){
     this.syn = syn;
     this.org = org;
     this.numSegments = 16;
     
-    // 1. 神经纤维/髓鞘 3D 曲线几何体 (Curved Axon / Myelin Sheath Fiber)
     this.curvePoints = new Float32Array((this.numSegments + 1) * 3);
     this.geo = new THREE.BufferGeometry();
-    this.geo.setAttribute('position', new THREE.BufferAttribute(this.curvePoints, 3));
+    this.geo.setAttribute("position", new THREE.BufferAttribute(this.curvePoints, 3));
     
     this.lineMat = new THREE.LineBasicMaterial({
       color: 0x38bdf8,
@@ -651,7 +659,6 @@ class SynapseView {
     });
     this.line = new THREE.Line(this.geo, this.lineMat);
 
-    // 2. 突触递质囊泡流 (Action Potential Neurotransmitter Vesicle Pulses)
     this.photonMat1 = new THREE.SpriteMaterial({ map: GLOW, color: 0x38bdf8, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     this.photonMat2 = new THREE.SpriteMaterial({ map: GLOW, color: 0xa855f7, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     this.photon1 = new THREE.Sprite(this.photonMat1);
@@ -659,7 +666,6 @@ class SynapseView {
     this.photon1.scale.set(16, 16, 1);
     this.photon2.scale.set(12, 12, 1);
 
-    // 3. 突触末梢膨大纽扣 (Synaptic Bouton / Terminal Swelling)
     this.boutonMat = new THREE.SpriteMaterial({ map: GLOW, color: 0x38bdf8, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     this.bouton = new THREE.Sprite(this.boutonMat);
     this.bouton.scale.set(20, 20, 1);
@@ -689,51 +695,70 @@ class SynapseView {
     }
     this.group.visible = true;
 
-    // 二次贝塞尔曲线有机弯曲计算 (Natural Biological Axon Curvature)
-    const p0 = new THREE.Vector3(a.x, a.y, a.z || 0);
-    const p2 = new THREE.Vector3(b.x, b.y, b.z || 0);
-    
-    // 正交扰动产生生理弯曲
-    const mid = new THREE.Vector3().addVectors(p0, p2).multiplyScalar(0.5);
-    const dist = p0.distanceTo(p2);
+    // 零 GC 暂存向量复用 (Zero-GC Vector Pooling & Analytical Bezier)
+    _tmpP0.set(a.x, a.y, a.z || 0);
+    _tmpP2.set(b.x, b.y, b.z || 0);
+    _tmpChord.subVectors(_tmpP2, _tmpP0);
+    const dist = _tmpChord.length();
     const arcHeight = Math.min(25, dist * 0.18);
-    const norm = new THREE.Vector3(-(p2.y - p0.y), (p2.x - p0.x), (p2.z - p0.z)).normalize();
-    const p1 = mid.add(norm.multiplyScalar(arcHeight * ((this.syn.port === 0) ? 1 : -1)));
 
-    const curve = new THREE.QuadraticBezierCurve3(p0, p1, p2);
-    const pts = curve.getPoints(this.numSegments);
+    // 标准 3D 外积正交法向量计算
+    if(Math.abs(_tmpChord.y) < 0.95 * dist) _tmpUp.set(0, 1, 0);
+    else _tmpUp.set(1, 0, 0);
+    _tmpNorm.crossVectors(_tmpChord, _tmpUp).normalize();
+
+    _tmpP1.addVectors(_tmpP0, _tmpP2).multiplyScalar(0.5);
+    _tmpP1.addScaledVector(_tmpNorm, arcHeight * ((this.syn.port === 0) ? 1 : -1));
+
+    // 解析计算二次贝塞尔曲线 16 离散点 (0 字节堆分配)
     const pos = this.geo.attributes.position;
     for(let i = 0; i <= this.numSegments; i++){
-      pos.setXYZ(i, pts[i].x, pts[i].y, pts[i].z);
+      const t = i / this.numSegments;
+      const it = 1.0 - t;
+      const bx = it * it * _tmpP0.x + 2.0 * it * t * _tmpP1.x + t * t * _tmpP2.x;
+      const by = it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y;
+      const bz = it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z;
+      pos.setXYZ(i, bx, by, bz);
     }
     pos.needsUpdate = true;
 
-    // 纤维颜色随权重动态调整
     const w = this.syn.w || 1.0;
     const hot = Math.abs(w) > 0.6;
     this.lineMat.color.setHex(w >= 0 ? (hot ? 0x38bdf8 : 0x0284c7) : (hot ? 0xf43f5e : 0xbe123c));
     this.lineMat.opacity = 0.4 + Math.min(0.5, Math.abs(w) * 0.4);
 
-    // 动作电位囊泡沿神经纤维流动
     const speed = (0.012 + Math.min(0.04, Math.abs(w) * 0.025)) * warpMultiplier;
     this.flowT1 = (this.flowT1 + speed) % 1.0;
     this.flowT2 = (this.flowT2 + speed * 1.1) % 1.0;
 
-    const pt1 = curve.getPoint(this.flowT1);
-    const pt2 = curve.getPoint(this.flowT2);
-    this.photon1.position.copy(pt1);
-    this.photon2.position.copy(pt2);
-    
-    const pScale1 = (12 + Math.sin(this.flowT1 * Math.PI) * 10) * (0.8 + Math.abs(w) * 0.5);
-    this.photon1.scale.set(pScale1, pScale1, 1);
-    this.photon1.material.opacity = 0.3 + Math.sin(this.flowT1 * Math.PI) * 0.7;
+    // 囊泡 1 采样
+    {
+      const t = this.flowT1, it = 1.0 - t;
+      this.photon1.position.set(
+        it * it * _tmpP0.x + 2.0 * it * t * _tmpP1.x + t * t * _tmpP2.x,
+        it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
+        it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
+      );
+      const pScale1 = (12 + Math.sin(t * Math.PI) * 10) * (0.8 + Math.abs(w) * 0.5);
+      this.photon1.scale.set(pScale1, pScale1, 1);
+      this.photon1.material.opacity = 0.3 + Math.sin(t * Math.PI) * 0.7;
+    }
 
-    const pScale2 = (10 + Math.sin(this.flowT2 * Math.PI) * 8) * (0.8 + Math.abs(w) * 0.5);
-    this.photon2.scale.set(pScale2, pScale2, 1);
-    this.photon2.material.opacity = 0.25 + Math.sin(this.flowT2 * Math.PI) * 0.6;
+    // 囊泡 2 采样
+    {
+      const t = this.flowT2, it = 1.0 - t;
+      this.photon2.position.set(
+        it * it * _tmpP0.x + 2.0 * it * t * _tmpP1.x + t * t * _tmpP2.x,
+        it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
+        it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
+      );
+      const pScale2 = (10 + Math.sin(t * Math.PI) * 8) * (0.8 + Math.abs(w) * 0.5);
+      this.photon2.scale.set(pScale2, pScale2, 1);
+      this.photon2.material.opacity = 0.25 + Math.sin(t * Math.PI) * 0.6;
+    }
 
-    // 突触终端小体贴合在目标细胞质膜接触点上
-    this.bouton.position.copy(p2);
+    // 突触终端小体
+    this.bouton.position.copy(_tmpP2);
     const boutonFlash = (1.0 - Math.min(1.0, this.flowT1)) * (a.glow || 0.2);
     const bScale = 14 + boutonFlash * 22;
     this.bouton.scale.set(bScale, bScale, 1);
@@ -750,6 +775,7 @@ class SynapseView {
     if(this.boutonMat) this.boutonMat.dispose();
   }
 }
+
 
 
 /* ============================================================
@@ -874,12 +900,12 @@ document.getElementById('b-bio').onclick = e=>{
 };
 document.getElementById('b-rad').onclick = e=>{
   radVisible = !radVisible;
-  e.target.textContent = radVisible ? '☢ 辐射场' : '☢ 辐射场(关)';
+  e.target.textContent = radVisible ? '[RAD] 辐射场' : '[RAD] 辐射场(关)';
   radPlane.visible = radVisible;
   for(const v of radRays.values()){ v.sprite.visible = radVisible; v.trail.visible = radVisible; }
 };
-document.getElementById('b-pause').onclick = e=>{ paused=!paused; e.target.textContent = paused?'▶ 继续':'⏸ 暂停'; };
-document.getElementById('b-reset').onclick = ()=>{ org = seedOrganism(); compile(org); rebuildViews(); log('↺ 重置为种子形态生物 Genesis-0', true); };
+document.getElementById('b-pause').onclick = e=>{ paused=!paused; e.target.textContent = paused?'[RESUME] 继续':'[PAUSE] 暂停'; };
+document.getElementById('b-reset').onclick = ()=>{ org = seedOrganism(); compile(org); rebuildViews(); log('[RESET] 重置为种子形态生物 Genesis-0', true); };
 
 /* 尝试从守护进程获取真实冠军有机体快照做坐标水合 (后台持续演化, 前端毫秒级实时同步观察) */
 async function syncServerChampion() {
@@ -930,7 +956,7 @@ async function syncServerChampion() {
       document.getElementById('st-gen').textContent = org.generation;
       document.getElementById('st-cells').textContent = org.cells.length;
       document.getElementById('st-syn').textContent = org.syns.filter(s=>s.active).length;
-      log(`✓ 同步后台冠军生物: ${org.lineage} · Gen ${org.generation} (${org.cells.length} 细胞 / ${org.syns.length} 突触)`, true);
+      log(`[SYNC] 同步后台冠军生物: ${org.lineage} · Gen ${org.generation} (${org.cells.length} 细胞 / ${org.syns.length} 突触)`, true);
     }
   }catch(e){ /* 离线使用客户端内嵌种子生物 */ }
 }
@@ -980,7 +1006,7 @@ window.setStress = async function(level) {
   fetch("/api/stress?level=" + level).catch(() => {});
   try {
     await fetch('/api/control/stress?level=' + level, { method: 'POST' });
-    log(level === 'extreme' ? ' [兵部] 触发红皇后极端流动性闪崩与对抗加压!' : '✓ 恢复平稳演化生境', true);
+    log(level === 'extreme' ? ' [兵部] 触发红皇后极端流动性闪崩与对抗加压!' : '[OK] 恢复平稳演化生境', true);
   } catch(e) { console.error(e); }
 };
 
@@ -1238,12 +1264,12 @@ window.loadPreset = function(type) {
   if(type === "seed") {
     org = seedOrganism();
     compile(org);
-    rebuildScene(org);
+    rebuildViews();
     log("已载入: 初始胚胎原基 (Gen 0, 9 细胞, 7 突触)");
   } else {
     org = makeMatureOrganism();
     compile(org);
-    rebuildScene(org);
+    rebuildViews();
     log("已载入: 成熟演化脑区 (Gen 384, 30 细胞, 33 突触, 四族原语全通)");
   }
 };
@@ -1256,24 +1282,24 @@ window.switchLOD = function(mode) {
 
   if(mode === 'organ') {
     if(lodPointsMesh) lodPointsMesh.visible = false;
-    for(const v of views.cells) { v.mesh.visible = true; v.halo.visible = true; v.label.visible = true; }
-    for(const v of views.syns) { v.line.visible = true; }
+    for(const v of views.cells) { v.group.visible = true; }
+    for(const v of views.syns) { v.group.visible = true; }
     document.getElementById('st-pipe').textContent = 'DOM/Sprite Organ';
     document.getElementById('st-draws').textContent = views.cells.length * 3;
     log(' 切换至: 本能器官微观视图 (15~100 细胞全细节)');
   } else if(mode === '10k') {
     initLODCloud(10000);
     lodPointsMesh.visible = true;
-    for(const v of views.cells) { v.mesh.visible = false; v.halo.visible = false; v.label.visible = false; }
-    for(const v of views.syns) { v.line.visible = false; }
+    for(const v of views.cells) { v.group.visible = false; }
+    for(const v of views.syns) { v.group.visible = false; }
     document.getElementById('st-pipe').textContent = 'GPU Points 10k Instanced';
     document.getElementById('st-draws').textContent = '1 (单批次)';
     log(' 切换至: 10,000 细胞皮层柱 (GPU 单批次点云零压渲染)');
   } else if(mode === '1m') {
     initLODCloud(35000); // 渲染 35,000 个宏观代表粒子，映射 1,000,000 细胞宏观形态，确保 60 FPS 零卡顿
     lodPointsMesh.visible = true;
-    for(const v of views.cells) { v.mesh.visible = false; v.halo.visible = false; v.label.visible = false; }
-    for(const v of views.syns) { v.line.visible = false; }
+    for(const v of views.cells) { v.group.visible = false; }
+    for(const v of views.syns) { v.group.visible = false; }
     document.getElementById('st-pipe').textContent = 'GPU Points 1M LOD Cluster';
     document.getElementById('st-draws').textContent = '1 (单批次)';
     log(' 切换至: 1,000,000 细胞宏观心智流形 (分层 LOD 动态聚合，0 显存溢出)');
@@ -1332,6 +1358,38 @@ async function syncBackendState() {
 function updateFromBackendState(data) {
   if (!data || !data.cells) return;
   
+  // 拓扑动态增殖生长或修剪 (Dynamic Mitosis / Apoptosis Sync)
+  if (data.cells.length !== org.cells.length || (data.synapses && data.synapses.length !== org.syns.length)) {
+    org.generation = data.generation;
+    org.cells = data.cells.map(c => ({
+      id: c.id,
+      type: c.type,
+      param1: c.p1 || 0.1,
+      param2: c.p2 || 0.0,
+      state: c.s || 0.0,
+      out: c.out || 0.0,
+      acts: c.acts || 0,
+      x: c.x,
+      y: c.y,
+      z: c.z || 0,
+      vx: 0, vy: 0, vz: 0,
+      glow: 0
+    }));
+    if (data.synapses) {
+      org.syns = data.synapses.map(s => ({
+        from: s.from,
+        to: s.to,
+        port: s.port || 0,
+        w: s.w !== undefined ? s.w : 1.0,
+        active: s.active !== undefined ? s.active : true,
+        photon: -1
+      }));
+    }
+    compile(org);
+    rebuildViews();
+    log(`[GROWTH] 形态发生增殖: Gen ${org.generation} (${org.cells.length} 细胞 / ${org.syns.length} 突触)`, true);
+  }
+
   // 1. 节流更新 DOM 文本指标
   const genEl = document.getElementById("st-gen");
   if (genEl && genEl.textContent != data.generation) genEl.textContent = data.generation;
@@ -1367,7 +1425,6 @@ function updateFromBackendState(data) {
   for (const v of views.cells) {
     const remote = byId.get(v.cell.id);
     if (remote) {
-      // 目标平滑阻尼趋近 (Lerp)
       v.cell.x += (remote.x - v.cell.x) * 0.35;
       v.cell.y += (remote.y - v.cell.y) * 0.35;
       v.cell.z += (remote.z - v.cell.z) * 0.35;
