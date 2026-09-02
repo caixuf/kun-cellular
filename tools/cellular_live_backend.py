@@ -901,10 +901,10 @@ class DummySiliconLibrary:
             {
                 "organism_id": "apex_generalist_prime",
                 "name": "Apex 通才全能超级生命体",
-                "tag": "通才中枢",
+                "tag": "双脑中枢",
                 "generation": 420,
                 "total_cells": 100000000,
-                "description": "集成了量化投资、自动驾驶、高阶因果对话与符号逻辑推演的顶级硅基全能生命体。",
+                "description": "集成了量化做市、自动驾驶、高阶因果对话与符号逻辑推演的顶级硅基全能生命体。",
                 "books": [
                     {
                         "book_id": "quant_30y_champion",
@@ -914,11 +914,25 @@ class DummySiliconLibrary:
                         "description": "4,234 根日线演化出的多尺度均线交叉与动量破位积分回路，全样本夏普 3.82，最大回撤 4.1%"
                     },
                     {
+                        "book_id": "hft_l2_order_flow",
+                        "title": "Level-2 逐笔盘口微观结构与高频做市大模型",
+                        "citations": 1150,
+                        "impact_score": 9.91,
+                        "description": "基于订单流失衡度 (OFI) 与微观有效价差捕获算法，在毫秒级盘口队列中实现双边做市获利"
+                    },
+                    {
                         "book_id": "vehicle_1m_mega",
                         "title": "SDSCC 100万细胞智能驾驶超级大脑",
                         "citations": 1290,
                         "impact_score": 9.92,
                         "description": "100万细胞与400万突触构成的阿克曼物理闭环超级大脑，连续6.7圈零出界，平均横向误差4.5厘米"
+                    },
+                    {
+                        "book_id": "discrete_sat_formal",
+                        "title": "离散符号布尔约束求解与形式化验证典籍",
+                        "citations": 760,
+                        "impact_score": 9.68,
+                        "description": "DPLL 命题逻辑合一与冲突子句学习 (CDCL)，提供 100% 形式化安全证明，消除任何未定义行为"
                     },
                     {
                         "book_id": "laokexia_billion",
@@ -939,11 +953,25 @@ class DummySiliconLibrary:
             {
                 "organism_id": "embodied_kinematic_beast",
                 "name": "具身物理运动演化生命体",
-                "tag": "具身小脑",
+                "tag": "四足小脑",
                 "generation": 280,
                 "total_cells": 5000000,
                 "description": "专注空间几何、动力学积分与机械多关节协同控制的具身物理生命体。",
                 "books": [
+                    {
+                        "book_id": "embodied_6dof_grasping",
+                        "title": "端到端 6-DoF 机械臂力控阻抗抓取大模型",
+                        "citations": 980,
+                        "impact_score": 9.75,
+                        "description": "结合视觉位姿与 6 自由度逆运动学，触觉六维力矩传感器自适应调节阻抗刚度与抓握力"
+                    },
+                    {
+                        "book_id": "v2x_fleet_shadow_mode",
+                        "title": "车路协同分布式影子模式与协同变道典籍",
+                        "citations": 830,
+                        "impact_score": 9.62,
+                        "description": "路侧单元感知盲区穿透，Boids 人工势场群体智能多车编队协同避障与无缝变道"
+                    },
                     {
                         "book_id": "loco_quadruped_cpg",
                         "title": "四足生物 CPG 中枢模式步态合成典籍",
@@ -963,7 +991,7 @@ class DummySiliconLibrary:
             {
                 "organism_id": "micro_defense_symbiosis",
                 "name": "微环境共生与免疫防御生命体",
-                "tag": "自组织免疫",
+                "tag": "淋巴免疫",
                 "generation": 190,
                 "total_cells": 3600000,
                 "description": "基于红皇后博弈与特异性趋化性吞噬演化出的生命微生态防御系统。",
@@ -987,7 +1015,7 @@ class DummySiliconLibrary:
             {
                 "organism_id": "celestial_chaos_integrator",
                 "name": "天体物理与混沌引力生命体",
-                "tag": "引力宇宙",
+                "tag": "三体轨道",
                 "generation": 150,
                 "total_cells": 1200000,
                 "description": "基于牛顿-洛伦兹非线性引力场演化出的轨道共振与引力弹弓系统。",
@@ -1648,7 +1676,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/dialogue"):
             import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            prompt = qs.get("q", ["你好"])[0]
+            prompt = qs.get("q", qs.get("text", qs.get("prompt", ["你好"])))[0]
             data = answer_cellular_dialogue(prompt)
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
             self.send_response(200)

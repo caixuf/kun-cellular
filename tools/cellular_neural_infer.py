@@ -70,15 +70,16 @@ class NeuralInferenceEngine:
         print(f"[NeuralInferenceEngine] 真实神经网络已就绪！参数量: {self.total_params:,} | 设备: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'}")
 
     @torch.no_grad()
-    def generate_pure_neural(self, prompt, max_tokens=70, temperature=0.6):
+    def generate_pure_neural(self, prompt, max_tokens=140, temperature=0.15):
         if not self.loaded:
             return {
                 "is_neural": False,
                 "response": "神经网络模型未就绪。"
             }
             
-        # 1. 字符 Token 映射
-        prefix = f"问：{prompt.strip()}？\n答："
+        # 1. 字符 Token 映射 (去除多余尾缀标点，与训练语料契合)
+        prompt_trimmed = prompt.strip().rstrip("？?。！!\n ")
+        prefix = f"问：{prompt_trimmed}？\n答："
         idx_tokens = [self.char_to_ix.get(c, 0) for c in prefix if c in self.char_to_ix]
         if not idx_tokens:
             idx_tokens = [self.char_to_ix.get("问", 0), self.char_to_ix.get("：", 0)]
@@ -88,11 +89,16 @@ class NeuralInferenceEngine:
         token_logits_top = []
         
         t0 = time.time()
-        # 2. 端到端 GPU 自回归 Next-Token 推理
+        # 2. 端到端 GPU 自回归 Next-Token 推理 (带自适应重复抑制与平滑截断)
         for _ in range(max_tokens):
             idx_cond = idx[:, -self.model.max_len:]
             logits = self.model(idx_cond)
-            next_logit = logits[:, -1, :] / max(0.1, temperature)
+            next_logit = logits[:, -1, :].clone() / max(0.05, temperature)
+            
+            # 重复惩罚：对最近 20 个已生成字符降低概率，杜绝死循环
+            for prev_token in idx[0, -20:]:
+                next_logit[0, prev_token] = next_logit[0, prev_token] - 1.8
+                
             probs = F.softmax(next_logit, dim=-1)
             
             top_prob, top_idx = torch.topk(probs, 3)
@@ -105,7 +111,8 @@ class NeuralInferenceEngine:
             idx = torch.cat((idx, next_ix), dim=1)
             ch = self.ix_to_char.get(next_ix.item(), "")
             
-            if ch == "\n" and len(generated_chars) > 10:
+            if (ch == "\n" or ch == "。") and len(generated_chars) > 30:
+                if ch == "。": generated_chars.append("。")
                 break
             generated_chars.append(ch)
             
