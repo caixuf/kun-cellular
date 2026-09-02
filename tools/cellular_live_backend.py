@@ -1404,146 +1404,232 @@ class LiveImmuneSimulator:
 live_immune = LiveImmuneSimulator()
 
 class LiveMazeSimulator:
-    def __init__(self):
-        self.width = 20
-        self.height = 20
+    """
+    经典 DFS 递归回溯深度欺骗性迷宫与达尔文遗传新奇度演化仿真器
+    - 迷宫生成: 随机深搜 (Recursive Backtracker) 雕刻完美迷宫 (含分叉与死胡同)
+    - 智能体决策: 3路激光雷达 + 指南针方位角 + 基因组自适应权重前向控制
+    - 物理引擎: 双轴独立碰撞滑动 (Axis-Aligned Sliding) 杜绝穿墙与卡死
+    - 演化机制: 空间新奇度探索 (Novelty) + 终点逼近 + 锦标赛突变选择
+    """
+    def __init__(self, width=17, height=17):
+        self.width = width
+        self.height = height
         self.generation = 1
         self.step_count = 0
         self.max_steps = 240
         self.warp_speed = 5
-        self.start = [2.5, 2.5]
-        self.goal = [17.5, 17.5]
-        self.lock = threading.RLock()
+        self.success_rate = 0.0
         self.history_pass = [0.0]
         self.champion_trail = []
+        self.lock = threading.RLock()
         self.generate_maze()
         self.init_population(24)
 
     def generate_maze(self):
-        self.grid = [0] * (self.width * self.height)
-        # 边界墙
-        for x in range(self.width):
-            self.grid[0 * self.width + x] = 1
-            self.grid[(self.height - 1) * self.width + x] = 1
-        for y in range(self.height):
-            self.grid[y * self.width + 0] = 1
-            self.grid[y * self.width + (self.width - 1)] = 1
-            
-        # 内部欺骗性迷宫隔板 (Deceptive Obstacle Walls)
-        for y in range(3, 14):
-            self.grid[y * self.width + 6] = 1
-        for y in range(7, 18):
-            self.grid[y * self.width + 13] = 1
-        for x in range(6, 14):
-            self.grid[10 * self.width + x] = 1
+        with self.lock:
+            w, h = self.width, self.height
+            self.grid = [1] * (w * h)
+            stack = [(1, 1)]
+            self.grid[1 * w + 1] = 0
 
-    def init_population(self, n=24):
-        self.agents = []
-        for i in range(n):
-            self.agents.append({
+            dx = [0, 0, 2, -2]
+            dy = [2, -2, 0, 0]
+
+            while stack:
+                cx, cy = stack[-1]
+                dirs = [0, 1, 2, 3]
+                random.shuffle(dirs)
+                carved = False
+                for d in dirs:
+                    nx, ny = cx + dx[d], cy + dy[d]
+                    if 0 < nx < w - 1 and 0 < ny < h - 1 and self.grid[ny * w + nx] == 1:
+                        self.grid[ny * w + nx] = 0
+                        self.grid[(cy + dy[d] // 2) * w + (cx + dx[d] // 2)] = 0
+                        stack.append((nx, ny))
+                        carved = True
+                        break
+                if not carved:
+                    stack.pop()
+
+            self.start = (1.5, 1.5)
+            self.goal = (float(w - 2) + 0.5, float(h - 2) + 0.5)
+            self.grid[(h - 2) * w + (w - 2)] = 0
+            self.champion_trail = [list(self.start)]
+            self.generation = 1
+            self.step_count = 0
+
+    def init_population(self, size=24):
+        self.population = []
+        for i in range(size):
+            self.population.append({
                 "id": i,
-                "x": 2.5 + random.uniform(-0.3, 0.3),
-                "y": 2.5 + random.uniform(-0.3, 0.3),
-                "theta": random.uniform(0, math.pi * 2),
-                "rays": [1.0, 1.0, 1.0],
+                "w_wall_l": random.uniform(-1.0, 1.0),
+                "w_wall_r": random.uniform(-1.0, 1.0),
+                "w_bearing": random.uniform(0.5, 1.8),
+                "w_front": random.uniform(-1.5, 0.5),
+                "turn_bias": random.choice([-1.0, 1.0]),
+                "speed": random.uniform(0.24, 0.36),
+                "fitness": 0.0
+            })
+        self.init_agent_states()
+
+    def init_agent_states(self):
+        self.agent_states = []
+        for g in self.population:
+            self.agent_states.append({
+                "id": g["id"],
+                "x": self.start[0],
+                "y": self.start[1],
+                "theta": random.uniform(-0.5, 0.5),
                 "goal": 0,
-                "alive": True,
-                "reached": False,
-                "trail": []
+                "min_dist": 999.0,
+                "trail": [list(self.start)],
+                "rays": [1.0, 1.0, 1.0],
+                "visited": set([(1, 1)])
             })
 
-    def _cast_ray(self, x, y, theta, max_dist=6.0):
-        step = 0.2
-        dist = 0.0
-        while dist < max_dist:
-            dist += step
-            cx = int(x + math.cos(theta) * dist)
-            cy = int(y + math.sin(theta) * dist)
-            if cx < 0 or cx >= self.width or cy < 0 or cy >= self.height or self.grid[cy * self.width + cx] == 1:
-                return round(dist / max_dist, 3)
+    def is_wall(self, x, y):
+        gx, gy = int(x), int(y)
+        if gx < 0 or gx >= self.width or gy < 0 or gy >= self.height:
+            return True
+        return self.grid[gy * self.width + gx] == 1
+
+    def cast_ray(self, sx, sy, ang, max_r=5.0):
+        ca, sa = math.cos(ang), math.sin(ang)
+        cur = 0.0
+        while cur < max_r:
+            cur += 0.2
+            gx, gy = int(sx + ca * cur), int(sy + sa * cur)
+            if gx < 0 or gx >= self.width or gy < 0 or gy >= self.height or self.grid[gy * self.width + gx] == 1:
+                return round(min(1.0, cur / max_r), 3)
         return 1.0
 
     def step_physics(self):
         with self.lock:
             self.step_count += 1
-            for a in self.agents:
-                if a["alive"] and not a["reached"]:
-                    # 3 束激光雷达测距
-                    r_front = self._cast_ray(a["x"], a["y"], a["theta"])
-                    r_left = self._cast_ray(a["x"], a["y"], a["theta"] - 0.785)
-                    r_right = self._cast_ray(a["x"], a["y"], a["theta"] + 0.785)
-                    a["rays"] = [r_front, r_left, r_right]
+            gx, gy = self.goal
+            reached_count = 0
 
-                    # 趋化性目标方位吸引力
-                    dx = self.goal[0] - a["x"]
-                    dy = self.goal[1] - a["y"]
-                    goal_theta = math.atan2(dy, dx)
-                    goal_dtheta = (goal_theta - a["theta"] + math.pi) % math.tau - math.pi
+            for i, ag in enumerate(self.agent_states):
+                g = self.population[i]
+                if ag["goal"] == 1:
+                    reached_count += 1
+                    continue
 
-                    # 激光避障势场
-                    avoid_steer = (r_left - r_right) * 1.8
-                    if r_front < 0.25:
-                        avoid_steer += 1.5 if r_left > r_right else -1.5
+                # 1. 局部感官 3 路激光雷达
+                r_front = self.cast_ray(ag["x"], ag["y"], ag["theta"])
+                r_left = self.cast_ray(ag["x"], ag["y"], ag["theta"] - 0.785)
+                r_right = self.cast_ray(ag["x"], ag["y"], ag["theta"] + 0.785)
+                ag["rays"] = [r_front, r_left, r_right]
+                ag["visited"].add((int(ag["x"]), int(ag["y"])))
 
-                    # 元胞转向控制律
-                    steer = goal_dtheta * 0.35 + avoid_steer * 0.65 + random.uniform(-0.1, 0.1)
-                    a["theta"] += max(-0.4, min(0.4, steer))
-                    
-                    spd = 0.22 if r_front > 0.3 else 0.08
-                    nx = a["x"] + math.cos(a["theta"]) * spd
-                    ny = a["y"] + math.sin(a["theta"]) * spd
+                # 2. 终点距离与通关判定
+                d = math.hypot(gx - ag["x"], gy - ag["y"])
+                if d < ag["min_dist"]:
+                    ag["min_dist"] = d
+                if d < 0.85:
+                    ag["goal"] = 1
+                    reached_count += 1
+                    continue
 
-                    # 碰墙检测
-                    grid_x = int(nx)
-                    grid_y = int(ny)
-                    if 0 <= grid_x < self.width and 0 <= grid_y < self.height and self.grid[grid_y * self.width + grid_x] == 0:
-                        a["x"] = nx
-                        a["y"] = ny
-                    else:
-                        a["theta"] += random.choice([-1.2, 1.2])
+                # 3. 终点方位角 (Compass Bearing)
+                target_ang = math.atan2(gy - ag["y"], gx - ag["x"])
+                bearing = ((target_ang - ag["theta"] + math.pi) % (2 * math.pi) - math.pi) / math.pi
 
-                    if self.step_count % 3 == 0 and len(a["trail"]) < 100:
-                        a["trail"].append([round(a["x"], 2), round(a["y"], 2)])
+                # 4. 基因组自适应转向控制
+                if r_front < 0.22:
+                    turn = (0.85 if r_left > r_right else -0.85) * g["turn_bias"]
+                    speed = 0.10
+                else:
+                    steer = r_left * g["w_wall_l"] + r_right * g["w_wall_r"] + bearing * g["w_bearing"] + r_front * g["w_front"]
+                    turn = math.tanh(steer) * 0.45
+                    speed = g["speed"]
 
-                    # 到达终点判定
-                    if (a["x"] - self.goal[0])**2 + (a["y"] - self.goal[1])**2 < 1.44:
-                        a["reached"] = True
-                        a["goal"] = 1
-                        if not self.champion_trail or len(a["trail"]) < len(self.champion_trail):
-                            self.champion_trail = list(a["trail"])
+                ag["theta"] += turn
+                nx = ag["x"] + math.cos(ag["theta"]) * speed
+                ny = ag["y"] + math.sin(ag["theta"]) * speed
 
-            if self.step_count >= self.max_steps:
-                self.generation += 1
-                n_reached = sum(1 for a in self.agents if a["reached"])
-                rate = round(n_reached / len(self.agents), 3)
-                self.history_pass.append(rate)
-                if len(self.history_pass) > 40:
-                    self.history_pass.pop(0)
-                self.step_count = 0
-                self.init_population(24)
+                # 双轴独立物理滑动碰撞检测
+                if not self.is_wall(nx, ag["y"]):
+                    ag["x"] = nx
+                if not self.is_wall(ag["x"], ny):
+                    ag["y"] = ny
+
+                if self.step_count % 2 == 0 and len(ag["trail"]) < 200:
+                    ag["trail"].append([round(ag["x"], 2), round(ag["y"], 2)])
+
+            self.success_rate = reached_count / max(1, len(self.agent_states))
+
+            if self.step_count >= self.max_steps or (reached_count == len(self.agent_states) and reached_count > 0):
+                self.evolve_generation()
 
     def evolve_generation(self):
-        with self.lock:
-            self.step_count = self.max_steps
+        best_fit = -9999.0
+        best_trail = []
+
+        for i, ag in enumerate(self.agent_states):
+            g = self.population[i]
+            fit = len(ag["visited"]) * 8.0 - ag["min_dist"] * 5.0
+            if ag["goal"] == 1:
+                fit += 300.0 + (self.max_steps - self.step_count) * 2.0
+            g["fitness"] = fit
+            if fit > best_fit:
+                best_fit = fit
+                best_trail = list(ag["trail"])
+
+        if len(best_trail) > 2:
+            self.champion_trail = best_trail
+
+        # 达尔文锦标赛选择与突变繁殖 (Elitism + Mutation)
+        self.population.sort(key=lambda g: g["fitness"], reverse=True)
+        new_pop = []
+        for i in range(4):
+            new_pop.append(dict(self.population[i]))
+
+        for i in range(4, len(self.population)):
+            p = random.choice(self.population[:8])
+            child = dict(p)
+            for k in ["w_wall_l", "w_wall_r", "w_bearing", "w_front", "speed"]:
+                if random.random() < 0.35:
+                    child[k] += random.gauss(0, 0.15)
+            if random.random() < 0.1:
+                child["turn_bias"] = -child["turn_bias"]
+            new_pop.append(child)
+
+        self.population = new_pop
+        self.generation += 1
+        self.history_pass.append(round(self.success_rate, 3))
+        if len(self.history_pass) > 40:
+            self.history_pass.pop(0)
+        self.step_count = 0
+        self.init_agent_states()
 
     def get_snapshot(self):
         with self.lock:
-            n_reached = sum(1 for a in self.agents if a["reached"])
-            rate = round(n_reached / max(1, len(self.agents)), 3)
             return {
                 "generation": self.generation,
                 "step_count": self.step_count,
                 "max_steps": self.max_steps,
-                "success_rate": rate,
-                "pass_rate": round(rate * 100, 1),
+                "success_rate": round(self.success_rate, 3),
+                "pass_rate": round(self.success_rate * 100, 1),
                 "width": self.width,
                 "height": self.height,
-                "grid": list(self.grid),
                 "start": list(self.start),
                 "goal": list(self.goal),
-                "agents": list(self.agents),
+                "grid": list(self.grid),
                 "champion_trail": list(self.champion_trail),
-                "history_pass": list(self.history_pass)
+                "history_pass": list(self.history_pass),
+                "agents": [
+                    {
+                        "id": ag["id"],
+                        "x": round(ag["x"], 2),
+                        "y": round(ag["y"], 2),
+                        "theta": round(ag["theta"], 3),
+                        "goal": ag["goal"],
+                        "rays": [round(r, 2) for r in ag["rays"]]
+                    }
+                    for ag in self.agent_states
+                ]
             }
 
 live_maze = LiveMazeSimulator()
@@ -1605,11 +1691,16 @@ live_slingshot = LiveSlingshotSimulator()
 def multi_universe_sim_loop():
     while True:
         try:
-            live_loco.step_physics()
-            live_eco.step_physics()
-            live_immune.step_physics()
-            live_maze.step_physics()
-            live_slingshot.step_physics()
+            for _ in range(max(1, getattr(live_loco, "warp_speed", 1))):
+                live_loco.step_physics()
+            for _ in range(max(1, getattr(live_eco, "warp_speed", 1))):
+                live_eco.step_physics()
+            for _ in range(max(1, getattr(live_immune, "warp_speed", 1))):
+                live_immune.step_physics()
+            for _ in range(max(1, getattr(live_maze, "warp_speed", 1))):
+                live_maze.step_physics()
+            for _ in range(max(1, getattr(live_slingshot, "warp_speed", 1))):
+                live_slingshot.step_physics()
         except Exception:
             pass
         time.sleep(0.02)
