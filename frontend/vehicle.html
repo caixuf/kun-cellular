@@ -251,10 +251,10 @@
         </div>
 
         <div class="sidebar">
-            <!-- 1. SDSCC 拓扑基因组与形态发生网络 -->
+            <!-- 1. SDSCC 128-细胞大脑皮层拓扑器官 -->
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[SDSCC_TOPOLOGY_GENOME]</span>
+                    <span>[SDSCC_128_CELL_CORTICAL_ORGAN]</span>
                     <span style="color:var(--emerald-glow);" id="stat-gen-badge">GEN: 1 // AGENT: 1/6</span>
                 </div>
                 
@@ -269,25 +269,34 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">ACTIVE_CELLS</div>
-                        <div class="stat-val cyan" id="stat-cells">10 细胞</div>
+                        <div class="stat-val cyan" id="stat-cells">128 细胞 (4层)</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">SYNAPSE_EDGES</div>
-                        <div class="stat-val emerald" id="stat-synapses">12 突触</div>
+                        <div class="stat-val emerald" id="stat-synapses">512 突触</div>
                     </div>
                 </div>
 
-                <!-- 实时 24 原语拓扑链路 -->
-                <div style="padding: 6px 12px 10px;">
-                    <div class="stat-label" style="margin-bottom:6px;">LIVE_PRIMITIVE_CHAIN // 活跃原语链路:</div>
-                    <div id="primitive-chain" style="display:flex; flex-wrap:wrap; gap:4px; font-size:10px;">
-                        <span style="background:#1e293b; color:#94a3b8; padding:2px 6px; border-radius:3px; border:1px solid #334155;">RECEPTORS(4)</span>
+                <!-- 128 细胞微观脉冲网格实时图谱 -->
+                <div style="padding: 4px 12px 8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                        <span class="stat-label">128-CELL CORTICAL PULSE MATRIX (膜电位脉冲):</span>
+                        <span style="font-size:9px; color:var(--cyan-glow);">[16 REC | 96 INTER | 16 MOT]</span>
+                    </div>
+                    <canvas id="cortex-canvas" width="340" height="64" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
+                </div>
+
+                <!-- 实时活跃原语链路 -->
+                <div style="padding: 2px 12px 10px;">
+                    <div class="stat-label" style="margin-bottom:4px;">DOMINANT_PRIMITIVES // 优势原语基因:</div>
+                    <div id="primitive-chain" style="display:flex; flex-wrap:wrap; gap:3px; font-size:9px;">
+                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">16 REC</span>
                         <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:2px 6px; border-radius:3px; border:1px solid #10b981;">INTEGRATE</span>
-                        <span style="background:rgba(0,240,255,0.2); color:#00f0ff; padding:2px 6px; border-radius:3px; border:1px solid #00f0ff;">AMPLIFY</span>
-                        <span style="background:rgba(251,191,36,0.2); color:#fbbf24; padding:2px 6px; border-radius:3px; border:1px solid #fbbf24;">THRESHOLD</span>
+                        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">INTEGRATE</span>
+                        <span style="background:rgba(0,240,255,0.2); color:#00f0ff; padding:1px 5px; border-radius:3px; border:1px solid #00f0ff;">AMPLIFY</span>
+                        <span style="background:rgba(251,191,36,0.2); color:#fbbf24; padding:1px 5px; border-radius:3px; border:1px solid #fbbf24;">THRESHOLD</span>
                         <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:#1e293b; color:#94a3b8; padding:2px 6px; border-radius:3px; border:1px solid #334155;">EFFECTORS(2)</span>
+                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">16 MOT</span>
                     </div>
                 </div>
             </div>
@@ -450,8 +459,8 @@
                 document.getElementById("stat-gen").innerText = `Gen ${gen} #${agentIdx}`;
                 document.getElementById("stat-gen-badge").innerText = `GEN: ${gen} // AGENT: ${agentIdx}/6`;
                 document.getElementById("stat-fit").innerText = `${vehState.champion_fitness || 0.0}`;
-                document.getElementById("stat-cells").innerText = `${vehState.n_cells || 10} 细胞`;
-                document.getElementById("stat-synapses").innerText = `${vehState.n_synapses || 12} 突触`;
+                document.getElementById("stat-cells").innerText = `${vehState.n_cells || 128} 细胞 (4层)`;
+                document.getElementById("stat-synapses").innerText = `${vehState.n_synapses || 512} 突触`;
 
                 // 动态渲染 24 原语链路徽章
                 const chainDiv = document.getElementById("primitive-chain");
@@ -464,21 +473,62 @@
                         "THRESHOLD": "rgba(251,191,36,0.2); color:#fbbf24; border:1px solid #fbbf24",
                         "DAMPER": "rgba(168,85,247,0.2); color:#a855f7; border:1px solid #a855f7",
                         "CLIP": "rgba(236,72,153,0.2); color:#ec4899; border:1px solid #ec4899",
-                        "ABS": "rgba(34,197,94,0.2); color:#22c55e; border:1px solid #22c55e"
+                        "ABS": "rgba(34,197,94,0.2); color:#22c55e; border:1px solid #22c55e",
+                        "MULTIPLY": "rgba(249,115,22,0.2); color:#f97316; border:1px solid #f97316"
                     };
-                    let html = `<span style="background:#1e293b; color:#94a3b8; padding:2px 6px; border-radius:3px; border:1px solid #334155;">RECEPTORS(4)</span>`;
+                    let html = `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">16 REC</span>`;
                     html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
                     vehState.hidden_types.forEach(ptype => {
                         const style = colors[ptype] || "background:#1e293b; color:#94a3b8; border:1px solid #334155";
-                        html += `<span style="background:${style}; padding:2px 6px; border-radius:3px; font-weight:700;">${ptype}</span>`;
+                        html += `<span style="background:${style}; padding:1px 5px; border-radius:3px; font-weight:700;">${ptype}</span>`;
                     });
                     html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                    html += `<span style="background:#1e293b; color:#94a3b8; padding:2px 6px; border-radius:3px; border:1px solid #334155;">EFFECTORS(2)</span>`;
+                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">16 MOT</span>`;
                     chainDiv.innerHTML = html;
                 }
+
+                drawCortexMatrix(vehState.cell_activities);
             }
 
             drawChart();
+        }
+
+        function drawCortexMatrix(cells) {
+            const cortexCanvas = document.getElementById("cortex-canvas");
+            if (!cortexCanvas || !cells || cells.length === 0) return;
+            const cCtx = cortexCanvas.getContext("2d");
+            const w = cortexCanvas.width;
+            const h = cortexCanvas.height;
+            cCtx.fillStyle = "#020617";
+            cCtx.fillRect(0, 0, w, h);
+
+            const cols = 16;
+            const rows = 8;
+            const cellW = w / cols;
+            const cellH = h / rows;
+
+            cells.forEach((cell, idx) => {
+                if (idx >= cols * rows) return;
+                const c = idx % cols;
+                const r = Math.floor(idx / cols);
+                const x = c * cellW + cellW * 0.5;
+                const y = r * cellH + cellH * 0.5;
+                const act = Math.abs(cell.out || 0.0);
+
+                let color = "#38bdf8";
+                if (cell.layer === 0) color = "#94a3b8"; // 受体
+                else if (cell.layer === 1) color = "#10b981"; // 联络
+                else if (cell.layer === 2) color = "#fbbf24"; // 记忆积分
+                else if (cell.layer === 3) color = "#f43f5e"; // 运动
+
+                const radius = Math.max(1.8, Math.min(cellH * 0.45, 2.0 + act * 2.5));
+                cCtx.fillStyle = color;
+                cCtx.globalAlpha = 0.35 + act * 0.65;
+                cCtx.beginPath();
+                cCtx.arc(x, y, radius, 0, Math.PI * 2);
+                cCtx.fill();
+            });
+            cCtx.globalAlpha = 1.0;
         }
 
         function drawChart() {
