@@ -1976,9 +1976,9 @@ function rebuildViews(){
   org.cellMap = new Map(org.cells.map(c => [c.id, c]));
   views.cells = Array.from(cellViewsMap.values());
   views.syns = Array.from(synViewsMap.values());
-  const hideMicro = (typeof camR === "number" ? camR : 560) > 280;
-  for (const v of views.cells) v.group.visible = !hideMicro;
-  for (const v of views.syns) v.group.visible = !hideMicro;
+  const hideCellMeshes = (typeof camR === "number" ? camR : 560) > 280;
+  for (const v of views.cells) v.group.visible = !hideCellMeshes;
+  for (const v of views.syns) v.group.visible = true;
 }
 rebuildViews();
 initLODCloud(30000);
@@ -2688,14 +2688,19 @@ function animate(){
     }
   }
 
+  // 轴突连线与囊泡放电在任何视距都要看得见：远看是脉冲网络，近看才是细胞本体。
+  const synPulse = 0.55 + microFactor * 0.45;
+  const photonScale = 0.45 + microFactor * 0.55;
   for (const v of views.syns) {
-    v.group.visible = isMicroVisible;
-    if (!isMicroVisible) continue;
+    v.group.visible = true;
     v.update(now * 0.001, clientWarpMultiplier);
-    v.lineMat.opacity *= microFactor;
-    v.photon1.material.opacity *= microFactor;
-    v.photon2.material.opacity *= microFactor;
-    v.bouton.material.opacity *= microFactor;
+    v.lineMat.opacity = Math.max(0.22, (v.lineMat.opacity || 0.6) * synPulse);
+    v.photon1.material.opacity = Math.max(0.35, (v.photon1.material.opacity || 0.8) * synPulse);
+    v.photon2.material.opacity = Math.max(0.35, (v.photon2.material.opacity || 0.8) * synPulse);
+    v.bouton.material.opacity = Math.max(0.3, (v.bouton.material.opacity || 0.8) * synPulse);
+    v.photon1.scale.multiplyScalar(photonScale);
+    v.photon2.scale.multiplyScalar(photonScale);
+    v.bouton.scale.multiplyScalar(photonScale);
   }
 
   const scaleText = camR > 420 ? "宏观全量因果点云流形 (百万细胞)" : camR < 240 ? "微观单神经元全细节质膜" : "介观皮层柱局部环路";
