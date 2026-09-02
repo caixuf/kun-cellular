@@ -1406,7 +1406,7 @@ live_immune = LiveImmuneSimulator()
 class LiveMazeSimulator:
     """
     经典 DFS 递归回溯深度欺骗性迷宫与达尔文遗传新奇度演化仿真器
-    - 迷宫生成: 随机深搜 (Recursive Backtracker) 雕刻完美迷宫 (含分叉与死胡同)
+    - 绝死无回头机制 (Hardcore Self-Avoiding Mode): 走过的路绝不能走第二次，踏入旧轨迹或掉头折返瞬间死亡
     - 智能体决策: 3路激光雷达 + 指南针方位角 + 基因组自适应权重前向控制
     - 物理引擎: 双轴独立碰撞滑动 (Axis-Aligned Sliding) 杜绝穿墙与卡死
     - 演化机制: 空间新奇度探索 (Novelty) + 终点逼近 + 锦标赛突变选择
@@ -1418,6 +1418,7 @@ class LiveMazeSimulator:
         self.step_count = 0
         self.max_steps = 240
         self.warp_speed = 5
+        self.no_backtrack_mode = True  # 默认开启【绝死无回头】模式
         self.success_rate = 0.0
         self.history_pass = [0.0]
         self.champion_trail = []
@@ -1482,10 +1483,13 @@ class LiveMazeSimulator:
                 "y": self.start[1],
                 "theta": random.uniform(-0.5, 0.5),
                 "goal": 0,
+                "alive": True,
+                "death_reason": "",
                 "min_dist": 999.0,
                 "trail": [list(self.start)],
-                "rays": [1.0, 1.0, 1.0],
-                "visited": set([(1, 1)])
+                "cell_path": [(1, 1)],
+                "visited_cells": set([(1, 1)]),
+                "rays": [1.0, 1.0, 1.0]
             })
 
     def is_wall(self, x, y):
@@ -1512,6 +1516,8 @@ class LiveMazeSimulator:
 
             for i, ag in enumerate(self.agent_states):
                 g = self.population[i]
+                if not ag["alive"]:
+                    continue
                 if ag["goal"] == 1:
                     reached_count += 1
                     continue
@@ -1521,7 +1527,6 @@ class LiveMazeSimulator:
                 r_left = self.cast_ray(ag["x"], ag["y"], ag["theta"] - 0.785)
                 r_right = self.cast_ray(ag["x"], ag["y"], ag["theta"] + 0.785)
                 ag["rays"] = [r_front, r_left, r_right]
-                ag["visited"].add((int(ag["x"]), int(ag["y"])))
 
                 # 2. 终点距离与通关判定
                 d = math.hypot(gx - ag["x"], gy - ag["y"])
@@ -1550,17 +1555,41 @@ class LiveMazeSimulator:
                 ny = ag["y"] + math.sin(ag["theta"]) * speed
 
                 # 双轴独立物理滑动碰撞检测
+                moved_x = False
+                moved_y = False
                 if not self.is_wall(nx, ag["y"]):
                     ag["x"] = nx
+                    moved_x = True
                 if not self.is_wall(ag["x"], ny):
                     ag["y"] = ny
+                    moved_y = True
+
+                cur_cell = (int(ag["x"]), int(ag["y"]))
+                last_cell = ag["cell_path"][-1]
+
+                # 5. 【绝死无回头 / 回头必死】严格判定逻辑 (Self-Avoiding Retrace Hazard)
+                if self.no_backtrack_mode:
+                    if cur_cell != last_cell:
+                        # 检查新踏入的格子是否在之前更早的历史格子集合中 (排除前一个刚刚离开的格子)
+                        if len(ag["cell_path"]) > 2 and cur_cell in ag["cell_path"][:-1]:
+                            ag["alive"] = False
+                            ag["death_reason"] = "RETRACE_FATAL (走回头路直接暴毙)"
+                            continue
+                        ag["cell_path"].append(cur_cell)
+                        ag["visited_cells"].add(cur_cell)
+                else:
+                    if cur_cell != last_cell:
+                        ag["cell_path"].append(cur_cell)
+                        ag["visited_cells"].add(cur_cell)
 
                 if self.step_count % 2 == 0 and len(ag["trail"]) < 200:
                     ag["trail"].append([round(ag["x"], 2), round(ag["y"], 2)])
 
             self.success_rate = reached_count / max(1, len(self.agent_states))
+            alive_count = sum(1 for a in self.agent_states if a["alive"] and a["goal"] == 0)
 
-            if self.step_count >= self.max_steps or (reached_count == len(self.agent_states) and reached_count > 0):
+            # 周期耗尽、全员到达、或全员阵亡时触发代际进化
+            if self.step_count >= self.max_steps or (reached_count == len(self.agent_states) and reached_count > 0) or (alive_count == 0 and reached_count == 0):
                 self.evolve_generation()
 
     def evolve_generation(self):
@@ -1569,9 +1598,12 @@ class LiveMazeSimulator:
 
         for i, ag in enumerate(self.agent_states):
             g = self.population[i]
-            fit = len(ag["visited"]) * 8.0 - ag["min_dist"] * 5.0
+            # 存活探索更多未踏足新格子获得更高适应度
+            fit = len(ag["visited_cells"]) * 10.0 - ag["min_dist"] * 5.0
             if ag["goal"] == 1:
-                fit += 300.0 + (self.max_steps - self.step_count) * 2.0
+                fit += 350.0 + (self.max_steps - self.step_count) * 2.5
+            elif not ag["alive"]:
+                fit -= 30.0  # 走回头路暴毙扣分惩罚
             g["fitness"] = fit
             if fit > best_fit:
                 best_fit = fit
@@ -1606,10 +1638,14 @@ class LiveMazeSimulator:
 
     def get_snapshot(self):
         with self.lock:
+            alive_count = sum(1 for a in self.agent_states if a["alive"])
             return {
                 "generation": self.generation,
                 "step_count": self.step_count,
                 "max_steps": self.max_steps,
+                "no_backtrack_mode": self.no_backtrack_mode,
+                "alive_count": alive_count,
+                "total_count": len(self.agent_states),
                 "success_rate": round(self.success_rate, 3),
                 "pass_rate": round(self.success_rate * 100, 1),
                 "width": self.width,
@@ -1626,6 +1662,8 @@ class LiveMazeSimulator:
                         "y": round(ag["y"], 2),
                         "theta": round(ag["theta"], 3),
                         "goal": ag["goal"],
+                        "alive": 1 if ag["alive"] else 0,
+                        "death_reason": ag.get("death_reason", ""),
                         "rays": [round(r, 2) for r in ag["rays"]]
                     }
                     for ag in self.agent_states
@@ -2214,6 +2252,16 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             except Exception:
                 live_maze.warp_speed = 5
             body = json.dumps({"status": "ok", "warp_speed": live_maze.warp_speed}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/maze/toggle_backtrack"):
+            live_maze.no_backtrack_mode = not live_maze.no_backtrack_mode
+            body = json.dumps({"status": "ok", "no_backtrack_mode": live_maze.no_backtrack_mode}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
