@@ -2447,37 +2447,24 @@ window.switchLOD = function(mode) {
   setBtn("lod-10k", mode === "10k");
   setBtn("lod-1m", mode === "1m");
 
+  isCamTransitioning = true;
   if(mode === "organ") {
-    if(lodPointsMesh) lodPointsMesh.visible = false;
-    for(const v of views.cells) { v.group.visible = true; }
-    for(const v of views.syns) { v.group.visible = true; }
-    document.getElementById("st-pipe").textContent = "DOM/Sprite Organ";
-    document.getElementById("st-draws").textContent = views.cells.length * 3;
-    log(" 切换至: 本能器官微观视图 (15~100 细胞全细节)");
+    targetCamR = 140;
+    log(" 聚焦至: 本能器官微观特写视距 (全细节细胞膜/核仁/线粒体)");
   } else if(mode === "1k") {
-    if(lodPointsMesh) lodPointsMesh.visible = false;
-    for(const v of views.cells) { v.group.visible = true; }
-    for(const v of views.syns) { v.group.visible = true; }
-    document.getElementById("st-pipe").textContent = "3D Cortical Column (1k Real Cells)";
-    document.getElementById("st-draws").textContent = views.cells.length * 2;
+    targetCamR = 260;
     loadPreset("adas");
-    log(" 切换至: 1,000 细胞真实大脑皮层柱 (真实 PyTorch 权重三维空间映射)");
+    log(" 聚焦至: 1,000 细胞皮层柱介观视距");
   } else if(mode === "10k") {
-    initLODCloud(10000);
-    lodPointsMesh.visible = true;
-    for(const v of views.cells) { v.group.visible = false; }
-    for(const v of views.syns) { v.group.visible = false; }
-    document.getElementById("st-pipe").textContent = "GPU Points 10k Instanced";
-    document.getElementById("st-draws").textContent = "1 (单批次)";
-    log(" 切换至: 10,000 细胞皮层柱 (GPU 单批次点云零压渲染)");
+    targetCamR = 420;
+    initLODCloud(25000);
+    log(" 聚焦至: 10,000 细胞流形过渡视距");
   } else if(mode === "1m") {
-    initLODCloud(35000);
-    lodPointsMesh.visible = true;
-    for(const v of views.cells) { v.group.visible = false; }
-    for(const v of views.syns) { v.group.visible = false; }
-    document.getElementById("st-pipe").textContent = "GPU Points 1M LOD Cluster";
-    document.getElementById("st-draws").textContent = "1 (单批次)";
-    log(" 切换至: 1,000,000 细胞宏观心智流形 (分层 LOD 动态聚合，0 显存溢出)");
+    targetCamR = 580;
+    initLODCloud(45000);
+    log(" 聚焦至: 1,000,000 细胞宏观全量流形 (亚像素点云聚合，0 孤立大细胞)");
+  }
+};
   }
 };
 
@@ -2670,34 +2657,57 @@ function animate(){
   );
   camera.lookAt(currentLookAt);
 
-  // 2. Smootherstep 驱动的无级 LOD 渐变 (保留宏观高密背景流形，杜绝放大时点云被突兀清空)
-  const macroAlpha = smootherstep(300, 560, camR);
-  const microAlpha = 1.0 - smootherstep(320, 580, camR);
+  // 2. Smootherstep 驱动的无级三尺度 LOD 物理渲染 (宏观百万流形 -> 介观皮层柱 -> 微观细胞器)
+  // 当 camR >= 380 时为纯宏观流形，单个细胞亚像素化完全收敛入点云流；拉近至 < 340 时局部实体细胞平滑淡入
+  const macroFactor = smootherstep(200, 420, camR);
+  const microFactor = 1.0 - smootherstep(180, 360, camR);
 
   if (lodPointsMesh && lodPointsMesh.material) {
-    // 关键优化：拉近镜头时，宏观点云绝不粗暴清空，而是保持柔和发光的介观/微观背景细胞质胶体 (Cytoplasmic Matrix Fog)
-    // 使得近景下前景微观细胞与后景百万细胞流形自然共存，真正呈现“显微镜潜入密集组织”的真实纵深感！
-    const pointCloudAlpha = Math.max(0.35, macroAlpha);
-    lodPointsMesh.material.opacity = pointCloudAlpha * 0.88;
+    // 宏观点云在远景下全量高光呈现百万级神经流形，拉近时柔和融入背景细胞质胶体
+    const pointCloudAlpha = Math.max(0.28, macroFactor * 0.92);
+    lodPointsMesh.material.opacity = pointCloudAlpha;
+    lodPointsMesh.material.size = 3.2 + macroFactor * 2.2;
     lodPointsMesh.visible = true;
-    lodPointsMesh.rotation.y += dt * 0.025;
+    lodPointsMesh.rotation.y += dt * 0.02;
   }
 
-  // 3. 微观实体网格弹性缩放与淡入淡出 (Scale-In / Scale-Out Bloom)
-  const meshScale = 0.45 + microAlpha * 0.55;
+  // 3. 微观实体网格在宏观远景下严格隐藏，仅在深入介观/微观视距时无缝淡入
+  const isMicroVisible = microFactor > 0.005;
+  const meshScale = Math.max(0.001, microFactor);
+
   for (const v of views.cells) {
-    v.group.visible = true;
-    v.group.scale.set(meshScale, meshScale, meshScale);
-    v.membrane.material.opacity = 0.25 + microAlpha * 0.45;
-    v.update(now * 0.001, clientWarpMultiplier);
-  }
-  for (const v of views.syns) {
-    v.group.visible = true;
-    v.lineMat.opacity = 0.2 + microAlpha * 0.65;
-    v.update(now * 0.001, clientWarpMultiplier);
+    v.group.visible = isMicroVisible;
+    if (isMicroVisible) {
+      v.group.scale.set(meshScale, meshScale, meshScale);
+      if (v.membraneMesh && v.membraneMesh.material) {
+        v.membraneMesh.material.opacity = microFactor * 0.68;
+      }
+      if (v.membrane && v.membrane.material) {
+        v.membrane.material.opacity = microFactor * 0.45;
+      }
+      if (v.nucleus && v.nucleus.material) {
+        v.nucleus.material.opacity = microFactor;
+      }
+      if (v.label && v.label.material) {
+        // 浮动原语文字标签仅在深入特写 (camR < 240) 时清晰浮现，远景彻底静默
+        v.label.material.opacity = Math.max(0.0, (microFactor - 0.5) / 0.5);
+      }
+      v.update(now * 0.001, clientWarpMultiplier);
+    }
   }
 
-  const scaleText = camR > 500 ? "宏观全量因果点云流形" : camR < 360 ? "微观单神经元全细节质膜" : "介观皮层柱过渡带";
+  for (const v of views.syns) {
+    v.group.visible = isMicroVisible;
+    if (isMicroVisible) {
+      v.lineMat.opacity = microFactor * 0.65;
+      v.photon1.material.opacity = microFactor * 0.7;
+      v.photon2.material.opacity = microFactor * 0.7;
+      v.bouton.material.opacity = microFactor * 0.8;
+      v.update(now * 0.001, clientWarpMultiplier);
+    }
+  }
+
+  const scaleText = camR > 420 ? "宏观全量因果点云流形 (百万细胞)" : camR < 240 ? "微观单神经元全细节质膜" : "介观皮层柱局部环路";
   const elScale = document.getElementById("st-pipe");
   if (elScale) elScale.textContent = scaleText;
   const elCamR = document.getElementById("st-cam-r");
@@ -2705,8 +2715,8 @@ function animate(){
 
   const elFocal = document.getElementById("st-focal");
   if (elFocal) {
-    if (camR > 500) elFocal.textContent = "全量宏观流形点云 (100万)";
-    else if (camR < 360) elFocal.textContent = `${org.cells.length} 核心因果细胞 (全细节)`;
+    if (camR > 420) elFocal.textContent = "全量宏观流形点云 (100万+)";
+    else if (camR < 240) elFocal.textContent = `${org.cells.length} 核心因果细胞 (全细节)`;
     else elFocal.textContent = "介观皮层柱局部环路";
   }
 
