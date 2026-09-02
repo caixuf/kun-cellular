@@ -1,1 +1,0 @@
-/usr/bin/c++  -O3 -DNDEBUG -fPIC -Wall -Wextra -fcoroutines -O3 -DNDEBUG CMakeFiles/test_flow_digital_pathogen.dir/tests/test_flow_digital_pathogen.cpp.o -o test_flow_digital_pathogen 

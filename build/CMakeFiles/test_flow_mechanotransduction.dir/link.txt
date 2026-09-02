@@ -1,1 +1,0 @@
-/usr/bin/c++  -O3 -DNDEBUG -fPIC -Wall -Wextra -fcoroutines -O3 -DNDEBUG CMakeFiles/test_flow_mechanotransduction.dir/tests/test_flow_mechanotransduction.cpp.o -o test_flow_mechanotransduction 

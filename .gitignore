@@ -1,0 +1,15 @@
+build/
+build-*/
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.log
+__pycache__/
+*.pyc
+.cache/
+.vscode/
+.idea/
+Testing/
