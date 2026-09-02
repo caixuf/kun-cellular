@@ -1,0 +1,38 @@
+{
+  "model_type": "PureCellularAdapter",
+  "best_fitness": 1.4271964576676275,
+  "species_count": 33,
+  "loci_count": 6,
+  "loci": [
+    {
+      "gene_id": 0,
+      "op_type": "THRESHOLD",
+      "weight": -1.162349480820412
+    },
+    {
+      "gene_id": 1,
+      "op_type": "DEADZONE",
+      "weight": -0.53824045745847
+    },
+    {
+      "gene_id": 2,
+      "op_type": "DIFF",
+      "weight": -1.3155921288890735
+    },
+    {
+      "gene_id": 3,
+      "op_type": "DEADZONE",
+      "weight": -0.9253646034521799
+    },
+    {
+      "gene_id": 4,
+      "op_type": "AND",
+      "weight": 0.6937120819079863
+    },
+    {
+      "gene_id": 5,
+      "op_type": "MULTIPLY",
+      "weight": -1.1216073799185557
+    }
+  ]
+}
