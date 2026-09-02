@@ -6,6 +6,10 @@
 
 > 基于胚胎形态发生 (Morphogenesis)、空间哈希力场自组织、鲍德温效应 (Baldwin Effect) 基因固化与开放式具身演化的通用人工生命 (Artificial Life) 与形态发生计算图基础底座。
 
+KunCellular 只提供通用生命体计算图、演化机制和世界模型原语，不包含
+ADAS 或量化交易 adapter。领域集成由 `kunautodrive` 和 `kunquant` 各自维护，
+避免将实时驾驶或交易逻辑耦合进生命体核心。
+
 ---
 
 ## 核心理论与学术成果
@@ -47,7 +51,7 @@ kun-cellular/
 |   |-- digital_pathogen_ecosystem.hpp # 数字病原体、免疫抗体与 HGT 机制
 |   |-- open_ended_embodiment.hpp # 开放式具身物理沙盒
 |   `-- ...
-|-- tests/                     # 21 组严苛回归与极限压测套件 (CTest 100% PASS)
+|-- tests/                     # 核心回归与极限压测套件 (CTest 100% PASS)
 |-- tools/                     # GPU 张量训练器、CUDA 演化内核与 Web 交互中枢
 |-- docs/                      # 核心学术论文 (zh/en) 与四阶段 ALife 规范
 `-- skills/                    # 专业 Agent Skills 知识库 (形态发生/病原体对抗/具身演化)

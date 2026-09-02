@@ -1,10 +1,10 @@
 # Morphogenetic Cellular Graph: Self-Organizing Topologies, Inter-Cellular Force Fields, and Deterministic Sub-Microsecond Graph Compilation
 
-**Authors**: Longfei Li  
-**Affiliations**: Antigravity Research Lab & FlowEngine Engineering Council  
-**Date**: September 1, 2026  
-**Positioning**: Reproducible Research Paper  
-**Fields**: Artificial Life, Evolutionary Computing, Cyber-Physical Systems (CPS), Real-Time Systems Software, Morphogenetic Dynamics  
+**Authors**: Longfei Li
+**Affiliations**: Antigravity Research Lab & KunAutoDrive Engineering Council
+**Date**: September 1, 2026
+**Positioning**: Reproducible Research Paper
+**Fields**: Artificial Life, Evolutionary Computing, Cyber-Physical Systems (CPS), Real-Time Systems Software, Morphogenetic Dynamics
 
 ---
 
@@ -94,10 +94,10 @@ where:
 | | `Op_Sub` | $u_i^{(t)} = w_1 u_1^{(t)} - w_2 u_2^{(t)}$ | Differential comparator (dual-EMA spread) |
 | | `Op_Sum` | $u_i^{(t)} = \sum_j w_j u_j^{(t)} + b_i$ | Linear weighted synthesizer |
 | | `Op_Product` | $u_i^{(t)} = \tanh((w_1 u_1) \cdot (w_2 u_2))$ | Second-order nonlinear tensor gating |
-| | `Op_Ratio` | $u_i^{(t)} = (w_1 u_1) / (ert w_2 u_2 ert + \epsilon)$ | Relative strength and volatility normalizer |
+| | `Op_Ratio` | $u_i^{(t)} = (w_1 u_1) / (\vert w_2 u_2 \vert + \epsilon)$ | Relative strength and volatility normalizer |
 | | `Op_Abs` | $u_i^{(t)} = |\text{in}_i^{(t)}|$ | Energy / directionless volatility extractor |
 | | `Op_Oscillator`| $\ddot{s} + \mu(s^2 - 1)\dot{s} + \omega^2 s = \text{in}_i$ | Van der Pol limit cycle (pacemaker oscillator) |
-| **Gating Neurons** | `Gate_Hysteresis` | $u_i^{(t)} = \begin{cases} \text{in}, & |\text{in}| > \theta_{\text{high}} \\\\ u_i^{(t-1)}, & \theta_{\text{low}} \le |\text{in}| \le \theta_{\text{high}} \\\\ 0, & |\text{in}| < \theta_{\text{low}} \end{cases}$ | Schmitt dual-threshold hysteresis (anti-chatter) |
+| **Gating Neurons** | `Gate_Hysteresis` | $u_i^{(t)} = \begin{cases} \text{in}, & |\text{in}| > \theta_{\text{high}} \\ u_i^{(t-1)}, & \theta_{\text{low}} \le |\text{in}| \le \theta_{\text{high}} \\ 0, & |\text{in}| < \theta_{\text{low}} \end{cases}$ | Schmitt dual-threshold hysteresis (anti-chatter) |
 | | `Gate_Threshold` | $u_i^{(t)} = \mathbb{I}(\text{in}_i > \theta)$ | Step decision gate |
 | | `Gate_Inhibit` | $u_i^{(t)} = \text{in}_0 \cdot \max(0, 1 - \text{in}_1)$ | Lateral inhibition & conditional interlocking |
 | | `Gate_Deadzone` | $u_i^{(t)} = \text{in}_i \cdot \mathbb{I}(|\text{in}_i| > \theta_{\text{dead}})$ | Deadzone filter |
@@ -172,25 +172,25 @@ $$\mathbf{F}_i = \sum_{j \ne i} \mathbf{F}_{ij}^{\text{LJ}} + \sum_{j \in \text{
 
 ### 7.1 C++ Flat-Array Compiler Microbenchmarks [E1]
 Compiling dynamic DAGs into contiguous cache-aligned buffers yields the following performance:
-* **Forward Inference Latency**: **$24.1 \pm 1.2\\ \text{ns}$**;
-* **Heap Memory Allocations**: **$0\\ \text{bytes (Zero-GC)}$**;
-* **Instruction Efficiency**: $3.8$ primitive operations per clock cycle, with $0.00\\%$ L1 instruction cache misses.
+* **Forward Inference Latency**: **$24.1 \pm 1.2\,\text{ns}$**;
+* **Heap Memory Allocations**: **$0\,\text{bytes (Zero-GC)}$**;
+* **Instruction Efficiency**: $3.8$ primitive operations per clock cycle, with $0.00\%$ L1 instruction cache misses.
 
 ### Table 2: ADAS Deterministic 6-Scenario Evaluation Results [E1]
 | Index | Scenario Description | Pass Criteria | Empirical Performance | Verdict |
 | :--- | :--- | :--- | :--- | :--- |
-| **[1]** | **High-Speed S-Curve Tracking** | Lateral Error $< 0.10\\ \text{m}$ | **Max Error $0.069\\ \text{m}$, Mean Error $0.008\\ \text{m}$** (Latency $0.49\\ \mu\text{s}$) | **PASS** |
-| **[2]** | **Emergency Cut-in AEB** | 0 Collisions & Clearance $> 2.0\\ \text{m}$ | **Braking Triggered=YES, Clearance $3.69\\ \text{m}$** (0 Collisions) | **PASS** |
-| **[3]** | **Smooth Lane Change** | Settle Time $< 3.5\\ \text{s}$, Overshoot $< 0.1\\ \text{m}$ | **Settle Time $2.55\\ \text{s}$, Overshoot $0.04\\ \text{m}$** | **PASS** |
-| **[4]** | **Stop-and-Go ACC Following** | Gap Error $< 8.0\\ \text{m}$ | **Max Gap Error $6.65\\ \text{m}$** | **PASS** |
-| **[5]** | **Ramp Highway Merge** | Terminal Speed $> 20.0\\ \text{m/s}$ | **Terminal Speed $26.00\\ \text{m/s}$ ($93.6\\ \text{km/h}$)** | **PASS** |
-| **[6]** | **Obstacle Emergency Swerve** | Lateral Clearance $> 1.5\\ \text{m}$ | **Lateral Clearance $2.50\\ \text{m}$** | **PASS** |
+| **[1]** | **High-Speed S-Curve Tracking** | Lateral Error $< 0.10\,\text{m}$ | **Max Error $0.069\,\text{m}$, Mean Error $0.008\,\text{m}$** (Latency $0.49\,\mu\text{s}$) | **PASS** |
+| **[2]** | **Emergency Cut-in AEB** | 0 Collisions & Clearance $> 2.0\,\text{m}$ | **Braking Triggered=YES, Clearance $3.69\,\text{m}$** (0 Collisions) | **PASS** |
+| **[3]** | **Smooth Lane Change** | Settle Time $< 3.5\,\text{s}$, Overshoot $< 0.1\,\text{m}$ | **Settle Time $2.55\,\text{s}$, Overshoot $0.04\,\text{m}$** | **PASS** |
+| **[4]** | **Stop-and-Go ACC Following** | Gap Error $< 8.0\,\text{m}$ | **Max Gap Error $6.65\,\text{m}$** | **PASS** |
+| **[5]** | **Ramp Highway Merge** | Terminal Speed $> 20.0\,\text{m/s}$ | **Terminal Speed $26.00\,\text{m/s}$ ($93.6\,\text{km/h}$)** | **PASS** |
+| **[6]** | **Obstacle Emergency Swerve** | Lateral Clearance $> 1.5\,\text{m}$ | **Lateral Clearance $2.50\,\text{m}$** | **PASS** |
 
 ### 7.2 Microstructure Simulation and Long-Horizon Walk-Forward Evaluation [E1]
 
 #### 7.2.1 Synthetic Multi-Regime Microstructure Experiment
 To validate real-time gating and circuit-breaker mechanics under extreme regime shifts, the cellular graph was evaluated across a 100,000-tick synthetic stream spanning oscillation, bull trend, flash crash, and high-volatility regimes:
-* **Execution Latency**: Single-step feature extraction and forward propagation requires only **$332.8\ \text{ns}$**, fulfilling sub-microsecond UHF requirements;
+* **Execution Latency**: Single-step feature extraction and forward propagation requires only **$332.8\ \,\text{ns}$**, fulfilling sub-microsecond UHF requirements;
 * **Deadzone & Hysteresis Filtering**: Schmitt hysteresis and deadzone cells filter high-frequency uninformative noise, reducing spurious signal toggling;
 * **Autonomous Immune Lock**: Under step-wise liquidity crashes, the `Act_ImmuneLock` gate fires within a single tick, demonstrating formal risk lock-out feasibility.
 
@@ -216,9 +216,9 @@ Empirical results are summarized in the table below:
 ### Table 3: GPU Tensorized Morphogenesis Scale Ladder [E1]
 | Scale Tier | Neuron / Synapse Scale | VRAM Footprint | Peak Throughput | Time per Gen | Core Emergent Capability |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Million (1M)** | $10^6$ Cells / $2 \times 10^6$ Synapses | **$568.4\\ \text{MB}$** | **$1,028.4\\ \text{MCells/s}$** | $2.92\\ \text{s}$ | 3D dynamic trajectory control, 0-collision AEB |
-| **Ten Million (10M)** | $10^7$ Cells / $2 \times 10^7$ Synapses | **$1,812.5\\ \text{MB}$** | **$1,114.4\\ \text{MCells/s}$** | $5.38\\ \text{s}$ | Lorenz strange attractor phase-space inversion |
-| **Hundred Million (100M)** | $10^8$ Cells / $2 \times 10^8$ Synapses | **$4,388.5\\ \text{MB}$** | **$120.4\\ \text{MCells/s}$** | $33.23\\ \text{s}$ | Orthogonal task compartmentalization, working memory limit cycles |
+| **Million (1M)** | $10^6$ Cells / $2 \times 10^6$ Synapses | **$568.4\,\text{MB}$** | **$1,028.4\,\text{MCells/s}$** | $2.92\,\text{s}$ | 3D dynamic trajectory control, 0-collision AEB |
+| **Ten Million (10M)** | $10^7$ Cells / $2 \times 10^7$ Synapses | **$1,812.5\,\text{MB}$** | **$1,114.4\,\text{MCells/s}$** | $5.38\,\text{s}$ | Lorenz strange attractor phase-space inversion |
+| **Hundred Million (100M)** | $10^8$ Cells / $2 \times 10^8$ Synapses | **$4,388.5\,\text{MB}$** | **$120.4\,\text{MCells/s}$** | $33.23\,\text{s}$ | Orthogonal task compartmentalization, working memory limit cycles |
 
 ---
 
