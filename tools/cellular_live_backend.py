@@ -712,6 +712,133 @@ class SiliconCellularOrganism:
             self.macro_synapses = 43564032
             self.init_cells()
 
+    def load_organism_by_id(self, org_id):
+        """根据生命体 ID 动态重构真实 3D 细胞与轴突拓扑"""
+        with self.lock:
+            self.current_organism_id = org_id
+            self.cells = []
+            self.synapses = []
+
+            if org_id == "embodied_kinematic_beast":
+                # 具身物理运动演化生命体: 四足关节骨骼与中枢 CPG 脊椎
+                self.macro_cells = 5000000
+                self.macro_synapses = 20000000
+                name = "具身物理运动演化生命体"
+                # 1. 脊椎 CPG 振荡链 (16 细胞, 沿 Z 轴)
+                for i in range(16):
+                    z = -150.0 + i * 20.0
+                    ptype = "OSCILLATOR" if i % 2 == 0 else "INTEGRATE"
+                    self.cells.append(PhysicalCell3D(i, ptype, 0.0, 0.0, z))
+                for i in range(15):
+                    self.synapses.append({"from": i, "to": i + 1, "weight": 1.4})
+
+                # 2. 四足肢节群 (4 肢 x 12 细胞 = 48 细胞, 分布在 4 个象限)
+                limb_angles = [math.pi / 4, 3 * math.pi / 4, 5 * math.pi / 4, 7 * math.pi / 4]
+                cell_id = 16
+                for limb_idx, ang in enumerate(limb_angles):
+                    spine_anchor = 2 + limb_idx * 3
+                    for j in range(12):
+                        dist = 60.0 + j * 14.0
+                        x = dist * math.cos(ang) + random.uniform(-6, 6)
+                        y = dist * math.sin(ang) + random.uniform(-6, 6)
+                        z = -60.0 + (j % 4) * 40.0
+                        ptype = "DAMPER" if j % 3 == 0 else "AMPLIFY"
+                        self.cells.append(PhysicalCell3D(cell_id, ptype, x, y, z))
+                        if j == 0:
+                            self.synapses.append({"from": spine_anchor, "to": cell_id, "weight": 1.8})
+                        else:
+                            self.synapses.append({"from": cell_id - 1, "to": cell_id, "weight": 1.2})
+                        cell_id += 1
+
+                # 肢节对角互抑制突触
+                for i in range(16, 28):
+                    opp = i + 24
+                    if opp < len(self.cells):
+                        self.synapses.append({"from": i, "to": opp, "weight": -0.8})
+
+            elif org_id == "micro_defense_symbiosis":
+                # 微环境共生与免疫防御生命体: 球状淋巴滤泡与特异性趋化性触角
+                self.macro_cells = 3600000
+                self.macro_synapses = 14400000
+                name = "微环境共生与免疫防御生命体"
+                # 1. 核心淋巴球体 (24 细胞, r in [30, 80])
+                for i in range(24):
+                    phi = math.acos(1 - 2 * (i + 0.5) / 24)
+                    theta = math.pi * (1 + 5**0.5) * i
+                    r = random.uniform(35, 75)
+                    x = r * math.sin(phi) * math.cos(theta)
+                    y = r * math.sin(phi) * math.sin(theta)
+                    z = r * math.cos(phi)
+                    ptype = "SUM" if i % 2 == 0 else "INTEGRATE"
+                    self.cells.append(PhysicalCell3D(i, ptype, x, y, z))
+                for i in range(24):
+                    for j in range(i + 1, 24):
+                        if (i * j) % 7 == 0:
+                            self.synapses.append({"from": i, "to": j, "weight": 1.1})
+
+                # 2. 外层特异性 T 细胞化学触角 (24 细胞, 辐射外层 r in [130, 200])
+                for i in range(24, 48):
+                    idx = i - 24
+                    phi = math.acos(1 - 2 * (idx + 0.5) / 24)
+                    theta = math.pi * (1 + 5**0.5) * idx + 0.5
+                    r = random.uniform(140, 190)
+                    x = r * math.sin(phi) * math.cos(theta)
+                    y = r * math.sin(phi) * math.sin(theta)
+                    z = r * math.cos(phi)
+                    ptype = "THRESHOLD" if i % 2 == 0 else "AMPLIFY"
+                    self.cells.append(PhysicalCell3D(i, ptype, x, y, z))
+                    # 触角与内核连接
+                    core_target = idx % 24
+                    self.synapses.append({"from": i, "to": core_target, "weight": 1.6})
+
+            elif org_id == "celestial_chaos_integrator":
+                # 天体物理与混沌引力生命体: 3 轨道非线性拉格朗日引力环
+                self.macro_cells = 1200000
+                self.macro_synapses = 4800000
+                name = "天体物理与混沌引力生命体"
+                # 3 个不同倾角的轨道环 (每个环 12 细胞 = 36 细胞)
+                ring_incls = [0.0, math.pi / 3, 2 * math.pi / 3]
+                cell_id = 0
+                for ring_idx, incl in enumerate(ring_incls):
+                    r_ring = 150.0 + ring_idx * 20.0
+                    for j in range(12):
+                        th = 2 * math.pi * j / 12
+                        x0 = r_ring * math.cos(th)
+                        y0 = r_ring * math.sin(th)
+                        z0 = 0.0
+                        # 倾角旋转
+                        x = x0
+                        y = y0 * math.cos(incl) - z0 * math.sin(incl)
+                        z = y0 * math.sin(incl) + z0 * math.cos(incl)
+                        ptype = "SUM" if j % 3 == 0 else ("INTEGRATE" if j % 3 == 1 else "DAMPER")
+                        self.cells.append(PhysicalCell3D(cell_id, ptype, x, y, z))
+                        nxt = cell_id + 1 if j < 11 else cell_id - 11
+                        self.synapses.append({"from": cell_id, "to": nxt, "weight": 1.3})
+                        cell_id += 1
+
+                # 跨环引力混沌摄动突触
+                for c1 in range(12):
+                    for r_off in [12, 24]:
+                        c2 = c1 + r_off
+                        if (c1 + c2) % 3 == 0 and c2 < len(self.cells):
+                            self.synapses.append({"from": c1, "to": c2, "weight": 0.9})
+
+            else:
+                # 默认: Apex 通才全脑生命体 (100M 细胞, 双半球皮层与胼胝体流形)
+                self.macro_cells = 100000000
+                self.macro_synapses = 400000000
+                name = "Apex 通才全脑生命体"
+                self.init_cells()
+
+            return {
+                "organism_id": org_id,
+                "name": name,
+                "macro_cells": self.macro_cells,
+                "macro_synapses": self.macro_synapses,
+                "cells_count": len(self.cells),
+                "synapses_count": len(self.synapses)
+            }
+
     def load_math_preset(self):
         with self.lock:
             self.macro_cells = 10000000
@@ -736,18 +863,19 @@ class SiliconCellularOrganism:
                 for c in self.cells
             ]
             return {
+                "organism_id": getattr(self, "current_organism_id", "apex_generalist_prime"),
                 "generation": self.generation,
                 "step": self.phy_steps,
-                "macro_cells": getattr(self, "macro_cells", 10891008),
-                "macro_synapses": getattr(self, "macro_synapses", 43564032),
-                "n_macro_cells": getattr(self, "macro_cells", 10891008),
-                "n_macro_synapses": getattr(self, "macro_synapses", 43564032),
+                "macro_cells": getattr(self, "macro_cells", 100000000),
+                "macro_synapses": getattr(self, "macro_synapses", 400000000),
+                "n_macro_cells": getattr(self, "macro_cells", 100000000),
+                "n_macro_synapses": getattr(self, "macro_synapses", 400000000),
                 "cells": cells_data,
                 "synapses": self.synapses,
                 "stats": {
                     "steps": self.phy_steps,
-                    "active_cells": getattr(self, "macro_cells", 10891008),
-                    "total_synapses": getattr(self, "macro_synapses", 43564032),
+                    "active_cells": getattr(self, "macro_cells", 100000000),
+                    "total_synapses": getattr(self, "macro_synapses", 400000000),
                     "projection_cores": len(self.cells),
                     "shannon_diversity": self.shannon_h,
                     "energy": 94.2,
@@ -1539,11 +1667,19 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
+        if self.path.startswith("/api/organism/switch") or self.path.startswith("/api/organism/select"):
+            import urllib.parse
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            org_id = qs.get("id", ["apex_generalist_prime"])[0]
+            res = organism.load_organism_by_id(org_id)
+            body = json.dumps({"status": "ok", "result": res}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
             self.end_headers()
             self.wfile.write(body)
             return
 
-        
         if self.path == "/api/checkpoints":
             ckpts = []
             runs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runs")
