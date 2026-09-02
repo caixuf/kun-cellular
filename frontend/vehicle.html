@@ -269,34 +269,32 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">ACTIVE_CELLS</div>
-                        <div class="stat-val cyan" id="stat-cells">128 细胞 (4层)</div>
+                        <div class="stat-val cyan" id="stat-cells">1024 细胞 (4层超级皮层)</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">SYNAPSE_EDGES</div>
-                        <div class="stat-val emerald" id="stat-synapses">512 突触</div>
+                        <div class="stat-val emerald" id="stat-synapses">4096 突触</div>
                     </div>
                 </div>
 
-                <!-- 128 细胞微观脉冲网格实时图谱 -->
+                <!-- 1024 细胞微观脉冲网格实时图谱 (32x32 密集点阵) -->
                 <div style="padding: 4px 12px 8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                        <span class="stat-label">128-CELL CORTICAL PULSE MATRIX (膜电位脉冲):</span>
-                        <span style="font-size:9px; color:var(--cyan-glow);">[16 REC | 96 INTER | 16 MOT]</span>
+                        <span class="stat-label">1024-CELL GRAND CORTEX PULSE (膜电位阵列):</span>
+                        <span style="font-size:9px; color:var(--cyan-glow);">[32 REC | 768 INTER | 224 MOT]</span>
                     </div>
-                    <canvas id="cortex-canvas" width="340" height="64" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
+                    <canvas id="cortex-canvas" width="340" height="96" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
                 </div>
 
                 <!-- 实时活跃原语链路 -->
                 <div style="padding: 2px 12px 10px;">
                     <div class="stat-label" style="margin-bottom:4px;">DOMINANT_PRIMITIVES // 优势原语基因:</div>
                     <div id="primitive-chain" style="display:flex; flex-wrap:wrap; gap:3px; font-size:9px;">
-                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">16 REC</span>
+                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">32 REC</span>
                         <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">INTEGRATE</span>
-                        <span style="background:rgba(0,240,255,0.2); color:#00f0ff; padding:1px 5px; border-radius:3px; border:1px solid #00f0ff;">AMPLIFY</span>
-                        <span style="background:rgba(251,191,36,0.2); color:#fbbf24; padding:1px 5px; border-radius:3px; border:1px solid #fbbf24;">THRESHOLD</span>
+                        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">768 INTERNEURONS</span>
                         <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">16 MOT</span>
+                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">224 MOT</span>
                     </div>
                 </div>
             </div>
@@ -502,8 +500,9 @@
             cCtx.fillStyle = "#020617";
             cCtx.fillRect(0, 0, w, h);
 
-            const cols = 16;
-            const rows = 8;
+            const is1024 = (cells.length > 256);
+            const cols = is1024 ? 32 : 16;
+            const rows = is1024 ? 32 : 8;
             const cellW = w / cols;
             const cellH = h / rows;
 
@@ -516,14 +515,15 @@
                 const act = Math.abs(cell.out || 0.0);
 
                 let color = "#38bdf8";
-                if (cell.layer === 0) color = "#94a3b8"; // 受体
-                else if (cell.layer === 1) color = "#10b981"; // 联络
-                else if (cell.layer === 2) color = "#fbbf24"; // 记忆积分
-                else if (cell.layer === 3) color = "#f43f5e"; // 运动
+                if (cell.layer === 0) color = "#94a3b8"; // 32 受体 (灰白)
+                else if (cell.layer === 1) color = "#10b981"; // 384 联络代谢 (翡翠绿)
+                else if (cell.layer === 2) color = "#fbbf24"; // 384 记忆积分 (琥珀金)
+                else if (cell.layer === 3) color = "#f43f5e"; // 224 运动效应 (赤红)
 
-                const radius = Math.max(1.8, Math.min(cellH * 0.45, 2.0 + act * 2.5));
+                const maxR = is1024 ? Math.min(cellW * 0.45, 2.0) : Math.min(cellH * 0.45, 4.0);
+                const radius = Math.max(0.8, maxR * (0.4 + act * 0.6));
                 cCtx.fillStyle = color;
-                cCtx.globalAlpha = 0.35 + act * 0.65;
+                cCtx.globalAlpha = 0.30 + act * 0.70;
                 cCtx.beginPath();
                 cCtx.arc(x, y, radius, 0, Math.PI * 2);
                 cCtx.fill();

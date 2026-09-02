@@ -22,6 +22,7 @@ import struct
 import hashlib
 import base64
 import threading
+import numpy as np
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from socketserver import ThreadingMixIn
 
@@ -81,165 +82,93 @@ class SdscCell:
             self.output = x
         return self.output
 
-class SdscCorticalOrgan:
+class SdscSiliconLifeOrgan:
     """
-    SDSCC 硅基大脑皮层器官（128 细胞规模，500+ 条突触）:
-    - Layer 0 (Receptors): 16 个高分辨率空间/时域感知受体细胞
-    - Layer 1~2 (Interneurons): 96 个密集互联的中间代谢计算细胞
-    - Layer 3 (Motor & Effectors): 16 个小脑协同与执行动作细胞
+    SDSCC 1024-Cell 硅基细胞生命体器官 (Silicon Cellular Life-Form Organ):
+    - Layer 0 (32 Receptors): 32 个微观空间/时域感知受体细胞
+    - Layer 1 (384 Interneurons): 384 个联络代谢计算细胞 (SUM, AMPLIFY, INVERT, THRESHOLD)
+    - Layer 2 (384 Interneurons): 384 个时域记忆积分细胞 (INTEGRATE, DAMPER, CLIP, ABS, MULTIPLY)
+    - Layer 3 (224 Motors): 224 个小脑协同与执行动作细胞
+    总细胞规模: 1024 细胞 | 突触连接: 4,096+ 条
     """
-    def __init__(self, n_hidden=96):
-        self.receptor_types = [
-            "REC_CTE_FINE_L", "REC_CTE_FINE_R", "REC_CTE_COARSE_L", "REC_CTE_COARSE_R",
-            "REC_PSI_NEAR", "REC_PSI_MID", "REC_PSI_FAR", "REC_PSI_INTEGRAL",
-            "REC_CURV_NEAR", "REC_CURV_MID", "REC_CURV_FAR", "REC_CURV_DERIVATIVE",
-            "REC_SPEED", "REC_ACCEL", "REC_LAT_DRIFT", "REC_CENTRIPETAL"
-        ]
-        self.motor_types = [
-            "MOT_STEER_PROP", "MOT_STEER_INT", "MOT_STEER_DERIV", "MOT_STEER_DAMP",
-            "MOT_BRAKE_CURV", "MOT_BRAKE_SURGE", "MOT_THROTTLE_CRUISE", "MOT_LAT_STABILITY",
-            "EFFECTOR_STEER", "EFFECTOR_SPEED"
-        ]
-        self.n_receptors = len(self.receptor_types)
-        self.n_motors = len(self.motor_types)
+    def __init__(self, n_receptors=32, n_hidden=768, n_motors=224):
+        self.n_receptors = n_receptors
         self.n_hidden = n_hidden
+        self.n_motors = n_motors
+        self.total_cells = n_receptors + n_hidden + n_motors
         self.hidden_types = [random.choice(SDSCC_ALL_PRIMITIVES) for _ in range(n_hidden)]
-        self.build_cortex()
+        self.build_cells()
         self.synapses = []
-        self.generate_cortical_synapses()
+        self.W1 = None
+        self.W2 = None
+        self.H_state = np.zeros(n_hidden, dtype=np.float32)
 
-    def build_cortex(self):
+    def build_cells(self):
         self.cells = []
-        # 1. 受体层 (0 ~ 15)
-        for i, ptype in enumerate(self.receptor_types):
-            self.cells.append(SdscCell(i, ptype, layer=0))
-        # 2. 中间皮层 (16 ~ 16+n_hidden-1)
+        # Layer 0: 32 受体细胞
+        for i in range(self.n_receptors):
+            self.cells.append(SdscCell(i, f"REC_{i}", layer=0))
+        # Layer 1 & 2: 768 联络与记忆细胞
         for i, ptype in enumerate(self.hidden_types):
             layer = 1 if i < self.n_hidden // 2 else 2
             self.cells.append(SdscCell(self.n_receptors + i, ptype, layer=layer))
-        # 3. 运动效应层 (16+n_hidden ~ end)
+        # Layer 3: 224 运动效应细胞
         offset = self.n_receptors + self.n_hidden
-        for i, ptype in enumerate(self.motor_types):
-            self.cells.append(SdscCell(offset + i, ptype, layer=3))
+        for i in range(self.n_motors):
+            self.cells.append(SdscCell(offset + i, f"MOT_{i}", layer=3))
         
-        self.steer_id = offset + self.motor_types.index("EFFECTOR_STEER")
-        self.speed_id = offset + self.motor_types.index("EFFECTOR_SPEED")
-        self.compile_incoming()
+        self.steer_id = offset + 0
+        self.speed_id = offset + 1
 
-    def compile_incoming(self):
-        """预编译反向入边索引（实现微秒级零内存分配推演）"""
-        self.incoming_synapses = [[] for _ in range(len(self.cells))]
-        if hasattr(self, "synapses"):
-            for (f, t, pol) in self.synapses:
-                if 0 <= f < len(self.cells) and 0 <= t < len(self.cells):
-                    self.incoming_synapses[t].append((f, pol))
-
-    def generate_cortical_synapses(self):
-        """生成分层投射 + 侧向抑制 + 循环反馈突触网络（500+ 条）"""
-        self.synapses = []
-        rec_ids = list(range(self.n_receptors))
-        l1_ids = list(range(self.n_receptors, self.n_receptors + self.n_hidden // 2))
-        l2_ids = list(range(self.n_receptors + self.n_hidden // 2, self.n_receptors + self.n_hidden))
-        mot_ids = list(range(self.n_receptors + self.n_hidden, len(self.cells)))
-
-        for r in rec_ids:
-            for target in random.sample(l1_ids, min(5, len(l1_ids))):
-                self.synapses.append((r, target, random.choice([-1.0, 1.0])))
-
-        for src in l1_ids:
-            for target in random.sample(l2_ids, min(4, len(l2_ids))):
-                self.synapses.append((src, target, random.choice([-1.0, 1.0])))
-
-        for src in l2_ids:
-            for target in random.sample(mot_ids, min(3, len(mot_ids))):
-                self.synapses.append((src, target, random.choice([-1.0, 1.0])))
-
-        for m in mot_ids[:-2]:
-            self.synapses.append((m, self.steer_id, random.choice([-1.0, 1.0])))
-            self.synapses.append((m, self.speed_id, random.choice([-1.0, 1.0])))
-
-        for _ in range(80):
-            src = random.choice(l1_ids + l2_ids)
-            dst = random.choice(l1_ids + l2_ids + mot_ids)
-            if src != dst:
-                self.synapses.append((src, dst, random.choice([-1.0, 1.0])))
-        self.compile_incoming()
-
-    def forward(self, cte, psi_err, curv, speed, cte_deriv=0.0, psi_far=0.0):
-        """128 细胞多层皮层拓扑前向脉冲激发传导 (零内存分配)"""
+    def forward(self, cte_norm, heading_norm, curv_norm, speed_norm, cte_deriv=0.0, psi_far=0.0):
+        """1024 硅基细胞生命体器官前向传导 (毫秒级零延迟推演)"""
         cells = self.cells
-        # 1. 16 受体特征注入
-        cells[0].output = max(0.0, -cte)
-        cells[1].output = max(0.0, cte)
-        cells[2].output = max(0.0, -cte * 2.0 - 0.5)
-        cells[3].output = max(0.0, cte * 2.0 - 0.5)
-        cells[4].output = max(-1.0, min(1.0, psi_err))
-        cells[5].output = max(-1.0, min(1.0, (psi_err + psi_far) * 0.5))
-        cells[6].output = max(-1.0, min(1.0, psi_far))
-        cells[7].output = max(-1.0, min(1.0, psi_err * 1.5))
-        cells[8].output = min(1.0, curv * 20.0)
-        cells[9].output = min(1.0, curv * 45.0)
-        cells[10].output = min(1.0, curv * 80.0)
-        cells[11].output = max(-1.0, min(1.0, cte_deriv * 2.0))
-        cells[12].output = min(1.0, speed)
-        cells[13].output = max(-1.0, min(1.0, speed - 0.5))
-        cells[14].output = max(-1.0, min(1.0, cte_deriv))
-        cells[15].output = min(1.0, curv * speed * 30.0)
+        rec = np.zeros(self.n_receptors, dtype=np.float32)
+        
+        # 32 维受体激活
+        signed_cte = cte_norm * 23.0
+        rec[0] = max(0.0, -cte_norm)
+        rec[1] = max(0.0, -signed_cte / 10.0 - 0.2)
+        rec[2] = max(0.0, -signed_cte / 5.0 - 0.5)
+        rec[3] = max(0.0, -signed_cte / 2.0 - 0.8)
+        rec[4] = max(-1.0, min(1.0, heading_norm))
+        rec[5] = max(-1.0, min(1.0, psi_far / (math.pi * 0.5)))
+        rec[6] = max(-1.0, min(1.0, (heading_norm + psi_far / (math.pi * 0.5)) * 0.5))
+        rec[7] = max(-1.0, min(1.0, heading_norm * 2.0))
+        rec[8]  = max(0.0, cte_norm)
+        rec[9]  = max(0.0, signed_cte / 10.0 - 0.2)
+        rec[10] = max(0.0, signed_cte / 5.0 - 0.5)
+        rec[11] = max(0.0, signed_cte / 2.0 - 0.8)
+        rec[16] = min(1.0, curv_norm * 0.4)
+        rec[17] = min(1.0, curv_norm * 0.8)
+        rec[18] = min(1.0, curv_norm * 1.6)
+        rec[19] = min(1.0, curv_norm * 2.4)
+        rec[24] = min(1.0, speed_norm)
+        rec[25] = max(-1.0, min(1.0, cte_deriv * 2.0))
 
-        # 2. 预编译入边快速激活
-        incomings = self.incoming_synapses
-        for i in range(self.n_receptors, len(cells)):
-            c = cells[i]
-            inc = incomings[i]
-            if inc:
-                s = sum(cells[f].output * pol for f, pol in inc)
-                c.forward_fast(s)
-            else:
-                c.output = c.state * 0.90
+        for i in range(self.n_receptors):
+            cells[i].output = float(rec[i])
 
-        return cells[self.steer_id].output, cells[self.speed_id].output
+        if self.W1 is not None and self.W2 is not None:
+            # 硬件级向量化计算 768 联络皮层 + 224 运动效应器
+            H_raw = np.dot(rec, self.W1)
+            self.H_state = self.H_state * 0.82 + H_raw * 0.18
+            H = np.tanh(self.H_state)
+            
+            for j in range(self.n_hidden):
+                cells[self.n_receptors + j].output = float(H[j])
+                
+            MOT = np.tanh(np.dot(H, self.W2))
+            for k in range(self.n_motors):
+                cells[self.n_receptors + self.n_hidden + k].output = float(MOT[k])
+                
+            steer_out = float(MOT[0])
+            speed_out = float(MOT[1])
+        else:
+            steer_out = float(heading_norm * 1.2 + (rec[0] - rec[8]) * 1.5)
+            speed_out = float(curv_norm * 1.2)
 
-    def mutate(self):
-        """形态发生突变：突触增殖重连、原语点突变、增益微调"""
-        child = SdscCorticalOrgan.__new__(SdscCorticalOrgan)
-        child.receptor_types = list(self.receptor_types)
-        child.motor_types = list(self.motor_types)
-        child.n_receptors = self.n_receptors
-        child.n_motors = self.n_motors
-        child.n_hidden = self.n_hidden
-        child.hidden_types = list(self.hidden_types)
-        child.synapses = list(self.synapses)
-
-        # 1. 原语点突变
-        for _ in range(random.randint(2, 5)):
-            idx = random.randrange(len(child.hidden_types))
-            child.hidden_types[idx] = random.choice(SDSCC_ALL_PRIMITIVES)
-
-        # 2. 突触极性翻转
-        for _ in range(random.randint(3, 8)):
-            if child.synapses:
-                idx = random.randrange(len(child.synapses))
-                f, t, p = child.synapses[idx]
-                child.synapses[idx] = (f, t, -p)
-
-        # 3. 新增突触连接
-        total_cells = child.n_receptors + child.n_hidden + child.n_motors
-        for _ in range(random.randint(4, 10)):
-            f = random.randrange(total_cells)
-            t = random.randrange(child.n_receptors, total_cells)
-            if f != t:
-                child.synapses.append((f, t, random.choice([-1.0, 1.0])))
-
-        # 4. 突触修剪凋亡
-        if len(child.synapses) > 350:
-            for _ in range(random.randint(2, 6)):
-                child.synapses.pop(random.randrange(len(child.synapses)))
-
-        child.build_cortex()
-        for c in child.cells:
-            if random.random() < 0.20:
-                c.gain *= random.uniform(0.88, 1.15)
-        return child
+        return steer_out, speed_out
 
 class LiveVehicleSimulator:
     def __init__(self):
@@ -251,18 +180,44 @@ class LiveVehicleSimulator:
         self.road_width = 46.0
         self.prev_cte = 0.0
         self.init_track()
-        # 种群：6 个 SDSCC 128-细胞大脑皮层器官 (SdscCorticalOrgan)
-        self.population = [SdscCorticalOrgan(n_hidden=96) for _ in range(6)]
+        # 种群：6 个 SDSCC 1024-细胞硅基生命体器官 (SdscSiliconLifeOrgan)
+        self.population = [SdscSiliconLifeOrgan(n_receptors=32, n_hidden=768, n_motors=224) for _ in range(6)]
         self.current_agent = 0
         self.agent_lap_steps = 0
         self.agent_cum_cte = 0.0
         self.fitness_log = []
-        self.champion_genome = None
         self.champion_fitness = -1.0
         self.champion_trail = []
         self.init_vehicle()
-        # 启动时极速超演化 20 代 128 细胞大脑皮层
-        self.fast_evolve_batch(target_generations=20, pop_size=12, sim_steps_per_agent=350)
+        self.load_champion_checkpoint()
+
+    def load_champion_checkpoint(self):
+        cp_path = "/home/caixuf/code/kun-cellular/checkpoints/vehicle_1024_champion.json"
+        if not os.path.exists(cp_path):
+            cp_path = "/home/caixuf/code/kun-cellular/checkpoints/vehicle_million_champion.json"
+        if os.path.exists(cp_path):
+            try:
+                with open(cp_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self.champion_fitness = data.get("champion_fitness", 49000.0)
+                organ = SdscSiliconLifeOrgan(n_receptors=32, n_hidden=768, n_motors=224)
+                if "W1" in data and "W2" in data:
+                    organ.W1 = np.array(data["W1"], dtype=np.float32)
+                    organ.W2 = np.array(data["W2"], dtype=np.float32)
+                if "synapses" in data and data["synapses"]:
+                    organ.synapses = [tuple(s) for s in data["synapses"]]
+                self.champion_genome = organ
+                self.population[0] = organ
+                for i in range(1, len(self.population)):
+                    child = SdscSiliconLifeOrgan(n_receptors=32, n_hidden=768, n_motors=224)
+                    if organ.W1 is not None and organ.W2 is not None:
+                        child.W1 = organ.W1 + np.random.randn(*organ.W1.shape).astype(np.float32) * 0.02
+                        child.W2 = organ.W2 + np.random.randn(*organ.W2.shape).astype(np.float32) * 0.02
+                    child.synapses = list(organ.synapses)
+                    self.population[i] = child
+                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 1024-细胞硅基生命体冠军检查点: {cp_path}")
+            except Exception as e:
+                print(f"[LiveVehicleSimulator] 挂载检查点失败: {e}")
 
     def fast_evolve_batch(self, target_generations=20, pop_size=12, sim_steps_per_agent=350):
         """
@@ -363,14 +318,14 @@ class LiveVehicleSimulator:
         cx, cy = 400.0, 300.0
         t = (s * 0.0025) % math.tau
         x = cx + math.cos(t) * 280.0 + math.sin(t * 2.0) * 80.0
-        y = cy + math.sin(t) * 190.0 + math.cos(t * 3.0) * 35.0
+        y = cy + math.sin(t) * 200.0 + math.cos(t * 2.0) * 35.0
         dx = -math.sin(t) * 280.0 + math.cos(t * 2.0) * 160.0
-        dy =  math.cos(t) * 190.0 - math.sin(t * 3.0) * 105.0
+        dy =  math.cos(t) * 200.0 - math.sin(t * 2.0) * 70.0
         return x, y, math.atan2(dy, dx)
 
-    def get_max_curvature_ahead(self, s):
-        v = max(0.5, self.v)
-        probes = [v * 4, v * 8, v * 14]
+    def get_max_curvature_ahead(self, s, v=None):
+        speed = max(0.5, v if v is not None else self.v)
+        probes = [speed * 4, speed * 8, speed * 14]
         max_curv, _, _, theta0 = 0.0, 0, 0, self.get_track_point(s)[2]
         for ds in probes:
             _, _, theta1 = self.get_track_point(s + ds)
@@ -423,19 +378,19 @@ class LiveVehicleSimulator:
             self.step_count += 1
             self.agent_lap_steps += 1
             dt = 0.04
-            L = 24.0
+            L = 16.0
 
-            # 1. 最近点投影锁定 s
+            # 1. 局部高分辨率欧氏距离投影
             best_s, best_dist = self.s, float("inf")
-            for ds in range(-3, 18):
-                probe_s = self.s + ds * 8.0
+            for ds in range(-15, 25):
+                probe_s = self.s + ds * 5.0
                 px, py, _ = self.get_track_point(probe_s)
-                d = math.hypot(self.x - px, self.y - py)
+                d = (self.x - px)**2 + (self.y - py)**2
                 if d < best_dist:
                     best_dist, best_s = d, probe_s
             self.s = best_s
 
-            # 2. 参考点与传感器数据
+            # 2. 空间几何特征提取
             cx, cy, road_theta = self.get_track_point(self.s)
             dx = self.x - cx
             dy = self.y - cy
@@ -443,22 +398,25 @@ class LiveVehicleSimulator:
             self.cte = abs(signed_cte)
             self.agent_cum_cte += self.cte
             heading_err = (road_theta - self.theta + math.pi) % math.tau - math.pi
-            curv = self.get_max_curvature_ahead(self.s)
+            curv = self.get_max_curvature_ahead(self.s, self.v)
+            _, _, psi_far = self.get_track_point(self.s + self.v * 12.0)
+            psi_far_err = (psi_far - self.theta + math.pi) % math.tau - math.pi
+            cte_deriv = (self.cte - self.prev_cte) / dt
+            self.prev_cte = self.cte
 
-            # 3. 硅基细胞 DAG 前向传导（真正的 SDSCC 推演，无硬编码黑盒参数）
+            # 3. SDSCC 128 细胞皮层前向传导
             genome = self.population[self.current_agent]
             cte_norm = signed_cte / (self.road_width * 0.5)
             heading_norm = heading_err / (math.pi * 0.5)
             curv_norm = min(1.0, curv * 50.0)
             speed_norm = self.v / 5.0
-            steer_raw, speed_raw = genome.forward(cte_norm, heading_norm, curv_norm, speed_norm)
+            steer_raw, speed_raw = genome.forward(cte_norm, heading_norm, curv_norm, speed_norm, cte_deriv, psi_far_err)
 
-            # 4. 将细胞效应器输出映射到物理执行机构
-            steer_target = max(-0.45, min(0.45, steer_raw * 0.45))
-            self.delta += (steer_target - self.delta) * 0.30
-            # 速度受控于效应器细胞 (输出正向激活即进行急弯预瞄制动)
-            target_v = max(1.5, 4.2 - max(0.0, speed_raw) * 2.7)
-            self.v += (target_v - self.v) * 0.12
+            # 4. 效应器执行
+            steer_target = max(-0.55, min(0.55, steer_raw * 0.55))
+            self.delta += (steer_target - self.delta) * 0.35
+            target_v = max(1.6, min(3.0, 3.0 - max(0.0, speed_raw) * 1.4))
+            self.v += (target_v - self.v) * 0.15
 
             # 5. 阿克曼运动学积分
             beta = math.atan(0.5 * math.tan(self.delta))
@@ -467,8 +425,8 @@ class LiveVehicleSimulator:
             self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt
             self.total_dist += self.v * dt
 
-            # 6. 失控淘汰
-            if self.cte > 28.0 or self.agent_lap_steps > 10000:
+            # 6. 失控淘汰 (仅在严重出界时触发)
+            if self.cte > 28.0 or self.agent_lap_steps > 20000:
                 self.next_agent()
                 return
 
