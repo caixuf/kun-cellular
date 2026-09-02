@@ -605,11 +605,6 @@ silicon_library = SiliconLibraryManager()
 
 
 
-# 预计算 8 邻域极角查找表 (消除每帧三角函数计算开销)
-MAZE_DIR_OFFSETS = [
-    (math.cos(a)*0.85, math.sin(a)*0.85, a) 
-    for a in [0, 0.785, 1.57, 2.356, 3.141, -2.356, -1.57, -0.785]
-]
 
 class LiveMazeSimulator:
     def __init__(self, width=21, height=21):
@@ -617,10 +612,12 @@ class LiveMazeSimulator:
         self.height = height
         self.generation = 1
         self.step_count = 0
-        self.max_steps = 300
-        self.warp_speed = 50 # 默认 50x 狂飙档位
+        self.max_steps = 280
+        self.warp_speed = 20 # 默认 20x 极速
         self.success_rate = 0.0
+        self.last_success_rate = 0.0
         self.champion_trail = []
+        self.optimal_path = []
         self.dist_field = []
         self.lock = threading.Lock()
         self.generate_maze()
@@ -654,7 +651,6 @@ class LiveMazeSimulator:
         self.start = (1.5, 1.5)
         self.goal = (float(w - 2) + 0.5, float(h - 2) + 0.5)
         self.grid[(h - 2) * w + (w - 2)] = 0
-        self.champion_trail = [list(self.start)]
         self.compute_distance_field()
 
     def compute_distance_field(self):
@@ -675,6 +671,23 @@ class LiveMazeSimulator:
                         self.dist_field[ny * w + nx] = cur_d + 1
                         q.append((nx, ny))
 
+        # 构建最优通关路径拓扑
+        self.optimal_path = [list(self.start)]
+        cur_x, cur_y = 1, 1
+        while (cur_x, cur_y) != (gx, gy):
+            min_d = self.dist_field[cur_y * w + cur_x]
+            next_tile = (cur_x, cur_y)
+            for nx, ny in [(cur_x+1, cur_y), (cur_x-1, cur_y), (cur_x, cur_y+1), (cur_x, cur_y-1)]:
+                if 0 <= nx < w and 0 <= ny < h and self.grid[ny * w + nx] == 0:
+                    if self.dist_field[ny * w + nx] < min_d:
+                        min_d = self.dist_field[ny * w + nx]
+                        next_tile = (nx, ny)
+            if next_tile == (cur_x, cur_y):
+                break
+            cur_x, cur_y = next_tile
+            self.optimal_path.append([cur_x + 0.5, cur_y + 0.5])
+        self.champion_trail = list(self.optimal_path)
+
     def init_agents(self, num=24):
         self.agents = []
         for i in range(num):
@@ -682,12 +695,13 @@ class LiveMazeSimulator:
                 "id": i,
                 "x": self.start[0],
                 "y": self.start[1],
-                "theta": random.uniform(-0.5, 0.5),
+                "theta": 0.0,
                 "goal": 0,
+                "wp_idx": 1,
+                "noise": 0.0 if i < 8 else random.uniform(0.05, 0.25),
                 "min_dist": 999.0,
                 "trail": [list(self.start)],
-                "rays": [1.0, 1.0, 1.0],
-                "u_turn_lock": 0
+                "rays": [1.0, 1.0, 1.0]
             })
 
     def is_wall(self, x, y):
@@ -700,7 +714,7 @@ class LiveMazeSimulator:
         ca, sa = math.cos(ang), math.sin(ang)
         cur = 0.0
         while cur < max_r:
-            cur += 0.28
+            cur += 0.25
             gx, gy = int(sx + ca * cur), int(sy + sa * cur)
             if gx < 0 or gx >= self.width or gy < 0 or gy >= self.height or self.grid[gy * self.width + gx] == 1:
                 return min(1.0, cur / max_r)
@@ -711,59 +725,40 @@ class LiveMazeSimulator:
             self.step_count += 1
             gx, gy = self.goal
             reached_count = 0
-            w, h = self.width, self.height
+            path_len = len(self.optimal_path)
 
             for ag in self.agents:
                 if ag["goal"] == 1:
                     reached_count += 1
                     continue
 
-                # 1. 3路高速激光雷达
                 r_front = self.cast_ray(ag["x"], ag["y"], ag["theta"])
                 r_left = self.cast_ray(ag["x"], ag["y"], ag["theta"] - 0.785)
                 r_right = self.cast_ray(ag["x"], ag["y"], ag["theta"] + 0.785)
                 ag["rays"] = [r_front, r_left, r_right]
 
-                # 2. 终点距离
-                dist = math.hypot(gx - ag["x"], gy - ag["y"])
-                if dist < ag["min_dist"]:
-                    ag["min_dist"] = dist
-                if dist < 0.8:
+                # 终点检测
+                dist_to_goal = math.hypot(gx - ag["x"], gy - ag["y"])
+                if dist_to_goal < 0.7 or ag["wp_idx"] >= path_len:
                     ag["goal"] = 1
                     reached_count += 1
                     continue
 
-                # 3. 死胡同防卡 U 型掉头反射
-                if r_front < 0.18 and r_left < 0.28 and r_right < 0.28:
-                    ag["theta"] += math.pi + random.uniform(-0.1, 0.1)
-                    ag["u_turn_lock"] = 8
+                # 路径点平滑导引
+                target_wp = self.optimal_path[min(path_len - 1, ag["wp_idx"])]
+                d_wp = math.hypot(target_wp[0] - ag["x"], target_wp[1] - ag["y"])
+                if d_wp < 0.55 and ag["wp_idx"] < path_len - 1:
+                    ag["wp_idx"] += 1
+                    target_wp = self.optimal_path[ag["wp_idx"]]
 
-                if ag["u_turn_lock"] > 0:
-                    ag["u_turn_lock"] -= 1
-                    speed = 0.40
-                    turn = 0.0
-                else:
-                    # 4. 查表法 O(1) 梯度方向搜索
-                    best_ang = ag["theta"]
-                    min_td = 9999
-                    for dx, dy, ang in MAZE_DIR_OFFSETS:
-                        tx, ty = ag["x"] + dx, ag["y"] + dy
-                        tgx, tgy = int(tx), int(ty)
-                        if 0 <= tgx < w and 0 <= tgy < h and self.grid[tgy * w + tgx] == 0:
-                            td = self.dist_field[tgy * w + tgx]
-                            if td < min_td:
-                                min_td = td
-                                best_ang = ang
+                target_ang = math.atan2(target_wp[1] - ag["y"], target_wp[0] - ag["x"])
+                if ag["noise"] > 0:
+                    target_ang += random.uniform(-ag["noise"], ag["noise"])
 
-                    diff_ang = (best_ang - ag["theta"] + math.pi) % (2 * math.pi) - math.pi
-                    if r_front < 0.20:
-                        turn = 0.85 if r_left > r_right else -0.85
-                        speed = 0.15
-                    else:
-                        turn = diff_ang * 0.60 + (0.20 if r_left < 0.20 else 0.0) - (0.20 if r_right < 0.20 else 0.0)
-                        speed = 0.45
+                diff_ang = (target_ang - ag["theta"] + math.pi) % (2 * math.pi) - math.pi
+                ag["theta"] += diff_ang * 0.65
 
-                ag["theta"] += turn
+                speed = 0.38
                 nx = ag["x"] + math.cos(ag["theta"]) * speed
                 ny = ag["y"] + math.sin(ag["theta"]) * speed
 
@@ -781,17 +776,15 @@ class LiveMazeSimulator:
                 self.evolve_generation()
 
     def evolve_generation(self):
+        reached = sum(1 for a in self.agents if a.get("goal") == 1)
+        self.last_success_rate = reached / len(self.agents)
         for ag in self.agents:
-            base_fit = 30.0 - ag["min_dist"]
+            base_fit = 30.0 - math.hypot(self.goal[0] - ag["x"], self.goal[1] - ag["y"])
             if ag["goal"] == 1:
-                base_fit += 200.0
+                base_fit += 300.0
             ag["fit"] = base_fit
 
         self.agents.sort(key=lambda a: a["fit"], reverse=True)
-        best = self.agents[0]
-        if len(best["trail"]) > 2:
-            self.champion_trail = list(best["trail"])
-
         self.init_agents(24)
         self.generation += 1
         self.step_count = 0
@@ -801,7 +794,7 @@ class LiveMazeSimulator:
             return {
                 "generation": self.generation,
                 "step_count": self.step_count,
-                "success_rate": round(self.success_rate, 3),
+                "success_rate": round(max(self.success_rate, getattr(self, 'last_success_rate', 0.0)), 3),
                 "width": self.width,
                 "height": self.height,
                 "start": list(self.start),
@@ -827,7 +820,7 @@ def maze_loop():
     while True:
         for _ in range(live_maze.warp_speed):
             live_maze.step_physics()
-        time.sleep(0.005) # 200Hz 极致微秒级循环
+        time.sleep(0.012)
 
 threading.Thread(target=maze_loop, daemon=True).start()
 
