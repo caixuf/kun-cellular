@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>形态发生细胞全息观测台 · Morphogenetic Cellular Observatory</title>
+<title>KunCellular // 软件定义硅基细胞计算机全息观测台 · SDSCC Observatory</title>
 <style>
   :root { --bg:#04070d; --panel:rgba(10,18,30,.82); --line:#1e293b; --cyan:#22d3ee; --emerald:#34d399; --purple:#a78bfa; --crimson:#f43f5e; --text:#cbd5e1; --dim:#64748b; }
   * { margin:0; padding:0; box-sizing:border-box; }
   html,body { width:100%; height:100%; overflow:hidden; background:var(--bg); font-family:"PingFang SC","Microsoft YaHei",monospace; color:var(--text); }
   #stage { position:fixed; inset:0; }
   .panel { position:fixed; background:var(--panel); border:1px solid var(--line); border-radius:10px; backdrop-filter:blur(6px); padding:14px 16px; }
-  #hud { top:16px; left:16px; width:270px; }
+  #hud { top:58px; left:16px; width:270px; }
   #hud h1 { font-size:14px; color:#e2e8f0; letter-spacing:1px; margin-bottom:2px; }
   #hud .sub { font-size:10px; color:var(--dim); margin-bottom:10px; }
   .kv { display:flex; justify-content:space-between; font-size:12px; padding:3px 0; border-bottom:1px dashed rgba(30,41,59,.6); }
@@ -18,19 +18,19 @@
   #src { font-size:10px; margin-top:8px; padding:4px 6px; border-radius:4px; background:rgba(34,211,238,.08); color:var(--cyan); }
   #legend { bottom:16px; left:16px; display:flex; gap:14px; font-size:11px; align-items:center; }
   .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
-  #actions { top:16px; right:16px; width:230px; }
+  #actions { top:58px; right:16px; width:230px; }
   #actions h2 { font-size:12px; color:#e2e8f0; margin-bottom:8px; }
   .act { display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:6px 8px; border-radius:6px; margin-bottom:5px; background:rgba(30,41,59,.4); transition:all .25s; }
   .act.flash-buy { background:rgba(52,211,153,.35); box-shadow:0 0 12px rgba(52,211,153,.5); }
   .act.flash-sell { background:rgba(244,63,94,.35); box-shadow:0 0 12px rgba(244,63,94,.5); }
   .act.flash-immune { background:rgba(250,204,21,.35); box-shadow:0 0 12px rgba(250,204,21,.55); }
   #ops { bottom:16px; right:16px; display:flex; gap:8px; }
-#bio { top:196px; right:16px; width:230px; }
+#bio { top:238px; right:16px; width:230px; }
 #bio h2 { font-size:12px; color:#e2e8f0; margin-bottom:8px; }
 .bio-niche b { color:#e2e8f0; }
   #ops button { background:var(--panel); border:1px solid var(--line); color:var(--text); font-size:12px; padding:8px 14px; border-radius:8px; cursor:pointer; font-family:inherit; transition:all .2s; }
   #ops button:hover { border-color:var(--cyan); color:var(--cyan); }
-  #eventlog { top:16px; right:262px; width:250px; max-height:220px; overflow:hidden auto; font-size:11px; line-height:1.7; }
+  #eventlog { top:58px; right:262px; width:250px; max-height:220px; overflow:hidden auto; font-size:11px; line-height:1.7; }
   #eventlog .ev { color:var(--dim); } #eventlog .ev.hi { color:var(--cyan); }
   #pricebar { bottom:16px; left:50%; transform:translateX(-50%); font-size:12px; color:var(--dim); }
   #pricebar b { color:var(--cyan); font-size:14px; }
@@ -38,11 +38,29 @@
 </style>
 </head>
 <body>
+
+<header style="position:fixed;top:0;left:0;right:0;height:46px;background:rgba(15,23,42,0.85);backdrop-filter:blur(10px);border-bottom:1px solid #1e293b;display:flex;align-items:center;justify-content:space-between;padding:0 16px;z-index:1000;font-family:monospace;">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <span style="font-weight:bold;color:#38bdf8;font-size:14px;letter-spacing:1px;">KunCellular</span>
+    <span style="font-size:11px;color:#64748b;padding-left:8px;border-left:1px solid #334155;">SDSCC v4.0 · In-Memory Compute</span>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <a href="index.html" style="color:#94a3b8;text-decoration:none;font-size:11px;padding:4px 10px;background:#0f172a;border:1px solid #1e293b;border-radius:4px;">工作台门户</a>
+    <a href="cellular.html" style="color:#38bdf8;text-decoration:none;font-size:11px;padding:4px 10px;background:rgba(56,189,248,0.1);border:1px solid #38bdf8;border-radius:4px;font-weight:bold;">3D 全息力场</a>
+    <a href="maze.html" style="color:#94a3b8;text-decoration:none;font-size:11px;padding:4px 10px;background:#0f172a;border:1px solid #1e293b;border-radius:4px;">具身迷宫沙盒</a>
+    <a href="https://github.com/caixuf/kun-cellular/blob/main/docs/morphogenetic_cellular_evolution_paper.zh.md" target="_blank" style="color:#a855f7;text-decoration:none;font-size:11px;padding:4px 10px;background:rgba(168,85,247,0.1);border:1px solid #a855f7;border-radius:4px;">学术论文 (Paper)</a>
+  </div>
+  <div style="font-size:11px;color:#34d399;display:flex;gap:12px;">
+    <span>Zero-GC: <b style="color:#fff">ACTIVE</b></span>
+    <span>Step: <b style="color:#fff">24.1 ns</b></span>
+  </div>
+</header>
+
 <div id="stage"></div>
 
 <div class="panel" id="hud">
-  <h1>形态发生细胞全息观测台</h1>
-  <div class="sub">MORPHOGENETIC CELLULAR OBSERVATORY</div>
+  <h1>硅基细胞计算机全息观测台</h1>
+  <div class="sub">SOFTWARE-DEFINED SILICON CELLULAR COMPUTER (SDSCC)</div>
   <div class="kv"><span>世代 Generation</span><b id="st-gen">0</b></div>
   <div class="kv"><span>细胞 Cells</span><b id="st-cells">0</b></div>
   <div class="kv"><span>活跃突触 Synapses</span><b id="st-syn">0</b></div>
@@ -51,7 +69,7 @@
   <div id="src">数据源: 连接守护进程...</div>
 </div>
 
-<div class="panel" id="lod-panel" style="top:390px;left:16px;width:270px;">
+<div class="panel" id="lod-panel" style="top:432px;left:16px;width:270px;">
   <h2> 算力尺度与 GPU 性能模式 (LOD)</h2>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;margin:6px 0;">
     <button id="lod-organ" onclick="switchLOD('organ')" style="padding:5px;background:rgba(34,211,238,.15);border:1px solid var(--cyan);color:var(--cyan);border-radius:6px;cursor:pointer;font-size:11px;">本能器官 (15~100)</button>
@@ -63,7 +81,7 @@
   <div class="kv"><span>渲染管线</span><b id="st-pipe" style="color:var(--cyan)">WebGL Points Buffer</b></div>
 </div>
 
-<div class="panel" id="warp-panel" style="top:220px;left:16px;width:270px;">
+<div class="panel" id="warp-panel" style="top:262px;left:16px;width:270px;">
   <h2>时空曲率演化加速 (Hyper-Warp)</h2>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0;">
     <button id="w-1x" onclick="setWarp('1x')" style="padding:6px;background:rgba(30,41,59,.6);border:1px solid var(--cyan);color:var(--cyan);border-radius:6px;cursor:pointer;">1x 观察模式</button>
@@ -116,8 +134,8 @@
 <div class="panel" id="pricebar">驱动行情 I0 (价格): <b id="px">--</b> <span id="px-src"></span></div>
 
 <div class="panel" id="ops">
-  <a href="/index.html" style="text-decoration:none"><button style="color:var(--dim)">[QUANT] 终端</button></a>
-  <a href="/maze.html" style="text-decoration:none"><button style="border-color:var(--cyan);color:var(--cyan)">[MAZE] 迷宫空间基准</button></a>
+  <a href="/index.html" style="text-decoration:none"><button style="color:var(--dim)">工作台门户</button></a>
+  <a href="/maze.html" style="text-decoration:none"><button style="border-color:var(--cyan);color:var(--cyan)">具身迷宫基准</button></a>
   <button id="b-mito">[MITO] 有丝分裂</button>
   <button id="b-rewire">[REWIRE] 突触重连</button>
   <button id="b-apop">[APOP] 凋亡剪枝</button>
