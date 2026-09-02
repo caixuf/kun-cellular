@@ -609,7 +609,8 @@ class LiveMazeSimulator:
         self.height = height
         self.generation = 1
         self.step_count = 0
-        self.max_steps = 160
+        self.max_steps = 180
+        self.warp_speed = 5 # 默认 5x 高速动力学
         self.success_rate = 0.0
         self.champion_trail = []
         self.lock = threading.Lock()
@@ -719,12 +720,11 @@ class LiveMazeSimulator:
                 act_rev = math.tanh(r_front * w[12] + r_left * w[13] + r_right * w[14] + bearing * w[15])
 
                 # 3. 动力学积分
-                turn = (act_right - act_left) * 0.25
-                speed = max(0.0, act_fwd * 0.12 - act_rev * 0.05)
-                # 避障本能强化: 前方极近时强制反向转向
-                if r_front < 0.15:
-                    turn += 0.4 if r_left > r_right else -0.4
-                    speed *= 0.3
+                turn = (act_right - act_left) * 0.38
+                speed = max(0.05, act_fwd * 0.26 - act_rev * 0.10) # 敏捷巡航动力学
+                if r_front < 0.20:
+                    turn += 0.6 if r_left > r_right else -0.6
+                    speed *= 0.4
 
                 ag["theta"] += turn
                 nx = ag["x"] + math.cos(ag["theta"]) * speed
@@ -815,8 +815,9 @@ live_maze = LiveMazeSimulator()
 
 def maze_loop():
     while True:
-        live_maze.step_physics()
-        time.sleep(0.04) # 25 FPS 连续动力学演化
+        for _ in range(live_maze.warp_speed):
+            live_maze.step_physics()
+        time.sleep(0.02) # 50Hz 高频动力学推送
 
 threading.Thread(target=maze_loop, daemon=True).start()
 
@@ -920,6 +921,22 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             live_maze.generate_maze()
             live_maze.init_agents(24)
             body = json.dumps({"status": "ok", "msg": "New maze generated"}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/maze/warp"):
+            try:
+                import urllib.parse
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                speed = int(qs.get("speed", ["5"])[0])
+                live_maze.warp_speed = max(1, min(50, speed))
+            except Exception:
+                live_maze.warp_speed = 5
+            body = json.dumps({"status": "ok", "warp_speed": live_maze.warp_speed}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")

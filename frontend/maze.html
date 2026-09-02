@@ -296,9 +296,15 @@
                 <canvas id="maze-canvas"></canvas>
             </div>
             <div class="controls-overlay">
-                <button class="btn btn-primary" id="btn-toggle">[PAUSE / RESUME]</button>
-                <button class="btn" id="btn-new-maze">[GENERATE_NEW_MAZE]</button>
-                <button class="btn" id="btn-step">[STEP_GENERATION]</button>
+                <button class="btn" id="btn-toggle">[PAUSE / RESUME]</button>
+                <button class="btn" id="btn-new-maze">[NEW_MAZE]</button>
+                <button class="btn" id="btn-step">[STEP_GEN]</button>
+                <span style="border-left:1px solid #283548;margin:0 2px;"></span>
+                <span style="font-size:10px;color:var(--text-dim);align-self:center;">速度:</span>
+                <button class="btn" onclick="setMazeWarp(1)" id="btn-w-1">1x</button>
+                <button class="btn btn-primary" onclick="setMazeWarp(5)" id="btn-w-5">5x 敏捷</button>
+                <button class="btn" onclick="setMazeWarp(20)" id="btn-w-20">20x 极速</button>
+                <button class="btn" onclick="setMazeWarp(50)" id="btn-w-50" style="color:var(--amber-glow);font-weight:bold;">50x 狂飙</button>
             </div>
         </div>
 
@@ -635,7 +641,17 @@
             requestAnimationFrame(render);
         }
 
-        setInterval(fetchMazeState, 60);
+        
+        window.setMazeWarp = async function(speed) {
+            document.querySelectorAll('[id^="btn-w-"]').forEach(b => b.classList.remove('btn-primary'));
+            const activeBtn = document.getElementById('btn-w-' + speed);
+            if (activeBtn) activeBtn.classList.add('btn-primary');
+            try {
+                await fetch('/api/maze/warp?speed=' + speed);
+            } catch(e) {}
+        };
+
+        setInterval(fetchMazeState, 30);
         requestAnimationFrame(render);
 
         // 控制按钮事件
