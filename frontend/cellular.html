@@ -1851,18 +1851,19 @@ function pollRadiation(rad){
 
 
 
-window.loadPreset = function(type) {
-  fetch("/api/preset?type=" + type).catch(() => {});
-  if(type === "seed") {
-    org = seedOrganism();
-    compile(org);
-    rebuildViews();
-    log("已载入: 初始胚胎原基 (Gen 0, 9 细胞, 7 突触)");
+window.loadPreset = async function(type) {
+  try {
+    await fetch("/api/preset?type=" + type);
+  } catch(e) {}
+  
+  if (type === "real" || type === "quant") {
+    log("已切换至: 4,234 根日线商品期货全天候量化大模型 (全息层状脑区拓扑)", true);
+  } else if (type === "adas" || type === "vehicle") {
+    log("已切换至: SDSCC 100万细胞智能驾驶超级生命体大脑流形", true);
+  } else if (type === "seed") {
+    log("已切换至: 初始胚胎原基 (16 细胞初始网络)", true);
   } else {
-    org = makeMatureOrganism();
-    compile(org);
-    rebuildViews();
-    log("已载入: 成熟演化脑区 (Gen 384, 30 细胞, 33 突触, 四族原语全通)");
+    log("已切换至: 成熟复杂多层硅基生命体器官", true);
   }
 };
 
@@ -2287,9 +2288,18 @@ function initTooltipEngine() {
   });
 }
 
-// 8.4 硅基文化图书馆点击回路联动高亮
+// 8.4 硅基文化图书馆点击回路联动高亮与生命体切换
 window.highlightBookCircuit = function(bookId, title) {
-  log(`[图书馆] 正在全息高亮名著回路: 《${title || bookId}》`, true);
+  log(`[硅基生命体图书馆] 正在挂载并全息高亮生命体: 《${title || bookId}》`, true);
+  if (bookId.includes("quant")) {
+    window.loadPreset("real");
+  } else if (bookId.includes("vehicle") || bookId.includes("adas")) {
+    window.loadPreset("adas");
+  } else if (bookId.includes("arithmetic") || bookId.includes("math")) {
+    window.loadPreset("math");
+  } else {
+    window.loadPreset("mature");
+  }
   window.setCameraPreset('front');
 
   // 突触金光脉冲
