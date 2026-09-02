@@ -460,7 +460,7 @@
 
   <!-- 顶栏中央常驻高亮加速器 (100% 绝对可见) -->
   <div style="display:flex;align-items:center;gap:6px;background:rgba(15,23,42,0.9);border:1px solid rgba(56,189,248,0.5);border-radius:6px;padding:3px 10px;box-shadow:0 0 12px rgba(56,189,248,0.2);">
-    <span style="color:var(--cyan);font-weight:bold;font-size:11px;">⚡ 演化加速:</span>
+    <span style="color:var(--cyan);font-weight:bold;font-size:11px;">[WARP_CONTROL]:</span>
     <button class="nav-tab-btn active" onclick="setWarp('1x')" id="hw-1x" style="padding:3px 8px;font-size:11px;">1x 实时</button>
     <button class="nav-tab-btn" onclick="setWarp('100x')" id="hw-100x" style="padding:3px 8px;font-size:11px;">100x 快速</button>
     <button class="nav-tab-btn" onclick="setWarp('1000x')" id="hw-1000x" style="padding:3px 8px;font-size:11px;">1000x 涡轮</button>
@@ -614,7 +614,7 @@
 
 <!-- 顶部中央醒目时空曲率加速条 -->
 <div class="warp-quick-bar">
-  <span style="color:var(--cyan);font-weight:bold;font-size:11px;">⚡ 演化加速:</span>
+  <span style="color:var(--cyan);font-weight:bold;font-size:11px;">[WARP_CONTROL]:</span>
   <button class="warp-qbtn active" onclick="setWarp('1x')" id="qw-1x">1x 实时</button>
   <button class="warp-qbtn" onclick="setWarp('100x')" id="qw-100x">100x 快速</button>
   <button class="warp-qbtn" onclick="setWarp('1000x')" id="qw-1000x">1000x 涡轮</button>
@@ -1642,7 +1642,7 @@ async function pollLibrary() {
           return `<div class="book-card" onclick="highlightBookCircuit('${b.book_id}', '${b.title || b.book_id}')">
             <div style="display:flex;justify-content:space-between;color:var(--cyan);font-weight:bold;font-size:10px;">
               <span>《${b.title || b.book_id}》</span>
-              <span style="color:var(--amber);">⭐ ${b.impact_score || 8.5}</span>
+              <span style="color:var(--amber);">[SCORE: ${b.impact_score || 8.5}</span>
             </div>
             <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:9px;margin-top:2px;">
               <span>Gen ${b.discovered_at_gen} · ${b.author_deme || 'Origin'}</span>

@@ -418,7 +418,7 @@
 
         <!-- 顶栏正中央大号加速器 (100% 绝对可见) -->
         <div style="display:flex;align-items:center;gap:6px;background:rgba(15,23,42,0.95);border:1px solid rgba(0,240,255,0.5);border-radius:6px;padding:3px 10px;box-shadow:0 0 14px rgba(0,240,255,0.25);">
-            <span style="color:var(--cyan-glow);font-weight:bold;font-size:12px;">⚡ 迷宫演化加速:</span>
+            <span style="color:var(--cyan-glow);font-weight:bold;font-size:12px;">[WARP_ACCELERATOR]:</span>
             <button class="nav-btn" onclick="setMazeWarp(1)" id="hw-m-1">1x 常规</button>
             <button class="nav-btn active" onclick="setMazeWarp(5)" id="hw-m-5">5x 敏捷</button>
             <button class="nav-btn" onclick="setMazeWarp(20)" id="hw-m-20" style="color:var(--cyan-glow);border-color:var(--cyan-glow);font-weight:bold;">20x 极速</button>
@@ -442,12 +442,12 @@
                         <!-- 迷宫主画布顶部正中央高亮主控条 (绝不遮挡、极其醒目) -->
             <div class="maze-top-bar">
                 <div style="display:flex;gap:8px;align-items:center;">
-                    <button class="maze-top-btn primary" id="btn-toggle-top" onclick="document.getElementById('btn-toggle').click()">[▶ 暂停/继续]</button>
-                    <button class="maze-top-btn" onclick="document.getElementById('btn-new-maze').click()">[🎲 生成新迷宫]</button>
-                    <button class="maze-top-btn" onclick="document.getElementById('btn-step').click()">[⏭ 迭代下一代]</button>
+                    <button class="maze-top-btn primary" id="btn-toggle-top" onclick="document.getElementById('btn-toggle').click()">[PAUSE / RESUME]</button>
+                    <button class="maze-top-btn" onclick="document.getElementById('btn-new-maze').click()">[GEN_NEW_MAZE]</button>
+                    <button class="maze-top-btn" onclick="document.getElementById('btn-step').click()">[STEP_NEXT_GEN]</button>
                 </div>
                 <div style="display:flex;gap:6px;align-items:center;">
-                    <span style="font-size:12px;font-weight:bold;color:var(--cyan-glow);margin-right:4px;">⚡ 演化加速:</span>
+                    <span style="font-size:12px;font-weight:bold;color:var(--cyan-glow);margin-right:4px;">[WARP_SPEED]:</span>
                     <button class="maze-top-warp-btn" onclick="setMazeWarp(1)" id="top-w-1">1x 常规</button>
                     <button class="maze-top-warp-btn active" onclick="setMazeWarp(5)" id="top-w-5">5x 敏捷</button>
                     <button class="maze-top-warp-btn" onclick="setMazeWarp(20)" id="top-w-20">20x 极速</button>
@@ -510,7 +510,7 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">CYCLE_STEPS</div>
-                        <div class="stat-val amber" id="stat-steps">0 / 160</div>
+                        <div class="stat-val amber" id="stat-steps">0 / 240</div>
                     </div>
                 </div>
             </div>
@@ -594,7 +594,8 @@
             rateEl.className = 'stat-val ' + (mazeState.success_rate > 0.5 ? 'green' : (mazeState.success_rate > 0.1 ? 'amber' : ''));
 
             document.getElementById('stat-agents').innerText = `${mazeState.agents.length} AGENTS`;
-            document.getElementById('stat-steps').innerText = `${mazeState.step_count} / 160`;
+            const maxSteps = mazeState.max_steps || 240;
+            document.getElementById('stat-steps').innerText = `${mazeState.step_count} / ${maxSteps}`;
 
             if (historyRates.length === 0 || historyRates[historyRates.length - 1].gen !== mazeState.generation) {
                 historyRates.push({ gen: mazeState.generation, rate: mazeState.success_rate });

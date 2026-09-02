@@ -169,6 +169,20 @@ class LiveOrganism:
                 print(f"[!] 加载 ADAS 1M 模型失败: {e}")
         return False
 
+    def set_warp(self, speed_str):
+        with self.lock:
+            speed_map = {
+                "1x": 1,
+                "100x": 20,
+                "1000x": 100,
+                "unlimited": 300,
+                "max": 300
+            }
+            factor = speed_map.get(str(speed_str).lower(), 1)
+            self.warp_mode = str(speed_str)
+            self.warp_factor = factor
+            return self.warp_mode
+
     def load_mature_preset(self):
         with self.lock:
             self.generation = 384
@@ -375,10 +389,11 @@ class LiveOrganism:
         fy = [0.0] * n
         fz = [0.0] * n
 
-        # 细胞间排斥
-        for i in range(n):
+        # 细胞间排斥 (对 N > 128 限制局部采样, 保证恒定 60 FPS)
+        max_rep_n = min(n, 128)
+        for i in range(max_rep_n):
             ci = self.cells[i]
-            for j in range(i + 1, n):
+            for j in range(i + 1, max_rep_n):
                 cj = self.cells[j]
                 dx = cj["x"] - ci["x"]
                 dy = cj["y"] - ci["y"]
@@ -626,7 +641,8 @@ class LiveMazeSimulator:
         self.init_population(24)
 
     def generate_maze(self):
-        w, h = self.width, self.height
+        with self.lock:
+            w, h = self.width, self.height
         self.grid = [1] * (w * h)
         stack = [(1, 1)]
         self.grid[1 * w + 1] = 0
@@ -808,6 +824,7 @@ class LiveMazeSimulator:
             return {
                 "generation": self.generation,
                 "step_count": self.step_count,
+                "max_steps": self.max_steps,
                 "success_rate": round(self.success_rate, 3),
                 "width": self.width,
                 "height": self.height,
