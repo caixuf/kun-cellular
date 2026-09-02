@@ -1976,6 +1976,9 @@ function rebuildViews(){
   org.cellMap = new Map(org.cells.map(c => [c.id, c]));
   views.cells = Array.from(cellViewsMap.values());
   views.syns = Array.from(synViewsMap.values());
+  const hideMicro = (typeof camR === "number" ? camR : 560) > 280;
+  for (const v of views.cells) v.group.visible = !hideMicro;
+  for (const v of views.syns) v.group.visible = !hideMicro;
 }
 rebuildViews();
 initLODCloud(30000);
@@ -2465,8 +2468,6 @@ window.switchLOD = function(mode) {
     log(" 聚焦至: 1,000,000 细胞宏观全量流形 (亚像素点云聚合，0 孤立大细胞)");
   }
 };
-  }
-};
 
 /* ============================================================
  * 7. 主循环与实时性能帧率遥测
@@ -2657,54 +2658,44 @@ function animate(){
   );
   camera.lookAt(currentLookAt);
 
-  // 2. Smootherstep 驱动的无级三尺度 LOD 物理渲染 (宏观百万流形 -> 介观皮层柱 -> 微观细胞器)
-  // 当 camR >= 380 时为纯宏观流形，单个细胞亚像素化完全收敛入点云流；拉近至 < 340 时局部实体细胞平滑淡入
+  // 2. 三尺度 LOD：远景只看点云流形，近景才出现实体细胞。
+  // 阈值必须在默认 camR=560 之上把 13 单位质膜 / 48 单位光晕全部关掉，
+  // 否则百万细胞远看会变成几个巨大孤立细胞。
   const macroFactor = smootherstep(200, 420, camR);
-  const microFactor = 1.0 - smootherstep(180, 360, camR);
+  const microFactor = 1.0 - smootherstep(120, 280, camR);
+  const isMicroVisible = microFactor > 0.02;
 
   if (lodPointsMesh && lodPointsMesh.material) {
-    // 宏观点云在远景下全量高光呈现百万级神经流形，拉近时柔和融入背景细胞质胶体
-    const pointCloudAlpha = Math.max(0.28, macroFactor * 0.92);
-    lodPointsMesh.material.opacity = pointCloudAlpha;
-    lodPointsMesh.material.size = 3.2 + macroFactor * 2.2;
     lodPointsMesh.visible = true;
-    lodPointsMesh.rotation.y += dt * 0.02;
+    lodPointsMesh.material.opacity = 0.22 + macroFactor * 0.66;
+    lodPointsMesh.material.size = 1.6 + macroFactor * 2.4;
   }
-
-  // 3. 微观实体网格在宏观远景下严格隐藏，仅在深入介观/微观视距时无缝淡入
-  const isMicroVisible = microFactor > 0.005;
-  const meshScale = Math.max(0.001, microFactor);
 
   for (const v of views.cells) {
     v.group.visible = isMicroVisible;
-    if (isMicroVisible) {
-      v.group.scale.set(meshScale, meshScale, meshScale);
-      if (v.membraneMesh && v.membraneMesh.material) {
-        v.membraneMesh.material.opacity = microFactor * 0.68;
-      }
-      if (v.membrane && v.membrane.material) {
-        v.membrane.material.opacity = microFactor * 0.45;
-      }
-      if (v.nucleus && v.nucleus.material) {
-        v.nucleus.material.opacity = microFactor;
-      }
-      if (v.label && v.label.material) {
-        // 浮动原语文字标签仅在深入特写 (camR < 240) 时清晰浮现，远景彻底静默
-        v.label.material.opacity = Math.max(0.0, (microFactor - 0.5) / 0.5);
-      }
-      v.update(now * 0.001, clientWarpMultiplier);
+    if (!isMicroVisible) continue;
+    v.update(now * 0.001, clientWarpMultiplier);
+    if (v.membraneMesh && v.membraneMesh.material) {
+      v.membraneMesh.material.opacity *= microFactor;
+    }
+    if (v.membrane && v.membrane.material) {
+      v.membrane.material.opacity *= microFactor;
+    }
+    if (v.label) {
+      const showLabel = microFactor > 0.62;
+      v.label.visible = showLabel;
+      if (v.label.material) v.label.material.opacity = showLabel ? (microFactor - 0.62) / 0.38 : 0;
     }
   }
 
   for (const v of views.syns) {
     v.group.visible = isMicroVisible;
-    if (isMicroVisible) {
-      v.lineMat.opacity = microFactor * 0.65;
-      v.photon1.material.opacity = microFactor * 0.7;
-      v.photon2.material.opacity = microFactor * 0.7;
-      v.bouton.material.opacity = microFactor * 0.8;
-      v.update(now * 0.001, clientWarpMultiplier);
-    }
+    if (!isMicroVisible) continue;
+    v.update(now * 0.001, clientWarpMultiplier);
+    v.lineMat.opacity *= microFactor;
+    v.photon1.material.opacity *= microFactor;
+    v.photon2.material.opacity *= microFactor;
+    v.bouton.material.opacity *= microFactor;
   }
 
   const scaleText = camR > 420 ? "宏观全量因果点云流形 (百万细胞)" : camR < 240 ? "微观单神经元全细节质膜" : "介观皮层柱局部环路";
