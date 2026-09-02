@@ -706,18 +706,20 @@ class LiveMazeSimulator:
             self.step_count += 1
             gx, gy = self.goal
             reached_count = 0
-            w = self.width
+            w, h = self.width, self.height
 
             for ag in self.agents:
                 if ag["goal"] == 1:
                     reached_count += 1
                     continue
 
+                # 1. 3路激光测距
                 r_front = self.cast_ray(ag["x"], ag["y"], ag["theta"])
                 r_left = self.cast_ray(ag["x"], ag["y"], ag["theta"] - 0.785398)
                 r_right = self.cast_ray(ag["x"], ag["y"], ag["theta"] + 0.785398)
                 ag["rays"] = [r_front, r_left, r_right]
 
+                # 2. 终点距离检测
                 dx = gx - ag["x"]
                 dy = gy - ag["y"]
                 dist = math.hypot(dx, dy)
@@ -728,31 +730,41 @@ class LiveMazeSimulator:
                     reached_count += 1
                     continue
 
-                # 硅基神经智能决策: 拓扑梯度引力 + 迟滞壁障门控 (HYST + Chemotaxis)
-                cgx, cgy = max(0, min(self.width-1, int(ag["x"]))), max(0, min(self.height-1, int(ag["y"])))
-                cur_dist_to_goal = self.dist_field[cgy * w + cgx] if (cgy * w + cgx < len(self.dist_field)) else 999
-
-                # 探测 8 邻域梯度方向
-                best_ang = math.atan2(dy, dx)
-                min_step_dist = cur_dist_to_goal
-                for test_ang in [0, 0.785, 1.57, 2.356, 3.141, -2.356, -1.57, -0.785]:
-                    tx = ag["x"] + math.cos(test_ang) * 0.9
-                    ty = ag["y"] + math.sin(test_ang) * 0.9
-                    if not self.is_wall(tx, ty):
-                        tgx, tgy = int(tx), int(ty)
-                        td = self.dist_field[tgy * w + tgx] if (tgy * w + tgx < len(self.dist_field)) else 999
-                        if td < min_step_dist:
-                            min_step_dist = td
-                            best_ang = test_ang
-
-                diff_ang = (best_ang - ag["theta"] + math.pi) % (2 * math.pi) - math.pi
-
-                if r_front < 0.22:
-                    turn = (0.75 * ag["bias"]) if (r_left > r_right) else (-0.75 * ag["bias"])
-                    speed = 0.08
+                # 3. 经典死胡同 U 型掉头反射 (Cul-de-sac 180° U-Turn Reflection)
+                # 当正前方撞墙且两侧均受阻时, 触发迟滞掉头锁
+                if r_front < 0.18 and r_left < 0.28 and r_right < 0.28:
+                    ag["theta"] += math.pi + random.uniform(-0.2, 0.2)
+                    ag["u_turn_lock"] = 6 # 保持 6 步防回头保护
+                
+                if ag.get("u_turn_lock", 0) > 0:
+                    ag["u_turn_lock"] -= 1
+                    speed = 0.30
+                    turn = 0.0
                 else:
-                    turn = diff_ang * 0.45 + (0.25 if r_left < 0.25 else 0.0) - (0.25 if r_right < 0.25 else 0.0)
-                    speed = 0.35
+                    # 4. 拓扑势能场全局全局极小值搜索 (严格沿 BFS 梯度下降, 绝不贪心直扑欧式直线)
+                    cgx, cgy = max(0, min(w-1, int(ag["x"]))), max(0, min(h-1, int(ag["y"])))
+                    best_ang = ag["theta"]
+                    min_td = 9999
+
+                    # 探测周边可行走方向中的绝对最小拓扑步数
+                    for test_ang in [0, 0.523, 1.047, 1.57, 2.094, 2.618, 3.141, -2.618, -2.094, -1.57, -1.047, -0.523]:
+                        tx = ag["x"] + math.cos(test_ang) * 0.85
+                        ty = ag["y"] + math.sin(test_ang) * 0.85
+                        if not self.is_wall(tx, ty):
+                            tgx, tgy = int(tx), int(ty)
+                            td = self.dist_field[tgy * w + tgx] if (0 <= tgx < w and 0 <= tgy < h) else 9999
+                            if td < min_td:
+                                min_td = td
+                                best_ang = test_ang
+
+                    diff_ang = (best_ang - ag["theta"] + math.pi) % (2 * math.pi) - math.pi
+
+                    if r_front < 0.20:
+                        turn = 0.85 if r_left > r_right else -0.85
+                        speed = 0.12
+                    else:
+                        turn = diff_ang * 0.55 + (0.22 if r_left < 0.22 else 0.0) - (0.22 if r_right < 0.22 else 0.0)
+                        speed = 0.38
 
                 ag["theta"] += turn
                 nx = ag["x"] + math.cos(ag["theta"]) * speed
@@ -763,7 +775,7 @@ class LiveMazeSimulator:
                 if not self.is_wall(ag["x"], ny):
                     ag["y"] = ny
 
-                if self.step_count % 2 == 0 and len(ag["trail"]) < 200:
+                if self.step_count % 2 == 0 and len(ag["trail"]) < 240:
                     ag["trail"].append([round(ag["x"], 2), round(ag["y"], 2)])
 
             self.success_rate = reached_count / len(self.agents)
