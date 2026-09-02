@@ -781,18 +781,66 @@ class SiliconCellularOrganism:
                     self.synapses.append({"from": m, "to": out, "weight": round(random.uniform(1.0, 2.0), 2)})
 
     def load_adas_1m_preset(self):
-        """挂载 SDSCC 1,000,000 细胞自动驾驶大脑流形"""
+        """挂载 SDSCC 1,000,000 细胞车载自动驾驶大脑流形 (前向感知 -> 空间规划 -> 底盘线控专属拓扑)"""
         with self.lock:
             self.macro_cells = 1000000
             self.macro_synapses = 4000000
-            self.init_cells()
-            for i, c in enumerate(self.cells):
-                c.gain = random.uniform(1.2, 2.4)
+            self.cells = []
+            self.synapses = []
+            cell_id = 0
+
+            # 1. 前向激光雷达与双目视觉感受野 (24 细胞，扇形向前延伸 Y in [80, 240])
+            for i in range(24):
+                ang = -math.pi / 3 + (i / 23.0) * (2 * math.pi / 3)
+                r = 160.0 + (i % 3) * 35.0
+                x = r * math.sin(ang)
+                y = 60.0 + r * math.cos(ang)
+                z = -20.0 + (i % 4) * 15.0
+                ptype = "INTEGRATE" if i % 2 == 0 else "AMPLIFY"
+                self.cells.append(PhysicalCell3D(cell_id, ptype, x, y, z))
+                cell_id += 1
+
+            # 2. 空间栅格与阿克曼轨迹规划皮层 (48 细胞，中枢矩阵 Y in [-40, 60])
+            for i in range(48):
+                layer = i // 12
+                sub_i = i % 12
+                theta = (sub_i / 12.0) * math.tau
+                r = 50.0 + layer * 25.0
+                x = r * math.cos(theta)
+                y = -30.0 + layer * 25.0
+                z = -40.0 + (sub_i % 3) * 40.0
+                ptype = "SUM" if i % 3 == 0 else ("DAMPER" if i % 3 == 1 else "THRESHOLD")
+                self.cells.append(PhysicalCell3D(cell_id, ptype, x, y, z))
+                cell_id += 1
+
+            # 3. 底盘线控效应器 (16 细胞，后置执行中枢 Y in [-220, -70])
+            for i in range(16):
+                x = -90.0 + (i % 4) * 60.0
+                y = -90.0 - (i // 4) * 40.0
+                z = -15.0 + (i % 2) * 30.0
+                ptype = "AMPLIFY" if i < 8 else "THRESHOLD"
+                self.cells.append(PhysicalCell3D(cell_id, ptype, x, y, z))
+                cell_id += 1
+
+            # 构建前向感知 -> 规划 -> 底盘执行专属突触通路 (200+ 突触)
+            for i in range(24):
+                for j in range(24, 72):
+                    if (i + j) % 4 == 0:
+                        self.synapses.append({"from": i, "to": j, "weight": round(random.uniform(0.9, 2.0), 2)})
+            for j in range(24, 72):
+                for k in range(72, 88):
+                    if (j + k) % 3 == 0:
+                        self.synapses.append({"from": j, "to": k, "weight": round(random.uniform(0.7, 1.8), 2)})
+            # 左右转向通道互抑制突触
+            for i in range(72, 76):
+                self.synapses.append({"from": i, "to": i + 4, "weight": -1.2})
+                self.synapses.append({"from": i + 4, "to": i, "weight": -1.2})
 
     def load_mature_preset(self):
+        """挂载 384 细胞成熟双脑半球小世界皮层"""
         with self.lock:
-            self.macro_cells = 10891008
-            self.macro_synapses = 43564032
+            self.macro_cells = 384
+            self.macro_synapses = 1536
             self.init_cells()
 
     def load_organism_by_id(self, org_id):
