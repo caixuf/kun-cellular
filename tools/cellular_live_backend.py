@@ -29,8 +29,8 @@ PORT = 8833
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 
 
-# ============================================================================
-# 0.13 真实车辆运动学与全景公路巡航引擎 (Universal Kinematic Vehicle Engine)
+## ============================================================================
+# 0.13 神经演化车辆控制器 (Neuroevolution Vehicle Controller - True Darwin Evolution)
 # ============================================================================
 
 class LiveVehicleSimulator:
@@ -42,102 +42,170 @@ class LiveVehicleSimulator:
         self.history_cte = []
         self.road_width = 46.0
         self.init_track()
-        self.init_vehicle()
+        # 演化种群：每个个体的基因组编码控制器全部参数
+        self.population = [self.random_genome() for _ in range(6)]
+        self.current_agent = 0
+        self.agent_lap_steps = 0
+        self.agent_cum_cte = 0.0
+        self.fitness_log = []
+        self.champion_genome = None
+        self.champion_fitness = -1.0
+        self.champion_trail = []
+        self.init_vehicle(self.population[0])
+
+    def random_genome(self):
+        """基因组编码 7 维控制参数（全部可遗传、可变异）"""
+        return {
+            "k_heading":        random.uniform(0.6, 1.6),
+            "k_cte":            random.uniform(0.08, 0.30),
+            "steer_limit":      random.uniform(0.28, 0.50),
+            "steer_lag":        random.uniform(0.18, 0.45),
+            "speed_max":        random.uniform(2.5, 5.0),
+            "brake_gain":       random.uniform(30.0, 90.0),
+            "lookahead_factor": random.uniform(3.0, 7.0),
+        }
+
+    def mutate(self, genome):
+        """高斯变异：50% 概率对每个维度施加 ±18% 随机扰动"""
+        child = {}
+        for k, v in genome.items():
+            child[k] = v * random.uniform(0.82, 1.18) if random.random() < 0.5 else v
+        return child
 
     def get_track_point(self, s):
-        # 闭环多曲率 S 弯公路中心线方程
+        """闭环多曲率 S 弯公路中心线（解析方程，与前端完全一致）"""
         cx, cy = 400.0, 300.0
         t = (s * 0.0025) % math.tau
         x = cx + math.cos(t) * 280.0 + math.sin(t * 2.0) * 80.0
         y = cy + math.sin(t) * 190.0 + math.cos(t * 3.0) * 35.0
-        
         dx = -math.sin(t) * 280.0 + math.cos(t * 2.0) * 160.0
-        dy = math.cos(t) * 190.0 - math.sin(t * 3.0) * 105.0
+        dy =  math.cos(t) * 190.0 - math.sin(t * 3.0) * 105.0
         theta = math.atan2(dy, dx)
         return x, y, theta
 
+    def get_max_curvature_ahead(self, s, genome):
+        """多点前向曲率采样：在 3 个前瞻距离处估算最大曲率，实现急弯提前制动"""
+        laf = genome["lookahead_factor"]
+        v = max(0.5, self.v)
+        probes = [laf * v, laf * v * 1.8, laf * v * 3.2]
+        max_curv = 0.0
+        _, _, theta_ref = self.get_track_point(s)
+        for ds in probes:
+            _, _, theta_n = self.get_track_point(s + ds)
+            dtheta = abs((theta_n - theta_ref + math.pi) % math.tau - math.pi)
+            curv = dtheta / max(ds, 1.0)
+            max_curv = max(max_curv, curv)
+            theta_ref = theta_n
+        return max_curv
+
     def init_track(self):
-        # 预计算全景赛道离散点 (180 点)
         self.track_points = []
         num_pts = 180
         for i in range(num_pts):
             s_i = (i / num_pts) * (math.tau / 0.0025)
             x, y, theta = self.get_track_point(s_i)
-            self.track_points.append({"s": round(s_i, 1), "x": round(x, 1), "y": round(y, 1), "theta": round(theta, 3)})
+            self.track_points.append({
+                "s": round(s_i, 1), "x": round(x, 1),
+                "y": round(y, 1), "theta": round(theta, 3)
+            })
 
-    def init_vehicle(self):
+    def init_vehicle(self, genome):
+        x0, y0, theta0 = self.get_track_point(0.0)
+        self.x, self.y, self.theta = x0, y0, theta0
+        self.v = 2.0
+        self.delta = 0.0
+        self.s = 0.0
+        self.cte = 0.0
+        self.total_dist = 0.0
+        self.trail = []
+        self.agent_lap_steps = 0
+        self.agent_cum_cte = 0.0
+
+    def next_agent(self):
+        """个体评估 → 锦标赛选择 → 变异繁殖 → 换代"""
         with self.lock:
-            self.s = 0.0
-            x0, y0, theta0 = self.get_track_point(0.0)
-            self.x = x0
-            self.y = y0
-            self.theta = theta0
-            self.v = 5.0 # 巡航车速
-            self.delta = 0.0 # 前轮转向角
-            self.cte = 0.0 # 横向偏离误差
-            self.total_dist = 0.0
-            self.laps = 0
-            self.trail = []
+            steps = max(1, self.agent_lap_steps)
+            fitness = steps / (1.0 + self.agent_cum_cte / steps)
+            self.fitness_log.append(round(fitness, 1))
+            if len(self.fitness_log) > 20:
+                self.fitness_log.pop(0)
+
+            if fitness > self.champion_fitness:
+                self.champion_fitness = fitness
+                self.champion_genome = dict(self.population[self.current_agent])
+                self.champion_trail = list(self.trail)
+
+            self.current_agent = (self.current_agent + 1) % len(self.population)
+            if self.current_agent == 0:
+                self.generation += 1
+                if self.champion_genome:
+                    self.population[0] = dict(self.champion_genome)
+                    for i in range(1, len(self.population)):
+                        self.population[i] = self.mutate(self.champion_genome)
+
+            self.init_vehicle(self.population[self.current_agent])
 
     def step_physics(self):
         with self.lock:
             self.step_count += 1
-            # --- 关键修复：去掉 dt*25 放大系数，速度单位与像素匹配 ---
+            self.agent_lap_steps += 1
             dt = 0.04
-            L = 24.0 # 轴距 (像素)
-            k_cte = 0.18
-            k_heading = 1.0
+            L = 24.0
+            genome = self.population[self.current_agent]
 
-            # 1. 最近点投影更新 s（防止 s 与实际 (x,y) 脱耦导致控制失稳）
-            best_s = self.s
-            best_dist = float("inf")
-            for ds_step in range(-4, 16):
-                probe_s = self.s + ds_step * 10.0
+            # 1. 最近点投影重新锁定 s（防止脱耦导致控制失稳）
+            best_s, best_dist = self.s, float("inf")
+            for ds_step in range(-3, 18):
+                probe_s = self.s + ds_step * 8.0
                 px, py, _ = self.get_track_point(probe_s)
                 d = math.hypot(self.x - px, self.y - py)
                 if d < best_dist:
-                    best_dist = d
-                    best_s = probe_s
+                    best_dist, best_s = d, probe_s
             self.s = best_s
 
-            # 2. 当前参考点与动态预瞄点
+            # 2. 当前中心线参考点
             center_x, center_y, road_theta = self.get_track_point(self.s)
-            look_ahead = max(18.0, self.v * 4.0)
-            _, _, look_theta = self.get_track_point(self.s + look_ahead)
 
-            # 3. 带符号横向偏差 (Signed CTE)
+            # 3. 带符号横向偏差 CTE
             dx = self.x - center_x
             dy = self.y - center_y
             signed_cte = math.cos(road_theta) * dy - math.sin(road_theta) * dx
             self.cte = abs(signed_cte)
+            self.agent_cum_cte += self.cte
 
             # 4. 航向误差 [-pi, pi]
             heading_err = (road_theta - self.theta + math.pi) % math.tau - math.pi
 
-            # 5. Stanley 闭环控制律
-            steer_target = heading_err * k_heading - math.atan2(k_cte * signed_cte, max(0.5, self.v))
-            steer_target = max(-0.42, min(0.42, steer_target))
-            self.delta += (steer_target - self.delta) * 0.28
+            # 5. 基因组编码 Stanley 闭环控制律（控制增益全部来自基因组，非硬编码）
+            steer_target = (heading_err * genome["k_heading"]
+                            - math.atan2(genome["k_cte"] * signed_cte, max(0.4, self.v)))
+            steer_target = max(-genome["steer_limit"], min(genome["steer_limit"], steer_target))
+            self.delta += (steer_target - self.delta) * genome["steer_lag"]
 
-            # 6. 曲率自适应巡航速度（弯道减速）
-            curvature = abs(look_theta - road_theta) / max(look_ahead, 1.0)
-            target_v = max(1.8, 3.8 - curvature * 50.0)
-            self.v += (target_v - self.v) * 0.10
+            # 6. 多点前向曲率探测 → 急弯自适应制动（修复右下大弯出界）
+            max_curv = self.get_max_curvature_ahead(self.s, genome)
+            target_v = max(1.2, genome["speed_max"] - max_curv * genome["brake_gain"])
+            self.v += (target_v - self.v) * 0.12
 
-            # 7. 阿克曼两轮自行车运动学积分（正确无放大）
+            # 7. 阿克曼两轮自行车运动学积分
             beta = math.atan(0.5 * math.tan(self.delta))
             self.x += self.v * math.cos(self.theta + beta) * dt
             self.y += self.v * math.sin(self.theta + beta) * dt
             self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt
             self.total_dist += self.v * dt
 
-            # 8. 历史 CTE
+            # 8. 失控淘汰（偏出路面或超时，淘汰当前个体换下一个）
+            if self.cte > 28.0 or self.agent_lap_steps > 8000:
+                self.next_agent()
+                return
+
+            # 9. CTE 历史记录
             if self.step_count % 5 == 0:
                 self.history_cte.append(round(self.cte * 0.05, 3))
                 if len(self.history_cte) > 40:
                     self.history_cte.pop(0)
 
-            # 9. 车尾发光轨迹
+            # 10. 车尾发光轨迹
             if self.step_count % 3 == 0:
                 self.trail.append({"x": round(self.x, 1), "y": round(self.y, 1)})
                 if len(self.trail) > 120:
@@ -146,11 +214,15 @@ class LiveVehicleSimulator:
     def get_snapshot(self):
         with self.lock:
             return {
+                "generation": self.generation,
+                "agent_index": self.current_agent,
+                "champion_fitness": round(self.champion_fitness, 1),
+                "fitness_log": list(self.fitness_log),
                 "step_count": self.step_count,
-                "s": round(self.s, 1),
                 "total_dist_m": round(self.total_dist, 1),
                 "road_width": self.road_width,
                 "track": self.track_points,
+                "champion_trail": list(self.champion_trail)[-60:],
                 "car": {
                     "x": round(self.x, 1),
                     "y": round(self.y, 1),
@@ -158,7 +230,7 @@ class LiveVehicleSimulator:
                     "theta": round(self.theta, 3),
                     "delta_deg": round(math.degrees(self.delta), 1),
                     "speed_kmh": round(self.v * 14.0, 1),
-                    "cte_m": round(self.cte * 0.02, 3)
+                    "cte_m": round(self.cte * 0.05, 3)
                 },
                 "trail": list(self.trail),
                 "history_cte": list(self.history_cte)
