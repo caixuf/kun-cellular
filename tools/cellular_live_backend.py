@@ -108,6 +108,54 @@ class LiveOrganism:
                 return True
         return False
 
+    
+    def load_adas_1m_preset(self):
+        ckpt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runs", "adas_million_champion.pt")
+        if os.path.exists(ckpt_path):
+            try:
+                import torch
+                data = torch.load(ckpt_path, map_location="cpu")
+                with self.lock:
+                    self.generation = 1000
+                    # 提取前 40 个核心代表性因果细胞子图映射到 3D 视图，宏观 1M 挂载到 GPU 点云
+                    types_arr = data["types"][:40].tolist()
+                    weights_arr = data["champion_weights"][:40].tolist()
+                    params_arr = data["champion_params"][:40].tolist()
+                    
+                    self.cells = []
+                    for i, t_val in enumerate(types_arr):
+                        t_name = CELL_TYPES.get(t_val % 34, "EMA")
+                        if i < 4: t_name = f"SENSE{i}"
+                        elif i >= len(types_arr) - 4: t_name = ["ACT_POS", "ACT_NEG", "ACT_RESET", "ACT_LOCK"][i - (len(types_arr) - 4)]
+                        
+                        self.cells.append({
+                            "id": i,
+                            "type": t_name,
+                            "p1": round(float(params_arr[i][0]), 3),
+                            "p2": round(float(params_arr[i][1]), 3),
+                            "s": 0.0, "out": 0.0, "acts": 0,
+                            "x": -220.0 + (440.0 * i / len(types_arr)),
+                            "y": round((float(weights_arr[i][0]) * 100.0) % 160.0 - 80.0, 1),
+                            "z": round((float(weights_arr[i][1]) * 40.0) % 60.0 - 30.0, 1),
+                            "vx": 0.0, "vy": 0.0, "vz": 0.0
+                        })
+                    
+                    self.synapses = []
+                    for i in range(len(self.cells) - 1):
+                        self.synapses.append({
+                            "from": i,
+                            "to": min(len(self.cells) - 1, i + 1 + (i % 3)),
+                            "port": i % 2,
+                            "w": round(float(weights_arr[i][0]), 3),
+                            "active": True
+                        })
+                    self.compile_topology()
+                    print(f"[*] 成功加载 ADAS 百万级冠军模型 (adas_million_champion.pt, 1,000,000 细胞 / 2,000,000 突触)")
+                    return True
+            except Exception as e:
+                print(f"[!] 加载 ADAS 1M 模型失败: {e}")
+        return False
+
     def load_mature_preset(self):
         with self.lock:
             self.generation = 384
@@ -475,6 +523,24 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             self.wfile.write(body)
             return
 
+        
+        if self.path == "/api/checkpoints":
+            ckpts = []
+            runs_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runs")
+            if os.path.exists(runs_dir):
+                for fname in sorted(os.listdir(runs_dir)):
+                    if fname.endswith(".pt") or fname.endswith(".json"):
+                        fpath = os.path.join(runs_dir, fname)
+                        size_mb = round(os.path.getsize(fpath) / (1024 * 1024), 2)
+                        ckpts.append({"name": fname, "size_mb": size_mb})
+            body = json.dumps({"status": "ok", "checkpoints": ckpts}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if self.path == "/api/state":
             data = organism.get_state_snapshot()
             body = json.dumps(data).encode("utf-8")
@@ -489,9 +555,11 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/preset"):
             ptype = "mature"
             if "seed" in self.path: ptype = "seed"
+            elif "adas" in self.path: ptype = "adas"
             elif "real" in self.path or "champion" in self.path: ptype = "real"
 
             if ptype == "seed": organism.load_seed_preset()
+            elif ptype == "adas": organism.load_adas_1m_preset()
             elif ptype == "real": organism.load_real_champion_preset()
             else: organism.load_mature_preset()
 

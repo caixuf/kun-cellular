@@ -67,10 +67,11 @@
   <div class="kv"><span>代谢放电次数</span><b id="st-act">0</b></div>
   <div class="kv"><span>力场步 Force Steps</span><b id="st-phys">0</b></div>
   
-  <div style="margin: 8px 0; display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 4px;">
-    <button onclick="loadPreset('seed')" style="padding:4px 4px;background:rgba(30,41,59,.6);border:1px solid var(--line);color:var(--text);border-radius:4px;cursor:pointer;font-size:10px;">种子 (Gen 0)</button>
-    <button onclick="loadPreset('mature')" style="padding:4px 4px;background:rgba(56,189,248,.15);border:1px solid var(--cyan);color:var(--cyan);border-radius:4px;cursor:pointer;font-size:10px;">成熟脑 (384)</button>
-    <button onclick="loadPreset('real')" style="padding:4px 4px;background:rgba(52,211,153,.15);border:1px solid var(--emerald);color:var(--emerald);border-radius:4px;cursor:pointer;font-size:10px;font-weight:bold;">真实训练冠军</button>
+  <div style="margin: 8px 0; display: grid; grid-template-columns: 1fr 1fr 1fr 1.2fr; gap: 3px;">
+    <button onclick="loadPreset('seed')" style="padding:4px 2px;background:rgba(30,41,59,.6);border:1px solid var(--line);color:var(--text);border-radius:4px;cursor:pointer;font-size:9px;">种子 (Gen0)</button>
+    <button onclick="loadPreset('mature')" style="padding:4px 2px;background:rgba(56,189,248,.15);border:1px solid var(--cyan);color:var(--cyan);border-radius:4px;cursor:pointer;font-size:9px;">成熟脑(384)</button>
+    <button onclick="loadPreset('adas')" style="padding:4px 2px;background:rgba(168,85,247,.15);border:1px solid var(--purple);color:var(--purple);border-radius:4px;cursor:pointer;font-size:9px;font-weight:bold;">ADAS 1M</button>
+    <button onclick="loadPreset('real')" style="padding:4px 2px;background:rgba(52,211,153,.15);border:1px solid var(--emerald);color:var(--emerald);border-radius:4px;cursor:pointer;font-size:9px;font-weight:bold;">量化实训冠军</button>
   </div>
 <div id="src">数据源: 硅基计算核心就绪 (30 细胞 / 33 突触 / 24.1ns)</div>
 </div>
