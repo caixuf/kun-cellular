@@ -82,56 +82,65 @@ class LiveVehicleSimulator:
     def step_physics(self):
         with self.lock:
             self.step_count += 1
+            # --- 关键修复：去掉 dt*25 放大系数，速度单位与像素匹配 ---
             dt = 0.04
-            L = 24.0 # 轴距
-            k_cte = 0.22
-            k_heading = 1.25
+            L = 24.0 # 轴距 (像素)
+            k_cte = 0.18
+            k_heading = 1.0
 
-            # 1. 探测当前公路中心线与预瞄点
+            # 1. 最近点投影更新 s（防止 s 与实际 (x,y) 脱耦导致控制失稳）
+            best_s = self.s
+            best_dist = float("inf")
+            for ds_step in range(-4, 16):
+                probe_s = self.s + ds_step * 10.0
+                px, py, _ = self.get_track_point(probe_s)
+                d = math.hypot(self.x - px, self.y - py)
+                if d < best_dist:
+                    best_dist = d
+                    best_s = probe_s
+            self.s = best_s
+
+            # 2. 当前参考点与动态预瞄点
             center_x, center_y, road_theta = self.get_track_point(self.s)
-            look_s = self.s + 28.0
-            look_x, look_y, look_theta = self.get_track_point(look_s)
+            look_ahead = max(18.0, self.v * 4.0)
+            _, _, look_theta = self.get_track_point(self.s + look_ahead)
 
-            # 2. 计算带符号横向偏差 (Signed CTE) 与航向误差
+            # 3. 带符号横向偏差 (Signed CTE)
             dx = self.x - center_x
             dy = self.y - center_y
-            # 法向量交叉乘积
-            cross = math.cos(road_theta) * dy - math.sin(road_theta) * dx
-            signed_cte = cross
+            signed_cte = math.cos(road_theta) * dy - math.sin(road_theta) * dx
             self.cte = abs(signed_cte)
-            
+
+            # 4. 航向误差 [-pi, pi]
             heading_err = (road_theta - self.theta + math.pi) % math.tau - math.pi
 
-            # 3. 闭环 Stanley 控制律 (Stanley Lane Centering)
-            steer_target = heading_err * k_heading - math.atan2(k_cte * signed_cte, max(1.0, self.v))
-            steer_target = max(-0.55, min(0.55, steer_target))
-            self.delta += (steer_target - self.delta) * 0.40
+            # 5. Stanley 闭环控制律
+            steer_target = heading_err * k_heading - math.atan2(k_cte * signed_cte, max(0.5, self.v))
+            steer_target = max(-0.42, min(0.42, steer_target))
+            self.delta += (steer_target - self.delta) * 0.28
 
-            # 4. 速度控制 (弯道平顺减速, 直道平稳巡航)
-            curvature = abs(look_theta - road_theta) / 28.0
-            target_v = max(3.5, 6.8 - curvature * 90.0)
-            self.v += (target_v - self.v) * 0.15
+            # 6. 曲率自适应巡航速度（弯道减速）
+            curvature = abs(look_theta - road_theta) / max(look_ahead, 1.0)
+            target_v = max(1.8, 3.8 - curvature * 50.0)
+            self.v += (target_v - self.v) * 0.10
 
-            # 5. 阿克曼运动学积分 (Kinematic Bicycle ODE)
+            # 7. 阿克曼两轮自行车运动学积分（正确无放大）
             beta = math.atan(0.5 * math.tan(self.delta))
-            self.x += self.v * math.cos(self.theta + beta) * dt * 25.0
-            self.y += self.v * math.sin(self.theta + beta) * dt * 25.0
-            self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt * 25.0
+            self.x += self.v * math.cos(self.theta + beta) * dt
+            self.y += self.v * math.sin(self.theta + beta) * dt
+            self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt
+            self.total_dist += self.v * dt
 
-            # 推进沿赛道里程 s
-            self.s += self.v * dt * 25.0
-            self.total_dist = self.s * 0.1 # 标定为米
-
-            # 6. 统计历史 CTE 误差
+            # 8. 历史 CTE
             if self.step_count % 5 == 0:
-                self.history_cte.append(round(self.cte * 0.02, 3))
+                self.history_cte.append(round(self.cte * 0.05, 3))
                 if len(self.history_cte) > 40:
                     self.history_cte.pop(0)
 
-            # 7. 车辆行驶发光轨迹尾迹
-            if self.step_count % 2 == 0:
+            # 9. 车尾发光轨迹
+            if self.step_count % 3 == 0:
                 self.trail.append({"x": round(self.x, 1), "y": round(self.y, 1)})
-                if len(self.trail) > 80:
+                if len(self.trail) > 120:
                     self.trail.pop(0)
 
     def get_snapshot(self):
