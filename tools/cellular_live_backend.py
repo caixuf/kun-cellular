@@ -170,6 +170,15 @@ class SdscSiliconLifeOrgan:
 
         return steer_out, speed_out
 
+    def mutate(self):
+        new_organ = SdscSiliconLifeOrgan(self.n_receptors, self.n_hidden, self.n_motors)
+        if self.W1 is not None:
+            new_organ.W1 = self.W1.copy() + np.random.randn(*self.W1.shape) * 0.02
+        if self.W2 is not None:
+            new_organ.W2 = self.W2.copy() + np.random.randn(*self.W2.shape) * 0.02
+        new_organ.synapses = list(self.synapses)
+        return new_organ
+
 class LiveVehicleSimulator:
     def __init__(self):
         self.generation = 1
@@ -517,40 +526,86 @@ class SiliconCellularOrganism:
         self.init_cells()
         
     def init_cells(self):
+        """构建真实生物形态学三维椭球体生命体流形 (Prolate Spheroid Organism)"""
         self.cells = []
         self.synapses = []
         n_cells = 96
         golden_ratio = (1 + math.sqrt(5)) / 2
+        
+        # 椭球体三轴半长 (a: 250, b: 175, c: 125 黄金生物椭球比例)
+        a_semi, b_semi, c_semi = 250.0, 175.0, 125.0
+
         for i in range(n_cells):
             theta = 2 * math.pi * i / golden_ratio
             phi = math.acos(1 - 2 * (i + 0.5) / n_cells)
-            r = random.uniform(160, 260)
-            x = r * math.sin(phi) * math.cos(theta)
-            y = r * math.sin(phi) * math.sin(theta)
-            z = r * math.cos(phi)
-            ptype = random.choice(SDSCC_ALL_PRIMITIVES)
+            # 径向分层分布：40% 核心核质，60% 外层双层呼吸质膜
+            radial_scale = random.uniform(0.45, 0.70) if i < 24 else random.uniform(0.85, 1.05)
+            
+            x = a_semi * math.sin(phi) * math.cos(theta) * radial_scale
+            y = b_semi * math.sin(phi) * math.sin(theta) * radial_scale
+            z = c_semi * math.cos(phi) * radial_scale
+            
+            # 生物功能极化分区
+            if x < -100:
+                ptype = "SUM" if i % 2 == 0 else "AMPLIFY" # 感知极
+            elif x > 100:
+                ptype = "AMPLIFY" if i % 2 == 0 else "THRESHOLD" # 效应极
+            elif abs(z) > 70:
+                ptype = "DAMPER" if i % 2 == 0 else "CLIP" # 极顶阻尼门控
+            else:
+                ptype = "INTEGRATE" if i % 2 == 0 else "INVERT" # 中间代谢积分
+                
             self.cells.append(PhysicalCell3D(i, ptype, x, y, z))
             
+        # 380+ 条高阶流形空间贝塞尔轴突连接
         for i in range(n_cells):
-            for target in random.sample(range(n_cells), min(4, n_cells)):
-                if i != target:
-                    w = random.choice([-1.0, 1.0]) * random.uniform(0.5, 1.8)
-                    self.synapses.append({"from": i, "to": target, "weight": round(w, 2)})
+            # 优先连接空间邻近与极性协同细胞
+            dists = []
+            ci = self.cells[i]
+            for j in range(n_cells):
+                if i != j:
+                    cj = self.cells[j]
+                    d = math.sqrt((ci.x-cj.x)**2 + (ci.y-cj.y)**2 + (ci.z-cj.z)**2)
+                    dists.append((d, j))
+            dists.sort(key=lambda x: x[0])
+            
+            # 连接最近的 3 个局部细胞 + 1 个长程突触
+            for _, target in dists[:3]:
+                w = random.choice([-1.0, 1.0]) * random.uniform(0.8, 2.0)
+                self.synapses.append({"from": i, "to": target, "weight": round(w, 2)})
+            if random.random() < 0.40 and len(dists) > 5:
+                _, long_target = random.choice(dists[5:15])
+                w = random.choice([-1.0, 1.0]) * random.uniform(0.5, 1.5)
+                self.synapses.append({"from": i, "to": long_target, "weight": round(w, 2)})
 
     def step_physics_and_signal(self):
         with self.lock:
             self.phy_steps += 1
             t = self.phy_steps * 0.04
             
+            a_semi, b_semi, c_semi = 250.0, 175.0, 125.0
+            golden_ratio = (1 + math.sqrt(5)) / 2
+            n_cells = len(self.cells)
+            
             for i, c in enumerate(self.cells):
-                target_r = 200.0 + math.sin(t * 1.5 + i * 0.4) * 25.0
-                curr_r = math.sqrt(c.x*c.x + c.y*c.y + c.z*c.z) + 1e-5
-                dr = (target_r - curr_r) * 0.05
-                c.x += (c.x / curr_r) * dr
-                c.y += (c.y / curr_r) * dr
-                c.z += (c.z / curr_r) * dr
+                # 真实生物椭球体表面呼吸振荡动力学
+                theta = 2 * math.pi * i / golden_ratio
+                phi = math.acos(1 - 2 * (i + 0.5) / max(1, n_cells))
+                radial_base = 0.55 if i < 24 else 0.95
                 
-                stimulus = math.sin(t * 2.0 + i * 0.3) * math.cos(t * 0.8 + i * 0.1)
+                # 空间波动方程叠加
+                breath = 1.0 + 0.06 * math.sin(t * 1.5 + phi * 2.0) + 0.04 * math.cos(t * 0.9 + theta)
+                
+                target_x = a_semi * math.sin(phi) * math.cos(theta) * radial_base * breath
+                target_y = b_semi * math.sin(phi) * math.sin(theta) * radial_base * breath
+                target_z = c_semi * math.cos(phi) * radial_base * breath
+                
+                c.x += (target_x - c.x) * 0.08
+                c.y += (target_y - c.y) * 0.08
+                c.z += (target_z - c.z) * 0.08
+                
+                # 24 离散原语代谢电位激活动力学
+                stimulus = math.sin(t * 2.2 + i * 0.35) * math.cos(t * 0.8 + phi)
                 if c.type == "INTEGRATE":
                     c.state = c.state * 0.88 + stimulus * 0.12
                     c.out = math.tanh(c.state * c.gain)
