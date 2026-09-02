@@ -1311,9 +1311,9 @@ async function pollIslands() {
   try {
     const r = await fetch('/api/islands/status', { signal: AbortSignal.timeout(2000) });
     const j = await r.json();
-    if(j.warp_mode) document.getElementById('st-warp').textContent = j.warp_mode;
-    if(j.total_generations != null) const elTg = document.getElementById('st-total-gens'); if(elTg) elTg.textContent = j.total_generations.toLocaleString();
-    if(j.total_migrations != null) const elTm = document.getElementById('st-total-mig'); if(elTm) elTm.textContent = j.total_migrations + ' 次';
+    if(j.warp_mode) { const el = document.getElementById('st-warp'); if(el) el.textContent = j.warp_mode; }
+    if(j.total_generations != null) { const elTg = document.getElementById('st-total-gens'); if(elTg) elTg.textContent = j.total_generations.toLocaleString(); }
+    if(j.total_migrations != null) { const elTm = document.getElementById('st-total-mig'); if(elTm) elTm.textContent = j.total_migrations + ' 次'; }
     
     if(j.islands && j.islands.length) {
       const html = j.islands.map(isl => {
