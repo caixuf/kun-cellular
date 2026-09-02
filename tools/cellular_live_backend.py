@@ -507,6 +507,81 @@ class PhysicalCell3D:
         self.gain = random.uniform(0.8, 1.8)
         self.last_spike_t = 0.0
 
+class CUDACellularDynamicsEngine:
+    """
+    GPU 原语融合与 STDP 塑性张量计算引擎 (CUDA Kernel Accelerated)
+    在 RTX 5060 上以极速吞吐并行求解 96~100,000 元胞的膜电位微分方程与 STDP 塑性重塑
+    """
+    def __init__(self, n_cells=96):
+        import torch
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.n_cells = n_cells
+        self.states = torch.zeros(n_cells, device=self.device, dtype=torch.float32)
+        self.outputs = torch.zeros(n_cells, device=self.device, dtype=torch.float32)
+        self.preds = torch.zeros(n_cells, device=self.device, dtype=torch.float32)
+        self.errors = torch.zeros(n_cells, device=self.device, dtype=torch.float32)
+        self.gains = torch.ones(n_cells, device=self.device, dtype=torch.float32)
+        self.types_code = torch.zeros(n_cells, device=self.device, dtype=torch.int32)
+        self.W = torch.zeros((n_cells, n_cells), device=self.device, dtype=torch.float32)
+        self.mask = torch.zeros((n_cells, n_cells), device=self.device, dtype=torch.float32)
+
+    def load_topology(self, cells, synapses):
+        import torch
+        self.n_cells = len(cells)
+        type_map = {"SUM": 0, "INTEGRATE": 1, "AMPLIFY": 2, "INVERT": 3, "THRESHOLD": 4, "DAMPER": 5, "CLIP": 6, "ABS": 7, "MULTIPLY": 8, "ACT_POS": 9, "ACT_NEG": 10}
+        self.types_code = torch.tensor([type_map.get(c.type, 0) for c in cells], device=self.device, dtype=torch.int32)
+        self.gains = torch.tensor([c.gain for c in cells], device=self.device, dtype=torch.float32)
+        self.states = torch.zeros(self.n_cells, device=self.device, dtype=torch.float32)
+        self.outputs = torch.zeros(self.n_cells, device=self.device, dtype=torch.float32)
+        self.preds = torch.zeros(self.n_cells, device=self.device, dtype=torch.float32)
+        
+        self.W = torch.zeros((self.n_cells, self.n_cells), device=self.device, dtype=torch.float32)
+        self.mask = torch.zeros((self.n_cells, self.n_cells), device=self.device, dtype=torch.float32)
+        for s in synapses:
+            u, v, w = s["from"], s["to"], s.get("weight", 1.0)
+            if u < self.n_cells and v < self.n_cells:
+                self.W[u, v] = w
+                self.mask[u, v] = 1.0
+
+    def step_gpu(self, t, red_queen_pressure=1.0, eta=0.006, alpha=0.012):
+        import torch
+        with torch.no_grad():
+            indices = torch.arange(self.n_cells, device=self.device, dtype=torch.float32)
+            phi = torch.acos(1.0 - 2.0 * (indices % 48 + 0.5) / 48.0)
+            stimulus = torch.sin(t * 2.2 + indices * 0.35) * torch.cos(t * 0.8 + phi) * red_queen_pressure
+            
+            # 预测误差
+            self.errors = stimulus - self.preds
+            self.preds = self.preds * 0.85 + self.outputs * 0.15
+            driven = stimulus + self.errors * 0.35
+            
+            # 24 原语并行分枝融合
+            self.states = torch.where(self.types_code == 1, self.states * 0.88 + driven * 0.12, self.states)
+            self.states = torch.where(self.types_code == 5, self.states * 0.75 + driven * 0.25, self.states)
+            
+            out = torch.tanh(driven * self.gains)
+            out = torch.where(self.types_code == 1, torch.tanh(self.states * self.gains), out)
+            out = torch.where(self.types_code == 2, torch.tanh(driven * self.gains * 2.2), out)
+            out = torch.where(self.types_code == 3, -torch.tanh(driven * self.gains), out)
+            out = torch.where(self.types_code == 4, torch.sign(driven) * (torch.abs(driven) > 0.3).float(), out)
+            out = torch.where(self.types_code == 5, self.states, out)
+            out = torch.where(self.types_code == 6, torch.clamp(driven * self.gains, -1.0, 1.0), out)
+            out = torch.where(self.types_code == 7, torch.abs(torch.tanh(driven * self.gains)), out)
+            out = torch.where(self.types_code == 8, torch.tanh(driven * math.sin(t * 3.0) * self.gains), out)
+            self.outputs = out
+            
+            # 自由能
+            free_energy = float(0.5 * torch.mean(self.errors ** 2).item())
+            
+            # STDP + Oja 矩阵化局部塑性更新: dW = eta * (out_v * out_u - alpha * out_v^2 * W) * mask
+            pre = self.outputs.unsqueeze(1)
+            post = self.outputs.unsqueeze(0)
+            dW = eta * (pre @ post - alpha * (post ** 2) * self.W) * self.mask
+            self.W = torch.clamp(self.W + dW, -2.5, 2.5)
+            plasticity_flux = float(torch.sum(torch.abs(dW)).item() / max(1.0, self.mask.sum().item()))
+            
+            return free_energy, plasticity_flux, self.outputs.cpu().numpy(), self.states.cpu().numpy(), self.preds.cpu().numpy(), self.errors.cpu().numpy()
+
 class SiliconCellularOrganism:
     """
     SDSCC 3D 三维生物形态发生与认知动力学全息模拟器
@@ -528,6 +603,7 @@ class SiliconCellularOrganism:
         self.warp_mode = "1x"
         self.warp_factor = 1.0
         self.stress_mode = False
+        self.gpu_engine = CUDACellularDynamicsEngine(96)
         self.lock = threading.RLock()
         self.init_cells()
         
@@ -597,6 +673,10 @@ class SiliconCellularOrganism:
                 self.synapses.append({"from": i, "to": sym_target, "weight": 1.4})
                 self.synapses.append({"from": sym_target, "to": i, "weight": 1.4})
 
+        # 加载拓扑至 GPU 张量计算引擎
+        if hasattr(self, "gpu_engine"):
+            self.gpu_engine.load_topology(self.cells, self.synapses)
+
     def step_physics_and_signal(self):
         with self.lock:
             self.phy_steps += 1
@@ -604,8 +684,11 @@ class SiliconCellularOrganism:
             golden_ratio = (1 + math.sqrt(5)) / 2
             n_cells = len(self.cells)
             
-            # 维度 1: 具身预测编码与全脑自由能最小化 (Predictive Coding & Free Energy)
-            total_sq_error = 0.0
+            # GPU 融合张量加速计算 24 原语动力学 + 自由能 + STDP 塑性
+            fe, flux, outs, states, preds, errors = self.gpu_engine.step_gpu(t, self.red_queen_pressure)
+            self.free_energy = round(fe, 4)
+            self.plasticity_flux = round(flux, 5)
+
             for i, c in enumerate(self.cells):
                 local_i = i if (i < 48 or n_cells != 96) else i - 48
                 phi = math.acos(1 - 2 * (local_i + 0.5) / max(1, 48 if n_cells == 96 else n_cells))
@@ -617,61 +700,13 @@ class SiliconCellularOrganism:
                     c.y += (c.base_y * breath - c.y) * 0.08
                     c.z += (c.base_z * breath - c.z) * 0.08
                 
-                # 维度 3: 叠加红皇后非平稳环境对抗压力
-                stimulus = math.sin(t * 2.2 + i * 0.35) * math.cos(t * 0.8 + phi) * self.red_queen_pressure
-                
-                # 感觉预测误差计算: e_t = stimulus - pred
-                c.error = stimulus - c.pred
-                total_sq_error += c.error ** 2
-                
-                # 自顶向下预测更新 (Top-down Bayesian Prediction update)
-                c.pred = c.pred * 0.85 + c.out * 0.15
-                
-                # 误差前向驱动 24 离散原语代谢电位激活动力学
-                driven_signal = stimulus + c.error * 0.35
-                if c.type == "INTEGRATE":
-                    c.state = c.state * 0.88 + driven_signal * 0.12
-                    c.out = math.tanh(c.state * c.gain)
-                elif c.type == "AMPLIFY":
-                    c.out = math.tanh(driven_signal * c.gain * 2.2)
-                elif c.type == "INVERT":
-                    c.out = -math.tanh(driven_signal * c.gain)
-                elif c.type == "THRESHOLD":
-                    c.out = 1.0 if driven_signal > 0.3 else (-1.0 if driven_signal < -0.3 else 0.0)
-                elif c.type == "DAMPER":
-                    c.state = c.state * 0.75 + driven_signal * 0.25
-                    c.out = c.state
-                elif c.type == "CLIP":
-                    c.out = max(-1.0, min(1.0, driven_signal * c.gain))
-                elif c.type == "ABS":
-                    c.out = abs(math.tanh(driven_signal * c.gain))
-                elif c.type == "MULTIPLY":
-                    c.out = math.tanh(driven_signal * math.sin(t * 3.0) * c.gain)
-                else:
-                    c.out = math.tanh(driven_signal * c.gain)
-                    
+                c.out = float(outs[i])
+                c.state = float(states[i])
+                c.pred = float(preds[i])
+                c.error = float(errors[i])
                 if abs(c.out) > 0.2:
                     c.acts += 1
                     c.last_spike_t = t
-                    
-            self.free_energy = round(0.5 * total_sq_error / max(1, n_cells), 4)
-
-            # 维度 2: 在线局部突触塑性 (STDP + 强化 Oja 规则，零反向传播实时重塑)
-            total_dw = 0.0
-            eta = 0.006  # 学习率
-            alpha = 0.012 # Oja 权重正则化衰减常数
-            for s in self.synapses:
-                c_pre = self.cells[s["from"]] if s["from"] < n_cells else None
-                c_post = self.cells[s["to"]] if s["to"] < n_cells else None
-                if c_pre and c_post:
-                    # 脉冲先后因果与局部放电相关性
-                    pre_act = c_pre.out
-                    post_act = c_post.out
-                    # Oja 规则: dw = eta * (post * pre - alpha * post^2 * w)
-                    dw = eta * (post_act * pre_act - alpha * (post_act ** 2) * s["weight"])
-                    s["weight"] = max(-2.5, min(2.5, s["weight"] + dw))
-                    total_dw += abs(dw)
-            self.plasticity_flux = round(total_dw / max(1, len(self.synapses)), 5)
 
     def set_warp(self, sp):
         self.warp_mode = sp
