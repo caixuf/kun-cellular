@@ -1855,7 +1855,7 @@ async function pollLibrary() {
           const groupId = `org-group-${org.organism_id}`;
           const isOpen = openGroups.has(groupId) ? "open" : "";
           const booksHtml = (org.books || []).map(b => {
-            return `<div class="book-card" onclick="event.stopPropagation(); highlightBookCircuit('${b.book_id}', '${b.title || b.book_id}', '${org.name}')">
+            return `<div class="book-card" onclick="event.stopPropagation(); highlightBookSubcircuit('${b.book_id}', '${b.title || b.book_id}', '${org.name}')">
               <div style="display:flex;justify-content:space-between;color:var(--cyan);font-weight:bold;font-size:10px;">
                 <span>《${b.title || b.book_id}》</span>
                 <span style="color:var(--amber);">[★ ${b.impact_score || 9.5}]</span>
@@ -1865,7 +1865,7 @@ async function pollLibrary() {
               </div>
               <div style="display:flex;justify-content:space-between;color:var(--text-dim);font-size:8px;margin-top:3px;">
                 <span style="color:var(--emerald);">引用: ${b.citations || 1} 次</span>
-                <span style="color:var(--purple);font-weight:bold;">[点击挂载回路]</span>
+                <span style="color:var(--amber);font-weight:bold;">[点亮特定回路]</span>
               </div>
             </div>`;
           }).join('');
@@ -1873,14 +1873,14 @@ async function pollLibrary() {
           const cellDesc = org.total_cells >= 100000000 ? '1亿细胞' : org.total_cells >= 10000000 ? '1000万细胞' : ((org.total_cells/10000).toFixed(0)+'万细胞');
 
           return `<div class="organism-group ${isOpen}" id="${groupId}">
-            <div class="organism-header" onclick="toggleOrganismGroup('${groupId}')">
+            <div class="organism-header" onclick="selectOrganism('${org.organism_id}', '${org.name}', '${groupId}')">
               <div>
                 <span style="color:#f8fafc;font-weight:bold;font-size:10px;">${org.name}</span>
                 <span class="org-tag" style="margin-left:4px;">${org.tag || '生命体'}</span>
               </div>
               <div style="display:flex;align-items:center;gap:6px;">
                 <span style="color:var(--cyan);font-size:9px;">${cellDesc} · ${(org.books||[]).length} 册</span>
-                <span style="color:var(--text-dim);font-size:8px;">▼</span>
+                <span style="color:var(--text-dim);font-size:8px;">[挂载/折叠]</span>
               </div>
             </div>
             <div class="organism-books">
@@ -2521,51 +2521,111 @@ function initTooltipEngine() {
   });
 }
 
-// 8.4 硅基生命体与典籍点击回路联动高亮与脑区重构
-window.highlightBookCircuit = function(bookId, title, organismName) {
-  const orgTitle = organismName ? `【${organismName}】之` : '';
-  log(`[典籍挂载] 正在将 ${orgTitle}《${title || bookId}》重构载入 3D 计算流形！`, true);
-  
-  if (bookId.includes("quant")) {
-    window.loadPreset("real");
-  } else if (bookId.includes("vehicle") || bookId.includes("adas")) {
-    window.loadPreset("adas");
-  } else if (bookId.includes("arithmetic") || bookId.includes("math")) {
-    window.loadPreset("math");
-  } else if (bookId.includes("loco") || bookId.includes("cpg")) {
+// 8.4 硅基生命体整体形态挂载 (Click Organism -> Mount Full Life-Form in 3D)
+window.selectOrganism = function(organismId, organismName, groupId) {
+  window.toggleOrganismGroup(groupId);
+  log(`[生命体形态发生] 正在将【${organismName}】的全息 3D 活体形态挂载到力场视界！`, true);
+
+  if (organismId === "apex_generalist_prime") {
+    window.currentPresetCells = 100000000;
+    window.currentPresetSyns = 400000000;
+    window.loadPreset("mature");
+  } else if (organismId === "embodied_kinematic_beast") {
     window.currentPresetCells = 5000000;
     window.currentPresetSyns = 20000000;
     window.loadPreset("mature");
-  } else if (bookId.includes("immune")) {
+  } else if (organismId === "micro_defense_symbiosis") {
     window.currentPresetCells = 3600000;
     window.currentPresetSyns = 14400000;
     window.loadPreset("mature");
-  } else if (bookId.includes("slingshot")) {
+  } else if (organismId === "celestial_chaos_integrator") {
     window.currentPresetCells = 1200000;
     window.currentPresetSyns = 4800000;
-    window.loadPreset("mature");
-  } else if (bookId.includes("laokexia")) {
-    window.currentPresetCells = 1000000000;
-    window.currentPresetSyns = 4000000000;
     window.loadPreset("mature");
   } else {
     window.loadPreset("mature");
   }
   window.setCameraPreset('front');
 
-  // 突触金光脉冲
+  // 全脑生命力脉冲
   for (const v of views.syns) {
-    v.lineMat.color.setHex(0xfbbf24);
-    v.lineMat.opacity = 1.0;
-    v.photon1.material.color.setHex(0xfbbf24);
-    v.photon2.material.color.setHex(0xfbbf24);
+    v.lineMat.color.setHex(0x38bdf8);
+    v.lineMat.opacity = 0.85;
+    v.photon1.material.color.setHex(0x38bdf8);
+    v.photon2.material.color.setHex(0xa855f7);
   }
   for (const v of views.cells) {
-    v.membrane.material.color.setHex(0xfbbf24);
-    v.membrane.material.opacity = 0.8;
+    const fam = FAMILY(v.cell.type);
+    v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
+    v.membrane.material.opacity = 0.65;
+  }
+};
+
+// 8.5 典籍局部回路精准高亮点亮 (Click Book -> Highlight Specific Subset of Cells & Synapses)
+window.highlightBookSubcircuit = function(bookId, title, organismName) {
+  const orgTitle = organismName ? `【${organismName}】体内` : '';
+  log(`[典籍回路点亮] 正在精准点亮 ${orgTitle}《${title || bookId}》的特定细胞簇与突触通路！`, true);
+
+  // 1. 确定该典籍对应的特定细胞簇与突触特征色彩
+  let targetCells = [];
+  let targetColor = 0xfbbf24; // 黄金光芒
+
+  if (bookId.includes("quant")) {
+    targetCells = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 21, 22, 23, 24];
+    targetColor = 0x10b981; // 翠绿量化动量
+  } else if (bookId.includes("vehicle") || bookId.includes("adas")) {
+    targetCells = [16, 17, 18, 19, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35];
+    targetColor = 0x38bdf8; // 智驾电光青
+  } else if (bookId.includes("arithmetic") || bookId.includes("math")) {
+    targetCells = [56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70];
+    targetColor = 0xa855f7; // 纯符号紫晶
+  } else if (bookId.includes("laokexia")) {
+    targetCells = Array.from({length: 96}, (_, i) => i);
+    targetColor = 0xf43f5e; // 十亿张量赤红
+  } else if (bookId.includes("loco") || bookId.includes("cpg")) {
+    targetCells = [0, 1, 2, 3, 4, 8, 9, 10, 11, 16, 17, 18, 19];
+    targetColor = 0xf59e0b; // 动力学琥珀
+  } else if (bookId.includes("maze")) {
+    targetCells = [20, 21, 22, 23, 24, 30, 31, 32, 40, 41, 42];
+    targetColor = 0x10b981; // 迷宫新奇绿
+  } else if (bookId.includes("immune")) {
+    targetCells = [10, 11, 12, 13, 25, 26, 27, 45, 46, 47];
+    targetColor = 0xa855f7; // 免疫淋巴紫
+  } else if (bookId.includes("slingshot")) {
+    targetCells = [3, 4, 5, 15, 16, 17, 35, 36, 37];
+    targetColor = 0x38bdf8; // 引力势阱青
+  } else {
+    targetCells = [0, 1, 2, 3, 10, 11, 20, 21, 30, 31];
+    targetColor = 0xfbbf24;
   }
 
-  // 2.5 秒后平滑恢复原生颜色
+  const targetSet = new Set(targetCells);
+
+  // 2. 将非目标细胞暗化 (Dimming)，将目标细胞强力高光点亮 (Spotlighting)
+  for (const v of views.cells) {
+    if (targetSet.has(v.cell.id)) {
+      v.membrane.material.color.setHex(targetColor);
+      v.membrane.material.opacity = 0.95;
+      v.cell.glow = 1.0;
+    } else {
+      v.membrane.material.opacity = 0.12;
+    }
+  }
+
+  // 3. 将属于目标回路的突触轴突全速爆发金光动作电位
+  for (const v of views.syns) {
+    const isTarget = targetSet.has(v.syn.from) || targetSet.has(v.syn.to);
+    if (isTarget) {
+      v.lineMat.color.setHex(0xfbbf24);
+      v.lineMat.opacity = 1.0;
+      v.photon1.material.color.setHex(0xfbbf24);
+      v.photon2.material.color.setHex(targetColor);
+    } else {
+      v.lineMat.opacity = 0.08;
+    }
+  }
+
+  // 4. 3.5 秒后平滑恢复整脑常态呼吸
   setTimeout(() => {
     for (const v of views.syns) {
       const w = v.syn.w || 1.0;
@@ -2579,7 +2639,7 @@ window.highlightBookCircuit = function(bookId, title, organismName) {
       v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
       v.membrane.material.opacity = 0.4;
     }
-  }, 2500);
+  }, 3500);
 };
 
 // 8.5 硅基生命体神经对话舱交互 (Silicon Neural Dialogue Deck)
