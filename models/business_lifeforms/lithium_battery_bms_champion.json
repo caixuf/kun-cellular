@@ -1,0 +1,33 @@
+{
+  "id": "lithium_battery_bms",
+  "name": "动力电池热失控与SOH健康生命体",
+  "domain": "新能源与储能热动力学",
+  "cells_scale": 10000000,
+  "input_signals": [
+    "单体电芯压差",
+    "电化学极化内阻",
+    "充放电温升斜率",
+    "析锂副反应气体溢出"
+  ],
+  "action_outputs": [
+    "主动均衡能量旁路",
+    "自适应降流恒功率",
+    "热管理液冷超频",
+    "热失控电芯物理隔离"
+  ],
+  "primitive_motif": [
+    "OP_INTEGRAL",
+    "OP_RATIO",
+    "GATE_THRESHOLD",
+    "OP_QUADRATIC",
+    "ACT_DEFENSIVE_RESET",
+    "ACT_IMMUNE_BLOCK"
+  ],
+  "sample_dialogue": "基于电化学极化阻抗与三维热动力学传导方程，在电芯内部析锂微短路初生阶段实现毫秒级自愈降载与热阻断。",
+  "training_metadata": {
+    "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "training_time_sec": 0.155,
+    "peak_throughput_mcells": 645.7,
+    "convergence_score": 0.9982
+  }
+}

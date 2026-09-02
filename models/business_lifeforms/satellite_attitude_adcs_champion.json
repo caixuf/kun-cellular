@@ -1,0 +1,33 @@
+{
+  "id": "satellite_attitude_adcs",
+  "name": "低轨微纳卫星姿态轨道控制ADCS生命体",
+  "domain": "航空航天与空间动力学",
+  "cells_scale": 15000000,
+  "input_signals": [
+    "星敏感器四元数误差",
+    "太阳敏感器矢量偏角",
+    "地磁仪三轴磁通",
+    "空间微重力引力梯度力矩"
+  ],
+  "action_outputs": [
+    "反作用飞轮三轴加减速",
+    "磁力矩器卸载电流",
+    "冷气微推姿态微调",
+    "对地对日快速机动定向"
+  ],
+  "primitive_motif": [
+    "OP_MULTIPLY",
+    "OP_INTEGRAL",
+    "GATE_HYSTERESIS",
+    "OP_ABS",
+    "ACT_PRIMARY_POSITIVE",
+    "ACT_DEFENSIVE_RESET"
+  ],
+  "sample_dialogue": "在 500km 太阳同步轨道自主对抗高层大气残余阻力与太阳光压摄动，三轴指向稳定度达 0.001 deg/s。",
+  "training_metadata": {
+    "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "training_time_sec": 0.155,
+    "peak_throughput_mcells": 965.8,
+    "convergence_score": 0.9982
+  }
+}

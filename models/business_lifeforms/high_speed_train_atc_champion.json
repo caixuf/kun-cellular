@@ -1,0 +1,33 @@
+{
+  "id": "high_speed_train_atc",
+  "name": "高铁列控防护曲线与轮轨粘着蠕滑生命体",
+  "domain": "高速铁路与轨道交通自动化",
+  "cells_scale": 15000000,
+  "input_signals": [
+    "ATP应答器动态限速曲线",
+    "雷达测速与多轴脉冲转速",
+    "轮轨蠕滑率与粘着利用系数",
+    "闭塞分区前车空间追踪间距"
+  ],
+  "action_outputs": [
+    "牵引变频逆变器力矩调配",
+    "电空制动平滑级位指令",
+    "轮对防滑空转自适应再粘着",
+    "超速预警硬防护截断"
+  ],
+  "primitive_motif": [
+    "OP_EMA",
+    "OP_DIFF",
+    "GATE_HYSTERESIS",
+    "OP_SUM",
+    "ACT_PRIMARY_POSITIVE",
+    "ACT_IMMUNE_BLOCK"
+  ],
+  "sample_dialogue": "在 350km/h 极速运行与雨雪低粘着恶劣天气下，自组织调整轮轨蠕滑力，实现平稳加减速与停站对标精度小于 5 毫米。",
+  "training_metadata": {
+    "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "training_time_sec": 0.156,
+    "peak_throughput_mcells": 962.8,
+    "convergence_score": 0.9982
+  }
+}

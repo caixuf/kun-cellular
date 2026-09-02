@@ -1,7 +1,7 @@
 {
   "organism_id": "vehicle_super_cortex",
   "generation": 100,
-  "best_fitness": 999.7991930227727,
+  "best_fitness": 999.7994935140014,
   "macro_cells": 1000000,
   "macro_synapses": 4200000,
   "history": [

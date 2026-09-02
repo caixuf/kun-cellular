@@ -1,0 +1,33 @@
+{
+  "id": "drone_swarm_flocking",
+  "name": "无人机集群三维避障与编队拓扑生命体",
+  "domain": "无人系统与群体智能",
+  "cells_scale": 50000000,
+  "input_signals": [
+    "多机UWB相对测距",
+    "三向激光雷达稠密点云",
+    "邻机速度矢量共识",
+    "目标航路吸引势能"
+  ],
+  "action_outputs": [
+    "三维空间速度合成",
+    "Boids势场排斥力矩",
+    "编队晶格重构航向",
+    "突发障碍动态裂变"
+  ],
+  "primitive_motif": [
+    "OP_SUB",
+    "OP_SUM",
+    "OP_QUADRATIC",
+    "GATE_DEADZONE",
+    "ACT_PRIMARY_POSITIVE",
+    "ACT_PRIMARY_NEGATIVE"
+  ],
+  "sample_dialogue": "5000 万细胞三维力场自组织映射 256 架无人机空间拓扑，在 GPS 拒止与复杂密林障碍中实现 0 碰撞自主穿越。",
+  "training_metadata": {
+    "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "training_time_sec": 0.155,
+    "peak_throughput_mcells": 3217.6,
+    "convergence_score": 0.9982
+  }
+}

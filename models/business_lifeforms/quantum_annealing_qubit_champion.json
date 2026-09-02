@@ -1,0 +1,33 @@
+{
+  "id": "quantum_annealing_qubit",
+  "name": "超导量子比特通量退相干动态补偿生命体",
+  "domain": "量子计算与超导电子学",
+  "cells_scale": 10000000,
+  "input_signals": [
+    "Ramsey干涉条纹相位漂移",
+    "Josephson结磁通噪声",
+    "微波腔色散读出频移",
+    "环境声子热涨落"
+  ],
+  "action_outputs": [
+    "磁通偏置实时反相注入",
+    "微波DRAG脉冲波形微调",
+    "退相干动态解耦序列",
+    "量子门保真度实时校准"
+  ],
+  "primitive_motif": [
+    "OP_OSCILLATOR",
+    "OP_DIFF",
+    "OP_MULTIPLY",
+    "GATE_DEADZONE",
+    "ACT_PRIMARY_POSITIVE",
+    "ACT_PRIMARY_NEGATIVE"
+  ],
+  "sample_dialogue": "以亚纳秒级神经元算存一体回路实时抑制低频 1/f 磁通噪声，使超导量子比特相干寿命 $T_2^*$ 提升 3.4 倍。",
+  "training_metadata": {
+    "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "training_time_sec": 0.155,
+    "peak_throughput_mcells": 644.8,
+    "convergence_score": 0.9982
+  }
+}

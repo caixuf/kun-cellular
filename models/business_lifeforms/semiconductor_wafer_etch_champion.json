@@ -1,0 +1,33 @@
+{
+  "id": "semiconductor_wafer_etch",
+  "name": "半导体等离子体刻蚀终点监控EPD生命体",
+  "domain": "微纳制造与半导体物理",
+  "cells_scale": 10000000,
+  "input_signals": [
+    "OES特征谱线强度突变",
+    "等离子体射频反射功率",
+    "真空腔体自偏压",
+    "纳米晶圆表面残余光泽"
+  ],
+  "action_outputs": [
+    "射频辉光毫秒级截断",
+    "刻蚀气体流量微调",
+    "腔体气压动态补偿",
+    "过刻蚀深度纳米级锁定"
+  ],
+  "primitive_motif": [
+    "OP_DIFF",
+    "OP_RATIO",
+    "GATE_THRESHOLD",
+    "OP_EMA",
+    "ACT_IMMUNE_BLOCK",
+    "ACT_DEFENSIVE_RESET"
+  ],
+  "sample_dialogue": "在 3nm 环绕栅极 (GAA) 工艺中，基于单原子层材料剥离的光学发射光谱（OES）跃迁，将刻蚀过切误差控制在 0.2nm 以内。",
+  "training_metadata": {
+    "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "training_time_sec": 0.157,
+    "peak_throughput_mcells": 638.9,
+    "convergence_score": 0.9982
+  }
+}

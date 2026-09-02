@@ -1,0 +1,33 @@
+{
+  "id": "protein_folding_pathway",
+  "name": "蛋白质折叠二面角能垒跃迁生命体",
+  "domain": "计算结构生物学与生物物理",
+  "cells_scale": 25000000,
+  "input_signals": [
+    "氨基酸主链二面角(phi, psi)",
+    "侧链疏水相互作用自由能",
+    "范德华接触距离与氢键网络",
+    "溶剂可及表面积SASA"
+  ],
+  "action_outputs": [
+    "主链扭转角构象扰动",
+    "疏水核心分子坍缩力矩",
+    "局部二级结构(alpha/beta)固化",
+    "能量全局极小态漏斗收敛"
+  ],
+  "primitive_motif": [
+    "OP_OSCILLATOR",
+    "OP_QUADRATIC",
+    "OP_MULTIPLY",
+    "GATE_MIN_MAX",
+    "ACT_PRIMARY_POSITIVE",
+    "ACT_DEFENSIVE_RESET"
+  ],
+  "sample_dialogue": "以 2500 万细胞模拟非线性自由能漏斗景观（Folding Funnel），克服构象采样 Levinthal 悖论，毫秒级自发折叠出天然活性结构。",
+  "training_metadata": {
+    "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
+    "training_time_sec": 0.155,
+    "peak_throughput_mcells": 1610.3,
+    "convergence_score": 0.9982
+  }
+}
