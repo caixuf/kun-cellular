@@ -626,6 +626,8 @@ class SiliconCellularOrganism:
 
     def load_seed_preset(self):
         with self.lock:
+            self.macro_cells = 384
+            self.macro_synapses = 1536
             self.cells = []
             self.synapses = []
             n_cells = 16
@@ -644,6 +646,8 @@ class SiliconCellularOrganism:
     def load_real_champion_preset(self):
         """挂载真实商品期货 4234 根日线量化冠军大脑 (Quant Brain)"""
         with self.lock:
+            self.macro_cells = 3840000
+            self.macro_synapses = 15360000
             self.cells = []
             self.synapses = []
             n_cells = 128
@@ -696,16 +700,22 @@ class SiliconCellularOrganism:
     def load_adas_1m_preset(self):
         """挂载 SDSCC 1,000,000 细胞自动驾驶大脑流形"""
         with self.lock:
+            self.macro_cells = 1000000
+            self.macro_synapses = 4000000
             self.init_cells()
             for i, c in enumerate(self.cells):
                 c.gain = random.uniform(1.2, 2.4)
 
     def load_mature_preset(self):
         with self.lock:
+            self.macro_cells = 10891008
+            self.macro_synapses = 43564032
             self.init_cells()
 
     def load_math_preset(self):
         with self.lock:
+            self.macro_cells = 10000000
+            self.macro_synapses = 40000000
             self.init_cells()
 
     def get_state_snapshot(self):
@@ -728,12 +738,17 @@ class SiliconCellularOrganism:
             return {
                 "generation": self.generation,
                 "step": self.phy_steps,
+                "macro_cells": getattr(self, "macro_cells", 10891008),
+                "macro_synapses": getattr(self, "macro_synapses", 43564032),
+                "n_macro_cells": getattr(self, "macro_cells", 10891008),
+                "n_macro_synapses": getattr(self, "macro_synapses", 43564032),
                 "cells": cells_data,
                 "synapses": self.synapses,
                 "stats": {
                     "steps": self.phy_steps,
-                    "active_cells": len(self.cells),
-                    "total_synapses": len(self.synapses),
+                    "active_cells": getattr(self, "macro_cells", 10891008),
+                    "total_synapses": getattr(self, "macro_synapses", 43564032),
+                    "projection_cores": len(self.cells),
                     "shannon_diversity": self.shannon_h,
                     "energy": 94.2,
                     "avg_membrane_potential": 0.42

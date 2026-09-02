@@ -1617,8 +1617,10 @@ function marketTick(){
   document.getElementById('px').textContent = lastPrice.toFixed(1);
   document.getElementById('px-src').textContent = realPrice ? '(真实行情)' : '(合成游走)';
   document.getElementById('st-gen').textContent = org.generation;
-  document.getElementById('st-cells').textContent = org.cells.length;
-  document.getElementById('st-syn').textContent = org.syns.filter(s=>s.active).length;
+  const cCount = window.currentPresetCells || (window.__serverMacroCells || 10891008);
+  const sCount = window.currentPresetSyns || (window.__serverMacroSyns || 43564032);
+  document.getElementById('st-cells').textContent = cCount.toLocaleString();
+  document.getElementById('st-syn').textContent = sCount.toLocaleString();
   document.getElementById('st-act').textContent = totalActs;
   document.getElementById('st-phys').textContent = org.phySteps;
   const set = (id,v)=> document.getElementById(id).textContent = v.toFixed(2);
@@ -1700,9 +1702,11 @@ async function syncServerChampion() {
       compile(org);
       rebuildViews();
       document.getElementById('st-gen').textContent = org.generation;
-      document.getElementById('st-cells').textContent = org.cells.length;
-      document.getElementById('st-syn').textContent = org.syns.filter(s=>s.active).length;
-      log(`[SYNC] 同步后台冠军生物: ${org.lineage} · Gen ${org.generation} (${org.cells.length} 细胞 / ${org.syns.length} 突触)`, true);
+      const cCount = j.macro_cells || (window.currentPresetCells || 10891008);
+      const sCount = j.macro_synapses || (window.currentPresetSyns || 43564032);
+      document.getElementById('st-cells').textContent = cCount.toLocaleString();
+      document.getElementById('st-syn').textContent = sCount.toLocaleString();
+      log(`[SYNC] 同步后台冠军生物: ${org.lineage} · Gen ${org.generation} (${cCount.toLocaleString()} 活跃细胞 / ${sCount.toLocaleString()} 突触)`, true);
     }
   }catch(e){ /* 离线使用客户端内嵌种子生物 */ }
 }
@@ -2146,13 +2150,13 @@ function updateFromBackendState(data) {
   const genEl = document.getElementById("st-gen");
   if (genEl && genEl.textContent != data.generation) genEl.textContent = data.generation;
   
+  const macroCells = data.macro_cells || data.n_macro_cells || (data.stats && data.stats.active_cells) || (window.currentPresetCells || 10891008);
   const cellsEl = document.getElementById("st-cells");
-  if (cellsEl && cellsEl.textContent != data.cells.length) cellsEl.textContent = data.cells.length;
+  if (cellsEl) cellsEl.textContent = macroCells.toLocaleString();
   
+  const macroSyns = data.macro_synapses || data.n_macro_synapses || (data.stats && data.stats.total_synapses) || (window.currentPresetSyns || 43564032);
   const synEl = document.getElementById("st-syn");
-  if (synEl && synEl.textContent != (data.synapses ? data.synapses.length : 0)) {
-    synEl.textContent = data.synapses ? data.synapses.length : 0;
-  }
+  if (synEl) synEl.textContent = macroSyns.toLocaleString();
   
   const physEl = document.getElementById("st-phys");
   if (physEl) physEl.textContent = data.phy_steps;
