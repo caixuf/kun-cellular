@@ -229,8 +229,8 @@
     <main>
         <div class="viewport-card">
             <div class="panel-header">
-                <span>[ENDLESS_PROCEDURAL_ROAD] // THIRD_PERSON_FOLLOW_CAM</span>
-                <span style="color:var(--emerald-glow);" id="hud-status">STATUS: INFINITE_LANE_CENTERING</span>
+                <span>[ENDLESS_HIGHWAY] // CHASE_CAMERA_STABILIZED</span>
+                <span style="color:var(--emerald-glow);" id="hud-status">STATUS: AUTONOMOUS_LANE_CENTERING</span>
             </div>
             
             <div class="veh-top-bar">
@@ -276,7 +276,6 @@
                     </div>
                 </div>
 
-                <!-- 实时方向盘偏角仪表 -->
                 <div class="steer-dial-box">
                     <svg class="steer-wheel-svg" id="steer-wheel" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="42" fill="none" stroke="#38bdf8" stroke-width="6"/>
@@ -319,6 +318,9 @@
         let isRunning = true;
         let vehState = null;
 
+        // 平滑摄像机水平平移，消除剧烈晃动
+        let smoothedCamX = 400.0;
+
         function resize() {
             canvas.width = wrap.clientWidth;
             canvas.height = wrap.clientHeight;
@@ -343,7 +345,7 @@
 
         window.toggleSim = function() {
             isRunning = !isRunning;
-            document.getElementById("hud-status").innerText = isRunning ? "STATUS: INFINITE_LANE_CENTERING" : "STATUS: PAUSED";
+            document.getElementById("hud-status").innerText = isRunning ? "STATUS: AUTONOMOUS_LANE_CENTERING" : "STATUS: PAUSED";
         };
 
         async function fetchVehState() {
@@ -365,7 +367,6 @@
             document.getElementById("stat-steer").innerText = `${car.delta_deg || 0.0}°`;
             document.getElementById("stat-cte").innerText = `${car.cte_m || 0.0} m`;
 
-            // 旋转方向盘图标
             const deg = car.delta_deg || 0.0;
             steerWheel.style.transform = `rotate(${deg * 4.5}deg)`;
             document.getElementById("steer-val-text").innerText = `${deg > 0 ? "+" : ""}${deg}°`;
@@ -394,7 +395,6 @@
             chartCtx.beginPath();
             ctes.forEach((val, i) => {
                 const x = (i / (ctes.length - 1)) * w;
-                // 最大 0.5 米偏差范围
                 const y = Math.max(8, Math.min(h - 8, h/2 + (val / 0.5) * (h/2 - 10)));
                 if (i === 0) chartCtx.moveTo(x, y);
                 else chartCtx.lineTo(x, y);
@@ -412,9 +412,8 @@
             ctx.fillStyle = "#050b14";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 第三人称平滑跟随摄像机：
-            // 将当前车辆保持在视口水平中心偏下位置 (y = canvas.height * 0.75)
-            const camTargetX = car.x;
+            // 摄像机平滑插值 (Lerp)，视野极其稳定
+            smoothedCamX += (car.x - smoothedCamX) * 0.12;
             const camTargetS = car.s;
             const screenCenterX = canvas.width * 0.5;
             const screenCarY = canvas.height * 0.75;
@@ -429,7 +428,7 @@
                 ctx.lineJoin = "round";
                 ctx.beginPath();
                 roadPoints.forEach((pt, i) => {
-                    const scrX = screenCenterX + (pt.x - camTargetX);
+                    const scrX = screenCenterX + (pt.x - smoothedCamX);
                     const scrY = screenCarY - (pt.s - camTargetS);
                     if (i === 0) ctx.moveTo(scrX, scrY);
                     else ctx.lineTo(scrX, scrY);
@@ -442,10 +441,8 @@
                     ctx.lineWidth = 3;
                     ctx.beginPath();
                     roadPoints.forEach((pt, i) => {
-                        const nx = Math.cos(pt.psi || 0.0) * offset;
-                        const ny = -Math.sin(pt.psi || 0.0) * offset;
-                        const scrX = screenCenterX + (pt.x + nx - camTargetX);
-                        const scrY = screenCarY - (pt.s + ny - camTargetS);
+                        const scrX = screenCenterX + (pt.x + offset - smoothedCamX);
+                        const scrY = screenCarY - (pt.s - camTargetS);
                         if (i === 0) ctx.moveTo(scrX, scrY);
                         else ctx.lineTo(scrX, scrY);
                     });
@@ -458,7 +455,7 @@
                 ctx.setLineDash([12, 10]);
                 ctx.beginPath();
                 roadPoints.forEach((pt, i) => {
-                    const scrX = screenCenterX + (pt.x - camTargetX);
+                    const scrX = screenCenterX + (pt.x - smoothedCamX);
                     const scrY = screenCarY - (pt.s - camTargetS);
                     if (i === 0) ctx.moveTo(scrX, scrY);
                     else ctx.lineTo(scrX, scrY);
@@ -468,9 +465,10 @@
             }
 
             // 4. 绘制第三人称主视角车辆 (Cyber Autonomous Car)
+            const carScreenX = screenCenterX + (car.x - smoothedCamX);
             ctx.save();
-            ctx.translate(screenCenterX, screenCarY);
-            // 车辆偏转角度 (相对于公路切线)
+            ctx.translate(carScreenX, screenCarY);
+            // 车身根据当前航向角平稳微调 (psi)
             ctx.rotate(car.psi || 0.0);
 
             // 前照大灯光束 (Headlight Cone)

@@ -1687,10 +1687,11 @@ class LiveVehicleSimulator:
         self.init_vehicle()
 
     def X_road(self, s):
-        return 400.0 + math.sin(s * 0.003) * 140.0 + math.sin(s * 0.007) * 70.0
+        # 真实高速公路平缓大半径曲率曲线 (Graceful Highway Geometry, R > 500m)
+        return 400.0 + math.sin(s * 0.0008) * 160.0 + math.sin(s * 0.0020) * 80.0
 
     def dX_road_ds(self, s):
-        return math.cos(s * 0.003) * 0.003 * 140.0 + math.cos(s * 0.007) * 0.007 * 70.0
+        return math.cos(s * 0.0008) * 0.0008 * 160.0 + math.cos(s * 0.0020) * 0.0020 * 80.0
 
     def init_vehicle(self):
         with self.lock:
