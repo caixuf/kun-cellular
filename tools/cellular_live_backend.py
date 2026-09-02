@@ -93,6 +93,21 @@ class LiveOrganism:
             elif speed == "unlimited" or speed == "max": self.warp_factor = 500
             return self.warp_mode
 
+    
+    def load_real_champion_preset(self):
+        ckpt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "checkpoints", "real_trained_champion.json")
+        if os.path.exists(ckpt_path):
+            with open(ckpt_path, "r", encoding="utf-8") as f:
+                ckpt = json.load(f)
+            with self.lock:
+                self.generation = ckpt.get("train_generations", 30)
+                self.cells = ckpt.get("cells", self.cells)
+                self.synapses = ckpt.get("synapses", self.synapses)
+                self.compile_topology()
+                print(f"[*] 成功加载真实演化训练冠军模型: {len(self.cells)} 细胞 / {len(self.synapses)} 突触")
+                return True
+        return False
+
     def load_mature_preset(self):
         with self.lock:
             self.generation = 384
@@ -472,12 +487,15 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/preset"):
-            ptype = "seed" if "seed" in self.path else "mature"
-            if ptype == "seed":
-                organism.load_seed_preset()
-            else:
-                organism.load_mature_preset()
-            body = json.dumps({"status": "ok", "preset": ptype}).encode("utf-8")
+            ptype = "mature"
+            if "seed" in self.path: ptype = "seed"
+            elif "real" in self.path or "champion" in self.path: ptype = "real"
+
+            if ptype == "seed": organism.load_seed_preset()
+            elif ptype == "real": organism.load_real_champion_preset()
+            else: organism.load_mature_preset()
+
+            body = json.dumps({"status": "ok", "preset": ptype, "cells_count": len(organism.cells)}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
