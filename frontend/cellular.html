@@ -466,10 +466,12 @@
   }
   .organism-books {
     display: none;
-    padding: 10px;
+    padding: 10px 8px;
     flex-direction: column;
     gap: 8px;
     background: rgba(10, 15, 28, 0.6);
+    max-height: 280px;
+    overflow-y: auto;
   }
   .organism-group.open .organism-books {
     display: flex;
@@ -482,6 +484,49 @@
     border: 1px solid rgba(168, 85, 247, 0.4);
     color: #c084fc;
     font-weight: 600;
+  }
+
+  /* 自定义赛博发光滚动条 (Custom Cyber Scrollbars) */
+  .organism-books::-webkit-scrollbar,
+  #library-shelf::-webkit-scrollbar,
+  .dock-left::-webkit-scrollbar,
+  .dock-right::-webkit-scrollbar,
+  #chat-msgs::-webkit-scrollbar,
+  #eventlog::-webkit-scrollbar,
+  #islands-grid::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .organism-books::-webkit-scrollbar-track,
+  #library-shelf::-webkit-scrollbar-track,
+  .dock-left::-webkit-scrollbar-track,
+  .dock-right::-webkit-scrollbar-track,
+  #chat-msgs::-webkit-scrollbar-track,
+  #eventlog::-webkit-scrollbar-track,
+  #islands-grid::-webkit-scrollbar-track {
+    background: rgba(15, 23, 42, 0.8);
+    border-radius: 4px;
+  }
+  .organism-books::-webkit-scrollbar-thumb,
+  #library-shelf::-webkit-scrollbar-thumb,
+  .dock-left::-webkit-scrollbar-thumb,
+  .dock-right::-webkit-scrollbar-thumb,
+  #chat-msgs::-webkit-scrollbar-thumb,
+  #eventlog::-webkit-scrollbar-thumb,
+  #islands-grid::-webkit-scrollbar-thumb {
+    background: rgba(56, 189, 248, 0.4);
+    border-radius: 4px;
+    border: 1px solid rgba(56, 189, 248, 0.2);
+  }
+  .organism-books::-webkit-scrollbar-thumb:hover,
+  #library-shelf::-webkit-scrollbar-thumb:hover,
+  .dock-left::-webkit-scrollbar-thumb:hover,
+  .dock-right::-webkit-scrollbar-thumb:hover,
+  #chat-msgs::-webkit-scrollbar-thumb:hover,
+  #eventlog::-webkit-scrollbar-thumb:hover,
+  #islands-grid::-webkit-scrollbar-thumb:hover {
+    background: var(--cyan);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
   }
 
   /* 典籍卡片样式 (Book Card Styling) */
@@ -704,7 +749,7 @@
       <span>硅基生命体与典籍 (Organisms & Books)</span>
       <span class="card-title-badge" id="st-total-books">4 大生命体 / 9 册典籍</span>
     </div>
-    <div id="library-shelf" style="display:flex;flex-direction:column;gap:8px;max-height:380px;overflow-y:auto;font-size:10px;padding-right:2px;">
+    <div id="library-shelf" style="display:flex;flex-direction:column;gap:8px;max-height:460px;overflow-y:auto;font-size:10px;padding-right:4px;">
     </div>
   </div>
 
