@@ -33,7 +33,7 @@
 ### 1.1 Motivation & Research Questions
 Modern automated control systems predominantly optimize parameters over a static topology:
 
-$$\\text{Action}(\\mathbf{x}) = \\mathcal{F}_{\\text{fixed}}(\\mathbf{x}; \\boldsymbol{\\theta})$$
+$$\text{Action}(\mathbf{x}) = \mathcal{F}_{\text{fixed}}(\mathbf{x}; \boldsymbol{\theta})$$
 
 According to **Ashby's Law of Requisite Variety** [1], a controller must possess internal structural variety matching the external environmental disturbances. When a physical system encounters out-of-distribution (OOD) regime shifts, parametric optimization on a rigid topology often converges to suboptimal or unstable attractors.
 
@@ -69,59 +69,59 @@ Classical force-directed layouts [7,8] are primarily used for graph aesthetics. 
 ## 3. System Model
 
 ### 3.1 Formal Definition of a Computational Cell
-Each computational cell $c_i \\in \\mathcal{C}$ is formalized as a 7-tuple [E2]:
+Each computational cell $c_i \in \mathcal{C}$ is formalized as a 7-tuple [E2]:
 
-$$c_i = \\langle \\tau_i, \\mathbf{p}_i, s_i, u_i, \\mathbf{x}_i, \\mathbf{v}_i, \\gamma_i \\rangle$$
+$$c_i = \langle \tau_i, \mathbf{p}_i, s_i, u_i, \mathbf{x}_i, \mathbf{v}_i, \gamma_i \rangle$$
 
 where:
-* $\\tau_i \\in \\{0, 1, \\dots, 23\\}$: functional cell primitive type;
-* $\\mathbf{p}_i = [p_{i,1}, p_{i,2}, p_{i,3}, p_{i,4}]^T \\in \\mathbb{R}^4$: internal operator parameters (e.g., smoothing factor $\\alpha$, hysteresis threshold $\\theta$);
-* $s_i \\in \\mathbb{R}$: internal accumulated state memory;
-* $u_i \\in \\mathbb{R}$: single-step output potential;
-* $\\mathbf{x}_i, \\mathbf{v}_i \\in \\mathbb{R}^3$: 3D spatial coordinate and velocity vectors;
-* $\\gamma_i \\in \\mathbb{R}^+$: basal metabolic energy tax rate.
+* $\tau_i \in \{0, 1, \dots, 23\}$: functional cell primitive type;
+* $\mathbf{p}_i = [p_{i,1}, p_{i,2}, p_{i,3}, p_{i,4}]^T \in \mathbb{R}^4$: internal operator parameters (e.g., smoothing factor $\alpha$, hysteresis threshold $\theta$);
+* $s_i \in \mathbb{R}$: internal accumulated state memory;
+* $u_i \in \mathbb{R}$: single-step output potential;
+* $\mathbf{x}_i, \mathbf{v}_i \in \mathbb{R}^3$: 3D spatial coordinate and velocity vectors;
+* $\gamma_i \in \mathbb{R}^+$: basal metabolic energy tax rate.
 
 ### Table 1: 24 Functional Computational Cell Primitives Taxonomy [E2]
 | Family | Primitive ID | Mathematical Transfer Function / State Equation | Control & Dynamical Semantics |
 | :--- | :--- | :--- | :--- |
-| **Receptors** | `Sense_0` | $u_i^{(t)} = \\text{clamp}(x_0 / S_0, -1, 1)$ | Price / Longitudinal relative gap receptor |
-| | `Sense_1` | $u_i^{(t)} = \\text{clamp}(x_1 / S_1, -1, 1)$ | Bid-ask spread / Relative velocity receptor |
-| | `Sense_2` | $u_i^{(t)} = \\text{clamp}(x_2 / S_2, -1, 1)$ | Volume / Lateral lane offset receptor |
-| | `Sense_3` | $u_i^{(t)} = \\text{clamp}(x_3 / S_3, -1, 1)$ | Order imbalance / Time-to-Collision (TTC) inverse receptor |
-| **Metabolic Filters** | `Op_EMA` | $s_i^{(t)} = (1-\\alpha)s_i^{(t-1)} + \\alpha \\text{in}_i, \\quad u_i = s_i$ | Exponential Moving Average filter |
-| | `Op_Diff` | $u_i^{(t)} = \\text{in}_i^{(t)} - s_i^{(t-1)}, \\quad s_i^{(t)} = \\text{in}_i^{(t)}$ | First-order temporal difference (rate-of-change) |
-| | `Op_Integral` | $s_i^{(t)} = \\text{clamp}(s_i^{(t-1)} + \\text{in}_i \\Delta t, -L, L), \\quad u_i = s_i$ | Temporal integrator (steady-state error elimination) |
+| **Receptors** | `Sense_0` | $u_i^{(t)} = \text{clamp}(x_0 / S_0, -1, 1)$ | Price / Longitudinal relative gap receptor |
+| | `Sense_1` | $u_i^{(t)} = \text{clamp}(x_1 / S_1, -1, 1)$ | Bid-ask spread / Relative velocity receptor |
+| | `Sense_2` | $u_i^{(t)} = \text{clamp}(x_2 / S_2, -1, 1)$ | Volume / Lateral lane offset receptor |
+| | `Sense_3` | $u_i^{(t)} = \text{clamp}(x_3 / S_3, -1, 1)$ | Order imbalance / Time-to-Collision (TTC) inverse receptor |
+| **Metabolic Filters** | `Op_EMA` | $s_i^{(t)} = (1-\alpha)s_i^{(t-1)} + \alpha \text{in}_i, \quad u_i = s_i$ | Exponential Moving Average filter |
+| | `Op_Diff` | $u_i^{(t)} = \text{in}_i^{(t)} - s_i^{(t-1)}, \quad s_i^{(t)} = \text{in}_i^{(t)}$ | First-order temporal difference (rate-of-change) |
+| | `Op_Integral` | $s_i^{(t)} = \text{clamp}(s_i^{(t-1)} + \text{in}_i \Delta t, -L, L), \quad u_i = s_i$ | Temporal integrator (steady-state error elimination) |
 | | `Op_Sub` | $u_i^{(t)} = w_1 u_1^{(t)} - w_2 u_2^{(t)}$ | Differential comparator (dual-EMA spread) |
-| | `Op_Sum` | $u_i^{(t)} = \\sum_j w_j u_j^{(t)} + b_i$ | Linear weighted synthesizer |
-| | `Op_Product` | $u_i^{(t)} = \\tanh((w_1 u_1) \\cdot (w_2 u_2))$ | Second-order nonlinear tensor gating |
-| | `Op_Ratio` | $u_i^{(t)} = (w_1 u_1) / (|w_2 u_2| + \\epsilon)$ | Relative strength and volatility normalizer |
-| | `Op_Abs` | $u_i^{(t)} = |\\text{in}_i^{(t)}|$ | Energy / directionless volatility extractor |
-| | `Op_Oscillator`| $\\ddot{s} + \\mu(s^2 - 1)\\dot{s} + \\omega^2 s = \\text{in}_i$ | Van der Pol limit cycle (pacemaker oscillator) |
-| **Gating Neurons** | `Gate_Hysteresis` | $u_i^{(t)} = \\begin{cases} \\text{in}, & |\\text{in}| > \\theta_{\\text{high}} \\\\ u_i^{(t-1)}, & \\theta_{\\text{low}} \\le |\\text{in}| \\le \\theta_{\\text{high}} \\\\ 0, & |\\text{in}| < \\theta_{\\text{low}} \\end{cases}$ | Schmitt dual-threshold hysteresis (anti-chatter) |
-| | `Gate_Threshold` | $u_i^{(t)} = \\mathbb{I}(\\text{in}_i > \\theta)$ | Step decision gate |
-| | `Gate_Inhibit` | $u_i^{(t)} = \\text{in}_0 \\cdot \\max(0, 1 - \\text{in}_1)$ | Lateral inhibition & conditional interlocking |
-| | `Gate_Deadzone` | $u_i^{(t)} = \\text{in}_i \\cdot \\mathbb{I}(|\\text{in}_i| > \\theta_{\\text{dead}})$ | Deadzone filter |
-| **Effectors** | `Act_Positive` | $A_{\\text{pos}} = \\text{clamp}(\\sum w_j u_j, 0, 1)$ | Positive action (Buy Open / Throttle) |
-| | `Act_Negative` | $A_{\\text{neg}} = \\text{clamp}(\\sum w_j u_j, 0, 1)$ | Negative action (Sell Open / Mechanical Brake) |
-| | `Act_ImmuneLock`| $L_{\\text{immune}} = \\mathbb{I}(\\sum w_j u_j > \\theta_{\\text{crit}})$ | Pre-trade risk lock (Flash crash liquidation / AEB hard brake) |
+| | `Op_Sum` | $u_i^{(t)} = \sum_j w_j u_j^{(t)} + b_i$ | Linear weighted synthesizer |
+| | `Op_Product` | $u_i^{(t)} = \tanh((w_1 u_1) \cdot (w_2 u_2))$ | Second-order nonlinear tensor gating |
+| | `Op_Ratio` | $u_i^{(t)} = (w_1 u_1) / (ert w_2 u_2 ert + \epsilon)$ | Relative strength and volatility normalizer |
+| | `Op_Abs` | $u_i^{(t)} = |\text{in}_i^{(t)}|$ | Energy / directionless volatility extractor |
+| | `Op_Oscillator`| $\ddot{s} + \mu(s^2 - 1)\dot{s} + \omega^2 s = \text{in}_i$ | Van der Pol limit cycle (pacemaker oscillator) |
+| **Gating Neurons** | `Gate_Hysteresis` | $u_i^{(t)} = \begin{cases} \text{in}, & |\text{in}| > \theta_{\text{high}} \\\\ u_i^{(t-1)}, & \theta_{\text{low}} \le |\text{in}| \le \theta_{\text{high}} \\\\ 0, & |\text{in}| < \theta_{\text{low}} \end{cases}$ | Schmitt dual-threshold hysteresis (anti-chatter) |
+| | `Gate_Threshold` | $u_i^{(t)} = \mathbb{I}(\text{in}_i > \theta)$ | Step decision gate |
+| | `Gate_Inhibit` | $u_i^{(t)} = \text{in}_0 \cdot \max(0, 1 - \text{in}_1)$ | Lateral inhibition & conditional interlocking |
+| | `Gate_Deadzone` | $u_i^{(t)} = \text{in}_i \cdot \mathbb{I}(|\text{in}_i| > \theta_{\text{dead}})$ | Deadzone filter |
+| **Effectors** | `Act_Positive` | $A_{\text{pos}} = \text{clamp}(\sum w_j u_j, 0, 1)$ | Positive action (Buy Open / Throttle) |
+| | `Act_Negative` | $A_{\text{neg}} = \text{clamp}(\sum w_j u_j, 0, 1)$ | Negative action (Sell Open / Mechanical Brake) |
+| | `Act_ImmuneLock`| $L_{\text{immune}} = \mathbb{I}(\sum w_j u_j > \theta_{\text{crit}})$ | Pre-trade risk lock (Flash crash liquidation / AEB hard brake) |
 
 ---
 
 ## 4. Structural Evolution & Developmental Constraints
 
 ### 4.1 Morphogenetic Mutation Operators [E2]
-1. **Synaptic Mitosis**: Splits an active synapse $e = (u, v)$ by inserting a new cell $c_{\\text{new}}$, creating edges $(u, c_{\\text{new}})$ and $(c_{\\text{new}}, v)$;
+1. **Synaptic Mitosis**: Splits an active synapse $e = (u, v)$ by inserting a new cell $c_{\text{new}}$, creating edges $(u, c_{\text{new}})$ and $(c_{\text{new}}, v)$;
 2. **Axonal Rewiring**: Creates or removes directed synaptic connections between spatially proximate cells;
 3. **Apoptosis**: Prunes unreferenced cells with zero in-degree or weights below metabolic maintenance thresholds.
 
 ### 4.2 Weisfeiler-Lehman (WL) Graph Hashing & True Graph Edit Distance [E1]
 To prevent mutations from degenerating into trivial parameter tuning or ancestor cloning, 3-round Weisfeiler-Lehman (WL) color refinement hashes the core connected subgraph:
 
-$$h_v^{(k+1)} = \\text{Hash}\\left( h_v^{(k)}, \\text{Multiset}\\left(\\{ (h_u^{(k)}, \\text{quantize}(w_{uv})) \\mid u \\in \\mathcal{N}_{\\text{in}}(v) \\}\\right) \\right)$$
+$$h_v^{(k+1)} = \text{Hash}\left( h_v^{(k)}, \text{Multiset}\left(\{ (h_u^{(k)}, \text{quantize}(w_{uv})) \mid u \in \mathcal{N}_{\text{in}}(v) \}\right) \right)$$
 
 Graph Edit Distance (GED) is formally computed via bipartite vertex-label histogram substitution costs and edge insertion/deletion operations:
 
-$$\\text{GED}(G_A, G_B) = \\sum_{\\tau \\in \\mathcal{T}} |N_A(\\tau) - N_B(\\tau)| + |E_A - E_B|$$
+$$\text{GED}(G_A, G_B) = \sum_{\tau \in \mathcal{T}} |N_A(\tau) - N_B(\tau)| + |E_A - E_B|$$
 
 ```mermaid
 graph LR
@@ -140,16 +140,16 @@ graph LR
 ## 5. Mechanical Embedding & 3D Spatial Self-Organization
 
 ### 5.1 Lennard-Jones Force-Field Dynamics [E2]
-To prevent topological collapse in high dimensions, computational cells are embedded in Euclidean $\\mathbb{R}^3$ space governed by an improved Lennard-Jones potential:
+To prevent topological collapse in high dimensions, computational cells are embedded in Euclidean $\mathbb{R}^3$ space governed by an improved Lennard-Jones potential:
 
-$$V_{\\text{LJ}}(r_{ij}) = 4\\epsilon \\left[ \\left(\\frac{\\sigma}{r_{ij}}\\right)^{12} - \\left(\\frac{\\sigma}{r_{ij}}\\right)^6 \\right]$$
+$$V_{\text{LJ}}(r_{ij}) = 4\epsilon \left[ \left(\frac{\sigma}{r_{ij}}\right)^{12} - \left(\frac{\sigma}{r_{ij}}\right)^6 \right]$$
 
 The net force acting on cell $c_i$ is:
 
-$$\\mathbf{F}_i = \\sum_{j \\ne i} \\mathbf{F}_{ij}^{\\text{LJ}} + \\sum_{j \\in \\text{Syn}(i)} k_{\\text{spring}}(r_{ij} - \\ell_0)\\hat{\\mathbf{r}}_{ij} - \\beta \\mathbf{v}_i$$
+$$\mathbf{F}_i = \sum_{j \ne i} \mathbf{F}_{ij}^{\text{LJ}} + \sum_{j \in \text{Syn}(i)} k_{\text{spring}}(r_{ij} - \ell_0)\hat{\mathbf{r}}_{ij} - \beta \mathbf{v}_i$$
 
-* **Short-Range Pauli Repulsion ($r < \\sigma$)**: Repels overlapping nodes to prevent redundant functional clustering;
-* **Medium-Range Synaptic Tension ($r \\approx \\ell_0$)**: Pulls strongly connected pathways together to promote cortical column formation.
+* **Short-Range Pauli Repulsion ($r < \sigma$)**: Repels overlapping nodes to prevent redundant functional clustering;
+* **Medium-Range Synaptic Tension ($r \approx \ell_0$)**: Pulls strongly connected pathways together to promote cortical column formation.
 
 ---
 
@@ -172,19 +172,19 @@ $$\\mathbf{F}_i = \\sum_{j \\ne i} \\mathbf{F}_{ij}^{\\text{LJ}} + \\sum_{j \\in
 
 ### 7.1 C++ Flat-Array Compiler Microbenchmarks [E1]
 Compiling dynamic DAGs into contiguous cache-aligned buffers yields the following performance:
-* **Forward Inference Latency**: **$24.1 \\pm 1.2\\ \\text{ns}$**;
-* **Heap Memory Allocations**: **$0\\ \\text{bytes (Zero-GC)}$**;
+* **Forward Inference Latency**: **$24.1 \pm 1.2\\ \text{ns}$**;
+* **Heap Memory Allocations**: **$0\\ \text{bytes (Zero-GC)}$**;
 * **Instruction Efficiency**: $3.8$ primitive operations per clock cycle, with $0.00\\%$ L1 instruction cache misses.
 
 ### Table 2: ADAS Deterministic 6-Scenario Evaluation Results [E1]
 | Index | Scenario Description | Pass Criteria | Empirical Performance | Verdict |
 | :--- | :--- | :--- | :--- | :--- |
-| **[1]** | **High-Speed S-Curve Tracking** | Lateral Error $< 0.10\\ \\text{m}$ | **Max Error $0.069\\ \\text{m}$, Mean Error $0.008\\ \\text{m}$** (Latency $0.49\\ \\mu\\text{s}$) | **PASS** |
-| **[2]** | **Emergency Cut-in AEB** | 0 Collisions & Clearance $> 2.0\\ \\text{m}$ | **Braking Triggered=YES, Clearance $3.69\\ \\text{m}$** (0 Collisions) | **PASS** |
-| **[3]** | **Smooth Lane Change** | Settle Time $< 3.5\\ \\text{s}$, Overshoot $< 0.1\\ \\text{m}$ | **Settle Time $2.55\\ \\text{s}$, Overshoot $0.04\\ \\text{m}$** | **PASS** |
-| **[4]** | **Stop-and-Go ACC Following** | Gap Error $< 8.0\\ \\text{m}$ | **Max Gap Error $6.65\\ \\text{m}$** | **PASS** |
-| **[5]** | **Ramp Highway Merge** | Terminal Speed $> 20.0\\ \\text{m/s}$ | **Terminal Speed $26.00\\ \\text{m/s}$ ($93.6\\ \\text{km/h}$)** | **PASS** |
-| **[6]** | **Obstacle Emergency Swerve** | Lateral Clearance $> 1.5\\ \\text{m}$ | **Lateral Clearance $2.50\\ \\text{m}$** | **PASS** |
+| **[1]** | **High-Speed S-Curve Tracking** | Lateral Error $< 0.10\\ \text{m}$ | **Max Error $0.069\\ \text{m}$, Mean Error $0.008\\ \text{m}$** (Latency $0.49\\ \mu\text{s}$) | **PASS** |
+| **[2]** | **Emergency Cut-in AEB** | 0 Collisions & Clearance $> 2.0\\ \text{m}$ | **Braking Triggered=YES, Clearance $3.69\\ \text{m}$** (0 Collisions) | **PASS** |
+| **[3]** | **Smooth Lane Change** | Settle Time $< 3.5\\ \text{s}$, Overshoot $< 0.1\\ \text{m}$ | **Settle Time $2.55\\ \text{s}$, Overshoot $0.04\\ \text{m}$** | **PASS** |
+| **[4]** | **Stop-and-Go ACC Following** | Gap Error $< 8.0\\ \text{m}$ | **Max Gap Error $6.65\\ \text{m}$** | **PASS** |
+| **[5]** | **Ramp Highway Merge** | Terminal Speed $> 20.0\\ \text{m/s}$ | **Terminal Speed $26.00\\ \text{m/s}$ ($93.6\\ \text{km/h}$)** | **PASS** |
+| **[6]** | **Obstacle Emergency Swerve** | Lateral Clearance $> 1.5\\ \text{m}$ | **Lateral Clearance $2.50\\ \text{m}$** | **PASS** |
 
 ### 7.2 Microstructure Simulation and Long-Horizon Walk-Forward Evaluation [E1]
 
@@ -216,9 +216,9 @@ Empirical results are summarized in the table below:
 ### Table 3: GPU Tensorized Morphogenesis Scale Ladder [E1]
 | Scale Tier | Neuron / Synapse Scale | VRAM Footprint | Peak Throughput | Time per Gen | Core Emergent Capability |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Million (1M)** | $10^6$ Cells / $2 \\times 10^6$ Synapses | **$568.4\\ \\text{MB}$** | **$1,028.4\\ \\text{MCells/s}$** | $2.92\\ \\text{s}$ | 3D dynamic trajectory control, 0-collision AEB |
-| **Ten Million (10M)** | $10^7$ Cells / $2 \\times 10^7$ Synapses | **$1,812.5\\ \\text{MB}$** | **$1,114.4\\ \\text{MCells/s}$** | $5.38\\ \\text{s}$ | Lorenz strange attractor phase-space inversion |
-| **Hundred Million (100M)** | $10^8$ Cells / $2 \\times 10^8$ Synapses | **$4,388.5\\ \\text{MB}$** | **$120.4\\ \\text{MCells/s}$** | $33.23\\ \\text{s}$ | Orthogonal task compartmentalization, working memory limit cycles |
+| **Million (1M)** | $10^6$ Cells / $2 \times 10^6$ Synapses | **$568.4\\ \text{MB}$** | **$1,028.4\\ \text{MCells/s}$** | $2.92\\ \text{s}$ | 3D dynamic trajectory control, 0-collision AEB |
+| **Ten Million (10M)** | $10^7$ Cells / $2 \times 10^7$ Synapses | **$1,812.5\\ \text{MB}$** | **$1,114.4\\ \text{MCells/s}$** | $5.38\\ \text{s}$ | Lorenz strange attractor phase-space inversion |
+| **Hundred Million (100M)** | $10^8$ Cells / $2 \times 10^8$ Synapses | **$4,388.5\\ \text{MB}$** | **$120.4\\ \text{MCells/s}$** | $33.23\\ \text{s}$ | Orthogonal task compartmentalization, working memory limit cycles |
 
 ---
 

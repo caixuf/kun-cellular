@@ -33,7 +33,7 @@
 ### 1.1 研究动机与科学问题
 现代自动化控制系统普遍采用固定拓扑参数优化范式：
 
-$$\\text{Action}(\\mathbf{x}) = \\mathcal{F}_{\\text{fixed}}(\\mathbf{x}; \\boldsymbol{\\theta})$$
+$$\text{Action}(\mathbf{x}) = \mathcal{F}_{\text{fixed}}(\mathbf{x}; \boldsymbol{\theta})$$
 
 根据 **Ashby 必备多样性定律 (Law of Requisite Variety)** [1]，系统的调节器必须具备与外部环境扰动相匹配的内部结构多样性。当物理系统遭遇突发分布外（OOD）相变时，固定结构的参数微调极易陷入局部最优或发生控制发散。
 
@@ -69,59 +69,59 @@ Turing 的经典论文《形态发生的化学基础》[4] 揭示了反应-扩�
 ## 3. 系统模型 (System Model)
 
 ### 3.1 计算细胞形式化定义
-每个计算细胞 $c_i \\in \\mathcal{C}$ 定义为一个 7 元组 [E2]：
+每个计算细胞 $c_i \in \mathcal{C}$ 定义为一个 7 元组 [E2]：
 
-$$c_i = \\langle \\tau_i, \\mathbf{p}_i, s_i, u_i, \\mathbf{x}_i, \\mathbf{v}_i, \\gamma_i \\rangle$$
+$$c_i = \langle \tau_i, \mathbf{p}_i, s_i, u_i, \mathbf{x}_i, \mathbf{v}_i, \gamma_i \rangle$$
 
 其中：
-* $\\tau_i \\in \\{0, 1, \\dots, 23\\}$：细胞功能类型标识；
-* $\\mathbf{p}_i = [p_{i,1}, p_{i,2}, p_{i,3}, p_{i,4}]^T \\in \\mathbb{R}^4$：内部算子参数（如滤波系数 $\\alpha$、迟滞阈值 $\\theta$）；
-* $s_i \\in \\mathbb{R}$：内部状态累积电位（状态记忆）；
-* $u_i \\in \\mathbb{R}$：单步输出电位；
-* $\\mathbf{x}_i, \\mathbf{v}_i \\in \\mathbb{R}^3$：三维空间物理坐标与运动速度；
-* $\\gamma_i \\in \\mathbb{R}^+$：基础代谢能耗税率。
+* $\tau_i \in \{0, 1, \dots, 23\}$：细胞功能类型标识；
+* $\mathbf{p}_i = [p_{i,1}, p_{i,2}, p_{i,3}, p_{i,4}]^T \in \mathbb{R}^4$：内部算子参数（如滤波系数 $\alpha$、迟滞阈值 $\theta$）；
+* $s_i \in \mathbb{R}$：内部状态累积电位（状态记忆）；
+* $u_i \in \mathbb{R}$：单步输出电位；
+* $\mathbf{x}_i, \mathbf{v}_i \in \mathbb{R}^3$：三维空间物理坐标与运动速度；
+* $\gamma_i \in \mathbb{R}^+$：基础代谢能耗税率。
 
 ### 表 1：24 种原生功能计算细胞原语分类与传递函数 [E2]
 | 细胞族 | 原语标识 | 数学传递函数 / 状态方程 | 动力学与控制语义 |
 | :--- | :--- | :--- | :--- |
-| **感知受体族** | `Sense_0` | $u_i^{(t)} = \\text{clamp}(x_0 / S_0, -1, 1)$ | 价格 / 纵向相对间距受体 |
-| | `Sense_1` | $u_i^{(t)} = \\text{clamp}(x_1 / S_1, -1, 1)$ | 价差 / 相对速度受体 |
-| | `Sense_2` | $u_i^{(t)} = \\text{clamp}(x_2 / S_2, -1, 1)$ | 成交量 / 车道横向偏差受体 |
-| | `Sense_3` | $u_i^{(t)} = \\text{clamp}(x_3 / S_3, -1, 1)$ | 盘口不平衡 / TTC 碰撞时间倒数受体 |
-| **代谢滤波族** | `Op_EMA` | $s_i^{(t)} = (1-\\alpha)s_i^{(t-1)} + \\alpha \\text{in}_i, \\quad u_i = s_i$ | 指数移动平均平滑滤波 |
-| | `Op_Diff` | $u_i^{(t)} = \\text{in}_i^{(t)} - s_i^{(t-1)}, \\quad s_i^{(t)} = \\text{in}_i^{(t)}$ | 一阶时间差分（变化率提取） |
-| | `Op_Integral` | $s_i^{(t)} = \\text{clamp}(s_i^{(t-1)} + \\text{in}_i \\Delta t, -L, L), \\quad u_i = s_i$ | 积分累加器（稳态误差消除） |
+| **感知受体族** | `Sense_0` | $u_i^{(t)} = \text{clamp}(x_0 / S_0, -1, 1)$ | 价格 / 纵向相对间距受体 |
+| | `Sense_1` | $u_i^{(t)} = \text{clamp}(x_1 / S_1, -1, 1)$ | 价差 / 相对速度受体 |
+| | `Sense_2` | $u_i^{(t)} = \text{clamp}(x_2 / S_2, -1, 1)$ | 成交量 / 车道横向偏差受体 |
+| | `Sense_3` | $u_i^{(t)} = \text{clamp}(x_3 / S_3, -1, 1)$ | 盘口不平衡 / TTC 碰撞时间倒数受体 |
+| **代谢滤波族** | `Op_EMA` | $s_i^{(t)} = (1-\alpha)s_i^{(t-1)} + \alpha \text{in}_i, \quad u_i = s_i$ | 指数移动平均平滑滤波 |
+| | `Op_Diff` | $u_i^{(t)} = \text{in}_i^{(t)} - s_i^{(t-1)}, \quad s_i^{(t)} = \text{in}_i^{(t)}$ | 一阶时间差分（变化率提取） |
+| | `Op_Integral` | $s_i^{(t)} = \text{clamp}(s_i^{(t-1)} + \text{in}_i \Delta t, -L, L), \quad u_i = s_i$ | 积分累加器（稳态误差消除） |
 | | `Op_Sub` | $u_i^{(t)} = w_1 u_1^{(t)} - w_2 u_2^{(t)}$ | 差动比较器（双均线剪刀差） |
-| | `Op_Sum` | $u_i^{(t)} = \\sum_j w_j u_j^{(t)} + b_i$ | 线性加权合成器 |
-| | `Op_Product` | $u_i^{(t)} = \\tanh((w_1 u_1) \\cdot (w_2 u_2))$ | 非线性二阶调制门控 |
-| | `Op_Ratio` | $u_i^{(t)} = (w_1 u_1) / (|w_2 u_2| + \\epsilon)$ | 相对强度与波动率归一化 |
-| | `Op_Abs` | $u_i^{(t)} = |\\text{in}_i^{(t)}|$ | 能量/无方向波动率提取 |
-| | `Op_Oscillator`| $\\ddot{s} + \\mu(s^2 - 1)\\dot{s} + \\omega^2 s = \\text{in}_i$ | Van der Pol 极限环（节律发生） |
-| **门控神经族** | `Gate_Hysteresis` | $u_i^{(t)} = \\begin{cases} \\text{in}, & |\\text{in}| > \\theta_{\\text{high}} \\\\ u_i^{(t-1)}, & \\theta_{\\text{low}} \\le |\\text{in}| \\le \\theta_{\\text{high}} \\\\ 0, & |\\text{in}| < \\theta_{\\text{low}} \\end{cases}$ | 施密特双阈值迟滞（防高频震颤） |
-| | `Gate_Threshold` | $u_i^{(t)} = \\mathbb{I}(\\text{in}_i > \\theta)$ | 阶跃决策硬门控 |
-| | `Gate_Inhibit` | $u_i^{(t)} = \\text{in}_0 \\cdot \\max(0, 1 - \\text{in}_1)$ | 侧向抑制与条件闭锁 |
-| | `Gate_Deadzone` | $u_i^{(t)} = \\text{in}_i \\cdot \\mathbb{I}(|\\text{in}_i| > \\theta_{\\text{dead}})$ | 死区过滤器 |
-| **效应动作族** | `Act_Positive` | $A_{\\text{pos}} = \\text{clamp}(\\sum w_j u_j, 0, 1)$ | 正向执行（买入开仓 / 油门开度） |
-| | `Act_Negative` | $A_{\\text{neg}} = \\text{clamp}(\\sum w_j u_j, 0, 1)$ | 负向执行（卖出开仓 / 机械刹车） |
-| | `Act_ImmuneLock`| $L_{\\text{immune}} = \\mathbb{I}(\\sum w_j u_j > \\theta_{\\text{crit}})$ | 事前风险闭锁（闪崩清仓 / AEB 刹停） |
+| | `Op_Sum` | $u_i^{(t)} = \sum_j w_j u_j^{(t)} + b_i$ | 线性加权合成器 |
+| | `Op_Product` | $u_i^{(t)} = \tanh((w_1 u_1) \cdot (w_2 u_2))$ | 非线性二阶调制门控 |
+| | `Op_Ratio` | $u_i^{(t)} = (w_1 u_1) / (ert w_2 u_2 ert + \epsilon)$ | 相对强度与波动率归一化 |
+| | `Op_Abs` | $u_i^{(t)} = |\text{in}_i^{(t)}|$ | 能量/无方向波动率提取 |
+| | `Op_Oscillator`| $\ddot{s} + \mu(s^2 - 1)\dot{s} + \omega^2 s = \text{in}_i$ | Van der Pol 极限环（节律发生） |
+| **门控神经族** | `Gate_Hysteresis` | $u_i^{(t)} = \begin{cases} \text{in}, & |\text{in}| > \theta_{\text{high}} \\\\ u_i^{(t-1)}, & \theta_{\text{low}} \le |\text{in}| \le \theta_{\text{high}} \\\\ 0, & |\text{in}| < \theta_{\text{low}} \end{cases}$ | 施密特双阈值迟滞（防高频震颤） |
+| | `Gate_Threshold` | $u_i^{(t)} = \mathbb{I}(\text{in}_i > \theta)$ | 阶跃决策硬门控 |
+| | `Gate_Inhibit` | $u_i^{(t)} = \text{in}_0 \cdot \max(0, 1 - \text{in}_1)$ | 侧向抑制与条件闭锁 |
+| | `Gate_Deadzone` | $u_i^{(t)} = \text{in}_i \cdot \mathbb{I}(|\text{in}_i| > \theta_{\text{dead}})$ | 死区过滤器 |
+| **效应动作族** | `Act_Positive` | $A_{\text{pos}} = \text{clamp}(\sum w_j u_j, 0, 1)$ | 正向执行（买入开仓 / 油门开度） |
+| | `Act_Negative` | $A_{\text{neg}} = \text{clamp}(\sum w_j u_j, 0, 1)$ | 负向执行（卖出开仓 / 机械刹车） |
+| | `Act_ImmuneLock`| $L_{\text{immune}} = \mathbb{I}(\sum w_j u_j > \theta_{\text{crit}})$ | 事前风险闭锁（闪崩清仓 / AEB 刹停） |
 
 ---
 
 ## 4. 结构演化与发育约束 (Structural Evolution & Development)
 
 ### 4.1 形态发生算子库 [E2]
-1. **突触有丝分裂 (Synaptic Mitosis)**：选择活跃突触 $e = (u, v)$，在其中间插入新细胞 $c_{\\text{new}}$，将突触分裂为 $(u, c_{\\text{new}})$ 与 $(c_{\\text{new}}, v)$；
+1. **突触有丝分裂 (Synaptic Mitosis)**：选择活跃突触 $e = (u, v)$，在其中间插入新细胞 $c_{\text{new}}$，将突触分裂为 $(u, c_{\text{new}})$ 与 $(c_{\text{new}}, v)$；
 2. **突触重连 (Axonal Rewiring)**：在空间邻近的细胞间随机建立或断开有向连接；
 3. **功能凋亡 (Apoptosis)**：清除无入边或入度权重低于阈值的冗余孤立细胞。
 
 ### 4.2 Weisfeiler-Lehman (WL) 规范图哈希与真实图编辑距离 [E1]
 为严格防止变异算法退化为参数微调或原基克隆，系统引入 3 轮 WL 颜色细化哈希算法对核心连通子图进行规范化哈希：
 
-$$h_v^{(k+1)} = \\text{Hash}\\left( h_v^{(k)}, \\text{Multiset}\\left(\\{ (h_u^{(k)}, \\text{quantize}(w_{uv})) \\mid u \\in \\mathcal{N}_{\\text{in}}(v) \\}\\right) \\right)$$
+$$h_v^{(k+1)} = \text{Hash}\left( h_v^{(k)}, \text{Multiset}\left(\{ (h_u^{(k)}, \text{quantize}(w_{uv})) \mid u \in \mathcal{N}_{\text{in}}(v) \}\right) \right)$$
 
 图编辑距离（Graph Edit Distance, GED）采用二分顶点标签多重集直方图替换代价与边增删代价之和进行精确形式化度量：
 
-$$\\text{GED}(G_A, G_B) = \\sum_{\\tau \\in \\mathcal{T}} |N_A(\\tau) - N_B(\\tau)| + |E_A - E_B|$$
+$$\text{GED}(G_A, G_B) = \sum_{\tau \in \mathcal{T}} |N_A(\tau) - N_B(\tau)| + |E_A - E_B|$$
 
 ```mermaid
 graph LR
@@ -140,16 +140,16 @@ graph LR
 ## 5. 胞间物理力场与三维空间自组织 (Mechanical Embedding)
 
 ### 5.1 改进型兰纳-琼斯力场动力学方程 [E2]
-为防止图拓扑在高维空间中缠结坍缩，细胞被置于三维欧几里得空间 $\\mathbb{R}^3$ 中，受以下势能场驱动：
+为防止图拓扑在高维空间中缠结坍缩，细胞被置于三维欧几里得空间 $\mathbb{R}^3$ 中，受以下势能场驱动：
 
-$$V_{\\text{LJ}}(r_{ij}) = 4\\epsilon \\left[ \\left(\\frac{\\sigma}{r_{ij}}\\right)^{12} - \\left(\\frac{\\sigma}{r_{ij}}\\right)^6 \\right]$$
+$$V_{\text{LJ}}(r_{ij}) = 4\epsilon \left[ \left(\frac{\sigma}{r_{ij}}\right)^{12} - \left(\frac{\sigma}{r_{ij}}\right)^6 \right]$$
 
 作用于细胞 $c_i$ 上的合力方程为：
 
-$$\\mathbf{F}_i = \\sum_{j \\ne i} \\mathbf{F}_{ij}^{\\text{LJ}} + \\sum_{j \\in \\text{Syn}(i)} k_{\\text{spring}}(r_{ij} - \\ell_0)\\hat{\\mathbf{r}}_{ij} - \\beta \\mathbf{v}_i$$
+$$\mathbf{F}_i = \sum_{j \ne i} \mathbf{F}_{ij}^{\text{LJ}} + \sum_{j \in \text{Syn}(i)} k_{\text{spring}}(r_{ij} - \ell_0)\hat{\mathbf{r}}_{ij} - \beta \mathbf{v}_i$$
 
-* **近程泡利斥力 ($r < \\sigma$)**：强力推开空间重叠细胞，消除计算功能冗余；
-* **中程突触弹簧力 ($r \\approx \\ell_0$)**：紧密牵引具备强因果信号流的细胞，促进空间微柱团簇（Cortical Columns）的自发聚集。
+* **近程泡利斥力 ($r < \sigma$)**：强力推开空间重叠细胞，消除计算功能冗余；
+* **中程突触弹簧力 ($r \approx \ell_0$)**：紧密牵引具备强因果信号流的细胞，促进空间微柱团簇（Cortical Columns）的自发聚集。
 
 ---
 
@@ -172,19 +172,19 @@ $$\\mathbf{F}_i = \\sum_{j \\ne i} \\mathbf{F}_{ij}^{\\text{LJ}} + \\sum_{j \\in
 
 ### 7.1 C++ 扁平数组编译器微基准测试 [E1]
 通过将动态有向无环图转化为连续缓存行内存块，测试得到以下核心性能指标：
-* **单步前向推理耗时**：**$24.1 \\pm 1.2\\ \\text{ns}$**；
-* **单步堆内存分配 (Heap Allocations)**：**$0\\ \\text{bytes (Zero-GC)}$**；
+* **单步前向推理耗时**：**$24.1 \pm 1.2\\ \text{ns}$**；
+* **单步堆内存分配 (Heap Allocations)**：**$0\\ \text{bytes (Zero-GC)}$**；
 * **指令吞吐效率**：每个时钟周期完成 $3.8$ 次算子执行，零指令缓存未命中（L1I Cache Miss = 0.00%）。
 
 ### 表 2：ADAS 智能驾驶 6 大核心车规场景实测指标 [E1]
 | 序号 | 驾驶工况场景 | 判定标准 | 实测表现 | 判定结论 |
 | :--- | :--- | :--- | :--- | :--- |
-| **[1]** | **高速大曲率 S 弯循迹** | 横向偏差 $< 0.10\\ \\text{m}$ | **最大偏差 $0.069\\ \\text{m}$，平均偏差 $0.008\\ \\text{m}$** (时延 $0.49\\ \\mu\\text{s}$) | **PASS** |
-| **[2]** | **突发贴脸加塞急刹 AEB** | 0 碰撞且安全间隙 $> 2.0\\ \\text{m}$ | **触发制动=YES，最终安全间隙 $3.69\\ \\text{m}$** (0 碰撞) | **PASS** |
-| **[3]** | **平滑自主变道** | 稳定时间 $< 3.5\\ \\text{s}$，超调 $< 0.1\\ \\text{m}$ | **稳定时间 $2.55\\ \\text{s}$，超调量 $0.04\\ \\text{m}$** | **PASS** |
-| **[4]** | **前车启停 ACC 跟车** | 间隙误差 $< 8.0\\ \\text{m}$ | **最大跟车距离误差 $6.65\\ \\text{m}$** | **PASS** |
-| **[5]** | **高速匝道自主汇入** | 终末速度 $> 20.0\\ \\text{m/s}$ | **终末汇入车速 $26.00\\ \\text{m/s}$ ($93.6\\ \\text{km/h}$)** | **PASS** |
-| **[6]** | **静态障碍物紧急避让** | 侧向安全余量 $> 1.5\\ \\text{m}$ | **侧向安全余量 $2.50\\ \\text{m}$** | **PASS** |
+| **[1]** | **高速大曲率 S 弯循迹** | 横向偏差 $< 0.10\\ \text{m}$ | **最大偏差 $0.069\\ \text{m}$，平均偏差 $0.008\\ \text{m}$** (时延 $0.49\\ \mu\text{s}$) | **PASS** |
+| **[2]** | **突发贴脸加塞急刹 AEB** | 0 碰撞且安全间隙 $> 2.0\\ \text{m}$ | **触发制动=YES，最终安全间隙 $3.69\\ \text{m}$** (0 碰撞) | **PASS** |
+| **[3]** | **平滑自主变道** | 稳定时间 $< 3.5\\ \text{s}$，超调 $< 0.1\\ \text{m}$ | **稳定时间 $2.55\\ \text{s}$，超调量 $0.04\\ \text{m}$** | **PASS** |
+| **[4]** | **前车启停 ACC 跟车** | 间隙误差 $< 8.0\\ \text{m}$ | **最大跟车距离误差 $6.65\\ \text{m}$** | **PASS** |
+| **[5]** | **高速匝道自主汇入** | 终末速度 $> 20.0\\ \text{m/s}$ | **终末汇入车速 $26.00\\ \text{m/s}$ ($93.6\\ \text{km/h}$)** | **PASS** |
+| **[6]** | **静态障碍物紧急避让** | 侧向安全余量 $> 1.5\\ \text{m}$ | **侧向安全余量 $2.50\\ \text{m}$** | **PASS** |
 
 ### 7.2 量化微结构仿真与长周期 Walk-Forward 严谨实测 [E1]
 
@@ -216,9 +216,9 @@ $$\\mathbf{F}_i = \\sum_{j \\ne i} \\mathbf{F}_{ij}^{\\text{LJ}} + \\sum_{j \\in
 ### 表 3：GPU 张量化形态发生规模阶梯实测指标 [E1]
 | 规模量级 | 神经元 / 突触规模 | 显存占用 (VRAM) | 峰值算力吞吐 | 单代耗时 | 核心涌现功能表现 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **百万级 (1M)** | $10^6$ 细胞 / $2 \\times 10^6$ 突触 | **$568.4\\ \\text{MB}$** | **$1,028.4\\ \\text{MCells/s}$** | $2.92\\ \\text{s}$ | 3D 动力学轨迹控制、0 碰撞安全制动 |
-| **千万级 (10M)** | $10^7$ 细胞 / $2 \\times 10^7$ 突触 | **$1,812.5\\ \\text{MB}$** | **$1,114.4\\ \\text{MCells/s}$** | $5.38\\ \\text{s}$ | 洛伦兹高维混沌吸引子逆向解析 |
-| **一亿级 (100M)** | $10^8$ 细胞 / $2 \\times 10^8$ 突触 | **$4,388.5\\ \\text{MB}$** | **$120.4\\ \\text{MCells/s}$** | $33.23\\ \\text{s}$ | 多任务正交隔室划分、长程工作记忆极限环 |
+| **百万级 (1M)** | $10^6$ 细胞 / $2 \times 10^6$ 突触 | **$568.4\\ \text{MB}$** | **$1,028.4\\ \text{MCells/s}$** | $2.92\\ \text{s}$ | 3D 动力学轨迹控制、0 碰撞安全制动 |
+| **千万级 (10M)** | $10^7$ 细胞 / $2 \times 10^7$ 突触 | **$1,812.5\\ \text{MB}$** | **$1,114.4\\ \text{MCells/s}$** | $5.38\\ \text{s}$ | 洛伦兹高维混沌吸引子逆向解析 |
+| **一亿级 (100M)** | $10^8$ 细胞 / $2 \times 10^8$ 突触 | **$4,388.5\\ \text{MB}$** | **$120.4\\ \text{MCells/s}$** | $33.23\\ \text{s}$ | 多任务正交隔室划分、长程工作记忆极限环 |
 
 ---
 
