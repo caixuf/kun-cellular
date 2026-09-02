@@ -272,6 +272,50 @@
   ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
 
+  
+  /* 顶部全局醒目曲率加速条 */
+  .warp-quick-bar {
+    position: fixed;
+    top: 58px;
+    left: 325px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(10, 16, 28, 0.95);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(56, 189, 248, 0.5);
+    border-radius: 6px;
+    padding: 4px 10px;
+    z-index: 60;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6), 0 0 10px rgba(56, 189, 248, 0.2);
+  }
+  .warp-qbtn {
+    background: rgba(18, 26, 44, 0.9);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    font-family: var(--font-mono);
+  }
+  .warp-qbtn:hover { color: var(--cyan); border-color: var(--cyan); }
+  .warp-qbtn.active {
+    background: rgba(56, 189, 248, 0.25);
+    color: var(--cyan);
+    border-color: var(--cyan);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.4);
+  }
+  .warp-qbtn.danger.active {
+    background: rgba(244, 63, 94, 0.25);
+    color: var(--rose);
+    border-color: var(--rose);
+    box-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
+  }
+
   /* 视角控制微型罗盘 */
   .cam-controls {
     position: fixed;
@@ -559,6 +603,15 @@
   </div>
 </aside>
 
+
+<!-- 顶部中央醒目时空曲率加速条 -->
+<div class="warp-quick-bar">
+  <span style="color:var(--cyan);font-weight:bold;font-size:11px;">⚡ 演化加速:</span>
+  <button class="warp-qbtn active" onclick="setWarp('1x')" id="qw-1x">1x 实时</button>
+  <button class="warp-qbtn" onclick="setWarp('100x')" id="qw-100x">100x 快速</button>
+  <button class="warp-qbtn" onclick="setWarp('1000x')" id="qw-1000x">1000x 涡轮</button>
+  <button class="warp-qbtn danger" onclick="setWarp('unlimited')" id="qw-max">MAX 极速狂飙</button>
+</div>
 
 <!-- 3D 视角微型罗盘 -->
 <div class="cam-controls">

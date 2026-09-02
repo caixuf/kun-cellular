@@ -345,6 +345,66 @@
             color: var(--cyan-glow);
         }
 
+    
+        /* 迷宫画布正上方醒目控制条 */
+        .maze-top-bar {
+            background: rgba(13, 18, 29, 0.95);
+            border-bottom: 1px solid var(--cyan-glow);
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 50;
+            box-shadow: 0 4px 16px rgba(0, 240, 255, 0.15);
+        }
+        .maze-top-btn {
+            background: #111827;
+            border: 1px solid #1f2937;
+            color: var(--text-main);
+            padding: 6px 14px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .maze-top-btn:hover {
+            color: var(--cyan-glow);
+            border-color: var(--cyan-glow);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+        }
+        .maze-top-btn.primary {
+            background: rgba(0, 240, 255, 0.2);
+            border-color: var(--cyan-glow);
+            color: var(--cyan-glow);
+        }
+        .maze-top-warp-btn {
+            background: #111827;
+            border: 1px solid #1f2937;
+            color: var(--text-dim);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .maze-top-warp-btn:hover { color: var(--cyan-glow); border-color: var(--cyan-glow); }
+        .maze-top-warp-btn.active {
+            background: rgba(0, 240, 255, 0.25);
+            color: var(--cyan-glow);
+            border-color: var(--cyan-glow);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+        }
+        .maze-top-warp-btn.danger.active {
+            background: rgba(255, 183, 0, 0.25);
+            color: var(--amber-glow);
+            border-color: var(--amber-glow);
+            box-shadow: 0 0 14px rgba(255, 183, 0, 0.5);
+        }
+
     </style>
 </head>
 <body>
@@ -371,6 +431,21 @@
             <div class="panel-header">
                 <span>[2D_DECEPTIVE_MAZE_SIMULATOR] // CONTINUOUS_KINEMATICS</span>
                 <span class="badge" id="hud-status">STATUS: RUNNING</span>
+            </div>
+                        <!-- 迷宫主画布顶部正中央高亮主控条 (绝不遮挡、极其醒目) -->
+            <div class="maze-top-bar">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button class="maze-top-btn primary" id="btn-toggle-top" onclick="document.getElementById('btn-toggle').click()">[▶ 暂停/继续]</button>
+                    <button class="maze-top-btn" onclick="document.getElementById('btn-new-maze').click()">[🎲 生成新迷宫]</button>
+                    <button class="maze-top-btn" onclick="document.getElementById('btn-step').click()">[⏭ 迭代下一代]</button>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <span style="font-size:12px;font-weight:bold;color:var(--cyan-glow);margin-right:4px;">⚡ 演化加速:</span>
+                    <button class="maze-top-warp-btn" onclick="setMazeWarp(1)" id="top-w-1">1x 常规</button>
+                    <button class="maze-top-warp-btn active" onclick="setMazeWarp(5)" id="top-w-5">5x 敏捷</button>
+                    <button class="maze-top-warp-btn" onclick="setMazeWarp(20)" id="top-w-20">20x 极速</button>
+                    <button class="maze-top-warp-btn danger" onclick="setMazeWarp(50)" id="top-w-50">50x 狂飙</button>
+                </div>
             </div>
             <div class="canvas-container" id="canvas-wrap">
                 <canvas id="maze-canvas"></canvas>
@@ -748,6 +823,9 @@
             const speedLabel = speed === 1 ? '1x 常规' : (speed === 5 ? '5x 敏捷' : (speed === 20 ? '20x 极速' : '50x 狂飙'));
             const deckBadge = document.getElementById('deck-cur-speed');
             if (deckBadge) deckBadge.textContent = `SPEED: ${speedLabel}`;
+            document.querySelectorAll('.maze-top-warp-btn').forEach(b => b.classList.remove('active'));
+            const topBtn = document.getElementById('top-w-' + speed);
+            if (topBtn) topBtn.classList.add('active');
             const hudWarp = document.getElementById('hud-warp-label');
             if (hudWarp) hudWarp.textContent = `曲率: ${speed}x`;
 
