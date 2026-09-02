@@ -3,17 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>无限公路阿克曼车辆居中控制沙盒 // SDSCC Infinite Highway</title>
+    <title>自车局部坐标系高精车道保持沙盒 // SDSCC Ego BEV</title>
     <style>
         :root {
-            --bg-base: #06090e;
-            --panel-bg: rgba(13, 18, 29, 0.92);
+            --bg-base: #040810;
+            --panel-bg: rgba(10, 16, 28, 0.94);
             --border: #1e293b;
             --cyan-glow: #00f0ff;
-            --rose-glow: #f43f5e;
-            --amber-glow: #fbbf24;
             --emerald-glow: #10b981;
-            --purple-glow: #a855f7;
+            --amber-glow: #fbbf24;
+            --rose-glow: #f43f5e;
             --text-main: #f1f5f9;
             --text-dim: #94a3b8;
             --font-mono: "JetBrains Mono", Consolas, monospace;
@@ -31,7 +30,7 @@
         }
 
         header {
-            background: rgba(10, 15, 26, 0.98);
+            background: rgba(8, 14, 26, 0.98);
             border-bottom: 1px solid var(--border);
             padding: 0 16px;
             height: 48px;
@@ -121,7 +120,7 @@
         .canvas-container {
             flex: 1;
             position: relative;
-            background: #070d18;
+            background: #030712;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -131,7 +130,7 @@
         canvas { display: block; }
 
         .veh-top-bar {
-            background: rgba(13, 18, 29, 0.95);
+            background: rgba(10, 16, 28, 0.95);
             border-bottom: 1px solid rgba(16, 185, 129, 0.4);
             padding: 8px 16px;
             display: flex;
@@ -201,9 +200,9 @@
 
     <header>
         <div class="brand">
-            <span>[INFINITE_HIGHWAY]</span>
+            <span>[AUTODRIVER_BEV]</span>
             <span style="color:var(--text-dim);">//</span>
-            <span style="color:var(--text-main);">无限多曲率公路车道保持</span>
+            <span style="color:var(--text-main);">自车局部鸟瞰坐标系高精车道保持</span>
         </div>
 
         <div class="warp-bar">
@@ -229,7 +228,7 @@
     <main>
         <div class="viewport-card">
             <div class="panel-header">
-                <span>[ENDLESS_HIGHWAY] // CHASE_CAMERA_STABILIZED</span>
+                <span>[EGO_CENTRIC_BEV_HMI] // AUTODRIVER_PROJECTION</span>
                 <span style="color:var(--emerald-glow);" id="hud-status">STATUS: AUTONOMOUS_LANE_CENTERING</span>
             </div>
             
@@ -239,9 +238,9 @@
                     <button class="nav-btn" onclick="resetVeh()">[RESET_POSITION]</button>
                 </div>
                 <div style="font-size:11px;color:var(--text-dim);">
-                    <span style="color:#00f0ff;">■ 自主居中车辆 (Ackermann)</span> &nbsp;|&nbsp;
-                    <span style="color:#fbbf24;">┆ 双黄车道中心线</span> &nbsp;|&nbsp;
-                    <span style="color:rgba(255,255,255,0.7);">═ 沥青公路路肩</span>
+                    <span style="color:rgba(16,185,129,0.35);">■ 绿色可通行车道走廊</span> &nbsp;|&nbsp;
+                    <span style="color:#00f0ff;">■ 自车 (Ego Vehicle)</span> &nbsp;|&nbsp;
+                    <span style="color:#fbbf24;">┆ 规划前瞻车道中心线</span>
                 </div>
             </div>
 
@@ -300,8 +299,8 @@
                     <canvas id="chart-canvas" width="340" height="110"></canvas>
                 </div>
                 <div class="info-box">
-                    <strong>[通用闭环车道保持原理]：</strong><br>
-                    控制器并非死记固定赛道，而是通过实时感知前方切线与横向偏差（Stanley 闭环几何律），自发适应任意无限程序化多曲率 S 弯道并死死咬住车道正中心。
+                    <strong>[自车局部 BEV 投影原理]：</strong><br>
+                    借鉴标准自动驾驶（如 kunautodriver）的自车坐标系（Ego-Centric BEV）渲染规范，自车永远稳定居中朝前，道路与规划绿毯沿前瞻方向自然流动，彻底消除屏幕晃动。
                 </div>
             </div>
         </div>
@@ -317,9 +316,6 @@
 
         let isRunning = true;
         let vehState = null;
-
-        // 平滑摄像机水平平移，消除剧烈晃动
-        let smoothedCamX = 400.0;
 
         function resize() {
             canvas.width = wrap.clientWidth;
@@ -409,84 +405,106 @@
             const car = vehState.car;
             if (!car) return;
 
-            ctx.fillStyle = "#050b14";
+            ctx.fillStyle = "#030712";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 摄像机平滑插值 (Lerp)，视野极其稳定
-            smoothedCamX += (car.x - smoothedCamX) * 0.12;
-            const camTargetS = car.s;
-            const screenCenterX = canvas.width * 0.5;
-            const screenCarY = canvas.height * 0.75;
-            const roadWidth = vehState.road_width || 140.0;
+            // 绘制自车坐标系网格 (Ego Grid)
+            const egoCarX = canvas.width * 0.5;
+            const egoCarY = canvas.height * 0.78;
+            const roadHalfWidth = (vehState.road_width || 140.0) * 0.5;
+
+            ctx.strokeStyle = "rgba(30, 41, 59, 0.4)";
+            ctx.lineWidth = 1;
+            for (let y = 0; y < canvas.height; y += 40) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+            }
 
             const roadPoints = vehState.road_points || [];
             if (roadPoints.length > 2) {
-                // 1. 绘制无限沥青公路面 (Asphalt Road Surface)
-                ctx.strokeStyle = "#1e293b";
-                ctx.lineWidth = roadWidth;
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-                ctx.beginPath();
-                roadPoints.forEach((pt, i) => {
-                    const scrX = screenCenterX + (pt.x - smoothedCamX);
-                    const scrY = screenCarY - (pt.s - camTargetS);
-                    if (i === 0) ctx.moveTo(scrX, scrY);
-                    else ctx.lineTo(scrX, scrY);
-                });
-                ctx.stroke();
+                // 自车坐标系变换 (Transform world points to Ego Frame):
+                // dx = pt.x - car.x, ds = pt.s - car.s
+                // x_ego = dx * cos(car.psi) - ds * sin(car.psi)
+                // y_ego = dx * sin(car.psi) + ds * cos(car.psi)
+                const c_psi = Math.cos(car.psi || 0.0);
+                const s_psi = Math.sin(car.psi || 0.0);
 
-                // 2. 绘制公路两侧白色实线路肩 (Road Shoulders)
-                [-roadWidth/2, roadWidth/2].forEach(offset => {
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
-                    ctx.lineWidth = 3;
+                const egoCenterLine = [];
+                const egoLeftBound = [];
+                const egoRightBound = [];
+
+                roadPoints.forEach(pt => {
+                    const dx = pt.x - car.x;
+                    const ds = pt.s - car.s;
+                    // 在屏幕上：+x_ego 向右，+y_ego 沿道路前瞻向上 (-y on canvas)
+                    const x_ego = dx * c_psi - ds * s_psi;
+                    const y_ego = dx * s_psi + ds * c_psi;
+
+                    const scrX = egoCarX + x_ego;
+                    const scrY = egoCarY - y_ego;
+
+                    egoCenterLine.push({x: scrX, y: scrY});
+                    egoLeftBound.push({x: scrX - roadHalfWidth * c_psi, y: scrY});
+                    egoRightBound.push({x: scrX + roadHalfWidth * c_psi, y: scrY});
+                });
+
+                // 1. 绘制绿色高精可行驶区域走廊 (Drivable Carpet Corridor)
+                ctx.fillStyle = "rgba(16, 185, 129, 0.08)";
+                ctx.beginPath();
+                egoLeftBound.forEach((pt, i) => {
+                    if (i === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
+                });
+                for (let i = egoRightBound.length - 1; i >= 0; i--) {
+                    ctx.lineTo(egoRightBound[i].x, egoRightBound[i].y);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                // 2. 绘制车道两侧白色实线路肩 (Lane Boundaries)
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
+                ctx.lineWidth = 3;
+                [egoLeftBound, egoRightBound].forEach(bound => {
                     ctx.beginPath();
-                    roadPoints.forEach((pt, i) => {
-                        const scrX = screenCenterX + (pt.x + offset - smoothedCamX);
-                        const scrY = screenCarY - (pt.s - camTargetS);
-                        if (i === 0) ctx.moveTo(scrX, scrY);
-                        else ctx.lineTo(scrX, scrY);
+                    bound.forEach((pt, i) => {
+                        if (i === 0) ctx.moveTo(pt.x, pt.y);
+                        else ctx.lineTo(pt.x, pt.y);
                     });
                     ctx.stroke();
                 });
 
-                // 3. 绘制双黄虚线中心线 (Double Yellow Centerline)
+                // 3. 绘制黄色虚线车道中心线 (Ego Centerline)
                 ctx.strokeStyle = "#fbbf24";
                 ctx.lineWidth = 2.5;
                 ctx.setLineDash([12, 10]);
                 ctx.beginPath();
-                roadPoints.forEach((pt, i) => {
-                    const scrX = screenCenterX + (pt.x - smoothedCamX);
-                    const scrY = screenCarY - (pt.s - camTargetS);
-                    if (i === 0) ctx.moveTo(scrX, scrY);
-                    else ctx.lineTo(scrX, scrY);
+                egoCenterLine.forEach((pt, i) => {
+                    if (i === 0) ctx.moveTo(pt.x, pt.y);
+                    else ctx.lineTo(pt.x, pt.y);
                 });
                 ctx.stroke();
                 ctx.setLineDash([]);
             }
 
-            // 4. 绘制第三人称主视角车辆 (Cyber Autonomous Car)
-            const carScreenX = screenCenterX + (car.x - smoothedCamX);
+            // 4. 绘制自车 (Ego Vehicle - 永远稳定定位于底部中央，车头正朝前)
             ctx.save();
-            ctx.translate(carScreenX, screenCarY);
-            // 车身根据当前航向角平稳微调 (psi)
-            ctx.rotate(car.psi || 0.0);
+            ctx.translate(egoCarX, egoCarY);
 
             // 前照大灯光束 (Headlight Cone)
-            const grad = ctx.createRadialGradient(0, -18, 5, 0, -100, 110);
-            grad.addColorStop(0, "rgba(0, 240, 255, 0.3)");
+            const grad = ctx.createRadialGradient(0, -18, 5, 0, -120, 130);
+            grad.addColorStop(0, "rgba(0, 240, 255, 0.35)");
             grad.addColorStop(1, "rgba(0, 240, 255, 0.0)");
             ctx.fillStyle = grad;
             ctx.beginPath();
             ctx.moveTo(0, -18);
-            ctx.lineTo(-45, -120);
-            ctx.lineTo(45, -120);
+            ctx.lineTo(-45, -140);
+            ctx.lineTo(45, -140);
             ctx.closePath();
             ctx.fill();
 
             // 车辆底盘 (Cyan Metallic Body)
             ctx.fillStyle = "#0284c7";
             ctx.shadowColor = "#00f0ff";
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = 14;
             ctx.fillRect(-14, -26, 28, 52);
 
             // 车顶挡风玻璃
