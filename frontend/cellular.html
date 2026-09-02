@@ -472,9 +472,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
-    border-radius: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
     background: rgba(56, 189, 248, 0.15);
     border: 1px solid rgba(56, 189, 248, 0.35);
     color: var(--cyan);
@@ -499,33 +499,37 @@
     justify-content: space-between;
     align-items: center;
   }
-  .tree-children {
-    max-height: 0;
-    opacity: 0;
+  .tree-children-wrapper {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .tree-node.open .tree-children-wrapper {
+    grid-template-rows: 1fr;
+  }
+  .tree-children-inner {
     overflow: hidden;
-    padding: 0 10px 0 22px;
-    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    background: rgba(10, 15, 28, 0.75);
-    border-top: 1px solid transparent;
-    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.25s ease, padding 0.3s ease;
+    gap: 6px;
+    padding: 0 8px 0 20px;
+    opacity: 0;
+    position: relative;
+    transition: opacity 0.2s ease, padding 0.2s ease;
   }
-  .tree-children::before {
+  .tree-children-inner::before {
     content: '';
     position: absolute;
     top: 0;
-    bottom: 14px;
-    left: 12px;
+    bottom: 12px;
+    left: 10px;
     width: 1px;
     border-left: 1px dashed rgba(56, 189, 248, 0.35);
   }
-  .tree-node.open .tree-children {
-    max-height: 600px;
+  .tree-node.open .tree-children-inner {
     opacity: 1;
-    padding: 8px 10px 10px 22px;
-    border-top-color: rgba(56, 189, 248, 0.15);
+    padding: 6px 8px 8px 20px;
+    border-top: 1px solid rgba(56, 189, 248, 0.15);
   }
   .tree-leaf {
     position: relative;
@@ -616,6 +620,20 @@
   #islands-grid::-webkit-scrollbar-thumb:hover {
     background: var(--cyan);
     box-shadow: 0 0 10px rgba(56, 189, 248, 0.8);
+  }
+
+  /* 1080p 及笔记本屏幕响应式深度优化 */
+  @media (max-width: 1536px) {
+    .dock-left { width: 290px; padding: 10px; gap: 8px; }
+    .dock-right { width: 280px; padding: 10px; gap: 8px; }
+    .warp-quick-bar { left: 300px; }
+    .cam-controls { right: 290px; }
+    .dialogue-deck {
+      width: 320px;
+      right: 290px;
+      bottom: 20px;
+    }
+    .card { padding: 8px 10px; gap: 6px; }
   }
 
   /* 典籍卡片样式 (Book Card Styling) */
@@ -1963,6 +1981,14 @@ let currentSelectedOrgId = 'apex_generalist_prime';
 let currentHighlightedBookId = null;
 let libraryInitialRenderDone = false;
 
+window.onRowClick = function(orgId, orgName) {
+  selectOrganism(orgId, orgName);
+  const node = document.getElementById('org-node-' + orgId);
+  if(node && !node.classList.contains('open')) {
+    window.toggleTreeNode(orgId);
+  }
+};
+
 window.toggleTreeNode = function(orgId) {
   const node = document.getElementById('org-node-' + orgId);
   if(node) {
@@ -2008,7 +2034,7 @@ async function pollLibrary() {
           }).join('');
 
           return `<div class="tree-node ${isOpen} ${isSelected}" id="org-node-${org.organism_id}" data-org-id="${org.organism_id}">
-            <div class="tree-row" onclick="selectOrganism('${org.organism_id}', '${org.name}')">
+            <div class="tree-row" onclick="onRowClick('${org.organism_id}', '${org.name}')">
               <div class="tree-expander" onclick="event.stopPropagation(); toggleTreeNode('${org.organism_id}')">
                 ${isOpen ? "−" : "+"}
               </div>
@@ -2023,8 +2049,10 @@ async function pollLibrary() {
                 </div>
               </div>
             </div>
-            <div class="tree-children">
-              ${booksHtml}
+            <div class="tree-children-wrapper">
+              <div class="tree-children-inner">
+                ${booksHtml}
+              </div>
             </div>
           </div>`;
         }).join('') + `</div>`;
@@ -2333,8 +2361,10 @@ async function syncBackendState() {
 function updateFromBackendState(data) {
   if (!data || !data.cells) return;
   
-  // 拓扑动态增殖生长或修剪 (Dynamic Mitosis / Apoptosis Sync)
-  if (data.cells.length !== org.cells.length || (data.synapses && data.synapses.length !== org.syns.length)) {
+  // 拓扑动态增殖生长或修剪 (基于拓扑指纹精准比对，杜绝突触残留)
+  const topoFingerprint = `${data.organism_id || ''}_${data.cells.length}_${(data.synapses || []).length}`;
+  if (org.lastFingerprint !== topoFingerprint) {
+    org.lastFingerprint = topoFingerprint;
     org.generation = data.generation;
     org.cells = data.cells.map(c => ({
       id: c.id,
@@ -2362,7 +2392,7 @@ function updateFromBackendState(data) {
     }
     compile(org);
     rebuildViews();
-    log(`[GROWTH] 形态发生增殖: Gen ${org.generation} (${org.cells.length} 细胞 / ${org.syns.length} 突触)`, true);
+    log(`[GROWTH] 形态发生重构: ${data.organism_id || 'SDSCC'} (${org.cells.length} 细胞 / ${org.syns.length} 突触)`, true);
   }
 
   // 1. 节流更新 DOM 文本指标
