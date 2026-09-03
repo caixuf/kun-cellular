@@ -396,7 +396,7 @@ public:
 
     StepResult step_continuous(const CellularOrganism::ActionOutputs& acts) override {
         float steer = static_cast<float>(acts.positive_action - acts.negative_action);
-        float accel = static_cast<float>(acts.positive_action * 2.5 - acts.defensive_action * 4.0);
+        float accel = static_cast<float>(acts.positive_action * 2.5 - acts.defensive_reset * 4.0);
         return step_internal(steer, accel);
     }
 
@@ -462,41 +462,6 @@ private:
     float oncoming_ttc_{3.0f};
     bool collision_{false};
     bool reached_target_{false};
-    std::mt19937 rng_;
-};
-
-        StepResult res;
-        res.obs = current_observation();
-        res.reward = reward;
-        res.done = done;
-        res.success = agent_won_;
-        res.steps = round_count_;
-        res.min_dist_to_goal = static_cast<double>(std::max(0, agent_cards_left_));
-        return res;
-    }
-
-    StepResult step_continuous(const CellularOrganism::ActionOutputs& acts) override {
-        int act = (acts.positive_action >= acts.negative_action) ? 1 : 0;
-        return step(act);
-    }
-
-    double current_fitness() const override {
-        double win_rate = (games_played_ > 0) ? (static_cast<double>(total_wins_) / games_played_) : 0.0;
-        double card_progress = static_cast<double>(17 - std::max(0, agent_cards_left_)) / 17.0;
-        return (win_rate * 60.0) + (card_progress * 40.0);
-    }
-
-private:
-    int max_rounds_{40};
-    int round_count_{0};
-    float agent_hand_strength_{0.5f};
-    int agent_cards_left_{17};
-    int opp_cards_left_{17};
-    float table_card_strength_{0.0f};
-    float played_history_intensity_{0.0f};
-    bool agent_won_{false};
-    int total_wins_{0};
-    int games_played_{0};
     std::mt19937 rng_;
 };
 

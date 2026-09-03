@@ -142,12 +142,12 @@ In 3D dynamical simulation:
 * Critical Cut-in AEB: TTC 0.36s emergency scenario, **3.69 m** residual safety margin;
 * 1000-Frame Long-Horizon Test: **0 Collisions**, satisfying ASIL-D safety envelope guarantees.
 
-### 5.3 10.7-Year Out-of-Sample Multi-Asset Walk-Forward Audit (2016 ~ 2026) [E1]
-Evaluated on 43 commodities across 81,570 daily bars under T+1 open execution, 1.0 Tick slippage, and 1.5 bp friction:
-* Initial Capital: 1,000,000.00 CNY $\to$ Terminal Liquidation: **2,485,166.43 CNY (+148.52%)**;
-* CAGR: **+8.92%**;
-* Max Drawdown: 44.73% (100% solvency preserved via 40% margin breaker);
-* Pre-Trade Risk Locking: 100% success rate in isolating 3 macro flash-crash shocks.
+### 5.3 10.7-Year Out-of-Sample Multi-Asset Walk-Forward Audit (2016 ~ 2026) [E1][Negative Result, Revised]
+Evaluated on 43 commodities across 81,570 daily bars under T+1 open execution, 1.0 Tick slippage, and 1.5 bp friction. **The previous version of this section cited a single-seed (seed42, only 8 trades over the entire period) equity curve of +148.52% as a representative result. Upon audit this was found to be a case of selective reporting (cherry-picking) and is hereby corrected**:
+* **Unevolved random-baseline network** (`evidence_quality_quant_audit.json`): one-sample t-tests across 10 random seeds over three independent rolling windows (2014-2026) yield **p-values between 0.41 and 0.80** for mean ROI, i.e. statistically indistinguishable from zero — consistent with pure noise;
+* **Genuinely evolved champion network** (`quant_million_brain_evolved_champion.pt`, 878 trades): out-of-sample **ROI −44.8%, max drawdown 68.1%, Calmar −0.08** — materially worse than the unevolved random baseline over the same period;
+* Four additional independently evolved architecture variants (`quant_all_weather` / `quant_multi_horizon` / `quant_plastic_adaptive` / `quant_reward_modulated`) all produced negative out-of-sample ROI (−8.6% to −93.1%);
+* **Conclusion**: current evidence does not support the claim that the cellular organism achieves robust quantitative profitability on this 43-asset daily-bar feature space. The previously cited +148.52% figure reflects the luck of a single random seed on an extremely small sample (8 trades) and is neither statistically meaningful nor reproducible; it is retracted here in favor of full disclosure of the negative results above, to inform future work on richer feature sources (cross-sectional correlation, term structure, open interest, etc.).
 
 ### 5.4 GPU Tensor-Scaled Morphogenetic Continuum [E1]
 

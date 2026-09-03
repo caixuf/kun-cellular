@@ -1877,6 +1877,13 @@ public:
         return true;
     }
 
+    static CellularOrganism load_checkpoint_json(const std::string& filepath) {
+        std::ifstream ifs(filepath);
+        if (!ifs.is_open()) return CellularOrganism();
+        std::string str((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
+        return from_json(str);
+    }
+
     // ========================================================================
     // 7. 李雅普诺夫 BIBO 稳定性判定与自适应阻尼 (Lyapunov BIBO Stability Analyzer)
     // 物理公理: 存在反馈环路的非线性动力系统若环增益 >= 1.0 且无耗散阻尼，必发生数值发散
@@ -2838,6 +2845,7 @@ public:
     }
 
     CellularOrganism& get_champion() { return population_[0]; }
+    const CellularOrganism& get_champion() const { return population_[0]; }
     const std::vector<CellularOrganism>& get_population() const { return population_; }
     std::vector<CellularOrganism>& get_population_mut() { return population_; }
     const std::vector<CellularOrganism>& population() const { return population_; }

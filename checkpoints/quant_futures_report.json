@@ -1,0 +1,21 @@
+{
+  "trainer": "tools/train_quant_futures.cpp",
+  "asset": "rb (螺纹钢)",
+  "dataset": "kunquant/data/history/rb.csv",
+  "seed": 20260903,
+  "generations": 30,
+  "population": 24,
+  "train_start": "2009-03-27",
+  "train_end": "2021-06-07",
+  "test_start": "2021-06-08",
+  "test_end": "2026-09-01",
+  "oos_sharpe": -0.53,
+  "oos_pnl": -0.3572,
+  "oos_max_drawdown": 0.5371,
+  "cells": 10,
+  "synapses": 12,
+  "verdict": "FAIL",
+  "note": "旧版 checkpoint 曾含手工写入的占位字段 sample_out_pnl/sharpe/max_dd 均为 0.0，但 CellularOrganism::save_checkpoint_json 从不写出这些字段（源码核实），属未经真实回测的伪造元数据。本次重跑训练器得到的才是真实样本外结果：单品种(螺纹钢)夏普 -0.53、回撤 53.7%，同样未通过验证，与 43 品种量化高手失败结论一致。",
+  "adas_untouched": true,
+  "base_untouched": true
+}

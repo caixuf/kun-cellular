@@ -1,0 +1,23 @@
+{
+  "trainer": "tools/train_multi_asset_quant_master.cpp",
+  "seed": 20260903,
+  "generations": 30,
+  "population": 24,
+  "n_assets": 43,
+  "train_start": "2005-01-04",
+  "train_end": "2012-12-31",
+  "val_start": "2013-01-04",
+  "val_end": "2015-12-31",
+  "test_start": "2016-01-04",
+  "test_end": "2026-09-01",
+  "train_fitness": 3.111435,
+  "oos_sharpe": 0.004712,
+  "oos_pnl": -0.213117,
+  "oos_max_drawdown": 0.507068,
+  "oos_calmar": -0.420293,
+  "oos_trades": 6566,
+  "final_capital": 786882.900387,
+  "adas_untouched": true,
+  "base_untouched": true,
+  "checkpoint": "checkpoints/quant_master_champion.json"
+}

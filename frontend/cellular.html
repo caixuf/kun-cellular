@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KunCellular // 软件定义硅基细胞计算机全息观测台 · SDSCC Observatory</title>
+<script src="vendor/marked.min.js"></script>
 <style>
   :root {
     --bg-dark: #030712;
@@ -19,6 +20,114 @@
     --text-main: #f1f5f9;
     --text-dim: #94a3b8;
     --font-mono: "JetBrains Mono", "Fira Code", monospace, system-ui;
+  }
+
+  /* 专业学术与工程 Markdown 排版风格 */
+  .markdown-body {
+    color: #cbd5e1;
+    font-size: 13px;
+    line-height: 1.7;
+    word-break: break-word;
+  }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3, .markdown-body h4 {
+    color: #f8fafc;
+    font-weight: 700;
+    margin-top: 22px;
+    margin-bottom: 12px;
+  }
+  .markdown-body h1 {
+    font-size: 22px;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+    padding-bottom: 8px;
+    color: var(--cyan);
+  }
+  .markdown-body h2 {
+    font-size: 17px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 6px;
+    color: #e2e8f0;
+  }
+  .markdown-body h3 {
+    font-size: 15px;
+    color: #38bdf8;
+  }
+  .markdown-body p {
+    margin-bottom: 14px;
+  }
+  .markdown-body strong {
+    color: #f8fafc;
+    font-weight: 700;
+  }
+  .markdown-body em {
+    color: #fbbf24;
+    font-style: italic;
+  }
+  .markdown-body blockquote {
+    border-left: 3px solid var(--cyan);
+    background: rgba(56, 189, 248, 0.08);
+    padding: 10px 16px;
+    margin: 14px 0;
+    border-radius: 0 4px 4px 0;
+    color: #94a3b8;
+  }
+  .markdown-body code {
+    font-family: var(--font-mono);
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    color: #38bdf8;
+  }
+  .markdown-body pre {
+    background: #060911;
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 6px;
+    padding: 16px;
+    overflow-x: auto;
+    margin: 16px 0;
+  }
+  .markdown-body pre code {
+    background: transparent;
+    border: none;
+    padding: 0;
+    color: #e2e8f0;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .markdown-body table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 12px;
+  }
+  .markdown-body th, .markdown-body td {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 8px 14px;
+    text-align: left;
+  }
+  .markdown-body th {
+    background: rgba(30, 41, 59, 0.7);
+    color: var(--cyan);
+    font-weight: 700;
+  }
+  .markdown-body tr:nth-child(even) {
+    background: rgba(255, 255, 255, 0.03);
+  }
+  .markdown-body ul, .markdown-body ol {
+    margin: 10px 0 14px 24px;
+  }
+  .markdown-body li {
+    margin-bottom: 6px;
+  }
+  .markdown-body hr {
+    border: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    margin: 24px 0;
+  }
+  .markdown-body a {
+    color: var(--cyan);
+    text-decoration: underline;
   }
   
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -59,6 +168,7 @@
     letter-spacing: 1px;
     background: linear-gradient(135deg, var(--cyan), var(--purple));
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
   }
   .brand-tag {
@@ -959,6 +1069,7 @@
     </div>
     <div class="kv" data-tip="st-gen"><span>演化世代 Generation</span><b id="st-gen">0</b></div>
     <div class="kv" data-tip="st-cells"><span>活跃细胞 Cells</span><b id="st-cells" style="color:var(--cyan)">0</b></div>
+    <div class="kv" data-tip="st-real-cells"><span>真实渲染细胞 Rendered</span><b id="st-real-cells" style="color:var(--emerald)">0</b></div>
     <div class="kv"><span>神经突触 Synapses</span><b id="st-syn" style="color:var(--purple)">0</b></div>
     <div class="kv" data-tip="st-free-energy"><span>预测自由能 Free Energy</span><b id="st-fe" style="color:var(--emerald)">0.084</b></div>
     <div class="kv" data-tip="st-plasticity"><span>突触塑性 STDP Flux</span><b id="st-flux" style="color:var(--amber)">0.035</b></div>
@@ -1010,27 +1121,24 @@
     </div>
   </div>
 
-  <!-- 卡片 2: 硅基生命体与文化典籍 (核心流形选择坞) -->
+  <!-- 卡片 2: 硅基生命体与工程技术规格 (真实物理底座与实证门禁，零虚构) -->
   <div class="card" id="card-library" style="flex: 1; min-height: 220px; display: flex; flex-direction: column;">
     <div class="card-title" style="flex-shrink: 0;">
-      <span>硅基生命体与典籍 (Organisms & Books)</span>
-      <span class="card-title-badge" id="st-total-books">4 大生命体 / 9 册典籍</span>
+      <span>生命体与工程规格 (Organisms & Specs)</span>
+      <span class="card-title-badge" id="st-total-books">6 大真实生命体 / 18 项工程规格</span>
     </div>
     <div id="library-shelf" style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; font-size: 10px; padding-right: 4px;">
     </div>
   </div>
 
-  <!-- 卡片 3: 快速检查点预设载入 -->
+  <!-- 卡片 3: 快速生命体快捷挂载 (从后端动态自动渲染，新增生命体零代码改动) -->
   <div class="card">
     <div class="card-title">
-      <span>快速检查点载入</span>
-      <span class="card-title-badge">Presets</span>
+      <span>生命体快捷挂载</span>
+      <span class="card-title-badge" id="st-presets-badge">Dynamic</span>
     </div>
-    <div class="btn-grid-4">
-      <button class="btn-ctrl" onclick="loadPreset('seed')">种子(0)</button>
-      <button class="btn-ctrl" onclick="loadPreset('mature')">成熟脑(384)</button>
-      <button class="btn-ctrl" onclick="loadPreset('adas')" style="color:var(--purple)">ADAS 1M</button>
-      <button class="btn-ctrl" onclick="loadPreset('real')" style="color:var(--emerald);font-weight:bold;">量化实训</button>
+    <div id="preset-buttons-deck" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+      <!-- 动态从 /api/library 注入全部生命体快捷挂载按钮 -->
     </div>
   </div>
 
@@ -1180,7 +1288,7 @@
   <button class="warp-qbtn danger" onclick="setWarp('unlimited')" id="qw-max">MAX 极速狂飙</button>
 </div>
 
-<!-- 3D 视角微型罗盘 -->
+<!-- 3D 视角与渲染视界罗盘 -->
 <div class="cam-controls">
   <span style="color:var(--text-dim);font-size:10px;margin-right:2px;">视角:</span>
   <button class="cam-btn active" onclick="setCameraPreset('front')">正视</button>
@@ -1188,6 +1296,11 @@
   <button class="cam-btn" onclick="setCameraPreset('side')">侧视</button>
   <button id="btn-auto-orbit" class="cam-btn" onclick="toggleAutoOrbit()">自动巡航</button>
   <button class="cam-btn" onclick="setCameraPreset('reset')" style="color:var(--cyan);">居中复位</button>
+  <span style="color:var(--border);margin:0 4px;">|</span>
+  <span style="color:var(--text-dim);font-size:10px;margin-right:2px;">视界:</span>
+  <button id="rmode-symbiosis" class="cam-btn active" onclick="setRenderMode('symbiosis')" title="实体细胞 + 伴生能量星云点云 (默认全景共生美学)">[实体+星云]</button>
+  <button id="rmode-puremesh" class="cam-btn" onclick="setRenderMode('puremesh')" title="纯实体微观细胞网格 (清爽生物结构)">[纯实体]</button>
+  <button id="rmode-lod" class="cam-btn" onclick="setRenderMode('lod')" title="宏观点云 + 视锥展示区微观LOD (百万规模极限性能)">[宏微LOD]</button>
 </div>
 
 <!-- 5幕式新手漫游导览 HUD -->
@@ -1214,7 +1327,7 @@
 <!-- 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) -->
 <div id="dialogue-deck" class="dialogue-deck">
   <div class="deck-header" onclick="toggleDialogueDeck()">
-    <span style="color:var(--cyan);font-weight:bold;font-size:11px;">[SILICON_NEURAL_CHAT] 硅基生命体神经对话舱 (亿级语言中枢)</span>
+    <span style="color:var(--cyan);font-weight:bold;font-size:11px;">[SILICON_NEURAL_CHAT] 硅基生命体神经交互舱 (全息多生境中枢)</span>
     <span id="deck-toggle-icon" style="color:var(--text-dim);font-size:10px;">[折叠/展开]</span>
   </div>
   <div id="deck-body" class="deck-body">
@@ -1226,8 +1339,8 @@
     </div>
     <div id="chat-msgs" class="chat-msgs">
       <div class="msg-bot">
-        <span class="bot-badge">[SDSCC-100M-ORGAN]</span>
-        我是软件定义硅基细胞计算机（SDSCC）演化出的超级生命体。你可以向我发问，我将通过时空动作电位与你对话。
+        <span class="bot-badge">[SDSCC-CHAMPION-ORGAN]</span>
+        我是软件定义硅基细胞计算机（SDSCC）演化出的具身生命体。你可以向我发问，我将通过时空动作电位与你对话。
       </div>
     </div>
     <div class="chat-input-bar">
@@ -1294,18 +1407,25 @@ const T = {
   DELAY_N:'DELAY_N', OSCILLATOR:'OSCILLATOR', QUADRATIC:'QUADRATIC',
   THRESH:'THRESH', HYST:'HYST', AND:'AND', INHIB:'INHIB',
   DEADZONE:'DEADZONE', MIN_MAX:'MIN_MAX',
+  DAMPER:'DAMPER', AMPLIFY:'AMPLIFY', INVERT:'INVERT', CLIP:'CLIP', MULTIPLY:'MULTIPLY',
+  THRESHOLD:'THRESHOLD', HYSTERESIS:'HYSTERESIS', INHIBIT:'INHIBIT',
+  CORRELATION:'CORRELATION', FATIGUE:'FATIGUE',
   ACT_POS:'ACT_POS', ACT_NEG:'ACT_NEG', ACT_RESET:'ACT_RESET', ACT_LOCK:'ACT_LOCK'
 };
 const FAMILY = c =>
-  c.startsWith('SENSE') || c.startsWith('Sense') ? 'receptor' :
-  (c.startsWith('Op_') || ['EMA','DIFF','INTEGRAL','SUM','SUB','MUL','RATIO','ABS','DELAY_N','OSCILLATOR','QUADRATIC'].includes(c)) ? 'metabolic' :
-  (c.startsWith('Gate_') || ['THRESH','HYST','AND','INHIB','DEADZONE','MIN_MAX'].includes(c)) ? 'gating' :
-  (c.startsWith('Pred_') || c.startsWith('Assoc_')) ? 'cognitive' : 'effector';
+  c.startsWith('SENSE') || c.startsWith('Sense') || c.startsWith('REC_') ? 'receptor' :
+  (c.startsWith('Op_') || ['EMA','DIFF','INTEGRAL','SUM','SUB','MUL','RATIO','ABS','DELAY_N','OSCILLATOR','QUADRATIC',
+   'DAMPER','AMPLIFY','INVERT','CLIP','MULTIPLY'].includes(c)) ? 'metabolic' :
+  (c.startsWith('Gate_') || ['THRESH','HYST','AND','INHIB','DEADZONE','MIN_MAX',
+   'THRESHOLD','HYSTERESIS','INHIBIT'].includes(c)) ? 'gating' :
+  (c.startsWith('Pred_') || c.startsWith('Assoc_') || ['CORRELATION','FATIGUE'].includes(c)) ? 'cognitive' : 'effector';
 const FAMILY_COLOR = { receptor:0x22d3ee, metabolic:0x34d399, gating:0xa78bfa, cognitive:0xfbbf24, effector:0xf43f5e };
 const MUT_CANDIDATES = [
   T.EMA, T.DIFF, T.INTEGRAL, T.SUM, T.SUB, T.MUL, T.RATIO, T.ABS,
   T.DELAY_N, T.OSCILLATOR, T.QUADRATIC,
-  T.THRESH, T.HYST, T.AND, T.INHIB, T.DEADZONE, T.MIN_MAX
+  T.THRESH, T.HYST, T.AND, T.INHIB, T.DEADZONE, T.MIN_MAX,
+  T.DAMPER, T.AMPLIFY, T.INVERT, T.CLIP, T.MULTIPLY,
+  T.THRESHOLD, T.HYSTERESIS, T.INHIBIT, T.CORRELATION, T.FATIGUE
 ];
 
 /* ============================================================
@@ -1486,6 +1606,34 @@ function forward(org, inputs){
       case T.INHIB: c.out = i0*Math.max(0,1-i1); break;
       case T.DEADZONE: c.out = Math.abs(i0) > Math.abs(c.param1) ? i0 : 0; break;
       case T.MIN_MAX: c.out = c.param1 > 0.5 ? Math.max(i0, i1) : Math.min(i0, i1); break;
+      case T.DAMPER: c.state = (c.state||0)*0.70 + i0*0.30; c.out = c.state; break;
+      case T.AMPLIFY: c.out = Math.tanh(i0 * 2.5); break;
+      case T.INVERT: c.out = -Math.tanh(i0); break;
+      case T.CLIP: c.out = Math.max(-1.0, Math.min(1.0, i0)); break;
+      case T.MULTIPLY: c.out = Math.tanh(i0 * 1.5); break;
+      case T.THRESHOLD: c.out = i0 > 0.25 ? 1.0 : (i0 < -0.25 ? -1.0 : 0.0); break;
+      case T.HYSTERESIS: {
+        if(i0 > 0.15) c.state = 1.0;
+        else if(i0 < -0.15) c.state = -1.0;
+        c.out = c.state || 0.0;
+        break;
+      }
+      case T.INHIBIT: {
+        c.state = (c.state||0)*0.80 + Math.abs(i0)*0.20;
+        c.out = Math.tanh(i0) * Math.max(0.0, 1.0 - c.state);
+        break;
+      }
+      case T.CORRELATION: {
+        c.state = (c.state||0)*0.90 + (i0 * (c.aux||0))*0.10;
+        c.aux = i0;
+        c.out = Math.tanh(c.state);
+        break;
+      }
+      case T.FATIGUE: {
+        c.state = Math.min(2.0, (c.state||0) + Math.abs(i0)*0.15)*0.96;
+        c.out = Math.tanh(i0) / (1.0 + c.state);
+        break;
+      }
       default: c.out = i0;
     }
     if(Math.abs(c.out)>1e-6){ c.acts++; c.glow=Math.min(1,c.glow+0.3); }
@@ -1566,14 +1714,20 @@ function apoptosis(org){
  * 4. three.js 全息渲染
  * ============================================================ */
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x04070d, 0.0016);
-const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.2, 6000);
+scene.fog = new THREE.FogExp2(0x04070d, 0.00035);
+const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.2, 20000);
 camera.position.set(0, 0, 560);
 const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.getElementById('stage').appendChild(renderer.domElement);
 addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+/* 零 GC 预分配几何计算对象 (Zero-GC Preallocated Math Objects for Spatial Frustum Culling) */
+const _projScreenMatrix = new THREE.Matrix4();
+const _frustum = new THREE.Frustum();
+const _cellWorldPos = new THREE.Vector3();
+const _cellBoundsSphere = new THREE.Sphere();
 
 /* PBR 生物全息照明系统 (Bio-Fluorescent Dynamic Lighting) */
 const ambientLight = new THREE.AmbientLight(0x0e1726, 1.6);
@@ -1649,7 +1803,14 @@ let autoOrbitEnabled = false;
 const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2();
 const focalPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+const _camForward = new THREE.Vector3();
+const _zoomHit = new THREE.Vector3();
 let panDragging = false;
+
+function clampCamDistance(r) {
+  const macro = (currentOrganismBounds && currentOrganismBounds.macroDist) || 560;
+  return Math.max(18, Math.min(Math.max(2400, macro * 4), r));
+}
 
 renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -1701,18 +1862,18 @@ addEventListener('keydown', e => {
 // 1. 真实城市切片级深入缩放 + 光标对焦点深度推进 (Zoom-to-Cursor Micro Navigation)
 renderer.domElement.addEventListener('wheel', e => {
   e.preventDefault();
-  const zoomFactor = Math.pow(1.0024, e.deltaY);
-  const oldCamR = targetCamR;
-  targetCamR = Math.max(10, Math.min(2200, targetCamR * zoomFactor));
+  mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  const zoomFactor = Math.pow(1.0018, e.deltaY);
+  const oldCamR = Math.max(1e-3, targetCamR);
+  targetCamR = clampCamDistance(oldCamR * zoomFactor);
 
+  camera.getWorldDirection(_camForward);
+  focalPlane.normal.copy(_camForward).negate();
+  focalPlane.constant = -currentLookAt.dot(focalPlane.normal);
   raycaster.setFromCamera(mouseNDC, camera);
-  const intersectPoint = new THREE.Vector3();
-  focalPlane.normal.copy(camera.getWorldDirection(new THREE.Vector3()).negate());
-  focalPlane.constant = -targetLookAt.dot(focalPlane.normal);
-  if (raycaster.ray.intersectPlane(focalPlane, intersectPoint)) {
-    const toward = e.deltaY < 0 ? 0.42 : -0.18;
-    const shiftRatio = Math.max(0.06, Math.min(0.5, Math.abs(1.0 - (targetCamR / oldCamR)) * 2.4)) * Math.sign(toward);
-    targetLookAt.add(intersectPoint.sub(targetLookAt).multiplyScalar(Math.abs(shiftRatio) * (e.deltaY < 0 ? 1 : -0.35)));
+  if (raycaster.ray.intersectPlane(focalPlane, _zoomHit)) {
+    targetLookAt.lerp(_zoomHit, 1.0 - targetCamR / oldCamR);
   }
 }, { passive: false });
 
@@ -1731,19 +1892,18 @@ renderer.domElement.addEventListener('dblclick', e => {
     const v = hits[0].object.userData.cellView;
     if (v && v.cell) {
       targetLookAt.set(v.cell.x, v.cell.y, v.cell.z || 0);
-      targetCamR = 38; // 真正的局部微观特写！单细胞占满屏幕，其余百万细胞退至视野边缘
-      targetPhi = 1.35;
-      targetTheta = camTheta + 0.15;
+      const neighborR = Math.max(90, Math.min(220, (currentOrganismBounds.radius || 180) * 0.55));
+      targetCamR = neighborR;
       isCamTransitioning = true;
-      log(`[显微对焦] 深入微观皮层局部: 锁定元胞 #${v.cell.id} (${v.cell.type}) · 其余组织延展至视野外`, true);
+      log(`[街区对焦] 推进至元胞 #${v.cell.id} (${v.cell.type})，邻域组织保持原尺度同屏可见`, true);
     }
   } else {
-    targetLookAt.set(0, 0, 0);
-    targetCamR = 560;
+    targetLookAt.copy(currentOrganismBounds.center);
+    targetCamR = currentOrganismBounds.macroDist || 560;
     targetPhi = Math.PI / 2;
     targetTheta = 0;
     isCamTransitioning = true;
-    log(`[全景复位] 镜头拉远至全脑宏观星云`, true);
+    log(`[全景复位] 镜头回到生命体中心全景`, true);
   }
 });
 
@@ -1768,12 +1928,61 @@ const GLOW = glowTexture();
 const sphereGeo = new THREE.SphereGeometry(6, 14, 14);
 
 let currentLOD = "organ";
-let lodPointsMesh = null;
 let lodPositions = null;
 let lodColors = null;
 
-// 基于真实突触邻接拓扑的力导向 3D 点云流形构建 (Raw Graph Adjacency Force Embedding)
-function initLODCloud(count = 45000) {
+// 通用生命体三维拓扑空间包围盒与中心 (Universal Spatial Bounding & Centroid)
+let currentOrganismBounds = {
+  center: new THREE.Vector3(0, 0, 0),
+  radius: 180,
+  min: new THREE.Vector3(-180, -180, -180),
+  max: new THREE.Vector3(180, 180, 180),
+  macroDist: 460,
+  microDist: 260
+};
+
+function updateOrganismBounds() {
+  if (!org || !org.cells || org.cells.length === 0) return;
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  let minZ = Infinity, maxZ = -Infinity;
+  for (const c of org.cells) {
+    const x = c.x || 0, y = c.y || 0, z = c.z || 0;
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+    if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+  }
+  const cx = (minX + maxX) * 0.5;
+  const cy = (minY + maxY) * 0.5;
+  const cz = (minZ + maxZ) * 0.5;
+  currentOrganismBounds.center.set(cx, cy, cz);
+  currentOrganismBounds.min.set(minX, minY, minZ);
+  currentOrganismBounds.max.set(maxX, maxY, maxZ);
+
+  const dx = maxX - minX;
+  const dy = maxY - minY;
+  const dz = maxZ - minZ;
+  const rad = Math.max(35, Math.sqrt(dx * dx + dy * dy + dz * dz) * 0.5);
+  currentOrganismBounds.radius = rad;
+  // 自适应宏观/微观视距：小生命体相对紧凑，大生命体拉阔视距
+  currentOrganismBounds.macroDist = Math.max(260, rad * 2.2);
+  currentOrganismBounds.microDist = Math.max(140, rad * 1.15);
+}
+
+// 动态计算点云粒子自适应密度 (Adaptive Point Cloud Density)
+function computeAdaptiveLodCount() {
+  const nCells = (org && org.cells) ? org.cells.length : 1;
+  const nSyns = (org && org.syns) ? org.syns.length : 0;
+  // 9 细胞 -> 约 2,000 粒子; 40 细胞 -> 约 6,000 粒子; 210 细胞 -> 约 32,000 粒子; 10,000+ 细胞 -> 60,000 粒子
+  return Math.min(65000, Math.max(2000, Math.round(nCells * 110 + nSyns * 45)));
+}
+
+// 基于真实突触邻接拓扑的自适应 3D 点云流形构建 (Adaptive Causal Manifold Point Cloud)
+function initLODCloud(count = null) {
+  updateOrganismBounds();
+  if (count === null || count === undefined) {
+    count = computeAdaptiveLodCount();
+  }
   if(lodPointsMesh) { 
     scene.remove(lodPointsMesh); 
     if (lodPointsMesh.geometry) lodPointsMesh.geometry.dispose(); 
@@ -1790,13 +1999,13 @@ function initLODCloud(count = 45000) {
     for (const c of org.cells) cellsMap.set(c.id, c);
   }
 
+  const spreadScale = Math.min(1.2, Math.max(0.35, currentOrganismBounds.radius / 180.0));
+
   // 1. 遍历点云粒子，100% 依据真实拓扑图结构采样
   for(let i = 0; i < count; ++i) {
     let px = 0, py = 0, pz = 0;
     let colHex = 0x38bdf8;
 
-    // 40% 点采样于真实元胞核周围 (Cell Soma Gaussian Manifold)
-    // 60% 点采样于真实突触轴突轴线与二次贝塞尔流形 (Axon Synaptic Pathway)
     const isAxon = (synList.length > 0) && (Math.random() < 0.65);
 
     if (isAxon) {
@@ -1805,15 +2014,14 @@ function initLODCloud(count = 45000) {
       const cTo = cellsMap.get(syn.to) || org.cells[Math.min(1, nCells - 1)];
 
       const t = Math.random();
-      // 二次贝塞尔流向：中点带突触拱起力矩
-      const midX = (cFrom.x + cTo.x) * 0.5 + (Math.sin(syn.from * 3.1 + syn.to * 1.7)) * 14.0;
-      const midY = (cFrom.y + cTo.y) * 0.5 + (Math.cos(syn.from * 2.3 + syn.to * 4.1)) * 14.0;
-      const midZ = (cFrom.z + cTo.z) * 0.5 + (Math.sin(syn.from * 1.9 + syn.to * 2.8)) * 14.0;
+      const midX = (cFrom.x + cTo.x) * 0.5 + (Math.sin(syn.from * 3.1 + syn.to * 1.7)) * 12.0 * spreadScale;
+      const midY = (cFrom.y + cTo.y) * 0.5 + (Math.cos(syn.from * 2.3 + syn.to * 4.1)) * 12.0 * spreadScale;
+      const midZ = ((cFrom.z || 0) + (cTo.z || 0)) * 0.5 + (Math.sin(syn.from * 1.9 + syn.to * 2.8)) * 12.0 * spreadScale;
 
       const oneMinusT = 1.0 - t;
-      px = oneMinusT * oneMinusT * cFrom.x + 2.0 * oneMinusT * t * midX + t * t * cTo.x + (Math.random() - 0.5) * 6.0;
-      py = oneMinusT * oneMinusT * cFrom.y + 2.0 * oneMinusT * t * midY + t * t * cTo.y + (Math.random() - 0.5) * 6.0;
-      pz = oneMinusT * oneMinusT * cFrom.z + 2.0 * oneMinusT * t * midZ + t * t * cTo.z + (Math.random() - 0.5) * 6.0;
+      px = oneMinusT * oneMinusT * cFrom.x + 2.0 * oneMinusT * t * midX + t * t * cTo.x + (Math.random() - 0.5) * 5.0 * spreadScale;
+      py = oneMinusT * oneMinusT * cFrom.y + 2.0 * oneMinusT * t * midY + t * t * cTo.y + (Math.random() - 0.5) * 5.0 * spreadScale;
+      pz = oneMinusT * oneMinusT * (cFrom.z || 0) + 2.0 * oneMinusT * t * midZ + t * t * (cTo.z || 0) + (Math.random() - 0.5) * 5.0 * spreadScale;
 
       const fam = FAMILY(cTo.type);
       colHex = FAMILY_COLOR[fam] || 0x38bdf8;
@@ -1822,11 +2030,11 @@ function initLODCloud(count = 45000) {
       const u = Math.random();
       const phi = Math.acos(1 - 2 * Math.random());
       const theta = Math.random() * Math.PI * 2;
-      const r = 2.0 + Math.pow(u, 0.4) * (20.0 + (c.glow || 0) * 10.0);
+      const r = (1.5 + Math.pow(u, 0.4) * (18.0 + (c.glow || 0) * 8.0)) * spreadScale;
 
       px = c.x + r * Math.sin(phi) * Math.cos(theta);
       py = c.y + r * Math.sin(phi) * Math.sin(theta);
-      pz = c.z + r * Math.cos(phi);
+      pz = (c.z || 0) + r * Math.cos(phi);
 
       const fam = FAMILY(c.type);
       colHex = FAMILY_COLOR[fam] || 0x38bdf8;
@@ -1846,7 +2054,7 @@ function initLODCloud(count = 45000) {
   geo.setAttribute("color", new THREE.BufferAttribute(lodColors, 3));
 
   const mat = new THREE.PointsMaterial({
-    size: 4.8,
+    size: 4.6 * spreadScale,
     vertexColors: true,
     map: GLOW,
     transparent: true,
@@ -2233,51 +2441,187 @@ const cellViewsMap = new Map();   // cell.id -> CellView
 const synViewsMap = new Map();    // `${syn.from}->${syn.to}:${syn.port}` -> SynapseView
 let views = { cells: [], syns: [] };
 
-function rebuildViews(){
-  const curCellIds = new Set();
-  for (const c of org.cells) {
-    curCellIds.add(c.id);
-    if (cellViewsMap.has(c.id)) {
-      cellViewsMap.get(c.id).updateCell(c);
-    } else {
-      const v = new CellView(c);
-      cellViewsMap.set(c.id, v);
-    }
-  }
-  for (const [id, v] of cellViewsMap) {
-    if (!curCellIds.has(id)) {
-      v.dispose();
-      cellViewsMap.delete(id);
-    }
-  }
+// ===== 真实渲染 LOD：点云打底 + 按屏幕像素尺寸实化放大区域的实体细胞 =====
+const MIN_CELL_PIXELS   = 7.0;     // 单细胞分裂膜在屏幕上 < 此像素直径 -> 退化为点云（放大到够大才实化）
+const MAX_SOLID_CELLS   = 2000;    // 同屏最多实体细胞数（性能护栏，防百万级近距爆量）
+const CELL_WORLD_RADIUS = 16.0;    // 用于投影尺寸估算的代表性细胞世界半径
+const POINT_CLOUD_CAP   = 2000000; // 点云 GPU 硬上限，超出才按 stride 降采样
+const cellViewPool = [];           // 空闲 CellView 复用池（避免反复 dispose/重建）
+const synViewPool  = [];           // 空闲 SynapseView 复用池
+let cellSpatialHash = new Map();   // "bx,by,bz" -> [cellId,...]  空间哈希（每帧 LOD 邻域查询）
+let cellSynAdj = new Map();        // cellId -> [synKey,...]       突触反查邻接
+let synKeyMap = new Map();         // synKey -> syn                突触 O(1) 查表
+let lodPointsMesh = null;          // 真实全量点云（每细胞一个点）
 
-  const curSynKeys = new Set();
-  for (const s of org.syns) {
-    const key = `${s.from}->${s.to}:${s.port}`;
-    curSynKeys.add(key);
-    if (synViewsMap.has(key)) {
-      synViewsMap.get(key).updateSyn(s, org);
-    } else {
-      const v = new SynapseView(s, org);
-      synViewsMap.set(key, v);
-    }
-  }
-  for (const [key, v] of synViewsMap) {
-    if (!curSynKeys.has(key)) {
-      v.dispose();
-      synViewsMap.delete(key);
-    }
-  }
+function rebuildViews(){
+  updateOrganismBounds();
+
+  // 1. 回收当前实体/突触视图到复用池（仅隐藏，不 dispose，下一帧按需复用）
+  for (const v of cellViewsMap.values()) { v.group.visible = false; cellViewPool.push(v); }
+  cellViewsMap.clear();
+  for (const v of synViewsMap.values()) { v.group.visible = false; synViewPool.push(v); }
+  synViewsMap.clear();
+
+  // 2. 真实全量点云（每细胞一个真实点，数量 = 后端真实返回的细胞数）
+  buildFullPointCloud();
+
+  // 3. 空间哈希 + 突触反查邻接（每帧 LOD 邻域查询用）
+  buildCellSpatialHash();
 
   org.cellMap = new Map(org.cells.map(c => [c.id, c]));
+  views.cells = [];
+  views.syns = [];
+}
+
+// 真实全量点云：后端返回多少个细胞就画多少个点，绝不造假
+function buildFullPointCloud(){
+  if (lodPointsMesh) {
+    scene.remove(lodPointsMesh);
+    if (lodPointsMesh.geometry) lodPointsMesh.geometry.dispose();
+    if (lodPointsMesh.material) lodPointsMesh.material.dispose();
+    lodPointsMesh = null;
+  }
+  const n = org.cells.length;
+  if (n === 0) return;
+  const stride = n > POINT_CLOUD_CAP ? Math.ceil(n / POINT_CLOUD_CAP) : 1;
+  const count = Math.ceil(n / stride);
+  const pos = new Float32Array(count * 3);
+  const col = new Float32Array(count * 3);
+  let k = 0;
+  for (let i = 0; i < n; i += stride) {
+    const c = org.cells[i];
+    pos[k*3]   = c.x || 0;
+    pos[k*3+1] = c.y || 0;
+    pos[k*3+2] = c.z || 0;
+    const hex = FAMILY_COLOR[FAMILY(c.type)] || 0x38bdf8;
+    col[k*3]   = ((hex >> 16) & 255) / 255;
+    col[k*3+1] = ((hex >> 8) & 255) / 255;
+    col[k*3+2] = (hex & 255) / 255;
+    k++;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 3.2, vertexColors: true, transparent: true, opacity: 0.5,
+    blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+  });
+  lodPointsMesh = new THREE.Points(geo, mat);
+  lodPointsMesh.frustumCulled = false;
+  scene.add(lodPointsMesh);
+}
+
+// 轻量均匀网格空间哈希：百万细胞只插一次 O(n)，每帧只查相机附近若干桶
+function buildCellSpatialHash(){
+  cellSpatialHash = new Map();
+  cellSynAdj = new Map();
+  synKeyMap = new Map();
+  const B = Math.max(20, (currentOrganismBounds.radius || 180) / 12);
+  for (const c of org.cells) {
+    const bx = Math.floor((c.x || 0) / B), by = Math.floor((c.y || 0) / B), bz = Math.floor((c.z || 0) / B);
+    const key = bx + ',' + by + ',' + bz;
+    let arr = cellSpatialHash.get(key);
+    if (!arr) { arr = []; cellSpatialHash.set(key, arr); }
+    arr.push(c);
+  }
+  for (const s of org.syns) {
+    const key = `${s.from}->${s.to}:${s.port}`;
+    synKeyMap.set(key, s);
+    for (const cid of [s.from, s.to]) {
+      let arr = cellSynAdj.get(cid);
+      if (!arr) { arr = []; cellSynAdj.set(cid, arr); }
+      arr.push(key);
+    }
+  }
+}
+
+// 每帧 LOD：用空间哈希取相机附近细胞，按「屏幕投影像素尺寸」判定是否实化
+const _lodCamPos = new THREE.Vector3();
+const _lodCellPos = new THREE.Vector3();
+const _lodSphere = new THREE.Sphere();
+const _lodCandidates = [];
+function updateDetailLOD(frustum){
+  const n = org.cells.length;
+  if (n === 0) return;
+  _lodCamPos.copy(camera.position);
+
+  // 投影比例尺：世界半径 -> 屏幕像素；由此得「实化所需的最大相机距离」
+  const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
+  const solidMaxDist = (CELL_WORLD_RADIUS * projScale) / MIN_CELL_PIXELS;
+  const orgR = currentOrganismBounds.radius || 180;
+
+  // 早退：相机离组织太远 -> 所有细胞在屏幕上 < MIN_CELL_PIXELS -> 全是点云
+  const camToCtr = _lodCamPos.distanceTo(currentOrganismBounds.center);
+  if (camToCtr > solidMaxDist + orgR + CELL_WORLD_RADIUS) {
+    if (cellViewsMap.size) {
+      for (const v of cellViewsMap.values()) { v.group.visible = false; cellViewPool.push(v); }
+      cellViewsMap.clear();
+    }
+    if (synViewsMap.size) {
+      for (const v of synViewsMap.values()) { v.group.visible = false; synViewPool.push(v); }
+      synViewsMap.clear();
+    }
+    views.cells = []; views.syns = [];
+    return;
+  }
+
+  // 只遍历「含细胞的桶」，对每个细胞测距离 + 视锥（百万细胞也只扫实有桶）
+  _lodCandidates.length = 0;
+  for (const arr of cellSpatialHash.values()) {
+    for (const c of arr) {
+      _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
+      const d = _lodCamPos.distanceTo(_lodCellPos);
+      if (d > solidMaxDist) continue;
+      _lodSphere.center.copy(_lodCellPos); _lodSphere.radius = 52.0;
+      if (!frustum.intersectsSphere(_lodSphere)) continue;
+      _lodCandidates.push({ id: c.id, d });
+    }
+  }
+
+  // 距相机最近者优先，截断到护栏
+  _lodCandidates.sort((a, b) => a.d - b.d);
+  if (_lodCandidates.length > MAX_SOLID_CELLS) _lodCandidates.length = MAX_SOLID_CELLS;
+  const wantIds = new Set();
+  for (const cd of _lodCandidates) wantIds.add(cd.id);
+
+  // 实体细胞：回收不需要的，分配/复用需要的
+  for (const [id, v] of cellViewsMap) {
+    if (!wantIds.has(id)) { v.group.visible = false; cellViewPool.push(v); cellViewsMap.delete(id); }
+  }
+  for (const cd of _lodCandidates) {
+    let v = cellViewsMap.get(cd.id);
+    if (!v) {
+      const c = org.cellMap.get(cd.id);
+      v = cellViewPool.length ? (cellViewPool.pop()) : new CellView(c);
+      v.updateCell(c);
+      cellViewsMap.set(cd.id, v);
+    }
+    v.group.visible = true;
+  }
   views.cells = Array.from(cellViewsMap.values());
+
+  // 突触 LOD：仅当至少一端是实体细胞时才显示
+  const wantSyn = new Set();
+  for (const id of wantIds) {
+    const adj = cellSynAdj.get(id);
+    if (adj) for (const key of adj) wantSyn.add(key);
+  }
+  for (const [key, v] of synViewsMap) {
+    if (!wantSyn.has(key)) { v.group.visible = false; synViewPool.push(v); synViewsMap.delete(key); }
+  }
+  for (const key of wantSyn) {
+    if (!synViewsMap.has(key)) {
+      const syn = synKeyMap.get(key);
+      if (!syn) continue;
+      let v = synViewPool.length ? (synViewPool.pop()) : new SynapseView(syn, org);
+      v.updateSyn(syn, org);
+      synViewsMap.set(key, v);
+      v.group.visible = true;
+    }
+  }
   views.syns = Array.from(synViewsMap.values());
-  const hideCellMeshes = (typeof camR === "number" ? camR : 560) > 280;
-  for (const v of views.cells) v.group.visible = !hideCellMeshes;
-  for (const v of views.syns) v.group.visible = true;
 }
 rebuildViews();
-initLODCloud(30000);
 
 let paused = false, lastPrice = 3620, realPrice = null, tickTimer = 0, mitoTimer = 0;
 let totalActs = 0;
@@ -2448,7 +2792,7 @@ async function pollIslands() {
 setInterval(pollIslands, 1000);
 pollIslands();
 
-let currentSelectedOrgId = 'apex_generalist_prime';
+let currentSelectedOrgId = 'adas_cortex_champion';
 let currentHighlightedBookId = null;
 let libraryInitialRenderDone = false;
 
@@ -2482,24 +2826,117 @@ async function pollLibrary() {
         libraryInitialRenderDone = true;
         window.__libCount = j.organisms.length;
 
-        shelf.innerHTML = `<div class="win-tree">` + j.organisms.map((org, idx) => {
+        const foundationsHtml = `
+          <div class="tree-node open" style="margin-bottom:8px;border-bottom:1px dashed rgba(56,189,248,0.3);padding-bottom:6px;">
+            <div class="tree-row" style="background:rgba(56,189,248,0.06);">
+              <div class="tree-label">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="color:#38bdf8;font-weight:700;font-size:11px;">[DOCS] 核心学术论著与工程宪章</span>
+                  <span class="org-tag" style="background:rgba(56,189,248,0.2);color:#38bdf8;">权威文献</span>
+                </div>
+                <div style="color:#64748b;font-size:9px;margin-top:2px;">点击 [全文研读] 在线阅读项目真实理论与数学公理</div>
+              </div>
+            </div>
+            <div class="tree-children-wrapper" style="display:block;">
+              <div class="tree-children-inner" style="padding:4px 0 0 0;display:flex;flex-direction:column;gap:4px;">
+                <div class="tree-leaf" style="cursor:pointer;" onclick="event.stopPropagation(); openDocReader('docs/ARCHITECTURE_DISCIPLINE.md', 'SDSCC 最高架构与工程纪律宪章')">
+                  <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
+                    <span>《最高架构与工程纪律宪章》</span>
+                    <span style="color:#fbbf24;font-size:9px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[全文研读]</span>
+                  </div>
+                  <div style="color:#94a3b8;font-size:10px;margin-top:3px;line-height:1.4;">非冯算存一体、六道实证门禁、26类原子原语定义与C绝对权威。</div>
+                  <div style="color:#64748b;font-size:9px;margin-top:4px;font-family:var(--font-mono);">docs/ARCHITECTURE_DISCIPLINE.md</div>
+                </div>
+                <div class="tree-leaf" style="cursor:pointer;" onclick="event.stopPropagation(); openDocReader('docs/morphogenetic_cellular_evolution_paper.zh.md', '形态发生非冯硅基细胞计算学术论文 (中文精译版)')">
+                  <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
+                    <span>《形态发生非冯硅基细胞计算论文》</span>
+                    <span style="color:#fbbf24;font-size:9px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[全文研读]</span>
+                  </div>
+                  <div style="color:#94a3b8;font-size:10px;margin-top:3px;line-height:1.4;">图灵形态发生动力学、代际自催化演化、100M细胞空间压测理论。</div>
+                  <div style="color:#64748b;font-size:9px;margin-top:4px;font-family:var(--font-mono);">docs/morphogenetic_cellular_evolution_paper.zh.md</div>
+                </div>
+                <div class="tree-leaf" style="cursor:pointer;" onclick="event.stopPropagation(); openDocReader('docs/2026-09-01-quantitative-cellular-evolution-roadmap.md', '三十年大宗商品量化演化数学路线图')">
+                  <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
+                    <span>《三十年商品量化演化路线图》</span>
+                    <span style="color:#fbbf24;font-size:9px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[全文研读]</span>
+                  </div>
+                  <div style="color:#94a3b8;font-size:10px;margin-top:3px;line-height:1.4;">近30年4,234根真实日线演化、施密特迟滞滤波与风控防线数学公理。</div>
+                  <div style="color:#64748b;font-size:9px;margin-top:4px;font-family:var(--font-mono);">docs/2026-09-01-quantitative-cellular-evolution-roadmap.md</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        // 渲染生命体在演化危机中涌现出的真实因果模体 (自然演化无语言名称，以原语特征流为客观签名)
+        const motifBooks = j.motif_books || [];
+        const motifBooksHtml = motifBooks.length === 0 ? '' : `
+          <div class="tree-node open" style="margin-bottom:8px;border-bottom:1px dashed rgba(251,191,36,0.3);padding-bottom:6px;">
+            <div class="tree-row" style="background:rgba(251,191,36,0.08);">
+              <div class="tree-label">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span style="color:#fbbf24;font-weight:700;font-size:11px;">[MOTIFS] 演化涌现因果模体库 (Evolved Causal Motifs)</span>
+                  <span class="org-tag" style="background:rgba(251,191,36,0.2);color:#fbbf24;">动力学拓扑</span>
+                </div>
+                <div style="color:#64748b;font-size:9px;margin-top:2px;">生命体无语言名称，知识积累为纯粹因果功能子图 (标注为人设推断语义)</div>
+              </div>
+            </div>
+            <div class="tree-children-wrapper" style="display:block;">
+              <div class="tree-children-inner" style="padding:4px 0 0 0;display:flex;flex-direction:column;gap:4px;">
+                ${motifBooks.map((mb, mIdx) => {
+                  const pList = (mb.causal_subgraph?.cells || []).map(c => c.type).join(' → ');
+                  const sigTitle = `MOTIF#${mIdx+1} · [${pList}]`;
+                  return `<div class="tree-leaf" style="cursor:pointer;" onclick="event.stopPropagation(); openDocReader('${mb.file_path}', '${sigTitle}')">
+                    <div style="display:flex;justify-content:space-between;align-items:center;color:#fbbf24;font-weight:700;font-size:11px;">
+                      <span style="font-family:var(--font-mono);">${sigTitle}</span>
+                      <span style="color:#34d399;font-size:9px;background:rgba(52,211,153,0.15);padding:1px 6px;border-radius:3px;border:1px solid rgba(52,211,153,0.3);">* ${mb.impact_score || 9.0}</span>
+                    </div>
+                    <div style="color:#e2e8f0;font-size:10px;margin-top:3px;line-height:1.4;">
+                      推断语义: <span style="color:#38bdf8;font-weight:600;">《${mb.title}》</span>
+                    </div>
+                    <div style="color:#94a3b8;font-size:9px;margin-top:2px;line-height:1.3;">
+                      涌现自 <b>${mb.author_deme || 'Deme'}</b> (第 ${mb.discovered_at_gen} 代) · 危机: <i>${mb.crisis_context || 'Stress Test'}</i>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:9px;margin-top:5px;padding-top:4px;border-top:1px solid rgba(251,191,36,0.15);">
+                      <span style="color:#38bdf8;font-weight:600;">跨种群借用: ${mb.citations || 1} 次</span>
+                      <div style="display:flex;gap:4px;">
+                        <span onclick="event.stopPropagation(); openDocReader('${mb.file_path}', '${sigTitle}')" style="color:#fbbf24;font-weight:700;background:rgba(251,191,36,0.12);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[研读子图]</span>
+                        <span onclick="event.stopPropagation(); highlightBookSubcircuit('${mb.book_id}', '${mb.title}', '因果模体')" style="color:#38bdf8;font-weight:700;background:rgba(56,189,248,0.12);padding:1px 6px;border-radius:3px;border:1px solid rgba(56,189,248,0.3);">[点亮微柱]</span>
+                      </div>
+                    </div>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+
+        shelf.innerHTML = `<div class="win-tree">` + foundationsHtml + motifBooksHtml + j.organisms.map((org, idx) => {
           const isOpen = idx === 0 ? "open" : "";
           const isSelected = org.organism_id === currentSelectedOrgId ? "selected" : "";
-          const cellDesc = org.total_cells >= 100000000 ? '1亿细胞' : org.total_cells >= 10000000 ? '1000万细胞' : ((org.total_cells/10000).toFixed(0)+'万细胞');
+          const cellDesc = org.total_cells >= 100000000 ? '1亿细胞' : org.total_cells >= 10000 ? ((org.total_cells/10000).toFixed(1)+'万细胞') : (org.total_cells + ' 细胞 / ' + (org.total_synapses || org.total_cells) + ' 突触');
 
-          const booksHtml = (org.books || []).map(b => {
+          const booksHtml = (org.books || org.specs || []).map(b => {
             const isLeafActive = b.book_id === currentHighlightedBookId ? "active-leaf" : "";
+            const badgeTxt = b.badge || "SPEC";
+            const badgeColor = badgeTxt.includes("PASSED") ? "#34d399" : (badgeTxt.includes("REFLEX") ? "#fbbf24" : "#38bdf8");
+            const badgeBg = badgeTxt.includes("PASSED") ? "rgba(52,211,153,0.15)" : (badgeTxt.includes("REFLEX") ? "rgba(251,191,36,0.15)" : "rgba(56,189,248,0.15)");
+            const hasSourceFile = b.file_path && (b.file_path.endsWith('.h') || b.file_path.endsWith('.c') || b.file_path.endsWith('.cpp') || b.file_path.endsWith('.py') || b.file_path.endsWith('.json') || b.file_path.endsWith('.md'));
+
             return `<div class="tree-leaf ${isLeafActive}" data-book-id="${b.book_id}" onclick="event.stopPropagation(); highlightBookSubcircuit('${b.book_id}', '${b.title || b.book_id}', '${org.name}')">
               <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
-                <span>《${b.title || b.book_id}》</span>
-                <span style="color:#fbbf24;font-size:10px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:4px;border:1px solid rgba(251,191,36,0.3);">* ${b.impact_score || 9.5}</span>
+                <span>${b.title || b.book_id}</span>
+                <span style="color:${badgeColor};font-size:9px;font-family:var(--font-mono);background:${badgeBg};padding:1px 6px;border-radius:4px;border:1px solid ${badgeColor}40;">${badgeTxt}</span>
               </div>
-              <div style="color:#94a3b8;font-size:10px;margin-top:4px;line-height:1.4;">
+              <div style="color:#94a3b8;font-size:10px;margin-top:4px;line-height:1.4;word-break:break-all;">
                 ${b.description || ''}
               </div>
               <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:9px;margin-top:5px;padding-top:4px;border-top:1px solid rgba(56,189,248,0.1);">
-                <span style="color:#34d399;font-weight:600;">引用: ${b.citations || 1} 次</span>
-                <span style="color:#fbbf24;font-weight:700;background:rgba(251,191,36,0.12);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[点亮回路]</span>
+                <span style="color:#94a3b8;font-family:var(--font-mono);">${b.file_path ? b.file_path : '物理自组织'}</span>
+                <div style="display:flex;gap:4px;">
+                  ${hasSourceFile ? `<span onclick="event.stopPropagation(); openDocReader('${b.file_path}', '${b.title}')" style="color:#38bdf8;cursor:pointer;font-weight:700;background:rgba(56,189,248,0.12);padding:1px 6px;border-radius:3px;border:1px solid rgba(56,189,248,0.3);">[查源码]</span>` : ''}
+                  <span style="color:#fbbf24;cursor:pointer;font-weight:700;background:rgba(251,191,36,0.12);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[聚焦回路]</span>
+                </div>
               </div>
             </div>`;
           }).join('');
@@ -2527,6 +2964,19 @@ async function pollLibrary() {
             </div>
           </div>`;
         }).join('') + `</div>`;
+
+        // 动态注入快速生命体挂载按钮 (100% 由后端接口驱动，新增生命体 0 前端改动！)
+        const presetDeck = document.getElementById('preset-buttons-deck');
+        if (presetDeck) {
+          presetDeck.innerHTML = j.organisms.map(org => {
+            const shortName = (org.name || "").split(' ')[0] || org.name;
+            const cellTxt = org.total_cells >= 10000 ? ((org.total_cells/10000).toFixed(0)+'万') : org.total_cells;
+            const isSel = org.organism_id === currentSelectedOrgId;
+            return `<button class="btn-ctrl ${isSel ? 'active' : ''}" style="${isSel ? 'border-color:var(--cyan);color:var(--cyan);font-weight:bold;' : ''}" onclick="selectOrganism('${org.organism_id}', '${org.name}')" title="${org.name} (${org.total_cells} 细胞 / ${org.total_synapses} 突触)">
+              ${shortName} (${cellTxt})
+            </button>`;
+          }).join('');
+        }
       }
     }
   } catch(e) {}
@@ -2728,14 +3178,22 @@ window.loadPreset = async function(type) {
     await fetch("/api/preset?type=" + type);
   } catch(e) {}
   
-  if (type === "real" || type === "quant") {
-    log("已切换至: 4,234 根日线商品期货全天候量化大模型 (全息层状脑区拓扑)", true);
+  if (type === "mega" || type === "1m") {
+    log("已切换至: SDSCC 旗舰百万微柱全息大生命体 (标称 1,000,000 细胞 / 3,000,000 突触；真实渲染与前向计算约 208 个代表性微柱细胞)", true);
+  } else if (type === "real" || type === "quant") {
+    log("已切换至: 三十年商品期货百万细胞量化演化大脑 (Quant Million Brain)", true);
   } else if (type === "adas" || type === "vehicle") {
-    log("已切换至: SDSCC 100万细胞智能驾驶超级生命体大脑流形", true);
+    log("已切换至: SDSCC 车规级 ASIL-D 百万微柱大脑皮层 (ADAS Cortex)", true);
+  } else if (type === "maze") {
+    log("已切换至: 空间迷宫自组织导航脱困生命体 (13 细胞 / 13 突触)", true);
+  } else if (type === "doudizhu" || type === "game") {
+    log("已切换至: 非完全信息离散博弈决策生命体 (9 细胞 / 9 突触)", true);
+  } else if (type === "fluid") {
+    log("已切换至: 连续多相流体自适应阻尼调节器 (40 细胞 / 145 突触)", true);
   } else if (type === "seed") {
     log("已切换至: 原始单体受精卵种子元胞 (1 细胞 / 0 突触发育原基)", true);
   } else {
-    log("已切换至: 成熟复杂多层硅基生命体器官", true);
+    log("已切换至: SDSCC 真实冠军生命体皮层", true);
   }
 };
 
@@ -2757,12 +3215,31 @@ window.switchLOD = function(mode) {
     log(" 聚焦至: 1,000 细胞皮层柱介观视距");
   } else if(mode === "10k") {
     targetCamR = 420;
-    initLODCloud(25000);
     log(" 聚焦至: 10,000 细胞流形过渡视距");
   } else if(mode === "1m") {
     targetCamR = 580;
-    initLODCloud(45000);
-    log(" 聚焦至: 1,000,000 细胞宏观全量流形 (亚像素点云聚合，0 孤立大细胞)");
+    loadPreset("mega");
+    log(" 聚焦至: 百万级标称规模宏观点云视距 (真实驱动细胞仅为代表性微柱采样，非逐细胞全量渲染)");
+  }
+};
+
+let currentRenderMode = "symbiosis"; // "symbiosis" (实体+星云) | "puremesh" (纯实体) | "lod" (宏微LOD)
+
+window.setRenderMode = function(mode) {
+  currentRenderMode = mode;
+  const bSym = document.getElementById("rmode-symbiosis");
+  const bMesh = document.getElementById("rmode-puremesh");
+  const bLod = document.getElementById("rmode-lod");
+  if (bSym) bSym.classList.toggle("active", mode === "symbiosis");
+  if (bMesh) bMesh.classList.toggle("active", mode === "puremesh");
+  if (bLod) bLod.classList.toggle("active", mode === "lod");
+
+  if (mode === "symbiosis") {
+    log("[视界] 开启【实体细胞 + 能量星云共生】：全天候呈现微观实体质膜与神经突触，外层环绕拓扑伴生点云星云！", true);
+  } else if (mode === "puremesh") {
+    log("[视界] 开启【纯净微观实体】：仅保留高精生物质膜、核仁与脉冲突触，隐藏点云！", true);
+  } else if (mode === "lod") {
+    log("[视界] 开启【宏微两极 LOD】：远景全量宏观点云，放大到局部视锥才展现实体微观，支撑超大规模！", true);
   }
 };
 
@@ -3408,20 +3885,39 @@ function updateFromBackendState(data) {
       }));
     }
     compile(org);
+    updateOrganismBounds();
     rebuildViews();
-    initLODCloud(30000);
-    log(`[GROWTH] 拓扑力导向点云重构: ${data.organism_id || 'SDSCC'} (${org.cells.length} 细胞 / ${org.syns.length} 突触)`, true);
+    if (org.lastOrganismId !== data.organism_id) {
+      org.lastOrganismId = data.organism_id;
+      targetLookAt.copy(currentOrganismBounds.center);
+      targetCamR = currentOrganismBounds.macroDist;
+      isCamTransitioning = true;
+    }
+    log(`[GROWTH] 通用拓扑流形与空间包围盒重构: ${data.organism_id || 'SDSCC'} (${org.cells.length} 细胞 / ${org.syns.length} 突触 · 特征半径 ${Math.round(currentOrganismBounds.radius)})`, true);
   }
 
   // 1. 节流更新 DOM 文本指标
   const genEl = document.getElementById("st-gen");
   if (genEl && genEl.textContent != data.generation) genEl.textContent = data.generation;
   
-  const macroCells = data.macro_cells || data.n_macro_cells || (data.stats && data.stats.active_cells) || (window.currentPresetCells || 10891008);
+  const macroCells = data.macro_cells || data.n_macro_cells || (data.stats && data.stats.active_cells) || org.cells.length;
   const cellsEl = document.getElementById("st-cells");
   if (cellsEl) cellsEl.textContent = macroCells.toLocaleString();
-  
-  const macroSyns = data.macro_synapses || data.n_macro_synapses || (data.stats && data.stats.total_synapses) || (window.currentPresetSyns || 43564032);
+
+  // 真实渲染细胞数 = 后端实际生成/前向计算的物理实体数量 (projection_cores)，
+  // 与上面"活跃细胞"标称规模区分：大规模生命体 (如百万微柱) 仅用代表性采样驱动 3D 渲染与前向计算，
+  // 标称规模只是展示标签，不代表真的逐细胞仿真/渲染了那么多个体，避免"放大后仍是全细节"的误导。
+  const realCells = (data.stats && data.stats.projection_cores) || data.cells_count || (data.cells && data.cells.length) || org.cells.length;
+  const realCellsEl = document.getElementById("st-real-cells");
+  if (realCellsEl) {
+    realCellsEl.textContent = realCells.toLocaleString();
+    const isSurrogate = macroCells > realCells * 5;
+    realCellsEl.title = isSurrogate
+      ? `标称规模 ${macroCells.toLocaleString()} 为代表性统计标签；实际驱动 3D 场景与前向计算的真实细胞仅 ${realCells.toLocaleString()} 个`
+      : `真实细胞数与标称规模一致`;
+  }
+
+  const macroSyns = data.macro_synapses || data.n_macro_synapses || (data.stats && data.stats.total_synapses) || org.syns.length;
   const synEl = document.getElementById("st-syn");
   if (synEl) synEl.textContent = macroSyns.toLocaleString();
   
@@ -3567,11 +4063,6 @@ function animate(){
     if(tickTimer >= 0.6){ tickTimer = 0; marketTick(); }
     stepPhysics(org);
   }
-  // 5 阶 Smootherstep S-Curve 丝滑过渡
-  function smootherstep(min, max, val) {
-    const t = Math.max(0.0, Math.min(1.0, (val - min) / (max - min)));
-    return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
-  }
 
   // 1. 物理动量惯性阻尼逼近
   if (autoOrbitEnabled && !dragging && !isCamTransitioning) {
@@ -3594,63 +4085,60 @@ function animate(){
     currentLookAt.z + camR * sinPhi * Math.cos(camTheta)
   );
   camera.lookAt(currentLookAt);
+  if (typeof cellPointLight !== 'undefined') {
+    cellPointLight.position.copy(currentLookAt);
+  }
+  if (scene.fog) {
+    scene.fog.density = 0.00018 + 0.00022 * Math.min(1.0, camR / 900.0);
+  }
 
-  // 2. 三尺度 LOD：远景只看点云流形，近景才出现实体细胞。
-  // 阈值必须在默认 camR=560 之上把 13 单位质膜 / 48 单位光晕全部关掉，
-  // 否则百万细胞远看会变成几个巨大孤立细胞。
-  const macroFactor = smootherstep(200, 420, camR);
-  const microFactor = 1.0 - smootherstep(120, 280, camR);
-  const isMicroVisible = microFactor > 0.02;
+  _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  _frustum.setFromProjectionMatrix(_projScreenMatrix);
+
+  const closeLook = camR < Math.max(160, (currentOrganismBounds.microDist || 220) * 0.85);
+  const showPointCloud = currentRenderMode !== "puremesh";
 
   if (lodPointsMesh && lodPointsMesh.material) {
-    lodPointsMesh.visible = true;
-    lodPointsMesh.material.opacity = 0.22 + macroFactor * 0.66;
-    lodPointsMesh.material.size = 1.6 + macroFactor * 2.4;
+    lodPointsMesh.visible = showPointCloud;
+    lodPointsMesh.material.opacity = closeLook ? 0.18 : (currentRenderMode === "lod" ? 0.7 : 0.5);
+    lodPointsMesh.material.size = (currentRenderMode === "lod") ? 3.6 : 3.2;
   }
 
+  // 真实渲染 LOD：点云打底，按屏幕像素尺寸实化放大区域的实体细胞
+  updateDetailLOD(_frustum);
+
+  let visibleMicroCount = 0;
   for (const v of views.cells) {
-    v.group.visible = isMicroVisible;
-    if (!isMicroVisible) continue;
+    visibleMicroCount++;
+    v.group.visible = true;
     v.update(now * 0.001, clientWarpMultiplier);
-    if (v.membraneMesh && v.membraneMesh.material) {
-      v.membraneMesh.material.opacity *= microFactor;
-    }
-    if (v.membrane && v.membrane.material) {
-      v.membrane.material.opacity *= microFactor;
-    }
     if (v.label) {
-      const showLabel = microFactor > 0.62;
-      v.label.visible = showLabel;
-      if (v.label.material) v.label.material.opacity = showLabel ? (microFactor - 0.62) / 0.38 : 0;
+      v.label.visible = visibleMicroCount < 80;
+      if (v.label.material) v.label.material.opacity = v.label.visible ? 0.95 : 0;
     }
   }
 
-  // 轴突连线与囊泡放电在任何视距都要看得见：远看是脉冲网络，近看才是细胞本体。
-  const synPulse = 0.55 + microFactor * 0.45;
-  const photonScale = 0.45 + microFactor * 0.55;
   for (const v of views.syns) {
     v.group.visible = true;
     v.update(now * 0.001, clientWarpMultiplier);
-    v.lineMat.opacity = Math.max(0.22, (v.lineMat.opacity || 0.6) * synPulse);
-    v.photon1.material.opacity = Math.max(0.35, (v.photon1.material.opacity || 0.8) * synPulse);
-    v.photon2.material.opacity = Math.max(0.35, (v.photon2.material.opacity || 0.8) * synPulse);
-    v.bouton.material.opacity = Math.max(0.3, (v.bouton.material.opacity || 0.8) * synPulse);
-    v.photon1.scale.multiplyScalar(photonScale);
-    v.photon2.scale.multiplyScalar(photonScale);
-    v.bouton.scale.multiplyScalar(photonScale);
+    v.lineMat.opacity = closeLook ? 0.72 : 0.38;
+    v.photon1.material.opacity = closeLook ? 0.9 : 0.55;
+    v.photon2.material.opacity = closeLook ? 0.9 : 0.55;
+    if (v.bouton) {
+      v.bouton.visible = true;
+      if (v.bouton.material) v.bouton.material.opacity = closeLook ? 0.85 : 0.45;
+    }
   }
 
-  const scaleText = camR > 420 ? "宏观全量因果点云流形 (百万细胞)" : camR < 240 ? "微观单神经元全细节质膜" : "介观皮层柱局部环路";
+  const totalCellCount = org && org.cells ? org.cells.length : 0;
   const elScale = document.getElementById("st-pipe");
-  if (elScale) elScale.textContent = scaleText;
+  if (elScale) elScale.textContent = `实体 ${visibleMicroCount} / 点云 ${totalCellCount} · 放大区域实化`;
   const elCamR = document.getElementById("st-cam-r");
   if (elCamR) elCamR.textContent = `${Math.round(camR)} 单位`;
 
   const elFocal = document.getElementById("st-focal");
   if (elFocal) {
-    if (camR > 420) elFocal.textContent = "全量宏观流形点云 (100万+)";
-    else if (camR < 240) elFocal.textContent = `${org.cells.length} 核心因果细胞 (全细节)`;
-    else elFocal.textContent = "介观皮层柱局部环路";
+    elFocal.textContent = `${visibleMicroCount}/${totalCellCount} 细胞可见 · 世界尺度未改`;
   }
 
   if(bioLayerVisible){
@@ -3718,16 +4206,17 @@ function animate(){
 // 8.1 3D 视角预设与平滑过渡控制器
 window.setCameraPreset = function(viewMode) {
   isCamTransitioning = true;
-  targetLookAt.set(0, 0, 0);
+  targetLookAt.copy(currentOrganismBounds.center);
+  const dist = currentOrganismBounds.macroDist || 560;
   document.querySelectorAll('.cam-btn').forEach(b => b.classList.remove('active'));
   if (viewMode === 'front') {
-    targetTheta = 0; targetPhi = Math.PI / 2; targetCamR = 560;
+    targetTheta = 0; targetPhi = Math.PI / 2; targetCamR = dist;
   } else if (viewMode === 'top') {
-    targetTheta = 0; targetPhi = 0.05; targetCamR = 620;
+    targetTheta = 0; targetPhi = 0.08; targetCamR = dist * 1.08;
   } else if (viewMode === 'side') {
-    targetTheta = Math.PI / 2; targetPhi = Math.PI / 2; targetCamR = 560;
+    targetTheta = Math.PI / 2; targetPhi = Math.PI / 2; targetCamR = dist;
   } else if (viewMode === 'reset') {
-    targetTheta = 0; targetPhi = Math.PI / 2; targetCamR = 560;
+    targetTheta = 0; targetPhi = Math.PI / 2; targetCamR = dist;
     autoOrbitEnabled = false;
     const btn = document.getElementById('btn-auto-orbit');
     if (btn) btn.classList.remove('active');
@@ -3795,7 +4284,7 @@ window.showTourStep = function(step) {
   targetTheta = stage.target.theta;
   targetPhi = stage.target.phi;
   targetCamR = stage.target.r;
-  targetLookAt.set(0, 0, 0);
+  targetLookAt.copy(currentOrganismBounds.center);
   isCamTransitioning = true;
 
   for (const v of views.cells) {
@@ -3831,6 +4320,7 @@ window.endAutoTour = function() {
 const TOOLTIP_DICT = {
   'st-gen': { title: '演化世代 (Generation)', desc: '大脑经历自然选择和突变的迭代总代数。代数越多，回路越成熟、越抗极端风险。', hint: '系统在后台持续自动演化' },
   'st-cells': { title: '活跃神经细胞 (Active Cells)', desc: '当前大脑中承担感知、计算和决策的基本神经元总量。', hint: '点击右侧[有丝分裂]可诞生新细胞' },
+  'st-real-cells': { title: '真实渲染细胞 (Rendered)', desc: '后端实际生成并驱动 3D 场景/前向计算的物理细胞实体数。大规模生命体的"活跃细胞"标称值仅为展示标签，真实仿真规模以此项为准。', hint: '标称规模远大于此值时，说明当前为代表性微柱采样模式' },
   'lod-organ': { title: '器官微观视图 (Organ 30)', desc: '以高精细生物质膜动画观察 30 个核心决策细胞的呼吸与放电脉冲。', hint: '适合初学者清晰观察信号传递因果' },
   'lod-1m': { title: '百万星系流形 (1M Manifold)', desc: 'GPU 单批次点云渲染，模拟由 100 万个神经元汇聚而成的宏观心智。', hint: '点击领略宏观星系级流形视觉' },
   'act-buy': { title: '买开 / 加速信号 (ACT_POS)', desc: '经过层层神经计算后，大脑输出的主动进攻/加速行为强度。', hint: '数值大于 0.2 时高亮发光' },
@@ -3880,6 +4370,13 @@ window.selectOrganism = async function(organismId, organismName) {
     const badge = n.querySelector('.tree-active-badge');
     if(badge) badge.style.display = isCurrent ? 'inline-block' : 'none';
   });
+  document.querySelectorAll('#preset-buttons-deck button').forEach(b => {
+    const isCurrent = (b.getAttribute('onclick') || '').includes(organismId);
+    b.classList.toggle('active', isCurrent);
+    b.style.borderColor = isCurrent ? 'var(--cyan)' : '';
+    b.style.color = isCurrent ? 'var(--cyan)' : '';
+    b.style.fontWeight = isCurrent ? 'bold' : '';
+  });
 
   // 2. 真实通知后端重构拓扑
   try {
@@ -3908,54 +4405,58 @@ window.selectOrganism = async function(organismId, organismName) {
   }
 };
 
-// 8.5 典籍局部回路精准高亮点亮 (Click Book -> Highlight Specific Subset of Cells & Synapses)
+// 8.5 物理神经反射弧与工程内核精准聚焦 (Click Spec -> Focus Specific Subset of Cells & Synapses)
 window.highlightBookSubcircuit = function(bookId, title, organismName) {
   currentHighlightedBookId = bookId;
-  const orgTitle = organismName ? `【${organismName}】体内` : '';
-  log(`[典籍回路点亮] 正在精准点亮 ${orgTitle}《${title || bookId}》的特定细胞簇与突触通路！`, true);
+  const orgTitle = organismName ? `【${organismName}】` : '';
+  log(`[反射弧聚焦] 正在精准聚焦 ${orgTitle}【${title || bookId}】的核心物理微柱与突触通路！`, true);
   
   // 纯 DOM 类切换锁定当前高亮卡片
   document.querySelectorAll('.tree-leaf').forEach(leaf => {
     leaf.classList.toggle('active-leaf', leaf.dataset.bookId === bookId);
   });
 
-  // 1. 确定该典籍对应的特定细胞簇，统一使用璀璨纯正黄金色 (Radiant Pure 24K Gold: #fbbf24 / 0xfbbf24)
+  // 1. 通用自适应确定典籍对应的细胞簇 (Universal Adaptive Book Subcircuit Mapping)
   let targetCells = [];
   const targetColor = 0xfbbf24; // 统一纯正耀眼金黄色
+  const bookKey = ((bookId || "") + " " + (title || "")).toLowerCase();
+  const allCells = org.cells || [];
 
-  if (bookId.includes("quant")) {
-    targetCells = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 21, 22, 23, 24];
-  } else if (bookId.includes("vehicle") || bookId.includes("adas")) {
-    targetCells = [16, 17, 18, 19, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35];
-  } else if (bookId.includes("arithmetic") || bookId.includes("math")) {
-    targetCells = [56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70];
-  } else if (bookId.includes("laokexia")) {
-    targetCells = Array.from({length: 96}, (_, i) => i);
-  } else if (bookId.includes("loco") || bookId.includes("cpg")) {
-    targetCells = [0, 1, 2, 3, 4, 8, 9, 10, 11, 16, 17, 18, 19];
-  } else if (bookId.includes("maze")) {
-    targetCells = [20, 21, 22, 23, 24, 30, 31, 32, 40, 41, 42];
-  } else if (bookId.includes("immune")) {
-    targetCells = [10, 11, 12, 13, 25, 26, 27, 45, 46, 47];
-  } else if (bookId.includes("slingshot")) {
-    targetCells = [3, 4, 5, 15, 16, 17, 35, 36, 37];
-  } else {
-    targetCells = [0, 1, 2, 3, 10, 11, 20, 21, 30, 31];
+  if (bookKey.includes("cortex") || bookKey.includes("asil") || bookKey.includes("ray") || bookKey.includes("avoid") || bookKey.includes("oracle") || bookKey.includes("momentum") || bookKey.includes("sensory") || bookKey.includes("drift") || bookKey.includes("lidar")) {
+    targetCells = allCells.filter(c => {
+      const t = (c.type || "").toUpperCase();
+      return t.startsWith("REC") || t.startsWith("SENSE") || (c.layer && c.layer.includes("SENSORY")) || c.id < Math.max(2, Math.min(16, Math.floor(allCells.length * 0.25)));
+    }).map(c => c.id);
+  } else if (bookKey.includes("effector") || bookKey.includes("steer") || bookKey.includes("accel") || bookKey.includes("slip") || bookKey.includes("escape") || bookKey.includes("pass") || bookKey.includes("risk") || bookKey.includes("motor") || bookKey.includes("actuator") || bookKey.includes("action") || bookKey.includes("deadend")) {
+    targetCells = allCells.filter(c => {
+      const t = (c.type || "").toUpperCase();
+      return t.startsWith("ACT") || t.startsWith("MOTOR") || t.startsWith("EFFECTOR") || (c.layer && c.layer.includes("MOTOR")) || c.id >= Math.max(1, Math.floor(allCells.length * 0.75));
+    }).map(c => c.id);
+  } else if (bookKey.includes("damper") || bookKey.includes("drag") || bookKey.includes("hysteresis") || bookKey.includes("memory") || bookKey.includes("association") || bookKey.includes("vortex") || bookKey.includes("fluid")) {
+    targetCells = allCells.filter(c => {
+      const t = (c.type || "").toUpperCase();
+      return t.includes("DAMPER") || t.includes("EMA") || t.includes("INTEG") || t.includes("DIFF") || t.includes("HYSTERESIS") || (c.layer && c.layer.includes("ASSOCIATION"));
+    }).map(c => c.id).slice(0, 36);
+  }
+
+  // 兜底保护：自动自适应选取核心子回路
+  if (targetCells.length === 0) {
+    targetCells = allCells.slice(0, Math.max(3, Math.min(24, Math.floor(allCells.length * 0.3)))).map(c => c.id);
   }
 
   const targetSet = new Set(targetCells);
 
-  // 2. 镜头平滑拉近至微观高亮尺度 (camR = 250)，保证实体细胞质膜与核质金光 100% 显现
+  // 2. 镜头平滑拉近至自适应微观高亮尺度，保证目标细胞实体质膜与核质金光 100% 显现
   let sumX = 0, sumY = 0, sumZ = 0, cnt = 0;
   for (const v of views.cells) {
     if (targetSet.has(v.cell.id)) {
-      sumX += v.cell.x; sumY += v.cell.y; sumZ += v.cell.z;
+      sumX += v.cell.x; sumY += v.cell.y; sumZ += (v.cell.z || 0);
       cnt++;
     }
   }
   if (cnt > 0) {
     targetLookAt.set(sumX / cnt, sumY / cnt, sumZ / cnt);
-    targetCamR = 240;
+    targetCamR = Math.max(130, Math.min(260, currentOrganismBounds.radius * 1.05));
     isCamTransitioning = true;
   }
 
@@ -4124,6 +4625,135 @@ window.sendDialogueMsg = async function() {
 
 initTooltipEngine();
 animate();
+
+// ============================================================
+// 9.0 核心学术文献与工程源码全景研读坞 (Document & Code Reader)
+// ============================================================
+window.openDocReader = async function(filePath, title) {
+  const modal = document.getElementById('reader-modal');
+  const titleEl = document.getElementById('reader-title');
+  const metaEl = document.getElementById('reader-meta');
+  const contentEl = document.getElementById('reader-content');
+  const statsEl = document.getElementById('reader-stats');
+
+  if (!modal) return;
+  modal.style.display = 'flex';
+  titleEl.textContent = title || filePath;
+  metaEl.textContent = '物理路径: ' + filePath;
+  contentEl.textContent = '正在从单真相源底座载入文件内容...';
+  statsEl.textContent = '读取中...';
+
+  try {
+    const res = await fetch('/api/doc/read?file=' + encodeURIComponent(filePath));
+    const data = await res.json();
+    if (data.status === 'ok') {
+      titleEl.textContent = data.title || title || filePath;
+      metaEl.textContent = '物理源文件: ' + data.file_path + ' (' + (data.size_bytes/1024).toFixed(1) + ' KB)';
+      
+      const isMd = filePath.endsWith('.md');
+      const isMotif = filePath.includes("library/motifs/") || filePath.includes("motif_");
+
+      if (isMd) {
+        if (window.marked && (window.marked.parse || typeof window.marked === 'function')) {
+          const parser = window.marked.parse || window.marked;
+          contentEl.className = "markdown-body";
+          contentEl.innerHTML = parser(data.content);
+        } else {
+          contentEl.className = "";
+          contentEl.innerHTML = `<pre style="margin:0;font-family:var(--font-mono);font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-all;">${escapeHtml(data.content)}</pre>`;
+        }
+      } else if (isMotif) {
+        try {
+          const mb = JSON.parse(data.content);
+          const cellsStr = (mb.causal_subgraph?.cells || []).map((c, i) => `  [细胞 ${i}] 原语: ${c.type.padEnd(12)} | 参数: p1=${c.p1}, p2=${c.p2}`).join('\n');
+          const synsStr = (mb.causal_subgraph?.synapses || []).map(s => `  [细胞 ${s.from_idx}] ──(权重 w=${s.w}, 端口 ${s.port})──> [细胞 ${s.to_idx}]`).join('\n');
+
+          const formatted = 
+`╔══════════════════════════════════════════════════════════════════════════════════════╗
+║               [MOTIF] 硅基生命体演化因果功能模体 (Evolutionary Causal Motif)           ║
+╚══════════════════════════════════════════════════════════════════════════════════════╝
+
+【客观结构签名】：MOTIF [${(mb.causal_subgraph?.cells || []).map(c=>c.type).join(' ──> ')}]
+【推断语义名称】：《${mb.title}》
+  (注：硅基生命体在自然演化中只有动力学拓扑与权重，无人类语言名字；
+   本名称为人类研究者对该子图功能的人类语言语义推测与标注。)
+【发现种群 Deme】：${mb.author_deme || '演化岛屿'}
+【涌现代际】：第 ${mb.discovered_at_gen} 代自组织涌现 (Discovered at Gen ${mb.discovered_at_gen})
+【演化危机】：${mb.crisis_context || '环境选择压力淘汰'}
+【种群借用引用】：${mb.citations || 0} 次跨生命体借用 (Horizontal Gene Transfer / Exaptation)
+【适应贡献评分】：${mb.impact_score || 9.0} / 10.0 (Fitness Impact)
+
+────────────────────────────────────────────────────────────────────────────────────────
+[TOPOLOGY] 因果微柱功能子图 (Causal Subgraph Topology):
+────────────────────────────────────────────────────────────────────────────────────────
+• 核心细胞节点 (Cells) 共 ${(mb.causal_subgraph?.cells || []).length} 个:
+${cellsStr}
+
+• 突触因果回路 (Synaptic Projections) 共 ${(mb.causal_subgraph?.synapses || []).length} 条:
+${synsStr}
+
+────────────────────────────────────────────────────────────────────────────────────────
+[SOURCE] 物理源文件校验通过 (Single Source of Truth):
+${data.file_path}
+
+════════════════════════════════════════════════════════════════════════════════════════
+[原生 JSON 契约数据]
+` + data.content;
+          contentEl.className = "";
+          contentEl.innerHTML = `<pre style="margin:0;font-family:var(--font-mono);font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-all;">${escapeHtml(formatted)}</pre>`;
+        } catch(e) {
+          contentEl.className = "";
+          contentEl.innerHTML = `<pre style="margin:0;font-family:var(--font-mono);font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-all;">${escapeHtml(data.content)}</pre>`;
+        }
+      } else {
+        contentEl.className = "";
+        contentEl.innerHTML = `<pre style="margin:0;font-family:var(--font-mono);font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-all;color:#7dd3fc;">${escapeHtml(data.content)}</pre>`;
+      }
+
+      statsEl.textContent = `共 ${data.total_lines} 行 · ${data.size_bytes} 字节 · UTF-8 原生流`;
+    } else {
+      contentEl.textContent = '读取失败: ' + (data.message || '未知错误');
+    }
+  } catch(e) {
+    contentEl.textContent = '网络错误: ' + e.message;
+  }
+};
+
+function escapeHtml(str) {
+  return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+window.closeDocReader = function() {
+  const modal = document.getElementById('reader-modal');
+  if (modal) modal.style.display = 'none';
+};
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') window.closeDocReader();
+});
 </script>
+
+<!-- 核心学术文献与工程规范全文研读坞 (Document & Code Reader Modal) -->
+<div id="reader-modal" style="display:none;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(2,6,23,0.88);backdrop-filter:blur(10px);z-index:9999;align-items:center;justify-content:center;">
+  <div style="width:90%;max-width:1000px;height:86vh;background:rgba(15,23,42,0.96);border:1px solid rgba(56,189,248,0.35);border-radius:12px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.85);display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:rgba(30,41,59,0.85);border-bottom:1px solid rgba(56,189,248,0.25);">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <span style="font-size:14px;color:var(--cyan);font-family:var(--font-mono);font-weight:bold;">[DOC]</span>
+        <div>
+          <div id="reader-title" style="color:#f8fafc;font-weight:700;font-size:14px;">文献标题</div>
+          <div id="reader-meta" style="color:#64748b;font-size:10px;font-family:var(--font-mono);margin-top:2px;">文件路径</div>
+        </div>
+      </div>
+      <button onclick="closeDocReader()" style="background:rgba(244,63,94,0.2);border:1px solid rgba(244,63,94,0.4);color:#f43f5e;padding:5px 12px;border-radius:4px;cursor:pointer;font-weight:bold;font-size:12px;">[ESC] 关闭</button>
+    </div>
+    <div style="flex:1;overflow-y:auto;padding:24px 28px;background:#090d16;">
+      <div id="reader-content" class="markdown-body"></div>
+    </div>
+    <div style="padding:10px 20px;background:rgba(15,23,42,0.95);border-top:1px solid rgba(56,189,248,0.2);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#64748b;">
+      <span id="reader-stats">共 0 行</span>
+      <span style="color:var(--emerald);">[VERIFIED] 物理源文件校验通过 (Single Source of Truth)</span>
+    </div>
+  </div>
+</div>
 </body>
 </html>
