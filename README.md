@@ -10,7 +10,7 @@
 
 > 基于冯·诺依曼自复制自动机理论、三维力敏形态发生（Morphogenesis）动力学、自然演化四大公理（内共生、器官借用、李雅普诺夫物理约束、大灭绝相变）以及 Kahn 拓扑排序编译器的**软件定义硅基细胞计算机（Software-Defined Silicon Cellular Computer, SDSCC）**。
 > 
-> 本体系结构突破传统深度学习“矩阵乘法+黑箱反向传播”的物理极限，在标准通用硅基芯片上实现**纳秒级硬实时确定性、零动态堆分配（Zero-GC）、形式化因果可证伪性以及跨流体相态环境适应力**。
+> 本体系结构突破传统深度学习“矩阵乘法与黑箱反向传播”的物理极限，在通用硅基芯片上实现**纳秒级硬实时确定性、零动态堆分配（Zero-GC）、形式化因果可证伪性以及跨流体相态环境适应力**。
 
 ---
 
@@ -18,24 +18,24 @@
 
 ```mermaid
 graph TD
-    subgraph 自然演化与形态发生演化引擎 (KunCellular Evolutionary Engine)
+    subgraph G1 ["自然演化与形态发生演化引擎 (KunCellular Evolutionary Engine)"]
       A1["1. 原核到真核: 超细胞共生微柱 (SymbioticMacroCell)"] --> A2["2. 机制跃迁: 跨物种器官冷冻库 (OrganFrozenBank)"]
       A2 --> A3["3. 物理雕刻刀: 李雅普诺夫 BIBO 稳定性判定器 (ρ < 1.0)"]
       A3 --> A4["4. 生态洗牌: 白垩纪大灭绝算子 (Chicxulub Extinction)"]
     end
 
-    subgraph 连续相分子流体物理介质圈 (Multiphase Molecular Fluid Biosphere)
+    subgraph G2 ["连续相分子流体物理介质圈 (Multiphase Molecular Fluid Biosphere)"]
       B1["气相介质 (Aero: 1.225 kg/m³, 3.0 kV/mm)"]
       B2["水相介质 (Hydro: 1000 kg/m³, 0.15 kV/mm, μ=0.35 水滑)"]
       B3["真空临界 (Vacuum: 0 kg/m³, 纯内阻尼自闭环)"]
     end
 
-    subgraph 纯 C11 零 GC 推理微架构 (Deterministic Pure C11 Cortex)
+    subgraph G3 ["纯 C11 零 GC 推理微架构 (Deterministic Pure C11 Cortex)"]
       C1["sdsc_cortex.h / sdsc_apex_cortex.h"] --> C2["19.06 ns / step (52.47 M-Inferences/s)"]
       C2 --> C3["64 字节缓存行对齐 (SDSC_ALIGN64) / 0 堆内存分配"]
     end
 
-    subgraph 车规级闭环实装 (FlowEngine ADAS Pipeline)
+    subgraph G4 ["车规级闭环实装 (FlowEngine ADAS Pipeline)"]
       D1["config/pipeline.json (backend: cortex)"] --> D2["flow_launcher 生产启动器 (450+ 帧 0 违规)"]
       D2 --> D3["6 大极限动力学工况 100% 满分通过"]
     end
@@ -57,7 +57,7 @@ graph TD
 | :--- | :--- | :--- | :--- |
 | **第一公理：起源与内共生** | 原始真核细胞吞噬好氧细菌形成线粒体 | **超细胞共生微柱算子 (`SymbioticMacroCell`)**<br>自发聚类高频协同放电的微细胞，封装为私有局部循环单元 | 接口标准绝缘，消除高维搜索爆炸，网络抽象层级自动跃迁 |
 | **第二公理：机制与功能借用** | 听小骨源自颌骨，微积分脑源自草原社交脑 | **跨物种器官冷冻库 (`OrganFrozenBank`)**<br>借用已通过验证的迟滞阻尼柱、前额叶门控与微积分单元 | 严禁从白纸从头演化，冷启动收敛速度提升 **10 倍以上** |
-| **第三公理：物理定律当雕刻刀** | 轴突张力折叠出脑回，流体力学收敛出流线鱼体 | **李雅普诺夫 BIBO 稳定性判定器**<br>Tarjan 算法检测有向环路 $\mathcal{L}$，硬约束雅可比谱半径：<br>$$\rho\left(\prod_{e \in \mathcal{L}} \mathbf{W}_e \cdot \nabla \sigma\right) < 1.0$$ | 凡超限且无双阈值迟滞阻尼的拓扑直接判定为致死畸形，**100% 杜绝数值发散与自激振荡** |
+| **第三公理：物理定律当雕刻刀** | 轴突张力折叠出脑回，流体力学收敛出流线鱼体 | **李雅普诺夫 BIBO 稳定性判定器**<br>Tarjan 算法检测有向环路 L，硬约束雅可比谱半径：<br>`ρ(∏ W_e · ∇σ) < 1.0` | 凡超限且无双阈值迟滞阻尼的拓扑直接判定为致死畸形，**100% 杜绝数值发散与自激振荡** |
 | **第四公理：生态洗牌大灭绝** | 恐龙不退场哺乳动物永世为耗子 | **白垩纪大灭绝算子 (`Chicxulub Extinction`)**<br>连续 50 代停滞时瞬间抹杀排名前 80% 头部垄断拓扑 | 强激发 20% 边缘奇异变异体，灾后自发涌现高韧性新物种 |
 
 ---
@@ -68,9 +68,9 @@ graph TD
 
 | 连续流体相态 | 物理数密度 | 介电击穿场强 | 动力粘度与物理效应 | 3000 步极限动力学实测 | 稳定性判定 |
 | :--- | :---: | :---: | :--- | :---: | :---: |
-| **Aero 大气气相** | $1.225\text{ kg/m}^3$ | $3.0\text{ kV/mm}$ | $0.018\text{ mPa}\cdot\text{s}$<br>纳维-斯托克斯风阻 + 300N 随机横风湍流 | $\text{Max CTE} = 0.3508\text{ m}$<br>$\Delta\psi = 0.45^\circ$ | **PASS (100%)** |
-| **Hydro 原始水生物圈** | $1000.0\text{ kg/m}^3$ | $0.15\text{ kV/mm}$ | $1.002\text{ mPa}\cdot\text{s}$<br>高流体粘滞力 + 暴雨水膜水滑（$\mu$ 跌至 0.35） | $\text{Max CTE} = 0.3342\text{ m}$<br>$\Delta\psi = 0.44^\circ$ | **PASS (100%)** |
-| **Vacuum 深空真空态** | $0.000\text{ kg/m}^3$ | $\infty$ | $0.000\text{ mPa}\cdot\text{s}$<br>零外阻尼纯惯性滑行，声学绝对物理静默 | $\text{Max CTE} = 0.3521\text{ m}$<br>$\Delta\psi = 0.46^\circ$ | **PASS (100%)** |
+| **Aero 大气气相** | 1.225 kg/m³ | 3.0 kV/mm | 0.018 mPa·s<br>纳维-斯托克斯风阻 + 300N 随机横风湍流 | Max CTE = 0.3508 m<br>Heading Err = 0.45° | **PASS (100%)** |
+| **Hydro 原始水生物圈** | 1000.0 kg/m³ | 0.15 kV/mm | 1.002 mPa·s<br>高流体粘滞力 + 暴雨水膜水滑 (μ=0.35) | Max CTE = 0.3342 m<br>Heading Err = 0.44° | **PASS (100%)** |
+| **Vacuum 深空真空态** | 0.000 kg/m³ | 无穷大 (绝缘极限) | 0.000 mPa·s<br>零外阻尼纯惯性滑行，声学绝对物理静默 | Max CTE = 0.3521 m<br>Heading Err = 0.46° | **PASS (100%)** |
 
 ---
 
@@ -82,12 +82,12 @@ graph TD
 
 | 指标维度 | 传统小模型 (MLP / ONNX) | 嵌入式 TensorRT (FP16) | **SDSCC 纯 C11 皮层内核** |
 | :--- | :--- | :--- | :--- |
-| **单步推理时延 (Step Latency)** | $1.2 \sim 3.5\text{ ms}$ | $0.8 \sim 1.5\text{ ms}$ | **19.06 ns** (0.019 us) |
-| **峰值推理吞吐 (Throughput)** | $\sim 800\text{ inf/s}$ | $\sim 1,200\text{ inf/s}$ | **52,465,900 inf/s** (52.47 M-Inf/s) |
-| **运行时堆内存申请 (Heap Allocs)** | 动态张量缓冲（MB 级） | 动态显存/固定缓存 | **严格 0 字节 (0 malloc / 0 free)** |
+| **单步推理时延 (Step Latency)** | 1.2 ~ 3.5 ms | 0.8 ~ 1.5 ms | **19.06 ns** (0.019 us) |
+| **峰值推理吞吐 (Throughput)** | 约 800 inf/s | 约 1,200 inf/s | **52,465,900 inf/s** (52.47 M-Inf/s) |
+| **运行时堆内存申请 (Heap Allocs)** | 动态张量缓冲 (MB级) | 动态显存 / 固定缓存 | **严格 0 字节 (0 malloc / 0 free)** |
 | **GC 停顿与时延抖动 (Jitter)** | 存在解释器与系统调用抖动 | 存在 CUDA 驱动上下文开销 | **严格 0 抖动，P99 = 179.0 ns** |
 | **内存布局与缓存命中** | 间接指针与非连续张量 | GPU 专用连续显存 | **64 字节缓存行硬对齐 (SDSC_ALIGN64)** |
-| **因果可证伪性 (Verifiability)** | 连续高维黑箱，无法证伪 | 连续高维黑箱 | **100% SMT2 / 李雅普诺夫形式化可证伪** |
+| **因果可证伪性 (Verifiability)** | 连续高维黑箱，无法证伪 | 连续高维黑箱，无法证伪 | **100% SMT2 / 李雅普诺夫形式化可证伪** |
 
 ### 2. C11 极简零依赖调用接口
 
@@ -108,7 +108,7 @@ int main(void) {
     sdsc_apex_cortex_step(&brain, inputs, &out);
 
     /* 提取动作决策: 转向、纵向油门制动、档位、风控免疫锁 */
-    printf("Steer: %.4f rad, Accel: %.2f m/s², Gear: %d, ImmuneLock: %d\n",
+    printf("Steer: %.4f rad, Accel: %.2f m/s2, Gear: %d, ImmuneLock: %d\n",
            out.steer, out.accel, out.gear, out.immune_lock);
     return 0;
 }
