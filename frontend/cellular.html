@@ -20,6 +20,8 @@
     --text-main: #f1f5f9;
     --text-dim: #94a3b8;
     --font-mono: "JetBrains Mono", "Fira Code", monospace, system-ui;
+    --dock-left-w: 360px;
+    --dock-right-w: 320px;
   }
 
   /* 专业学术与工程 Markdown 排版风格 */
@@ -212,17 +214,28 @@
     top: 48px;
     left: 0;
     bottom: 0;
-    width: 320px;
+    width: var(--dock-left-w);
     background: var(--dock-bg);
     backdrop-filter: blur(16px);
     border-right: 1px solid var(--border);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    z-index: 50;
+    min-width: 0;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .dock-scroll {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    overflow-x: hidden;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding: 14px;
-    z-index: 50;
-    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 14px 12px 18px 14px;
   }
   .dock-left.collapsed {
     transform: translateX(-100%);
@@ -232,7 +245,7 @@
     top: 48px;
     right: 0;
     bottom: 0;
-    width: 310px;
+    width: var(--dock-right-w);
     background: var(--dock-bg);
     backdrop-filter: blur(16px);
     border-left: 1px solid var(--border);
@@ -273,13 +286,13 @@
     box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
   }
   #btn-toggle-left {
-    left: 326px;
+    left: calc(var(--dock-left-w) + 6px);
   }
   #btn-toggle-left.collapsed {
     left: 10px;
   }
   #btn-toggle-right {
-    right: 316px;
+    right: calc(var(--dock-right-w) + 6px);
   }
   #btn-toggle-right.collapsed {
     right: 10px;
@@ -301,11 +314,18 @@
     font-size: 11px;
     font-weight: 700;
     color: var(--text-main);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
+    gap: 8px;
+    flex-wrap: wrap;
+    line-height: 1.35;
+  }
+  .card-title > span:first-child {
+    flex: 1 1 140px;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .card-title-badge {
     font-size: 9px;
@@ -313,18 +333,40 @@
     border-radius: 3px;
     background: rgba(56, 189, 248, 0.15);
     color: var(--cyan);
+    flex: 0 1 auto;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+    text-align: right;
   }
 
   /* 键值行 (Key-Value Row) */
   .kv {
     display: flex;
     justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
     font-size: 11px;
     padding: 2px 0;
     font-family: var(--font-mono);
+    min-width: 0;
   }
-  .kv span { color: var(--text-dim); }
-  .kv b { color: var(--text-main); font-weight: 600; }
+  .kv span {
+    color: var(--text-dim);
+    flex: 1 1 auto;
+    min-width: 0;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+  .kv b {
+    color: var(--text-main);
+    font-weight: 600;
+    flex: 0 1 42%;
+    text-align: right;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
 
   /* 按钮通用网格 */
   .btn-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
@@ -336,13 +378,16 @@
     border: 1px solid var(--border);
     color: var(--text-main);
     font-size: 10px;
-    padding: 6px 4px;
+    padding: 6px 6px;
     border-radius: 4px;
     cursor: pointer;
     font-family: var(--font-mono);
     text-align: center;
     transition: all 0.2s;
     user-select: none;
+    white-space: normal;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
   }
   .btn-ctrl:hover {
     border-color: var(--cyan);
@@ -473,7 +518,7 @@
   .warp-quick-bar {
     position: fixed;
     top: 58px;
-    left: 325px;
+    left: calc(var(--dock-left-w) + 8px);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -516,7 +561,7 @@
   .cam-controls {
     position: fixed;
     top: 58px;
-    right: 325px;
+    right: calc(var(--dock-right-w) + 8px);
     display: flex;
     align-items: center;
     gap: 4px;
@@ -651,7 +696,7 @@
   .tree-row {
     padding: 9px 10px;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 8px;
     cursor: pointer;
     background: linear-gradient(90deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.85));
@@ -691,9 +736,18 @@
   }
   .tree-label {
     flex: 1;
+    min-width: 0;
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+  }
+  .tree-label > div {
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    gap: 6px;
   }
   .tree-children-wrapper {
     display: grid;
@@ -790,6 +844,7 @@
   /* 自定义赛博发光滚动条 (Custom Cyber Scrollbars) */
   .organism-books::-webkit-scrollbar,
   #library-shelf::-webkit-scrollbar,
+  .dock-scroll::-webkit-scrollbar,
   .dock-left::-webkit-scrollbar,
   .dock-right::-webkit-scrollbar,
   #chat-msgs::-webkit-scrollbar,
@@ -800,6 +855,7 @@
   }
   .organism-books::-webkit-scrollbar-track,
   #library-shelf::-webkit-scrollbar-track,
+  .dock-scroll::-webkit-scrollbar-track,
   .dock-left::-webkit-scrollbar-track,
   .dock-right::-webkit-scrollbar-track,
   #chat-msgs::-webkit-scrollbar-track,
@@ -810,6 +866,7 @@
   }
   .organism-books::-webkit-scrollbar-thumb,
   #library-shelf::-webkit-scrollbar-thumb,
+  .dock-scroll::-webkit-scrollbar-thumb,
   .dock-left::-webkit-scrollbar-thumb,
   .dock-right::-webkit-scrollbar-thumb,
   #chat-msgs::-webkit-scrollbar-thumb,
@@ -821,6 +878,7 @@
   }
   .organism-books::-webkit-scrollbar-thumb:hover,
   #library-shelf::-webkit-scrollbar-thumb:hover,
+  .dock-scroll::-webkit-scrollbar-thumb:hover,
   .dock-left::-webkit-scrollbar-thumb:hover,
   .dock-right::-webkit-scrollbar-thumb:hover,
   #chat-msgs::-webkit-scrollbar-thumb:hover,
@@ -832,16 +890,23 @@
 
   /* 1080p 及笔记本屏幕响应式深度优化 */
   @media (max-width: 1536px) {
-    .dock-left { width: 290px; padding: 10px; gap: 8px; }
-    .dock-right { width: 280px; padding: 10px; gap: 8px; }
-    .warp-quick-bar { left: 300px; }
-    .cam-controls { right: 290px; }
+    :root {
+      --dock-left-w: 320px;
+      --dock-right-w: 300px;
+    }
+    .dock-scroll { padding: 10px 10px 16px 10px; gap: 8px; }
     .dialogue-deck {
-      width: 320px;
-      right: 290px;
+      width: 300px;
+      right: calc(var(--dock-right-w) + 10px);
       bottom: 20px;
     }
     .card { padding: 8px 10px; gap: 6px; }
+  }
+  @media (max-width: 1280px) {
+    :root {
+      --dock-left-w: 300px;
+      --dock-right-w: 280px;
+    }
   }
 
   /* 典籍卡片样式 (Book Card Styling) */
@@ -1061,6 +1126,7 @@
 
 <!-- 左侧控制坞 (Left Dock) -->
 <aside class="dock-left">
+<div class="dock-scroll">
   <!-- 卡片 1: 核心计算指标 -->
   <div class="card">
     <div class="card-title">
@@ -1122,12 +1188,12 @@
   </div>
 
   <!-- 卡片 2: 硅基生命体与工程技术规格 (真实物理底座与实证门禁，零虚构) -->
-  <div class="card" id="card-library" style="flex: 1; min-height: 220px; display: flex; flex-direction: column;">
-    <div class="card-title" style="flex-shrink: 0;">
-      <span>生命体与工程规格 (Organisms & Specs)</span>
-      <span class="card-title-badge" id="st-total-books">6 大真实生命体 / 18 项工程规格</span>
+  <div class="card" id="card-library">
+    <div class="card-title">
+      <span>生命体与工程规格</span>
+      <span class="card-title-badge" id="st-total-books">生命体 / 规格</span>
     </div>
-    <div id="library-shelf" style="flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; font-size: 10px; padding-right: 4px;">
+    <div id="library-shelf" style="display: flex; flex-direction: column; gap: 8px; font-size: 10px;">
     </div>
   </div>
 
@@ -1148,8 +1214,9 @@
       <span>8 岛多生境演化拓扑 (Demes)</span>
       <span class="card-title-badge" id="st-total-mig">0 迁徙</span>
     </div>
-    <div id="islands-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;max-height:120px;overflow-y:auto;"></div>
+    <div id="islands-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;"></div>
   </div>
+</div>
 </aside>
 
 <!-- 右侧遥测坞 (Right Dock) -->
@@ -2678,10 +2745,9 @@ function marketTick(){
   document.getElementById('px-src').textContent = realPrice ? '(真实行情)' : '(合成游走)';
   if (!serverOnline) {
     document.getElementById('st-gen').textContent = org.generation;
-    const cCount = window.currentPresetCells || 10891008;
-    const sCount = window.currentPresetSyns || 43564032;
-    document.getElementById('st-cells').textContent = cCount.toLocaleString();
-    document.getElementById('st-syn').textContent = sCount.toLocaleString();
+    // 尺度真理: 离线模式也只显示真实渲染的细胞/突触数，严禁硬编码假规模兜底
+    document.getElementById('st-cells').textContent = org.cells.length.toLocaleString();
+    document.getElementById('st-syn').textContent = org.syns.length.toLocaleString();
     document.getElementById('st-phys').textContent = org.phySteps;
   }
   document.getElementById('st-act').textContent = totalActs;
@@ -2819,7 +2885,7 @@ async function pollLibrary() {
     const j = await r.json();
     if(j.organisms && j.organisms.length) {
       const elB = document.getElementById('st-total-books');
-      if(elB) elB.textContent = `${j.organisms.length} 大生命体 / ${j.total_books || 9} 册典籍`;
+      if(elB) elB.textContent = `${j.organisms.length} 生命体 · ${j.total_books || 9} 规格`;
       const shelf = document.getElementById('library-shelf');
       
       if(shelf && (!libraryInitialRenderDone || j.organisms.length !== window.__libCount)) {
@@ -3177,24 +3243,27 @@ window.loadPreset = async function(type) {
   try {
     await fetch("/api/preset?type=" + type);
   } catch(e) {}
-  
-  if (type === "mega" || type === "1m") {
-    log("已切换至: SDSCC 旗舰百万微柱全息大生命体 (标称 1,000,000 细胞 / 3,000,000 突触；真实渲染与前向计算约 208 个代表性微柱细胞)", true);
-  } else if (type === "real" || type === "quant") {
-    log("已切换至: 三十年商品期货百万细胞量化演化大脑 (Quant Million Brain)", true);
-  } else if (type === "adas" || type === "vehicle") {
-    log("已切换至: SDSCC 车规级 ASIL-D 百万微柱大脑皮层 (ADAS Cortex)", true);
-  } else if (type === "maze") {
-    log("已切换至: 空间迷宫自组织导航脱困生命体 (13 细胞 / 13 突触)", true);
-  } else if (type === "doudizhu" || type === "game") {
-    log("已切换至: 非完全信息离散博弈决策生命体 (9 细胞 / 9 突触)", true);
-  } else if (type === "fluid") {
-    log("已切换至: 连续多相流体自适应阻尼调节器 (40 细胞 / 145 突触)", true);
-  } else if (type === "seed") {
-    log("已切换至: 原始单体受精卵种子元胞 (1 细胞 / 0 突触发育原基)", true);
-  } else {
-    log("已切换至: SDSCC 真实冠军生命体皮层", true);
-  }
+
+  // 尺度真理: 名称与规模一律动态读取后端真实状态，严禁前端硬编码细胞数
+  try {
+    const r = await fetch("/api/state", { signal: AbortSignal.timeout(3000) });
+    const s = await r.json();
+    const cells = (s.macro_cells || s.n_macro_cells || (s.stats && s.stats.active_cells) || (s.cells && s.cells.length) || 0);
+    const syns  = (s.macro_synapses || s.n_macro_synapses || (s.stats && s.stats.total_synapses) || (s.syns && s.syns.length) || 0);
+    const NAME_MAP = {
+      mega: "SDSCC 旗舰微柱阵列全息大生命体",
+      "1m": "SDSCC 旗舰微柱阵列全息大生命体",
+      real: "三十年商品期货量化演化冠军",
+      quant: "三十年商品期货量化演化冠军",
+      adas: "SDSCC 车规级 ASIL-D 微柱皮层",
+      vehicle: "SDSCC 车规级 ASIL-D 微柱皮层",
+      primordial: "无目标原始进化生命体冠军"
+    };
+    const name = NAME_MAP[type] || s.organism_id || "SDSCC 冠军生命体";
+    log(`已切换至: ${name} (${cells.toLocaleString()} 细胞 / ${syns.toLocaleString()} 突触 · 后端实时读取)`, true);
+    return;
+  } catch(e) {}
+  log(`已切换至: ${type} (预设指令已发送，等待后端状态回报)`, true);
 };
 
 window.switchLOD = function(mode) {
@@ -3212,14 +3281,14 @@ window.switchLOD = function(mode) {
   } else if(mode === "1k") {
     targetCamR = 260;
     loadPreset("adas");
-    log(" 聚焦至: 1,000 细胞皮层柱介观视距");
+    log(" 聚焦至: 皮层柱介观视距");
   } else if(mode === "10k") {
     targetCamR = 420;
-    log(" 聚焦至: 10,000 细胞流形过渡视距");
+    log(" 聚焦至: 流形过渡视距");
   } else if(mode === "1m") {
     targetCamR = 580;
-    loadPreset("mega");
-    log(" 聚焦至: 百万级标称规模宏观点云视距 (真实驱动细胞仅为代表性微柱采样，非逐细胞全量渲染)");
+    loadPreset("adas");
+    log(" 聚焦至: 宏观点云视距 (按屏幕像素密度自动 LOD 实化)");
   }
 };
 
@@ -3904,9 +3973,8 @@ function updateFromBackendState(data) {
   const cellsEl = document.getElementById("st-cells");
   if (cellsEl) cellsEl.textContent = macroCells.toLocaleString();
 
-  // 真实渲染细胞数 = 后端实际生成/前向计算的物理实体数量 (projection_cores)，
-  // 与上面"活跃细胞"标称规模区分：大规模生命体 (如百万微柱) 仅用代表性采样驱动 3D 渲染与前向计算，
-  // 标称规模只是展示标签，不代表真的逐细胞仿真/渲染了那么多个体，避免"放大后仍是全细节"的误导。
+  // 真实渲染细胞数 = 后端实际生成/前向计算的物理实体数量 (projection_cores)。
+  // 尺度真理: 后端 macro_cells 已等于真实 len(cells)，两处口径一致，不再有"标称规模"。
   const realCells = (data.stats && data.stats.projection_cores) || data.cells_count || (data.cells && data.cells.length) || org.cells.length;
   const realCellsEl = document.getElementById("st-real-cells");
   if (realCellsEl) {
@@ -3914,7 +3982,7 @@ function updateFromBackendState(data) {
     const isSurrogate = macroCells > realCells * 5;
     realCellsEl.title = isSurrogate
       ? `标称规模 ${macroCells.toLocaleString()} 为代表性统计标签；实际驱动 3D 场景与前向计算的真实细胞仅 ${realCells.toLocaleString()} 个`
-      : `真实细胞数与标称规模一致`;
+      : `真实细胞数与活跃细胞数一致 (${realCells.toLocaleString()})`;
   }
 
   const macroSyns = data.macro_synapses || data.n_macro_synapses || (data.stats && data.stats.total_synapses) || org.syns.length;
@@ -4320,9 +4388,9 @@ window.endAutoTour = function() {
 const TOOLTIP_DICT = {
   'st-gen': { title: '演化世代 (Generation)', desc: '大脑经历自然选择和突变的迭代总代数。代数越多，回路越成熟、越抗极端风险。', hint: '系统在后台持续自动演化' },
   'st-cells': { title: '活跃神经细胞 (Active Cells)', desc: '当前大脑中承担感知、计算和决策的基本神经元总量。', hint: '点击右侧[有丝分裂]可诞生新细胞' },
-  'st-real-cells': { title: '真实渲染细胞 (Rendered)', desc: '后端实际生成并驱动 3D 场景/前向计算的物理细胞实体数。大规模生命体的"活跃细胞"标称值仅为展示标签，真实仿真规模以此项为准。', hint: '标称规模远大于此值时，说明当前为代表性微柱采样模式' },
+  'st-real-cells': { title: '真实渲染细胞 (Rendered)', desc: '后端实际生成并驱动 3D 场景/前向计算的物理细胞实体数，与活跃细胞数同源同值（后端有多少就渲染多少）。', hint: '放大视距时按像素密度自动实化为实体细节' },
   'lod-organ': { title: '器官微观视图 (Organ 30)', desc: '以高精细生物质膜动画观察 30 个核心决策细胞的呼吸与放电脉冲。', hint: '适合初学者清晰观察信号传递因果' },
-  'lod-1m': { title: '百万星系流形 (1M Manifold)', desc: 'GPU 单批次点云渲染，模拟由 100 万个神经元汇聚而成的宏观心智。', hint: '点击领略宏观星系级流形视觉' },
+  'lod-1m': { title: '宏观星系流形 (Macro Manifold)', desc: 'GPU 单批次点云渲染当前生命体的宏观形态，规模即后端真实细胞数；放大局部时按像素密度实化为实体细胞。', hint: '点击领略宏观星系级流形视觉' },
   'act-buy': { title: '买开 / 加速信号 (ACT_POS)', desc: '经过层层神经计算后，大脑输出的主动进攻/加速行为强度。', hint: '数值大于 0.2 时高亮发光' },
   'act-sell': { title: '卖开 / 制动信号 (ACT_NEG)', desc: '大脑感知到危险或反向趋势时，输出的刹车/避险行为强度。', hint: '数值小于 -0.2 时高亮发光' },
   'act-immune': { title: '安全免疫熔断 (ACT_LOCK)', desc: '当外界数据发生剧烈异常波动时，大脑自动触发的防御性锁死保护。', hint: '防止在极端危机中盲目决策' }
