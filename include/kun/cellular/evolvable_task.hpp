@@ -136,7 +136,7 @@ public:
 
     virtual const char* name() const = 0;
 
-    // 观测维度 (适配 4 通道输入，多维自动前置切片或投影)
+    // 观测维度 (完整张量宽度；评测不得再裁成 4 路)
     virtual size_t obs_dim() const = 0;
 
     // 动作空间大小 (离散动作: 0 .. act_dim()-1)
@@ -158,6 +158,15 @@ public:
         if (acts.negative_action > 0.3) return step(1);  // 左转
         if (acts.negative_action < -0.3) return step(2); // 右转
         return step(0); // 直行
+    }
+
+    virtual StepResult step_tensor(const float* acts, size_t act_n) {
+        CellularOrganism::ActionOutputs mapped{};
+        if (acts != nullptr && act_n > 0) mapped.positive_action = acts[0];
+        if (acts != nullptr && act_n > 1) mapped.negative_action = acts[1];
+        if (acts != nullptr && act_n > 2) mapped.defensive_reset = acts[2];
+        if (acts != nullptr && act_n > 3) mapped.immune_lock = acts[3] > 0.5f;
+        return step_continuous(mapped);
     }
 
     // 回合结束后的适应度打分
@@ -188,12 +197,12 @@ public:
             double last_min_dist = 999.0;
 
             for (; step_i < max_steps; ++step_i) {
-                double inputs[4] = {0.0, 0.0, 0.0, 0.0};
-                for (size_t d = 0; d < 4 && d < obs.size(); ++d) {
+                std::vector<double> inputs(obs.size(), 0.0);
+                for (size_t d = 0; d < obs.size(); ++d) {
                     inputs[d] = obs[d];
                 }
 
-                auto acts = org.forward(inputs, allow_plasticity);
+                auto acts = org.forward_nd(inputs.data(), inputs.size(), allow_plasticity);
                 auto res = step_continuous(acts);
                 obs = res.obs;
                 last_min_dist = res.min_dist_to_goal;

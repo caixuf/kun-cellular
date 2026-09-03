@@ -36,6 +36,7 @@ enum class CellType : uint8_t {
     SENSE_RAW_INPUT_1 = 1,   // 输入通道 1 (量化: 成交量 / 智驾: 相对速度)
     SENSE_RAW_INPUT_2 = 2,   // 输入通道 2 (量化: 盘口价差 / 智驾: 车道线偏离)
     SENSE_RAW_INPUT_3 = 3,   // 输入通道 3 (量化: 委托不平衡 / 智驾: TTC碰撞时距)
+    SENSE_CHANNEL     = 4,   // 任意维受体: output = inputs[floor(param2)] * param1
     
     // 【代谢运算细胞 (Metabolic Math Operators)】
     OP_EMA = 10,             // 指数平滑滤波 (具备衰减记忆)
@@ -63,6 +64,7 @@ enum class CellType : uint8_t {
     ACT_PRIMARY_NEGATIVE = 31, // 反向激发动作 (量化: 卖开仓 / 智驾: 减速避让)
     ACT_DEFENSIVE_RESET  = 32, // 防御性归零 (量化: 平仓清空 / 智驾: 保持车道居中)
     ACT_IMMUNE_BLOCK     = 33, // 免疫阻断刹车 (量化: 熔断锁定 / 智驾: AEB紧急制动)
+    ACT_CHANNEL          = 34, // 任意维效应器: 写入动作张量槽 floor(param2)
 
     // 【认知联络与预测受体 (Cognitive & Predictive World Model)】
     PREDICT_SENSE_0      = 40, // 内部前瞻预测受体 0 (预测下一时刻输入0, 内部世界模型输出)
@@ -76,6 +78,7 @@ inline const char* to_string(CellType t) {
         case CellType::SENSE_RAW_INPUT_1: return "Sense_Input1";
         case CellType::SENSE_RAW_INPUT_2: return "Sense_Input2";
         case CellType::SENSE_RAW_INPUT_3: return "Sense_Input3";
+        case CellType::SENSE_CHANNEL: return "Sense_Channel";
         case CellType::OP_EMA: return "Op_EMA";
         case CellType::OP_DIFF: return "Op_Diff";
         case CellType::OP_INTEGRAL: return "Op_Integral";
@@ -97,6 +100,7 @@ inline const char* to_string(CellType t) {
         case CellType::ACT_PRIMARY_NEGATIVE: return "Act_NegAction";
         case CellType::ACT_DEFENSIVE_RESET: return "Act_DefReset";
         case CellType::ACT_IMMUNE_BLOCK: return "Act_ImmuneLock";
+        case CellType::ACT_CHANNEL: return "Act_Channel";
         case CellType::PREDICT_SENSE_0: return "Pred_Sense0";
         case CellType::PREDICT_SENSE_1: return "Pred_Sense1";
         case CellType::ASSOCIATION_HUB: return "Assoc_Hub";
@@ -109,6 +113,7 @@ inline CellType cell_type_from_string(const std::string& name) {
     if (name == "Sense_Input1") return CellType::SENSE_RAW_INPUT_1;
     if (name == "Sense_Input2") return CellType::SENSE_RAW_INPUT_2;
     if (name == "Sense_Input3") return CellType::SENSE_RAW_INPUT_3;
+    if (name == "Sense_Channel") return CellType::SENSE_CHANNEL;
     if (name == "Op_EMA") return CellType::OP_EMA;
     if (name == "Op_Diff") return CellType::OP_DIFF;
     if (name == "Op_Integral") return CellType::OP_INTEGRAL;
@@ -130,10 +135,51 @@ inline CellType cell_type_from_string(const std::string& name) {
     if (name == "Act_NegAction") return CellType::ACT_PRIMARY_NEGATIVE;
     if (name == "Act_DefReset") return CellType::ACT_DEFENSIVE_RESET;
     if (name == "Act_ImmuneLock") return CellType::ACT_IMMUNE_BLOCK;
+    if (name == "Act_Channel") return CellType::ACT_CHANNEL;
     if (name == "Pred_Sense0") return CellType::PREDICT_SENSE_0;
     if (name == "Pred_Sense1") return CellType::PREDICT_SENSE_1;
     if (name == "Assoc_Hub") return CellType::ASSOCIATION_HUB;
     return CellType::OP_EMA;
+}
+
+inline bool is_receptor_cell(CellType t) {
+    return t == CellType::SENSE_RAW_INPUT_0 ||
+           t == CellType::SENSE_RAW_INPUT_1 ||
+           t == CellType::SENSE_RAW_INPUT_2 ||
+           t == CellType::SENSE_RAW_INPUT_3 ||
+           t == CellType::SENSE_CHANNEL;
+}
+
+inline bool is_effector_cell(CellType t) {
+    return t == CellType::ACT_PRIMARY_POSITIVE ||
+           t == CellType::ACT_PRIMARY_NEGATIVE ||
+           t == CellType::ACT_DEFENSIVE_RESET ||
+           t == CellType::ACT_IMMUNE_BLOCK ||
+           t == CellType::ACT_CHANNEL;
+}
+
+inline size_t receptor_channel_index(CellType t, double param2) {
+    switch (t) {
+        case CellType::SENSE_RAW_INPUT_0: return 0;
+        case CellType::SENSE_RAW_INPUT_1: return 1;
+        case CellType::SENSE_RAW_INPUT_2: return 2;
+        case CellType::SENSE_RAW_INPUT_3: return 3;
+        case CellType::SENSE_CHANNEL:
+            return (param2 >= 0.0) ? static_cast<size_t>(param2) : 0;
+        default: return 0;
+    }
+}
+
+inline size_t effector_channel_index(CellType t, double param2) {
+    switch (t) {
+        case CellType::ACT_PRIMARY_POSITIVE: return 0;
+        case CellType::ACT_PRIMARY_NEGATIVE: return 1;
+        case CellType::ACT_DEFENSIVE_RESET: return 2;
+        case CellType::ACT_IMMUNE_BLOCK: return 3;
+        case CellType::ACT_CHANNEL:
+            return (param2 >= 0.0) ? static_cast<size_t>(param2) : 0;
+        default: return 0;
+    }
 }
 
 // ============================================================================
@@ -623,10 +669,7 @@ public:
         std::vector<uint32_t> rev_queue;
 
         for (size_t i = 0; i < cells.size(); ++i) {
-            if (cells[i].type == CellType::ACT_PRIMARY_POSITIVE ||
-                cells[i].type == CellType::ACT_PRIMARY_NEGATIVE ||
-                cells[i].type == CellType::ACT_DEFENSIVE_RESET ||
-                cells[i].type == CellType::ACT_IMMUNE_BLOCK ||
+            if (is_effector_cell(cells[i].type) ||
                 cells[i].type == CellType::PREDICT_SENSE_0 ||
                 cells[i].type == CellType::PREDICT_SENSE_1) {
                 compiled_actions_.push_back({i, cells[i].type});
@@ -1074,6 +1117,11 @@ public:
                 case CellType::SENSE_RAW_INPUT_1: mask = 1u << 1; break;
                 case CellType::SENSE_RAW_INPUT_2: mask = 1u << 2; break;
                 case CellType::SENSE_RAW_INPUT_3: mask = 1u << 3; break;
+                case CellType::SENSE_CHANNEL: {
+                    const size_t ch = receptor_channel_index(cells[i].type, cells[i].param2) & 7u;
+                    mask = static_cast<uint8_t>(1u << ch);
+                    break;
+                }
                 default: break;
             }
             if (mask != 0) {
@@ -1143,10 +1191,7 @@ public:
         std::unordered_map<uint32_t, size_t> id_to_idx;
         for (size_t i = 0; i < cells.size(); ++i) {
             id_to_idx[cells[i].id] = i;
-            if (cells[i].type == CellType::SENSE_RAW_INPUT_0 ||
-                cells[i].type == CellType::SENSE_RAW_INPUT_1 ||
-                cells[i].type == CellType::SENSE_RAW_INPUT_2 ||
-                cells[i].type == CellType::SENSE_RAW_INPUT_3) {
+            if (is_receptor_cell(cells[i].type)) {
                 sensor_indices.insert(i);
             }
             if (cells[i].type == CellType::ACT_PRIMARY_POSITIVE ||
@@ -1343,7 +1388,12 @@ public:
     };
 
     ActionOutputs forward(const double inputs[4], bool enable_hebbian = true) {
+        return forward_nd(inputs, 4, enable_hebbian);
+    }
+
+    ActionOutputs forward_nd(const double* inputs, size_t in_dim, bool enable_hebbian = true) {
         if (!is_compiled_) compile();
+        if (inputs == nullptr) in_dim = 0;
 
         // 1. 清空扁平输入端口缓冲 (连续内存快速清零)
         double* __restrict port_ptr = flat_port_inputs_.data();
@@ -1373,10 +1423,15 @@ public:
             double in1 = port_ptr[idx * 2 + 1];
 
             switch (c.type) {
-                case CellType::SENSE_RAW_INPUT_0: c.output_val = inputs[0] * c.param1; break;
-                case CellType::SENSE_RAW_INPUT_1: c.output_val = inputs[1] * c.param1; break;
-                case CellType::SENSE_RAW_INPUT_2: c.output_val = inputs[2] * c.param1; break;
-                case CellType::SENSE_RAW_INPUT_3: c.output_val = inputs[3] * c.param1; break;
+                case CellType::SENSE_RAW_INPUT_0:
+                case CellType::SENSE_RAW_INPUT_1:
+                case CellType::SENSE_RAW_INPUT_2:
+                case CellType::SENSE_RAW_INPUT_3:
+                case CellType::SENSE_CHANNEL: {
+                    const size_t ch = receptor_channel_index(c.type, c.param2);
+                    c.output_val = (ch < in_dim) ? inputs[ch] * c.param1 : 0.0;
+                    break;
+                }
 
                 case CellType::OP_EMA: {
                     double alpha = std::clamp(c.param1, 0.001, 1.0);
@@ -1466,6 +1521,7 @@ public:
                 case CellType::ACT_PRIMARY_NEGATIVE:
                 case CellType::ACT_DEFENSIVE_RESET:
                 case CellType::ACT_IMMUNE_BLOCK:
+                case CellType::ACT_CHANNEL:
                 case CellType::PREDICT_SENSE_0:
                 case CellType::PREDICT_SENSE_1:
                     c.output_val = in0;
@@ -1530,8 +1586,10 @@ public:
         }
 
         // 预测误差 (Surprise)
-        double err0 = inputs[0] - actions.predicted_sense_0;
-        double err1 = inputs[1] - actions.predicted_sense_1;
+        const double in0_obs = (in_dim > 0) ? inputs[0] : 0.0;
+        const double in1_obs = (in_dim > 1) ? inputs[1] : 0.0;
+        double err0 = in0_obs - actions.predicted_sense_0;
+        double err1 = in1_obs - actions.predicted_sense_1;
         actions.prediction_error = std::sqrt(err0 * err0 + err1 * err1);
 
         if (actions.prediction_error > 5.0) actions.thought_mode = "SURPRISE";
@@ -1540,6 +1598,22 @@ public:
         else actions.thought_mode = "STABLE_ATTRACTOR";
 
         return actions;
+    }
+
+    void write_action_tensor(const ActionOutputs& acts, float* y, uint32_t out_dim) const {
+        if (!y || out_dim == 0) return;
+        for (uint32_t i = 0; i < out_dim; ++i) y[i] = 0.0f;
+        if (out_dim > 0) y[0] = static_cast<float>(acts.positive_action);
+        if (out_dim > 1) y[1] = static_cast<float>(acts.negative_action);
+        if (out_dim > 2) y[2] = static_cast<float>(acts.defensive_reset);
+        if (out_dim > 3) y[3] = acts.immune_lock ? 1.0f : 0.0f;
+        for (const auto& ac : compiled_actions_) {
+            if (ac.cell_idx >= cells.size()) continue;
+            const Cell& c = cells[ac.cell_idx];
+            if (!is_effector_cell(c.type)) continue;
+            const size_t ch = effector_channel_index(c.type, c.param2);
+            if (ch < out_dim) y[ch] = static_cast<float>(c.output_val);
+        }
     }
 
     // ── 闭门心理推演与反事实想象 (Mental Simulation / Thought Rollout) ──
@@ -2033,10 +2107,7 @@ public:
         }
 
         for (const auto& c : cells) {
-            if (c.type == CellType::SENSE_RAW_INPUT_0 ||
-                c.type == CellType::SENSE_RAW_INPUT_1 ||
-                c.type == CellType::SENSE_RAW_INPUT_2 ||
-                c.type == CellType::SENSE_RAW_INPUT_3) {
+            if (is_receptor_cell(c.type)) {
                 std::unordered_set<uint32_t> visited;
                 std::vector<uint32_t> q = {c.id};
                 visited.insert(c.id);
@@ -2444,10 +2515,7 @@ public:
             size_t idx_b = dist_cell(rng_);
             if (idx_a == idx_b) continue;
 
-            if (org.cells[idx_b].type == CellType::SENSE_RAW_INPUT_0 ||
-                org.cells[idx_b].type == CellType::SENSE_RAW_INPUT_1 ||
-                org.cells[idx_b].type == CellType::SENSE_RAW_INPUT_2 ||
-                org.cells[idx_b].type == CellType::SENSE_RAW_INPUT_3) {
+            if (is_receptor_cell(org.cells[idx_b].type)) {
                 continue;
             }
 
@@ -2531,14 +2599,8 @@ public:
             // 受限骨架模式：受体与效应器器官细胞永远免疫凋亡，只凋亡中间无用悬空计算节点
             org.cells.erase(
                 std::remove_if(org.cells.begin(), org.cells.end(), [&](const Cell& c) {
-                    if (c.type == CellType::SENSE_RAW_INPUT_0 ||
-                        c.type == CellType::SENSE_RAW_INPUT_1 ||
-                        c.type == CellType::SENSE_RAW_INPUT_2 ||
-                        c.type == CellType::SENSE_RAW_INPUT_3 ||
-                        c.type == CellType::ACT_PRIMARY_POSITIVE ||
-                        c.type == CellType::ACT_PRIMARY_NEGATIVE ||
-                        c.type == CellType::ACT_DEFENSIVE_RESET ||
-                        c.type == CellType::ACT_IMMUNE_BLOCK ||
+                    if (is_receptor_cell(c.type) ||
+                        is_effector_cell(c.type) ||
                         c.type == CellType::PREDICT_SENSE_0 ||
                         c.type == CellType::PREDICT_SENSE_1) return false;
                     return !useful_cells.count(c.id);
