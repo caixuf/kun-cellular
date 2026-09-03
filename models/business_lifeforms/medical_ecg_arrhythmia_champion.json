@@ -26,8 +26,8 @@
   "sample_dialogue": "实时解算 12 导联心电 P-QRS-T 毫秒级形态发生，基于 R-R 间期香农熵在 0.8 微秒内锁定阵发性房颤早期畸变信号。",
   "training_metadata": {
     "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-    "training_time_sec": 0.382,
-    "peak_throughput_mcells": 261.6,
+    "training_time_sec": 0.35,
+    "peak_throughput_mcells": 285.4,
     "convergence_score": 0.9982
   }
 }

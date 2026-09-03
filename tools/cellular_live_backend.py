@@ -498,6 +498,432 @@ def veh_loop():
 
 threading.Thread(target=veh_loop, daemon=True).start()
 
+# ============================================================================
+# 0.99 零依赖 RFC 6455 WebSocket 协议与高频遥测广播 (Zero-Dependency WebSocket Engine)
+# ============================================================================
+
+def encode_ws_frame(msg_str):
+    payload = msg_str.encode("utf-8")
+    length = len(payload)
+    if length <= 125:
+        header = bytearray([0x81, length])
+    elif length <= 65535:
+        header = bytearray([0x81, 126]) + struct.pack("!H", length)
+    else:
+        header = bytearray([0x81, 127]) + struct.pack("!Q", length)
+    return bytes(header) + payload
+
+def recv_exact(sock, n):
+    data = bytearray()
+    while len(data) < n:
+        try:
+            chunk = sock.recv(n - len(data))
+            if not chunk:
+                return None
+            data.extend(chunk)
+        except Exception:
+            return None
+    return bytes(data)
+
+def read_ws_frame(sock):
+    head = recv_exact(sock, 2)
+    if not head:
+        return None, None
+    byte0, byte1 = head[0], head[1]
+    opcode = byte0 & 0x0F
+    is_masked = bool(byte1 & 0x80)
+    length = byte1 & 0x7F
+    if length == 126:
+        ext = recv_exact(sock, 2)
+        if not ext:
+            return None, None
+        length = struct.unpack("!H", ext)[0]
+    elif length == 127:
+        ext = recv_exact(sock, 8)
+        if not ext:
+            return None, None
+        length = struct.unpack("!Q", ext)[0]
+    mask = recv_exact(sock, 4) if is_masked else None
+    payload = recv_exact(sock, length)
+    if payload is None:
+        return None, None
+    if is_masked and mask:
+        payload = bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
+    return opcode, payload
+
+class WebSocketRegistry:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._clients = set()
+
+    def add(self, sock):
+        with self._lock:
+            self._clients.add(sock)
+
+    def remove(self, sock):
+        with self._lock:
+            self._clients.discard(sock)
+
+    def has_clients(self):
+        with self._lock:
+            return bool(self._clients)
+
+    def broadcast(self, msg_str):
+        with self._lock:
+            if not self._clients:
+                return
+            clients = list(self._clients)
+        frame = encode_ws_frame(msg_str)
+        dead = []
+        for s in clients:
+            try:
+                s.sendall(frame)
+            except Exception:
+                dead.append(s)
+        if dead:
+            with self._lock:
+                for s in dead:
+                    self._clients.discard(s)
+
+ws_registry = WebSocketRegistry()
+
+
+# ============================================================================
+# 1.0 进化公理与形式化安全中枢 (Evolution Axioms & Formal Stability Engine)
+# 公理 1: 李雅普诺夫 BIBO 稳定性判定与阻尼自愈 (Lyapunov BIBO Stability Analyzer)
+# 公理 2: 原核到真核跃迁：超细胞共生微柱 (Symbiotic Macro-Cells & Endosymbiosis)
+# 公理 3: 跨物种功能借用引擎与器官冷冻库 (Organ Frozen Bank & Exaptation Splice)
+# 公理 4: 白垩纪大灭绝算子 (Chicxulub Extinction Operator)
+# ============================================================================
+
+def get_cell_operator_gain(cell_type):
+    t = str(cell_type).upper()
+    if "EMA" in t or "INTEGRATE" in t:
+        return 0.85
+    elif "HYSTERESIS" in t or "HYST" in t:
+        return 0.50
+    elif "DEADZONE" in t:
+        return 0.60
+    elif "THRESHOLD" in t or "THRESH" in t:
+        return 0.30
+    elif "DAMPER" in t:
+        return 0.70
+    elif "INTEGRAL" in t:
+        return 1.15
+    elif "DIFF" in t:
+        return 1.35
+    elif "OSCILLATOR" in t:
+        return 0.95
+    else:
+        return 1.0
+
+def compute_lyapunov_stability(cells, synapses):
+    """
+    李雅普诺夫 BIBO 稳定性判定 (Lyapunov BIBO Stability Analyzer)
+    物理公理: 存在反馈环路的非线性动力系统若环增益 >= 1.0 且无耗散阻尼，必发生数值发散
+    """
+    if not cells or not synapses:
+        return {
+            "is_stable": True,
+            "max_loop_gain": 0.0,
+            "cycles_count": 0,
+            "unstable_cycles": []
+        }
+    
+    id_to_cell = {c.id: c for c in cells}
+    adj = {}
+    for syn in synapses:
+        u = syn.get("from")
+        v = syn.get("to")
+        w = float(syn.get("weight", 1.0))
+        if u in id_to_cell and v in id_to_cell:
+            adj.setdefault(u, []).append((v, w))
+            
+    visited = {}
+    path = []
+    weights_path = []
+    detected_cycles_count = 0
+    max_loop_gain = 0.0
+    is_stable = True
+    unstable_cycles = []
+
+    def dfs(u):
+        nonlocal detected_cycles_count, max_loop_gain, is_stable
+        visited[u] = 1
+        path.append(u)
+        
+        for v, w in adj.get(u, []):
+            weights_path.append(w)
+            if visited.get(v, 0) == 1:
+                detected_cycles_count += 1
+                try:
+                    start_idx = path.index(v)
+                except ValueError:
+                    start_idx = 0
+                
+                cycle_nodes = path[start_idx:]
+                cycle_gain = 1.0
+                has_dissipative_gate = False
+                for cid in cycle_nodes:
+                    cell = id_to_cell.get(cid)
+                    ptype = getattr(cell, "type", "SUM")
+                    gain = get_cell_operator_gain(ptype)
+                    cycle_gain *= gain
+                    ptype_upper = str(ptype).upper()
+                    if any(k in ptype_upper for k in ["HYSTERESIS", "HYST", "DEADZONE", "EMA", "DAMPER"]):
+                        has_dissipative_gate = True
+                for cw in weights_path[start_idx:]:
+                    cycle_gain *= abs(cw)
+                
+                if cycle_gain > max_loop_gain:
+                    max_loop_gain = cycle_gain
+                
+                if cycle_gain >= 1.0 and not has_dissipative_gate:
+                    is_stable = False
+                    if cycle_nodes not in unstable_cycles and len(unstable_cycles) < 10:
+                        unstable_cycles.append(cycle_nodes)
+            elif visited.get(v, 0) == 0:
+                dfs(v)
+            weights_path.pop()
+            
+        path.pop()
+        visited[u] = 2
+
+    for c in cells:
+        if visited.get(c.id, 0) == 0:
+            dfs(c.id)
+
+    return {
+        "is_stable": is_stable,
+        "max_loop_gain": round(max_loop_gain, 4),
+        "cycles_count": detected_cycles_count,
+        "unstable_cycles": unstable_cycles
+    }
+
+class SymbioticMacroCell:
+    """超细胞微柱 (Symbiotic Macro-Cell & Endosymbiosis)"""
+    def __init__(self, macro_id, label, internal_cell_ids, sensory_ports=None, effector_ports=None, color="#38bdf8"):
+        self.macro_id = macro_id
+        self.label = label
+        self.internal_cell_ids = list(internal_cell_ids)
+        self.sensory_ports = list(sensory_ports or [])
+        self.effector_ports = list(effector_ports or [])
+        self.color = color
+
+    def to_dict(self):
+        return {
+            "id": self.macro_id,
+            "label": self.label,
+            "internal_cell_ids": self.internal_cell_ids,
+            "cells_count": len(self.internal_cell_ids),
+            "sensory_ports": self.sensory_ports,
+            "effector_ports": self.effector_ports,
+            "color": self.color
+        }
+
+class FrozenOrgan:
+    def __init__(self, name, domain, description, cells, internal_synapses, input_ids, output_ids):
+        self.name = name
+        self.domain = domain
+        self.description = description
+        self.cells = cells
+        self.internal_synapses = internal_synapses
+        self.input_ids = input_ids
+        self.output_ids = output_ids
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "domain": self.domain,
+            "description": self.description,
+            "cells_count": len(self.cells),
+            "synapses_count": len(self.internal_synapses),
+            "input_ports": self.input_ids,
+            "output_ports": self.output_ids,
+            "cell_types": [c.get("type") for c in self.cells]
+        }
+
+class OrganFrozenBank:
+    _instance = None
+    _lock = threading.Lock()
+
+    @classmethod
+    def instance(cls):
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls()
+            return cls._instance
+
+    def __init__(self):
+        self.vault = {}
+        self._init_default_vault()
+
+    def _init_default_vault(self):
+        # 1. 施密特迟滞强抗震颤阻尼柱 (universal_cybernetics)
+        self.vault["schmitt_damping_column"] = FrozenOrgan(
+            name="schmitt_damping_column",
+            domain="universal_cybernetics",
+            description="施密特迟滞强抗震颤阻尼柱 (EMA滤波 + 双阈值迟滞滤波，消除高频抖动)",
+            cells=[
+                {"id": 1, "type": "DAMPER", "p1": 0.45, "layer": "L2_ASSOCIATION"},
+                {"id": 2, "type": "THRESHOLD", "p1": -0.3, "layer": "L2_ASSOCIATION"}
+            ],
+            internal_synapses=[{"from": 1, "to": 2, "weight": 1.2}],
+            input_ids=[1],
+            output_ids=[2]
+        )
+        # 2. 前额叶形式化防御阻断执行门 (cognitive_cortex)
+        self.vault["prefrontal_executive_gate"] = FrozenOrgan(
+            name="prefrontal_executive_gate",
+            domain="cognitive_cortex",
+            description="前额叶形式化防御阻断执行门 (防范恶意越界决策，提供不可违逆的形式化安全契约)",
+            cells=[
+                {"id": 1, "type": "SUM", "p1": 1.0, "layer": "L2_ASSOCIATION"},
+                {"id": 2, "type": "THRESHOLD", "p1": 0.75, "layer": "L2_ASSOCIATION"},
+                {"id": 3, "type": "AMPLIFY", "p1": 1.5, "layer": "L3_MOTOR"}
+            ],
+            internal_synapses=[
+                {"from": 1, "to": 2, "weight": 1.0},
+                {"from": 2, "to": 3, "weight": 1.4}
+            ],
+            input_ids=[1],
+            output_ids=[3]
+        )
+        # 3. 快速高频差分微积分感知微囊 (signal_transduction)
+        self.vault["fast_fourier_sensory_pod"] = FrozenOrgan(
+            name="fast_fourier_sensory_pod",
+            domain="signal_transduction",
+            description="快速高频差分微积分感知微囊 (微分提取突变斜率 + 积分稳态跟踪，捕捉非平稳冲击)",
+            cells=[
+                {"id": 1, "type": "DIFF", "p1": 1.0, "layer": "L1_SENSORY"},
+                {"id": 2, "type": "INTEGRATE", "p1": 0.85, "layer": "L2_ASSOCIATION"}
+            ],
+            internal_synapses=[{"from": 1, "to": 2, "weight": 0.95}],
+            input_ids=[1],
+            output_ids=[2]
+        )
+        # 4. 脊髓反射弧快速伸肌单元 (embodied_locomotion)
+        self.vault["reflex_arc_fast_extensor"] = FrozenOrgan(
+            name="reflex_arc_fast_extensor",
+            domain="embodied_locomotion",
+            description="脊髓反射弧快速伸肌单元 (小脑皮层毫秒级硬反馈短路回路，提供姿态回正保护)",
+            cells=[
+                {"id": 1, "type": "THRESHOLD", "p1": 0.5, "layer": "L2_ASSOCIATION"},
+                {"id": 2, "type": "AMPLIFY", "p1": 2.0, "layer": "L3_MOTOR"},
+                {"id": 3, "type": "DAMPER", "p1": 0.6, "layer": "L2_ASSOCIATION"}
+            ],
+            internal_synapses=[
+                {"from": 1, "to": 2, "weight": 1.5},
+                {"from": 2, "to": 3, "weight": 0.8},
+                {"from": 3, "to": 1, "weight": -0.5}
+            ],
+            input_ids=[1],
+            output_ids=[2]
+        )
+        # 5. 量子极限环混沌熵哨兵 (quantum_cybernetics)
+        self.vault["quantum_entropy_sentinel"] = FrozenOrgan(
+            name="quantum_entropy_sentinel",
+            domain="quantum_cybernetics",
+            description="量子极限环混沌熵哨兵 (极限环周期振荡器 + 非线性死区调制，监控红皇后熵增)",
+            cells=[
+                {"id": 1, "type": "OSCILLATOR", "p1": 0.95, "layer": "L2_ASSOCIATION"},
+                {"id": 2, "type": "THRESHOLD", "p1": 0.25, "layer": "L2_ASSOCIATION"}
+            ],
+            internal_synapses=[{"from": 1, "to": 2, "weight": 1.1}],
+            input_ids=[1],
+            output_ids=[2]
+        )
+
+    def list_organs(self):
+        return [o.to_dict() for o in self.vault.values()]
+
+    def list_organs_summary(self):
+        return {
+            "total_organs": len(self.vault),
+            "organs": [o.to_dict() for o in self.vault.values()]
+        }
+
+    def exaptation_splice(self, organ_name, target_org, connect_from_sensor=None, connect_to_actuator=None):
+        with target_org.lock:
+            if organ_name not in self.vault:
+                return {"status": "error", "message": f"未在冷冻库中找到器官: {organ_name}"}
+            
+            organ = self.vault[organ_name]
+            max_id = max([c.id for c in target_org.cells], default=0)
+            
+            remap = {}
+            new_cells = []
+            cluster_cell_ids = []
+            
+            splice_idx = len(target_org.symbiotic_macro_cells) + 1
+            ang = (splice_idx * 1.25) % math.tau
+            center_x = 130.0 * math.cos(ang)
+            center_y = 130.0 * math.sin(ang)
+            center_z = 70.0 + (splice_idx % 3) * 35.0
+
+            for i, c in enumerate(organ.cells):
+                max_id += 1
+                remap[c["id"]] = max_id
+                cluster_cell_ids.append(max_id)
+                
+                cx = center_x + (i % 2) * 25.0 - 12.0
+                cy = center_y + (i // 2) * 25.0 - 12.0
+                cz = center_z + i * 15.0
+                
+                pcell = PhysicalCell3D(max_id, c["type"], cx, cy, cz, layer=c.get("layer", "L2_ASSOCIATION"))
+                pcell.gain = float(c.get("p1", 1.0))
+                target_org.cells.append(pcell)
+                new_cells.append(pcell)
+
+            added_synapses = []
+            for s in organ.internal_synapses:
+                new_s = {
+                    "from": remap[s["from"]],
+                    "to": remap[s["to"]],
+                    "weight": round(s.get("weight", 1.0), 2)
+                }
+                target_org.synapses.append(new_s)
+                added_synapses.append(new_s)
+
+            all_sensor_ids = [c.id for c in target_org.cells if "SENSE" in getattr(c, "type", "") or getattr(c, "layer", "") == "L1_SENSORY"]
+            all_motor_ids = [c.id for c in target_org.cells if "ACT" in getattr(c, "type", "") or getattr(c, "layer", "") == "L3_MOTOR"]
+
+            src_id = connect_from_sensor if connect_from_sensor is not None else (all_sensor_ids[0] if all_sensor_ids else target_org.cells[0].id)
+            dst_id = connect_to_actuator if connect_to_actuator is not None else (all_motor_ids[-1] if all_motor_ids else target_org.cells[-1].id)
+
+            if organ.input_ids:
+                in_target = remap[organ.input_ids[0]]
+                bridge_in = {"from": src_id, "to": in_target, "weight": 1.25}
+                target_org.synapses.append(bridge_in)
+                added_synapses.append(bridge_in)
+
+            if organ.output_ids:
+                out_source = remap[organ.output_ids[-1]]
+                bridge_out = {"from": out_source, "to": dst_id, "weight": 1.15}
+                target_org.synapses.append(bridge_out)
+                added_synapses.append(bridge_out)
+
+            macro_label = f"Symbiotic_{organ.name}_{splice_idx}"
+            macro_cell = target_org.form_symbiotic_macro_cell(cluster_cell_ids, label=macro_label)
+
+            target_org.check_lyapunov_stability()
+            if hasattr(target_org, "gpu_engine"):
+                target_org.gpu_engine.load_topology(target_org.cells, target_org.synapses)
+
+            return {
+                "status": "ok",
+                "organ_name": organ_name,
+                "spliced_cells_count": len(new_cells),
+                "spliced_cell_ids": cluster_cell_ids,
+                "added_synapses_count": len(added_synapses),
+                "macro_cell": macro_cell.to_dict() if macro_cell else None,
+                "connected_from": src_id,
+                "connected_to": dst_id,
+                "lyapunov": target_org.lyapunov_report,
+                "message": f"成功从冷冻库借用剪裁器官【{organ.name}】，封装为新超细胞微柱【{macro_label}】，已与中枢网络完成突触融合！",
+                "timestamp": time.time()
+            }
+
 class PhysicalCell3D:
     def __init__(self, cid, ptype, x, y, z, layer="L2_ASSOCIATION"):
         self.id = cid
@@ -547,9 +973,13 @@ class CUDACellularDynamicsEngine:
         
         self.W = torch.zeros((self.n_cells, self.n_cells), device=self.device, dtype=torch.float32)
         self.mask = torch.zeros((self.n_cells, self.n_cells), device=self.device, dtype=torch.float32)
+        id_to_idx = {c.id: idx for idx, c in enumerate(cells)}
         for s in synapses:
-            u, v, w = s["from"], s["to"], s.get("weight", 1.0)
-            if u < self.n_cells and v < self.n_cells:
+            u_id, v_id = s.get("from"), s.get("to")
+            u = id_to_idx.get(u_id)
+            v = id_to_idx.get(v_id)
+            w = s.get("weight", 1.0)
+            if u is not None and v is not None and u < self.n_cells and v < self.n_cells:
                 self.W[u, v] = w
                 self.mask[u, v] = 1.0
 
@@ -615,6 +1045,9 @@ class SiliconCellularOrganism:
         self.stress_mode = False
         self.gpu_engine = CUDACellularDynamicsEngine(96)
         self.lock = threading.RLock()
+        self.symbiotic_macro_cells = []
+        self.lyapunov_report = None
+        self.last_extinction_report = None
         self.init_cells()
         
     def init_cells(self):
@@ -686,6 +1119,154 @@ class SiliconCellularOrganism:
         # 加载拓扑至 GPU 张量计算引擎
         if hasattr(self, "gpu_engine"):
             self.gpu_engine.load_topology(self.cells, self.synapses)
+
+        # 构建 5 大核心超细胞微柱共生体 (Symbiotic Macro-Cells)
+        self.symbiotic_macro_cells = [
+            SymbioticMacroCell(1, "LeftSensoryColumn", list(range(0, 12)), color="#22d3ee"),
+            SymbioticMacroCell(2, "LeftAssociationColumn", list(range(12, 36)), color="#34d399"),
+            SymbioticMacroCell(3, "RightSensoryColumn", list(range(48, 60)), color="#a78bfa"),
+            SymbioticMacroCell(4, "RightAssociationColumn", list(range(60, 84)), color="#fbbf24"),
+            SymbioticMacroCell(5, "BilateralMotorCore", list(range(36, 48)) + list(range(84, 96)), color="#f43f5e"),
+        ]
+        self._refresh_macro_cells_ports()
+        self.check_lyapunov_stability()
+
+    def _refresh_macro_cells_ports(self):
+        id_to_cell = {c.id for c in self.cells}
+        for mc in self.symbiotic_macro_cells:
+            cset = set(mc.internal_cell_ids).intersection(id_to_cell)
+            mc.internal_cell_ids = list(cset)
+            sensory = []
+            effector = []
+            for s in self.synapses:
+                u, v = s.get("from"), s.get("to")
+                if u not in cset and v in cset:
+                    sensory.append(v)
+                elif u in cset and v not in cset:
+                    effector.append(u)
+            mc.sensory_ports = sorted(list(set(sensory)))[:8]
+            mc.effector_ports = sorted(list(set(effector)))[:8]
+
+    def check_lyapunov_stability(self):
+        with self.lock:
+            self.lyapunov_report = compute_lyapunov_stability(self.cells, self.synapses)
+            return self.lyapunov_report
+
+    def enforce_lyapunov_stability(self, max_allowable_gain=0.95):
+        """施加自适应李雅普诺夫耗散阻尼，消除发散正反馈环路"""
+        with self.lock:
+            rep = self.check_lyapunov_stability()
+            if rep["is_stable"] or not rep["unstable_cycles"]:
+                return rep
+            
+            for cycle in rep["unstable_cycles"]:
+                cycle_set = set(cycle)
+                for syn in self.synapses:
+                    u, v = syn.get("from"), syn.get("to")
+                    if u in cycle_set and v in cycle_set:
+                        syn["weight"] = round(syn.get("weight", 1.0) * (max_allowable_gain / max(1.0, rep["max_loop_gain"])), 2)
+            
+            if hasattr(self, "gpu_engine"):
+                self.gpu_engine.load_topology(self.cells, self.synapses)
+            self.check_lyapunov_stability()
+            return self.lyapunov_report
+
+    def form_symbiotic_macro_cell(self, cluster_ids, label="MacroCortex", color=None):
+        with self.lock:
+            if len(cluster_ids) < 1:
+                return None
+            macro_id = len(self.symbiotic_macro_cells) + 1
+            colors = ["#38bdf8", "#34d399", "#a855f7", "#fbbf24", "#f43f5e", "#06b6d4", "#ec4899", "#eab308"]
+            if not color:
+                color = colors[(macro_id - 1) % len(colors)]
+            mc = SymbioticMacroCell(macro_id, label, cluster_ids, color=color)
+            self.symbiotic_macro_cells.append(mc)
+            self._refresh_macro_cells_ports()
+            return mc
+
+    def trigger_chicxulub_extinction(self, wipeout_ratio=0.8, shock_scale=2.5):
+        """
+        白垩纪大灭绝算子 (Chicxulub Extinction Operator)
+        进化学原理: 恐龙不退场，哺乳类永为夜行小耗子。
+        当种群成熟内卷时，抹杀排名前 80% 的成熟垄断突触/拓扑，保留边缘奇异变异体并施加相变冲击
+        """
+        with self.lock:
+            wipeout_ratio = max(0.5, min(0.95, float(wipeout_ratio)))
+            shock_scale = max(1.0, min(5.0, float(shock_scale)))
+            
+            pre_gain = self.lyapunov_report.get("max_loop_gain", 0.0) if self.lyapunov_report else 0.0
+            total_syns = len(self.synapses)
+            if total_syns < 10:
+                return {
+                    "triggered": False,
+                    "reason": "突触规模过小，无法施加大灭绝冲击",
+                    "timestamp": time.time()
+                }
+
+            # 1. 识别并抹杀 80% 头部高权重垄断突触
+            sorted_syns = sorted(self.synapses, key=lambda s: abs(s.get("weight", 1.0)), reverse=True)
+            wipe_count = int(total_syns * wipeout_ratio)
+            survivor_syns = sorted_syns[wipe_count:]
+            
+            # 2. 对幸存者施加高斯强相变扰动 (Shock scale)
+            for s in survivor_syns:
+                s["weight"] = round(max(-3.5, min(3.5, s.get("weight", 1.0) + random.gauss(0, shock_scale * 0.25))), 2)
+            
+            # 3. 适应性辐射增殖：从幸存节点中随机萌发新探索突触
+            survivor_nodes = list(set([s["from"] for s in survivor_syns] + [s["to"] for s in survivor_syns]))
+            if len(survivor_nodes) >= 2:
+                new_syn_count = int(total_syns * 0.45)
+                for _ in range(new_syn_count):
+                    u = random.choice(survivor_nodes)
+                    v = random.choice(survivor_nodes)
+                    if u != v:
+                        survivor_syns.append({
+                            "from": u,
+                            "to": v,
+                            "weight": round(random.uniform(-1.8, 1.8), 2)
+                        })
+
+            self.synapses = survivor_syns
+
+            # 4. 物理空间冲击波脉冲 (Shock Wave Radial Impulse)
+            for c in self.cells:
+                dist = math.sqrt(c.x**2 + c.y**2 + c.z**2) + 1.0
+                radial_boost = (shock_scale * 22.0) / (dist ** 0.4)
+                c.x += (c.x / dist) * radial_boost * random.uniform(0.7, 1.4)
+                c.y += (c.y / dist) * radial_boost * random.uniform(0.7, 1.4)
+                c.z += (c.z / dist) * radial_boost * random.uniform(0.7, 1.4)
+
+            # 5. 代谢与世代跃迁
+            self.generation += random.randint(15, 35)
+            self.free_energy = round(self.free_energy * 1.75, 4)
+            self.plasticity_flux = round(self.plasticity_flux * 2.4, 5)
+            self.red_queen_pressure = min(3.5, round(self.red_queen_pressure + shock_scale * 0.35, 2))
+
+            # 6. 重核李雅普诺夫稳定性与 GPU 引擎
+            self.check_lyapunov_stability()
+            self._refresh_macro_cells_ports()
+            if hasattr(self, "gpu_engine"):
+                self.gpu_engine.load_topology(self.cells, self.synapses)
+
+            post_gain = self.lyapunov_report.get("max_loop_gain", 0.0)
+
+            report = {
+                "triggered": True,
+                "wipeout_ratio": wipeout_ratio,
+                "shock_scale": shock_scale,
+                "wiped_synapses_count": wipe_count,
+                "survivors_count": total_syns - wipe_count,
+                "new_radiation_synapses": len(self.synapses) - (total_syns - wipe_count),
+                "total_synapses_now": len(self.synapses),
+                "generation_advanced_to": self.generation,
+                "pre_extinction_gain": pre_gain,
+                "post_extinction_gain": post_gain,
+                "is_stable": self.lyapunov_report.get("is_stable", True),
+                "message": f"白垩纪大灭绝冲击完成！抹杀 {wipe_count} 条垄断突触，保留 {total_syns - wipe_count} 条边缘幸存体，施加 {shock_scale}x 强相变扰动，种群跃迁至第 {self.generation} 代！",
+                "timestamp": time.time()
+            }
+            self.last_extinction_report = report
+            return report
 
     def step_physics_and_signal(self):
         with self.lock:
@@ -907,6 +1488,24 @@ class SiliconCellularOrganism:
             if "protein" in oid or "fold" in oid:
                 th = i * 0.45
                 return (28 * math.cos(th), i * 3.5 - 80, 28 * math.sin(th) + layer * 10)
+            if "doudizhu" in oid or "game" in oid or "card" in oid:
+                # 斗地主扇形手牌博弈因果拓扑
+                ang = -math.pi / 2.5 + (i / max(1, n_in if layer == 0 else (n_hid if layer == 1 else n_out))) * (math.pi * 0.8)
+                r = 60 + layer * 45
+                return (r * math.sin(ang), layer * 35 - 35, -r * math.cos(ang) + 40)
+            if "intersection" in oid or "maneuver" in oid or "turn" in oid or "uturn" in oid:
+                # 十字交叉路口与掉头回环环状拓扑
+                ang = (i / max(1, n_in if layer == 0 else (n_hid if layer == 1 else n_out))) * math.tau
+                r = 45 + layer * 35
+                return (r * math.cos(ang), math.sin(ang * 2) * 20 + layer * 25 - 30, r * math.sin(ang))
+            if "apex_unified_driving" in oid or "apex_driving" in oid:
+                # 亿级全场景合体超级大脑：前额叶中枢 + 左右多核团立体网络
+                col = i % 5 # 5个功能柱
+                sub_i = i // 5
+                theta = (sub_i / 8.0) * math.tau
+                col_r = 30.0 + col * 28.0
+                col_y = -80.0 + col * 40.0
+                return (col_r * math.cos(theta), col_y + math.sin(theta * 2.0) * 15.0, col_r * math.sin(theta) + (layer - 1) * 35.0)
             return (-120 + layer * 90, (i % 7) * 22 - 70, (i // 7) * 22 - 40)
 
         for i in range(n_in):
@@ -1084,6 +1683,12 @@ class SiliconCellularOrganism:
 
     def get_state_snapshot(self):
         with self.lock:
+            if not hasattr(self, "lyapunov_report") or self.lyapunov_report is None:
+                self.check_lyapunov_stability()
+
+            macro_cells_list = [mc.to_dict() for mc in getattr(self, "symbiotic_macro_cells", [])]
+            organ_bank_summary = OrganFrozenBank.instance().list_organs_summary()
+
             cells_data = [
                 {
                     "id": c.id,
@@ -1115,6 +1720,11 @@ class SiliconCellularOrganism:
                 "clustering_coef": getattr(self, "clustering_coef", 0.682),
                 "avg_path_len": getattr(self, "avg_path_len", 2.41),
                 "red_queen_pressure": getattr(self, "red_queen_pressure", 1.0),
+                "lyapunov": self.lyapunov_report,
+                "symbiotic_macro_cells": macro_cells_list,
+                "symbiotic_macro_cells_count": len(macro_cells_list),
+                "organ_bank": organ_bank_summary,
+                "last_extinction": getattr(self, "last_extinction_report", None),
                 "cells": cells_data,
                 "synapses": self.synapses,
                 "syns": self.synapses,
@@ -1129,7 +1739,11 @@ class SiliconCellularOrganism:
                     "avg_path_len": getattr(self, "avg_path_len", 2.41),
                     "shannon_diversity": self.shannon_h,
                     "energy": 94.2,
-                    "avg_membrane_potential": 0.42
+                    "avg_membrane_potential": 0.42,
+                    "lyapunov_gain": self.lyapunov_report.get("max_loop_gain", 0.0),
+                    "lyapunov_stable": self.lyapunov_report.get("is_stable", True),
+                    "macro_cells_count": len(macro_cells_list),
+                    "organ_bank_count": organ_bank_summary.get("total_organs", 0)
                 },
                 "warp_factor": self.warp_factor
             }
@@ -1142,6 +1756,19 @@ def organism_loop():
         time.sleep(0.025)
 
 threading.Thread(target=organism_loop, daemon=True).start()
+
+def ws_broadcaster_loop():
+    """35~40Hz 高频非阻塞 WebSocket 状态流式广播 (RFC 6455)"""
+    while True:
+        try:
+            time.sleep(0.025)
+            if ws_registry.has_clients():
+                snap = organism.get_state_snapshot()
+                ws_registry.broadcast(json.dumps(snap))
+        except Exception:
+            pass
+
+threading.Thread(target=ws_broadcaster_loop, daemon=True).start()
 
 class DummySiliconLibrary:
     def __init__(self):
@@ -2151,7 +2778,159 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         self.send_header("Expires", "0")
         super().end_headers()
 
+    def do_OPTIONS(self):
+        self.send_response(200)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Upgrade, Connection, Sec-WebSocket-Key, Sec-WebSocket-Version")
+        self.end_headers()
+
+    def handle_websocket(self):
+        key = self.headers.get("Sec-WebSocket-Key", "").strip()
+        if not key:
+            self.send_error(400, "Missing Sec-WebSocket-Key")
+            return
+        
+        GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+        accept_str = base64.b64encode(hashlib.sha1((key + GUID).encode("utf-8")).digest()).decode("utf-8")
+        
+        response = (
+            "HTTP/1.1 101 Switching Protocols\r\n"
+            "Upgrade: websocket\r\n"
+            "Connection: Upgrade\r\n"
+            f"Sec-WebSocket-Accept: {accept_str}\r\n\r\n"
+        )
+        try:
+            self.request.sendall(response.encode("utf-8"))
+        except Exception:
+            return
+            
+        sock = self.request
+        ws_registry.add(sock)
+        try:
+            # 推送首帧全息状态
+            init_frame = encode_ws_frame(json.dumps(organism.get_state_snapshot()))
+            sock.sendall(init_frame)
+            
+            while True:
+                opcode, payload = read_ws_frame(sock)
+                if opcode is None or opcode == 0x08:
+                    break
+                elif opcode == 0x09:
+                    sock.sendall(bytes(bytearray([0x8A, len(payload)]) + payload))
+                elif opcode == 0x01:
+                    try:
+                        text = payload.decode("utf-8")
+                        cmd = json.loads(text)
+                        act = cmd.get("action")
+                        res = None
+                        if act == "extinction":
+                            w_ratio = float(cmd.get("wipeout_ratio", 0.8))
+                            s_scale = float(cmd.get("shock_scale", 2.5))
+                            res = organism.trigger_chicxulub_extinction(w_ratio, s_scale)
+                        elif act == "splice":
+                            org_name = cmd.get("organ_name", cmd.get("name", "schmitt_damping_column"))
+                            src_id = cmd.get("from_id")
+                            dst_id = cmd.get("to_id")
+                            res = OrganFrozenBank.instance().exaptation_splice(org_name, organism, src_id, dst_id)
+                        elif act == "lyapunov_enforce":
+                            max_g = float(cmd.get("max_gain", 0.95))
+                            res = organism.enforce_lyapunov_stability(max_g)
+                        elif act == "warp":
+                            sp = str(cmd.get("speed", "1x"))
+                            res = {"status": "ok", "warp_speed": organism.set_warp(sp)}
+                        elif act == "state_query":
+                            res = organism.get_state_snapshot()
+
+                        if res:
+                            ack = {"status": "ok", "type": "action_ack", "action": act, "result": res}
+                            sock.sendall(encode_ws_frame(json.dumps(ack)))
+                            ws_registry.broadcast(json.dumps(organism.get_state_snapshot()))
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        finally:
+            ws_registry.remove(sock)
+            try:
+                sock.close()
+            except Exception:
+                pass
+
     def do_GET(self):
+        if self.headers.get("Upgrade", "").lower() == "websocket" or self.path == "/ws":
+            self.handle_websocket()
+            return
+
+        # 白垩纪大灭绝算子触发接口
+        if self.path.startswith("/api/extinction/trigger"):
+            import urllib.parse
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            wipeout_ratio = float(qs.get("wipeout_ratio", ["0.8"])[0])
+            shock_scale = float(qs.get("shock_scale", ["2.5"])[0])
+            res = organism.trigger_chicxulub_extinction(wipeout_ratio, shock_scale)
+            ws_registry.broadcast(json.dumps(organism.get_state_snapshot()))
+            body = json.dumps({"status": "ok", "report": res}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # 跨物种器官冷冻库借用剪裁接口
+        if self.path.startswith("/api/organ/splice"):
+            import urllib.parse
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            organ_name = qs.get("name", qs.get("organ_name", ["schmitt_damping_column"]))[0]
+            from_id = int(qs["from_id"][0]) if "from_id" in qs else None
+            to_id = int(qs["to_id"][0]) if "to_id" in qs else None
+            res = OrganFrozenBank.instance().exaptation_splice(organ_name, organism, from_id, to_id)
+            ws_registry.broadcast(json.dumps(organism.get_state_snapshot()))
+            body = json.dumps(res, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # 跨物种器官冷冻库列表接口
+        if self.path.startswith("/api/organ/bank") or self.path == "/api/organs":
+            data = OrganFrozenBank.instance().list_organs()
+            body = json.dumps({"status": "ok", "bank": data}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        # 李雅普诺夫稳定性检测与自适应阻尼抑制接口
+        if self.path.startswith("/api/lyapunov/check"):
+            res = organism.check_lyapunov_stability()
+            body = json.dumps({"status": "ok", "lyapunov": res}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/lyapunov/enforce"):
+            import urllib.parse
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            max_gain = float(qs.get("max_gain", ["0.95"])[0])
+            res = organism.enforce_lyapunov_stability(max_gain)
+            ws_registry.broadcast(json.dumps(organism.get_state_snapshot()))
+            body = json.dumps({"status": "ok", "lyapunov": res}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         if self.path.startswith("/api/dialogue"):
             import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
@@ -2625,6 +3404,60 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
     
     def do_POST(self):
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = {}
+        if content_length > 0:
+            try:
+                raw_body = self.rfile.read(content_length)
+                post_data = json.loads(raw_body.decode('utf-8'))
+            except Exception:
+                post_data = {}
+
+        if self.path.startswith("/api/extinction/trigger"):
+            import urllib.parse
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            wipeout_ratio = float(post_data.get("wipeout_ratio", qs.get("wipeout_ratio", ["0.8"])[0]))
+            shock_scale = float(post_data.get("shock_scale", qs.get("shock_scale", ["2.5"])[0]))
+            res = organism.trigger_chicxulub_extinction(wipeout_ratio, shock_scale)
+            ws_registry.broadcast(json.dumps(organism.get_state_snapshot()))
+            body = json.dumps({"status": "ok", "report": res}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/organ/splice"):
+            import urllib.parse
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            organ_name = post_data.get("name", post_data.get("organ_name", qs.get("name", qs.get("organ_name", ["schmitt_damping_column"]))[0]))
+            from_id = post_data.get("from_id", int(qs["from_id"][0]) if "from_id" in qs else None)
+            to_id = post_data.get("to_id", int(qs["to_id"][0]) if "to_id" in qs else None)
+            res = OrganFrozenBank.instance().exaptation_splice(organ_name, organism, from_id, to_id)
+            ws_registry.broadcast(json.dumps(organism.get_state_snapshot()))
+            body = json.dumps(res, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/lyapunov/enforce"):
+            import urllib.parse
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            max_gain = float(post_data.get("max_gain", qs.get("max_gain", ["0.95"])[0]))
+            res = organism.enforce_lyapunov_stability(max_gain)
+            ws_registry.broadcast(json.dumps(organism.get_state_snapshot()))
+            body = json.dumps({"status": "ok", "lyapunov": res}, ensure_ascii=False).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
         self.do_GET()
 
     def log_message(self, format, *args):

@@ -97,7 +97,7 @@
   }
 
   /* 统一左右侧边工作坞 (Dock Sidebars) */
-  .dock-left {
+    .dock-left {
     position: fixed;
     top: 48px;
     left: 0;
@@ -112,6 +112,10 @@
     gap: 12px;
     padding: 14px;
     z-index: 50;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .dock-left.collapsed {
+    transform: translateX(-100%);
   }
   .dock-right {
     position: fixed;
@@ -128,6 +132,47 @@
     gap: 12px;
     padding: 14px;
     z-index: 50;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .dock-right.collapsed {
+    transform: translateX(100%);
+  }
+
+  /* 浮动折叠把手 */
+  .dock-toggle-btn {
+    position: fixed;
+    top: 54px;
+    z-index: 60;
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid var(--border);
+    color: var(--cyan);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    user-select: none;
+    letter-spacing: 0.5px;
+  }
+  .dock-toggle-btn:hover {
+    border-color: var(--cyan);
+    background: rgba(56, 189, 248, 0.2);
+    box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+  }
+  #btn-toggle-left {
+    left: 326px;
+  }
+  #btn-toggle-left.collapsed {
+    left: 10px;
+  }
+  #btn-toggle-right {
+    right: 316px;
+  }
+  #btn-toggle-right.collapsed {
+    right: 10px;
   }
 
   /* 面板卡片 (Card Styling) */
@@ -207,6 +252,47 @@
   .btn-ctrl.btn-danger:hover {
     background: rgba(244, 63, 94, 0.2);
     border-color: var(--crimson);
+  }
+
+  /* 进化公理与超细胞微柱专用样式 */
+  .macro-badge {
+    font-size: 9px;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: rgba(56, 189, 248, 0.12);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    color: var(--cyan);
+    font-family: var(--font-mono);
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .macro-badge:hover {
+    border-color: var(--cyan);
+    background: rgba(56, 189, 248, 0.25);
+    box-shadow: 0 0 8px rgba(56, 189, 248, 0.4);
+    transform: translateY(-1px);
+  }
+  .lyapunov-unstable-pulse {
+    animation: lyapPulse 1.2s infinite ease-in-out;
+  }
+  @keyframes lyapPulse {
+    0%, 100% { box-shadow: 0 0 4px rgba(244, 63, 94, 0.3); border-color: rgba(244, 63, 94, 0.4); }
+    50% { box-shadow: 0 0 16px rgba(244, 63, 94, 0.85); border-color: var(--crimson); }
+  }
+  .screen-shockwave {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background: radial-gradient(circle at center, rgba(244, 63, 94, 0.45) 0%, rgba(251, 191, 36, 0.2) 50%, transparent 80%);
+    animation: shockwaveFade 0.8s ease-out forwards;
+  }
+  @keyframes shockwaveFade {
+    0% { opacity: 1; transform: scale(0.9); }
+    100% { opacity: 0; transform: scale(1.15); }
   }
 
   /* 动作指示器 */
@@ -556,9 +642,21 @@
     box-shadow: 0 0 12px rgba(251, 191, 36, 0.25);
   }
   .tree-leaf.active-leaf {
-    border-color: var(--amber);
-    background: rgba(251, 191, 36, 0.16);
-    box-shadow: 0 0 16px rgba(251, 191, 36, 0.4);
+    border-color: #f59e0b !important;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.45), rgba(251, 191, 36, 0.25)) !important;
+    box-shadow: 0 0 24px rgba(245, 158, 11, 0.7), inset 0 0 16px rgba(251, 191, 36, 0.4) !important;
+    color: #fef08a !important;
+    font-weight: 700 !important;
+    transform: translateX(4px) scale(1.02);
+  }
+  .tree-leaf.active-leaf span {
+    color: #fef08a !important;
+    text-shadow: 0 0 12px rgba(251, 191, 36, 0.9) !important;
+  }
+  .tree-leaf.active-leaf::before {
+    background: #fbbf24 !important;
+    box-shadow: 0 0 10px #fbbf24;
+    width: 12px;
   }
   .tree-active-badge {
     color: var(--emerald);
@@ -823,14 +921,33 @@
   </div>
 
   <div class="header-metrics">
+    <div id="nav-audio-toggle" style="display:flex;align-items:center;gap:4px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.35);padding:2px 8px;border-radius:4px;color:var(--purple);cursor:pointer;transition:all 0.2s;" title="空气介质声学与离子电弧 (点击开启/静音)" onclick="toggleBioAcoustics()">
+      <span id="nav-audio-text" style="font-size:10px;font-weight:700;">AUDIO: ON</span>
+    </div>
+    <div id="nav-fluid-status" style="display:flex;align-items:center;gap:4px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);padding:2px 8px;border-radius:4px;color:var(--cyan);" title="连续相分子流体介质相态与击穿场强 (气相/水相/真空)">
+      <span style="font-size:10px;font-weight:700;">FLUID:</span>
+      <b id="fluid-field-val" style="font-size:11px;">AERO 3.0 kV/mm</b>
+    </div>
+    <div id="nav-lyapunov-shield" style="display:flex;align-items:center;gap:4px;background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.35);padding:2px 8px;border-radius:4px;color:var(--emerald);cursor:pointer;transition:all 0.2s;" title="李雅普诺夫 BIBO 稳定性盾牌 (点击施加自适应阻尼抑制)" onclick="triggerLyapunovEnforce()">
+      <span style="font-size:10px;font-weight:700;">BIBO:</span>
+      <b id="nav-shield-gain" style="font-size:11px;">0.00</b>
+    </div>
+    <div id="nav-ws-status" style="display:flex;align-items:center;gap:4px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);padding:2px 8px;border-radius:4px;color:var(--cyan);">
+      <span class="legend-dot" id="ws-dot" style="background:var(--emerald);margin-right:0;"></span>
+      <span id="ws-text" style="font-size:10px;font-weight:600;">WS 40Hz</span>
+    </div>
     <span style="color:var(--emerald)">Zero-GC: <b>ACTIVE</b></span>
-    <span style="color:var(--cyan)">Step Latency: <b>24.1 ns</b></span>
+    <span style="color:var(--cyan)">Latency: <b>24.1 ns</b></span>
     <span style="color:var(--amber)">FPS: <b id="st-fps">60.0</b></span>
   </div>
 </header>
 
 <!-- 3D 渲染舞台 -->
 <div id="stage"></div>
+
+<!-- 侧边坞浮动折叠控制器 (Collapsible Dock Toggles) -->
+<button id="btn-toggle-left" class="dock-toggle-btn" onclick="toggleDock('left')" title="折叠/展开左侧控制坞">[◀ 控制坞]</button>
+<button id="btn-toggle-right" class="dock-toggle-btn" onclick="toggleDock('right')" title="折叠/展开右侧遥测坞">[遥测坞 ▶]</button>
 
 <!-- 左侧控制坞 (Left Dock) -->
 <aside class="dock-left">
@@ -851,7 +968,46 @@
     <div id="src" style="font-size:10px;padding:4px 6px;border-radius:4px;background:rgba(56,189,248,.1);color:var(--cyan);margin-top:4px;">
       数据源: 连接中...
     </div>
-    <div style="font-size:9px;color:#64748b;margin-top:6px;line-height:1.45;">左键平移 · 右键/Alt旋转 · 滚轮深入光标处 · WASD 漫游 · 双击对焦</div>
+    <div style="font-size:9px;color:#64748b;margin-top:6px;line-height:1.45;">左键旋转 · 右键/Alt平移 · 滚轮深入光标处 · WASD 漫游 · 双击对焦</div>
+  </div>
+
+  <!-- 卡片 1.5: 进化公理与李雅普诺夫稳定性盾牌 (Evolution Axioms & Stability Shield) -->
+  <div class="card" id="card-evolution-axioms" style="border-left: 3px solid var(--emerald); transition: all 0.3s ease;">
+    <div class="card-title">
+      <span style="display:flex;align-items:center;gap:6px;">
+        <span id="st-shield-icon" style="font-size:14px;">[BIBO]</span>
+        <span>李雅普诺夫 BIBO 稳定性</span>
+      </span>
+      <span class="card-title-badge" id="st-lyapunov-badge" style="background:rgba(52,211,153,0.15);color:var(--emerald);font-weight:bold;">BIBO STABLE</span>
+    </div>
+    <div class="kv" data-tip="st-lyapunov-gain">
+      <span>最大环路增益 Max Loop Gain</span>
+      <b id="st-lyapunov-gain" style="color:var(--emerald)">0.000</b>
+    </div>
+    <div class="kv">
+      <span>拓扑有向环数 Detected Cycles</span>
+      <b id="st-lyapunov-cycles">0</b>
+    </div>
+    <div class="kv">
+      <span>形式化安全公理</span>
+      <span style="font-size:10px;color:var(--text-dim);" id="st-lyapunov-desc">增益 &lt; 1.0 (无发散正反馈)</span>
+    </div>
+    <div style="display:flex;gap:4px;margin-top:2px;">
+      <button class="btn-ctrl" onclick="triggerLyapunovEnforce()" id="btn-enforce-lyap" style="flex:1;border-color:rgba(52,211,153,0.4);color:var(--emerald);padding:4px 6px;">
+        [PULSE] 施加自适应阻尼抑制 (BIBO Enforce)
+      </button>
+    </div>
+
+    <!-- 超细胞共生微柱部分 -->
+    <div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(56,189,248,0.2);">
+      <div class="card-title" style="margin-bottom:4px;">
+        <span style="font-size:10px;color:var(--text-main);">超细胞微柱 (Symbiotic Macro-Cells)</span>
+        <span class="card-title-badge" id="st-macro-count" style="color:var(--purple);background:rgba(168,85,247,0.15)">5 个微柱</span>
+      </div>
+      <div id="macro-cells-badges" style="display:flex;flex-wrap:wrap;gap:4px;max-height:85px;overflow-y:auto;padding-right:2px;">
+        <!-- 动态徽章注入 -->
+      </div>
+    </div>
   </div>
 
   <!-- 卡片 2: 硅基生命体与文化典籍 (核心流形选择坞) -->
@@ -899,6 +1055,88 @@
     <div class="act-bar" id="act-buy" data-tip="act-buy"><span>买开 / 加速 ACT_POS</span><b id="v-buy">0.00</b></div>
     <div class="act-bar" id="act-sell" data-tip="act-sell"><span>卖开 / 制动 ACT_NEG</span><b id="v-sell">0.00</b></div>
     <div class="act-bar" id="act-immune" data-tip="act-immune"><span>免疫阻断 ACT_LOCK</span><b id="v-immune">NORMAL</b></div>
+  </div>
+
+  <!-- 卡片 1.6: 白垩纪大灭绝算子 (Chicxulub Extinction Operator) -->
+    <!-- 卡片 1.5: 连续相分子流体介质与电离放电 (Continuous Molecular Fluid Biosphere) -->
+  <div class="card" id="card-fluid-physics" style="border: 1px solid rgba(56,189,248,0.4); background: linear-gradient(180deg, rgba(56,189,248,0.1), rgba(18,26,44,0.85));">
+    <div class="card-title">
+      <span style="color:var(--cyan);display:flex;align-items:center;gap:6px;">
+        <span>[FLUID_BIOSPHERE]</span>
+        <span>连续相分子流体介质</span>
+      </span>
+      <span class="card-title-badge" id="st-fluid-phase-badge" style="background:rgba(56,189,248,0.2);color:var(--cyan);font-weight:bold;">AERO // 气相</span>
+    </div>
+
+    <!-- 介质多相态切换器 (气相 / 原始水相 / 深空真空) -->
+    <div style="display:flex;gap:4px;margin-bottom:6px;">
+      <button class="nav-tab-btn active" id="btn-phase-aero" onclick="setFluidPhase('aero')" style="flex:1;padding:3px 2px;font-size:10px;text-align:center;">大气气相</button>
+      <button class="nav-tab-btn" id="btn-phase-hydro" onclick="setFluidPhase('hydro')" style="flex:1;padding:3px 2px;font-size:10px;text-align:center;color:var(--cyan);">原始水相</button>
+      <button class="nav-tab-btn" id="btn-phase-vacuum" onclick="setFluidPhase('vacuum')" style="flex:1;padding:3px 2px;font-size:10px;text-align:center;color:var(--rose);">深空真空</button>
+    </div>
+
+    <div class="kv"><span>介质相态 Phase</span><b id="st-fluid-phase-name" style="color:var(--cyan)">气相分子气溶胶</b></div>
+    <div class="kv"><span>分子数密度 Density</span><b id="st-fluid-density" style="color:var(--emerald)">1.225 kg/m³</b></div>
+    <div class="kv"><span>击穿临界场强 Breakdown</span><b id="st-fluid-breakdown" style="color:var(--amber)">3.0 kV/mm</b></div>
+    <div class="kv"><span>流体动力粘度 Viscosity</span><b id="st-fluid-viscosity" style="color:var(--purple)">0.018 mPa·s</b></div>
+
+    <div style="display:flex;gap:5px;margin-top:6px;">
+      <button class="btn-ctrl" onclick="triggerManualDischargeBurst()" style="flex:1;padding:6px 4px;font-weight:bold;font-size:10px;background:rgba(56,189,248,0.25);border-color:var(--cyan);color:var(--cyan);">
+        [DISCHARGE] 激发介质击穿放电
+      </button>
+      <button class="btn-ctrl" onclick="togglePlasmaStorm()" id="btn-plasma-storm" style="flex:1;padding:6px 4px;font-weight:bold;font-size:10px;background:rgba(168,85,247,0.2);border-color:var(--purple);color:#d8b4fe;">
+        [STORM] 开启放电风暴
+      </button>
+    </div>
+  </div>
+
+  <div class="card" id="card-extinction" style="border: 1px solid rgba(244,63,94,0.45); background: linear-gradient(180deg, rgba(244,63,94,0.1), rgba(18,26,44,0.85));">
+    <div class="card-title">
+      <span style="color:var(--crimson);display:flex;align-items:center;gap:6px;">
+        <span>[CHICXULUB]</span>
+        <span>白垩纪大灭绝算子</span>
+      </span>
+      <span class="card-title-badge" style="background:rgba(244,63,94,0.2);color:var(--crimson);font-weight:bold;">Chicxulub Impact</span>
+    </div>
+    <div style="font-size:10px;color:var(--text-dim);line-height:1.45;">
+      进化学公理：恐龙不退场，哺乳类永为夜行耗子。抹杀排名前 80% 成熟垄断拓扑，强激发 20% 边缘幸存异变体！
+    </div>
+    <div style="display:flex;gap:6px;margin-top:4px;">
+      <button class="btn-ctrl btn-danger" onclick="triggerChicxulubExtinction()" id="btn-extinction-shock" style="flex:1;padding:8px 6px;font-weight:bold;font-size:11px;background:rgba(244,63,94,0.22);box-shadow:0 0 12px rgba(244,63,94,0.3);letter-spacing:0.5px;">
+        [EXTINCTION] 触发白垩纪大灭绝 (80% 头部抹杀)
+      </button>
+    </div>
+    <div id="extinction-impact-report" style="display:none;font-size:10px;color:var(--amber);background:rgba(251,191,36,0.1);padding:6px 8px;border-radius:4px;border:1px dashed rgba(251,191,36,0.4);line-height:1.4;">
+    </div>
+  </div>
+
+  <!-- 卡片 1.7: 跨物种器官冷冻库与借用剪裁 (Exaptation Bank & Splice) -->
+  <div class="card" id="card-organ-bank" style="border: 1px solid rgba(168,85,247,0.45); background: linear-gradient(180deg, rgba(168,85,247,0.1), rgba(18,26,44,0.85));">
+    <div class="card-title">
+      <span style="color:#c084fc;display:flex;align-items:center;gap:6px;">
+        <span>[VAULT]</span>
+        <span>跨物种器官冷冻库</span>
+      </span>
+      <span class="card-title-badge" id="st-organ-bank-badge" style="background:rgba(168,85,247,0.2);color:#c084fc;">Exaptation Bank</span>
+    </div>
+    <div style="font-size:10px;color:var(--text-dim);line-height:1.45;">
+      进化学公理：进化不造新轮子，全靠旧零件改用途。从冷冻库借用成熟器官并剪裁重组。
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+      <select id="sel-frozen-organ" onchange="onOrganSelectionChange()" style="background:rgba(10,16,28,0.95);border:1px solid rgba(168,85,247,0.45);color:var(--text-main);padding:5px 8px;border-radius:4px;font-size:11px;font-family:var(--font-mono);outline:none;">
+        <option value="schmitt_damping_column">施密特迟滞抗震颤阻尼柱 [EMA+HYST]</option>
+        <option value="prefrontal_executive_gate">前额叶形式化防御执行门 [SUM+THRESH+AMP]</option>
+        <option value="fast_fourier_sensory_pod">高频差分微积分感知微囊 [DIFF+INT]</option>
+        <option value="reflex_arc_fast_extensor">脊髓反射弧快速伸肌单元 [THRESH+AMP+DAMP]</option>
+        <option value="quantum_entropy_sentinel">量子极限环混沌熵哨兵 [OSC+THRESH]</option>
+      </select>
+      <div id="organ-preview-desc" style="font-size:9px;color:var(--cyan);line-height:1.4;background:rgba(56,189,248,0.08);padding:4px 6px;border-radius:4px;border:1px solid rgba(56,189,248,0.2);">
+        施密特迟滞强抗震颤阻尼柱 (EMA滤波 + 双阈值迟滞比较，消除高频抖动)
+      </div>
+      <button class="btn-ctrl" onclick="triggerOrganSplice()" id="btn-splice-organ" style="background:rgba(168,85,247,0.22);border-color:rgba(168,85,247,0.55);color:#d8b4fe;font-weight:bold;padding:7px 8px;font-size:11px;box-shadow:0 0 10px rgba(168,85,247,0.25);">
+        [SPLICE] 借用剪裁接入器官 (Exaptation Splice)
+      </button>
+    </div>
   </div>
 
   <!-- 卡片 2: 生态圈多样性 -->
@@ -1352,6 +1590,51 @@ scene.add(dirLight2);
 const cellPointLight = new THREE.PointLight(0x00f0ff, 1.6, 1200);
 scene.add(cellPointLight);
 
+/* 空气介质击穿与离子电弧图层 (Atmospheric Dielectric Breakdown Layer) */
+const lightningGroup = new THREE.Group();
+scene.add(lightningGroup);
+
+/* ============================================================
+ * 空气介质三维流动微粒场 (Atmospheric Aero-Medium Particle Field)
+ * 模拟空气气溶胶、布朗对流运动与介质环境散射
+ * ============================================================ */
+const AIR_PARTICLE_COUNT = 900;
+const airGeo = new THREE.BufferGeometry();
+const airPos = new Float32Array(AIR_PARTICLE_COUNT * 3);
+const airVel = new Float32Array(AIR_PARTICLE_COUNT * 3);
+const airCol = new Float32Array(AIR_PARTICLE_COUNT * 3);
+
+for (let i = 0; i < AIR_PARTICLE_COUNT; i++) {
+  airPos[i*3]   = (Math.random() - 0.5) * 1200;
+  airPos[i*3+1] = (Math.random() - 0.5) * 900;
+  airPos[i*3+2] = (Math.random() - 0.5) * 1200;
+
+  airVel[i*3]   = (Math.random() - 0.5) * 0.45;
+  airVel[i*3+1] = (Math.random() - 0.5) * 0.35 + 0.2; // 真实热对流轻微上升
+  airVel[i*3+2] = (Math.random() - 0.5) * 0.45;
+
+  // 离子化空气分子呈现柔和电青色与银灰色
+  const isIonized = Math.random() < 0.25;
+  const c = isIonized ? new THREE.Color(0x38bdf8) : new THREE.Color(0x94a3b8);
+  airCol[i*3]   = c.r;
+  airCol[i*3+1] = c.g;
+  airCol[i*3+2] = c.b;
+}
+
+airGeo.setAttribute('position', new THREE.BufferAttribute(airPos, 3));
+airGeo.setAttribute('color', new THREE.BufferAttribute(airCol, 3));
+
+const airMat = new THREE.PointsMaterial({
+  size: 3.8,
+  vertexColors: true,
+  transparent: true,
+  opacity: 0.65,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false
+});
+const airParticleCloud = new THREE.Points(airGeo, airMat);
+scene.add(airParticleCloud);
+
 /* ============================================================
  * 2. 增强型 3D 动力学相机控制器 (Momentum Lerp, Zoom-to-Cursor, Double-Click Focus)
  * ============================================================ */
@@ -1381,9 +1664,12 @@ function panCameraByPixels(dx, dy) {
 
 renderer.domElement.addEventListener('pointerdown', e => {
   lx = e.clientX; ly = e.clientY;
-  const wantOrbit = e.button === 2 || e.altKey || e.ctrlKey;
-  if (e.button === 1 || e.button === 0 && !wantOrbit) panDragging = true;
-  else dragging = true;
+  const wantPan = e.button === 2 || e.button === 1 || e.altKey || e.ctrlKey;
+  if (wantPan) {
+    panDragging = true;
+  } else if (e.button === 0) {
+    dragging = true;
+  }
   renderer.domElement.setPointerCapture?.(e.pointerId);
 });
 addEventListener('pointerup', () => { dragging = false; panDragging = false; });
@@ -2206,7 +2492,7 @@ async function pollLibrary() {
             return `<div class="tree-leaf ${isLeafActive}" data-book-id="${b.book_id}" onclick="event.stopPropagation(); highlightBookSubcircuit('${b.book_id}', '${b.title || b.book_id}', '${org.name}')">
               <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
                 <span>《${b.title || b.book_id}》</span>
-                <span style="color:#fbbf24;font-size:10px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:4px;border:1px solid rgba(251,191,36,0.3);">★ ${b.impact_score || 9.5}</span>
+                <span style="color:#fbbf24;font-size:10px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:4px;border:1px solid rgba(251,191,36,0.3);">* ${b.impact_score || 9.5}</span>
               </div>
               <div style="color:#94a3b8;font-size:10px;margin-top:4px;line-height:1.4;">
                 ${b.description || ''}
@@ -2488,12 +2774,572 @@ let frameCount = 0, lastFpsTime = performance.now();
 
 
 /* ============================================================
- * 6. 后端实时流同步与防卡顿优化 (Anti-Lag Real Backend Sync)
+ * 6. 后端 WebSocket 40Hz 零延迟直连与防卡顿 HTTP 容灾轮询 (Dual-Channel Sync)
  * ============================================================ */
 let isFetchingState = false;
 let serverOnline = false;
+let ws = null;
+let wsConnected = false;
+let wsReconnectTimer = null;
+let lastExtinctionTs = 0;
+
+function connectWebSocket() {
+  if (ws) {
+    try { ws.close(); } catch(e) {}
+  }
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${proto}//${window.location.host}/ws`;
+  
+  try {
+    ws = new WebSocket(wsUrl);
+    ws.onopen = () => {
+      wsConnected = true;
+      serverOnline = true;
+      const wsDot = document.getElementById("ws-dot");
+      if (wsDot) wsDot.style.background = "var(--emerald)";
+      const wsText = document.getElementById("ws-text");
+      if (wsText) wsText.textContent = "WS 40Hz (直连)";
+      const srcEl = document.getElementById("src");
+      if (srcEl) {
+        srcEl.textContent = "数据源: WebSocket 40Hz 零延迟双工直连 (实时力场 + 24原语前向)";
+        srcEl.style.color = "var(--emerald)";
+        srcEl.style.background = "rgba(52,211,153,0.1)";
+      }
+      log("[PULSE] [WebSocket] 已连接至 SDSCC 40Hz 实时双工全息遥测流 (零延迟直连)", true);
+    };
+    ws.onmessage = (evt) => {
+      try {
+        const data = JSON.parse(evt.data);
+        if (data.status === "ok" && data.type === "action_ack") {
+          log(`[WS ACK] ${data.action}: ${JSON.stringify(data.result?.message || data.result)}`, true);
+          return;
+        }
+        updateFromBackendState(data);
+      } catch(err) {
+        console.error("WS Parse error", err);
+      }
+    };
+    ws.onclose = () => {
+      wsConnected = false;
+      const wsDot = document.getElementById("ws-dot");
+      if (wsDot) wsDot.style.background = "var(--amber)";
+      const wsText = document.getElementById("ws-text");
+      if (wsText) wsText.textContent = "WS 离线重连中";
+      scheduleWsReconnect();
+    };
+    ws.onerror = () => {
+      wsConnected = false;
+      const wsDot = document.getElementById("ws-dot");
+      if (wsDot) wsDot.style.background = "var(--crimson)";
+    };
+  } catch(e) {
+    wsConnected = false;
+    scheduleWsReconnect();
+  }
+}
+
+function scheduleWsReconnect() {
+  if (wsReconnectTimer) return;
+  wsReconnectTimer = setTimeout(() => {
+    wsReconnectTimer = null;
+    connectWebSocket();
+  }, 2500);
+}
+
+connectWebSocket();
+
+async function sendBackendCommand(action, params = {}) {
+  const payload = { action, ...params };
+  if (ws && wsConnected && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(payload));
+    return { status: "sent_ws" };
+  } else {
+    // 优雅回退至 REST API
+    if (action === "extinction") {
+      const w = params.wipeout_ratio ?? 0.8;
+      const s = params.shock_scale ?? 2.5;
+      const r = await fetch(`/api/extinction/trigger?wipeout_ratio=${w}&shock_scale=${s}`, { method: "POST" });
+      return await r.json();
+    } else if (action === "splice") {
+      const name = params.name || params.organ_name || "schmitt_damping_column";
+      const from_id = params.from_id !== undefined ? `&from_id=${params.from_id}` : "";
+      const to_id = params.to_id !== undefined ? `&to_id=${params.to_id}` : "";
+      const r = await fetch(`/api/organ/splice?name=${encodeURIComponent(name)}${from_id}${to_id}`, { method: "POST" });
+      return await r.json();
+    } else if (action === "lyapunov_enforce") {
+      const max_g = params.max_gain ?? 0.95;
+      const r = await fetch(`/api/lyapunov/enforce?max_gain=${max_g}`, { method: "POST" });
+      return await r.json();
+    }
+  }
+}
+
+/* ============================================================
+ * 空气介质声学与离子闪电击穿引擎 (Atmospheric Bio-Acoustics & Dielectric Breakdown)
+ * 空气作为物理介质：传播压力声波、空气阻尼、高压电场电离击穿 (3.0 kV/mm) 与闪电电弧
+ * ============================================================ */
+let audioCtx = null;
+let soundEnabled = true;
+let airHumOsc = null;
+let airHumGain = null;
+
+function initBioAudio() {
+  if (audioCtx) {
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    return;
+  }
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AudioContext();
+
+    // 1. 空气介质背景布朗运动与舒曼微弱共振 (432Hz 极微弱环境底噪)
+    airHumOsc = audioCtx.createOscillator();
+    airHumGain = audioCtx.createGain();
+    const filter = audioCtx.createBiquadFilter();
+
+    airHumOsc.type = 'sine';
+    airHumOsc.frequency.setValueAtTime(432, audioCtx.currentTime);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(360, audioCtx.currentTime);
+
+    airHumGain.gain.setValueAtTime(soundEnabled ? 0.012 : 0.0, audioCtx.currentTime);
+
+    airHumOsc.connect(filter);
+    filter.connect(airHumGain);
+    airHumGain.connect(audioCtx.destination);
+    airHumOsc.start();
+  } catch (e) {
+    console.warn("Web Audio API not supported:", e);
+  }
+}
+
+
+window.toggleDock = function(side) {
+  if (side === 'left') {
+    const dock = document.querySelector('.dock-left');
+    const btn = document.getElementById('btn-toggle-left');
+    if (dock && btn) {
+      const isCol = dock.classList.toggle('collapsed');
+      btn.classList.toggle('collapsed', isCol);
+      btn.textContent = isCol ? '[▶ 控制坞]' : '[◀ 控制坞]';
+    }
+  } else if (side === 'right') {
+    const dock = document.querySelector('.dock-right');
+    const btn = document.getElementById('btn-toggle-right');
+    if (dock && btn) {
+      const isCol = dock.classList.toggle('collapsed');
+      btn.classList.toggle('collapsed', isCol);
+      btn.textContent = isCol ? '[◀ 遥测坞]' : '[遥测坞 ▶]';
+    }
+  }
+};
+
+window.toggleBioAcoustics = function() {
+  soundEnabled = !soundEnabled;
+  if (!audioCtx && soundEnabled) initBioAudio();
+  if (airHumGain && audioCtx) {
+    airHumGain.gain.setValueAtTime(soundEnabled ? 0.012 : 0.0, audioCtx.currentTime);
+  }
+  const icon = document.getElementById("nav-audio-icon");
+  const text = document.getElementById("nav-audio-text");
+  if (icon) icon.textContent = soundEnabled ? "[AUDIO]" : "[MUTED]";
+  if (text) text.textContent = soundEnabled ? "空气声场: 开启" : "空气声场: 静音";
+  log(soundEnabled ? "[AUDIO] 空气介质声学与离子电弧音效已开启" : "[MUTED] 空气介质声学音效已静音", true);
+};
+
+// 交互自动解锁音频（遵循现代浏览器策略）
+window.addEventListener("pointerdown", () => {
+  if (soundEnabled && !audioCtx) initBioAudio();
+}, { once: true });
+
+// 突触放电空气电离爆鸣 (Ionization Arc Spark)
+function playIonizationSpark(intensity = 0.5) {
+  if (typeof currentFluidPhase !== 'undefined' && currentFluidPhase === 'vacuum') return; // 真空绝不传声
+  if (!soundEnabled) return;
+  if (!audioCtx) initBioAudio();
+  if (!audioCtx) return;
+  try {
+    const t = audioCtx.currentTime;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800 + Math.random() * 1200, t);
+    osc.frequency.exponentialRampToValueAtTime(100, t + 0.04);
+
+    gain.gain.setValueAtTime(0.22 * intensity, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
+    osc.start(t);
+    osc.stop(t + 0.045);
+  } catch (e) {}
+}
+
+// 白垩纪大灭绝：陨石撕裂大气音爆与滚滚雷暴 (Chicxulub Atmospheric Thunder & Shockwave)
+function playChicxulubAtmosphericThunder() {
+  if (!soundEnabled) return;
+  if (!audioCtx) initBioAudio();
+  if (!audioCtx) return;
+  try {
+    const t = audioCtx.currentTime;
+
+    // 1. 次声波极低频轰鸣 (Sub-bass drop 95Hz -> 32Hz)
+    const subOsc = audioCtx.createOscillator();
+    const subGain = audioCtx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(95, t);
+    subOsc.frequency.exponentialRampToValueAtTime(32, t + 1.4);
+
+    subGain.gain.setValueAtTime(0.35, t);
+    subGain.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
+    subOsc.connect(subGain);
+    subGain.connect(audioCtx.destination);
+    subOsc.start(t);
+    subOsc.stop(t + 1.6);
+
+    // 2. 大气压缩激波爆炸白噪音 (Air Shockwave Burst)
+    const bufLen = Math.floor(audioCtx.sampleRate * 1.2);
+    const buf = audioCtx.createBuffer(1, bufLen, audioCtx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+
+    const noise = audioCtx.createBufferSource();
+    noise.buffer = buf;
+
+    const lp = audioCtx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(2200, t);
+    lp.frequency.exponentialRampToValueAtTime(50, t + 1.1);
+
+    const nGain = audioCtx.createGain();
+    nGain.gain.setValueAtTime(0.32, t);
+    nGain.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+
+    noise.connect(lp);
+    lp.connect(nGain);
+    nGain.connect(audioCtx.destination);
+    noise.start(t);
+    noise.stop(t + 1.2);
+  } catch (e) {}
+}
+
+// 递归中点位移算法生成分形闪电折线 (Fractal Lightning Branching)
+function generateFractalLightningPoints(start, end, displacement, iterations) {
+  let segments = [{ start: start.clone(), end: end.clone() }];
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const newSegs = [];
+    const scale = displacement * Math.pow(0.55, iter);
+    for (const seg of segments) {
+      const mid = seg.start.clone().add(seg.end).multiplyScalar(0.5);
+      mid.x += (Math.random() - 0.5) * scale;
+      mid.y += (Math.random() - 0.5) * scale;
+      mid.z += (Math.random() - 0.5) * scale;
+      newSegs.push({ start: seg.start, end: mid });
+      newSegs.push({ start: mid, end: seg.end });
+    }
+    segments = newSegs;
+  }
+
+  const points = [];
+  if (segments.length > 0) points.push(segments[0].start);
+  for (const seg of segments) points.push(seg.end);
+  return points;
+}
+
+// 在 3D 空间中实例化空气介质电弧
+let currentFluidPhase = 'aero'; // 'aero' | 'hydro' | 'vacuum'
+
+window.setFluidPhase = function(phase) {
+  currentFluidPhase = phase;
+  document.querySelectorAll('#btn-phase-aero, #btn-phase-hydro, #btn-phase-vacuum').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`btn-phase-${phase}`);
+  if (btn) btn.classList.add('active');
+
+  const badge = document.getElementById('st-fluid-phase-badge');
+  const nameEl = document.getElementById('st-fluid-phase-name');
+  const densEl = document.getElementById('st-fluid-density');
+  const bdEl = document.getElementById('st-fluid-breakdown');
+  const viscEl = document.getElementById('st-fluid-viscosity');
+  const headVal = document.getElementById('fluid-field-val');
+
+  if (phase === 'aero') {
+    if (badge) { badge.textContent = 'AERO // 气相'; badge.style.color = 'var(--cyan)'; }
+    if (nameEl) nameEl.textContent = '气相分子气溶胶';
+    if (densEl) densEl.textContent = '1.225 kg/m³';
+    if (bdEl) bdEl.textContent = '3.0 kV/mm';
+    if (viscEl) viscEl.textContent = '0.018 mPa·s';
+    if (headVal) headVal.textContent = 'AERO 3.0 kV/mm';
+
+    if (scene && scene.fog) scene.fog.color.setHex(0x04070d);
+    if (renderer) renderer.setClearColor(0x04070d);
+
+    if (airParticleCloud && airGeo) {
+      airParticleCloud.visible = true;
+      const colArr = airGeo.attributes.color.array;
+      for (let i = 0; i < AIR_PARTICLE_COUNT; i++) {
+        const isIon = Math.random() < 0.25;
+        const c = isIon ? new THREE.Color(0x38bdf8) : new THREE.Color(0x94a3b8);
+        colArr[i*3] = c.r; colArr[i*3+1] = c.g; colArr[i*3+2] = c.b;
+      }
+      airGeo.attributes.color.needsUpdate = true;
+    }
+    log('[FLUID] 已切换为【连续气相分子介质】(空气动力学对流，击穿场强 3.0 kV/mm)', true);
+  } else if (phase === 'hydro') {
+    if (badge) { badge.textContent = 'HYDRO // 水相'; badge.style.color = '#38bdf8'; }
+    if (nameEl) nameEl.textContent = '原始水生物圈分子汤';
+    if (densEl) densEl.textContent = '1000.0 kg/m³';
+    if (bdEl) bdEl.textContent = '0.15 kV/mm (高电导率)';
+    if (viscEl) viscEl.textContent = '1.002 mPa·s (水力粘度)';
+    if (headVal) headVal.textContent = 'HYDRO 0.15 kV/mm';
+
+    if (scene && scene.fog) scene.fog.color.setHex(0x021627);
+    if (renderer) renderer.setClearColor(0x021627);
+
+    if (airParticleCloud && airGeo) {
+      airParticleCloud.visible = true;
+      const colArr = airGeo.attributes.color.array;
+      for (let i = 0; i < AIR_PARTICLE_COUNT; i++) {
+        const isBio = Math.random() < 0.45;
+        const c = isBio ? new THREE.Color(0x10b981) : new THREE.Color(0x00f0ff);
+        colArr[i*3] = c.r; colArr[i*3+1] = c.g; colArr[i*3+2] = c.b;
+      }
+      airGeo.attributes.color.needsUpdate = true;
+    }
+    log('[FLUID] 已切换为【连续液相水生物圈】(原始细胞外水汤，高电导率离子流动，声速 1500m/s)', true);
+  } else if (phase === 'vacuum') {
+    if (badge) { badge.textContent = 'VACUUM // 真空'; badge.style.color = 'var(--rose)'; }
+    if (nameEl) nameEl.textContent = '绝对深空虚空';
+    if (densEl) densEl.textContent = '0.000 kg/m³';
+    if (bdEl) bdEl.textContent = '∞ (绝缘极限)';
+    if (viscEl) viscEl.textContent = '0.000 mPa·s';
+    if (headVal) headVal.textContent = 'VACUUM 0 kg/m³';
+
+    if (scene && scene.fog) scene.fog.color.setHex(0x010204);
+    if (renderer) renderer.setClearColor(0x010204);
+
+    if (airParticleCloud) airParticleCloud.visible = false;
+    log('[FLUID] 已切换为【深空真空临界态】(分子密度为零，绝对声学静默)', true);
+  }
+};
+
+let plasmaStormActive = false;
+
+window.triggerManualDischargeBurst = function() {
+  log("[DISCHARGE] 局部强电场击穿空气介质！高压离子电弧正在神经微柱间立体放电", true);
+  if (views.cells.length < 2) return;
+  for (let i = 0; i < 6; i++) {
+    setTimeout(() => {
+      const c1 = views.cells[Math.floor(Math.random() * views.cells.length)];
+      const c2 = views.cells[Math.floor(Math.random() * views.cells.length)];
+      if (c1 !== c2) {
+        const v1 = new THREE.Vector3(c1.cell.x, c1.cell.y, c1.cell.z);
+        const v2 = new THREE.Vector3(c2.cell.x, c2.cell.y, c2.cell.z);
+        const colors = [0x38bdf8, 0xa855f7, 0xfbbf24, 0x00f0ff, 0xffffff];
+        spawnDielectricBreakdownArc(v1, v2, colors[i % colors.length], 1.6);
+        playIonizationSpark(0.85);
+      }
+    }, i * 50);
+  }
+};
+
+window.togglePlasmaStorm = function() {
+  plasmaStormActive = !plasmaStormActive;
+  const btn = document.getElementById("btn-plasma-storm");
+  if (btn) {
+    btn.style.background = plasmaStormActive ? "rgba(56,189,248,0.45)" : "rgba(168,85,247,0.2)";
+    btn.textContent = plasmaStormActive ? "[STORM] 正在持续高压电离放电" : "[STORM] 开启放电风暴";
+  }
+  log(plasmaStormActive ? "[STORM] 高压等离子连续放电风暴已激活" : "[STORM] 等离子放电风暴已平息", true);
+};
+
+// 在 3D 空间中实例化真三维等离子放电管 (Volumetric Plasma Lightning Tube)
+function spawnDielectricBreakdownArc(startVec, endVec, colorHex = 0x38bdf8, intensity = 1.0) {
+  if (typeof lightningGroup === 'undefined') return;
+  const pts = generateFractalLightningPoints(startVec, endVec, 34 * intensity, 4);
+  if (pts.length < 2) return;
+
+  const arcObj = new THREE.Group();
+
+  // 1. 纯白炽热核心管 (Plasma Core Tube, 3D 实体网格，完全无视 WebGL 1px 线宽限制)
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const coreGeo = new THREE.TubeGeometry(curve, Math.max(16, pts.length * 2), 1.3 * intensity, 4, false);
+  const coreMat = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.95
+  });
+  const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+  arcObj.add(coreMesh);
+
+  // 2. 电离光晕外层 (Ionization Halo Tube)
+  const auraGeo = new THREE.TubeGeometry(curve, Math.max(16, pts.length * 2), 4.2 * intensity, 4, false);
+  const auraMat = new THREE.MeshBasicMaterial({
+    color: colorHex,
+    transparent: true,
+    opacity: 0.85,
+    blending: THREE.AdditiveBlending
+  });
+  const auraMesh = new THREE.Mesh(auraGeo, auraMat);
+  arcObj.add(auraMesh);
+
+  // 3. 放电接触点火花爆发球 (Sparks at endpoints)
+  const sparkGeo = new THREE.SphereGeometry(2.8 * intensity, 6, 6);
+  const sparkMat = new THREE.MeshBasicMaterial({ color: 0xffffff, blending: THREE.AdditiveBlending });
+  const s1 = new THREE.Mesh(sparkGeo, sparkMat); s1.position.copy(startVec);
+  const s2 = new THREE.Mesh(sparkGeo, sparkMat); s2.position.copy(endVec);
+  arcObj.add(s1); arcObj.add(s2);
+
+  lightningGroup.add(arcObj);
+
+  // 持续 360ms，高频频闪模拟真实电弧震颤
+  const startT = performance.now();
+  const duration = 360;
+  function stepArc() {
+    const elapsed = performance.now() - startT;
+    if (elapsed < duration) {
+      const p = 1.0 - elapsed / duration;
+      const flicker = (Math.random() * 0.4 + 0.6);
+      coreMat.opacity = p * 0.95 * flicker;
+      auraMat.opacity = p * 0.85 * flicker;
+      requestAnimationFrame(stepArc);
+    } else {
+      lightningGroup.remove(arcObj);
+      coreGeo.dispose();
+      coreMat.dispose();
+      auraGeo.dispose();
+      auraMat.dispose();
+      sparkGeo.dispose();
+      sparkMat.dispose();
+    }
+  }
+  stepArc();
+}
+
+// 触发大灭绝天幕雷暴击穿 (Mass Extinction Lightning Tempest)
+function triggerExtinctionLightningBurst() {
+  playChicxulubAtmosphericThunder();
+  const targetPoints = views.cells.map(v => new THREE.Vector3(v.cell.x, v.cell.y, v.cell.z));
+  if (targetPoints.length === 0) return;
+
+  const boltCount = 12;
+  for (let i = 0; i < boltCount; i++) {
+    setTimeout(() => {
+      const skyStart = new THREE.Vector3(
+        (Math.random() - 0.5) * 700,
+        450 + Math.random() * 180,
+        (Math.random() - 0.5) * 700
+      );
+      const target = targetPoints[Math.floor(Math.random() * targetPoints.length)].clone();
+      target.x += (Math.random() - 0.5) * 50;
+      target.y += (Math.random() - 0.5) * 50;
+      target.z += (Math.random() - 0.5) * 50;
+
+      const colors = [0x38bdf8, 0xa855f7, 0xf43f5e, 0xffffff];
+      spawnDielectricBreakdownArc(skyStart, target, colors[i % colors.length], 2.4);
+      playIonizationSpark(0.85);
+    }, i * 35);
+  }
+}
+
+function triggerExtinctionVisualShock() {
+  // 1. 全屏相变冲击波光晕
+  const shockEl = document.createElement("div");
+  shockEl.className = "screen-shockwave";
+  document.body.appendChild(shockEl);
+  setTimeout(() => shockEl.remove(), 800);
+
+  // 2. 触发空气介质雷暴音爆与群发天幕闪电
+  triggerExtinctionLightningBurst();
+
+  // 2. 3D 相机震颤与环境光爆发
+  if (typeof ambLight !== 'undefined' && typeof camera !== 'undefined') {
+    const origAmb = ambLight.intensity;
+    ambLight.intensity = Math.min(5.0, origAmb * 3.5);
+    let shakeCount = 20;
+    const origPos = camera.position.clone();
+    function doShake() {
+      if (shakeCount > 0) {
+        camera.position.x += (Math.random() - 0.5) * 14 * (shakeCount / 20);
+        camera.position.y += (Math.random() - 0.5) * 14 * (shakeCount / 20);
+        camera.position.z += (Math.random() - 0.5) * 14 * (shakeCount / 20);
+        ambLight.intensity = origAmb + (shakeCount / 20) * 2.5;
+        shakeCount--;
+        requestAnimationFrame(doShake);
+      } else {
+        camera.position.copy(origPos);
+        ambLight.intensity = origAmb;
+      }
+    }
+    doShake();
+  }
+}
+
+window.triggerChicxulubExtinction = async function() {
+  log("[EXTINCTION] 正在注入白垩纪大灭绝相变冲击算子 (抹杀 80% 成熟垄断拓扑)...", true);
+  triggerExtinctionVisualShock();
+  const btn = document.getElementById("btn-extinction-shock");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "[EXTINCTION] 大灭绝冲击波扩散中...";
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = "[EXTINCTION] 触发白垩纪大灭绝 (80% 头部抹杀)";
+    }, 1500);
+  }
+  const res = await sendBackendCommand("extinction", { wipeout_ratio: 0.8, shock_scale: 2.5 });
+  if (res && res.report) {
+    log(`[EXTINCTION] ${res.report.message}`, true);
+  }
+};
+
+const ORGAN_DESCRIPTIONS = {
+  "schmitt_damping_column": "施密特迟滞强抗震颤阻尼柱 (EMA滤波 + 双阈值迟滞比较，消除高频抖动)",
+  "prefrontal_executive_gate": "前额叶形式化防御阻断执行门 (防范恶意越界决策，提供不可违逆的形式化安全契约)",
+  "fast_fourier_sensory_pod": "快速高频差分微积分感知微囊 (微分提取突变斜率 + 积分稳态跟踪，捕捉非平稳冲击)",
+  "reflex_arc_fast_extensor": "脊髓反射弧快速伸肌单元 (小脑皮层毫秒级硬反馈短路回路，提供姿态回正保护)",
+  "quantum_entropy_sentinel": "量子极限环混沌熵哨兵 (极限环周期振荡器 + 非线性死区调制，监控红皇后熵增)"
+};
+
+window.onOrganSelectionChange = function() {
+  const sel = document.getElementById("sel-frozen-organ");
+  const descEl = document.getElementById("organ-preview-desc");
+  if (sel && descEl) {
+    const desc = ORGAN_DESCRIPTIONS[sel.value] || "成熟模块化冷冻器官";
+    descEl.textContent = desc;
+  }
+};
+
+window.triggerOrganSplice = async function() {
+  const sel = document.getElementById("sel-frozen-organ");
+  const organName = sel ? sel.value : "schmitt_damping_column";
+  log(`[VAULT] 正在从冷冻库借用剪裁器官【${organName}】并接入中枢网络...`, true);
+  const btn = document.getElementById("btn-splice-organ");
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "[SPLICE] 剪裁拼装中...";
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.textContent = "[SPLICE] 借用剪裁接入器官 (Exaptation Splice)";
+    }, 1200);
+  }
+  const res = await sendBackendCommand("splice", { name: organName });
+  if (res && res.message) {
+    log(`[SPLICE] ${res.message}`, true);
+  }
+};
+
+window.triggerLyapunovEnforce = async function() {
+  log("[PULSE] 正在施加自适应李雅普诺夫耗散阻尼，抑制非线性发散环路...", true);
+  const res = await sendBackendCommand("lyapunov_enforce", { max_gain: 0.95 });
+  if (res && res.lyapunov) {
+    log(`[LYAPUNOV] 阻尼抑制已施加！最大环增益更新为: ${res.lyapunov.max_loop_gain} (稳定: ${res.lyapunov.is_stable ? 'YES' : 'NO'})`, true);
+  }
+};
 
 async function syncBackendState() {
+  if (wsConnected) return; // WebSocket 直连处于活跃状态，无须重复轮询
   if (isFetchingState) return;
   isFetchingState = true;
   try {
@@ -2507,16 +3353,16 @@ async function syncBackendState() {
         serverOnline = true;
         const srcEl = document.getElementById("src");
         if (srcEl) {
-          srcEl.textContent = "数据源: SDSCC 真实实时物理后端 (40Hz 连续推演)";
+          srcEl.textContent = "数据源: SDSCC 真实实时物理后端 (HTTP 轮询 40Hz 连续推演)";
           srcEl.style.color = "var(--emerald)";
           srcEl.style.background = "rgba(52,211,153,0.1)";
         }
-        log("已连接至 SDSCC 真实物理后端引擎 (40Hz 连续力场 + 24原语前向)", true);
+        log("已连接至 SDSCC 真实物理后端引擎 (HTTP 轮询 40Hz 连续力场 + 24原语前向)", true);
       }
       updateFromBackendState(data);
     }
   } catch (e) {
-    if (serverOnline) {
+    if (serverOnline && !wsConnected) {
       serverOnline = false;
       const srcEl = document.getElementById("src");
       if (srcEl) {
@@ -2604,6 +3450,86 @@ function updateFromBackendState(data) {
     
     const actImmune = document.getElementById("act-immune");
     if (actImmune) actImmune.classList.toggle("flash-immune", isLocked);
+  }
+
+  // 1.5 李雅普诺夫 BIBO 稳定性指标与盾牌徽章
+  if (data.lyapunov) {
+    const lyap = data.lyapunov;
+    const isStable = !!lyap.is_stable;
+    const maxGain = (lyap.max_loop_gain !== undefined ? lyap.max_loop_gain : 0).toFixed(3);
+    const cycles = lyap.cycles_count || 0;
+
+    const navGain = document.getElementById("nav-shield-gain");
+    if (navGain) navGain.textContent = maxGain;
+    const navIcon = document.getElementById("nav-shield-icon");
+    if (navIcon) navIcon.textContent = isStable ? "[BIBO]" : "[WARN]";
+    const navShield = document.getElementById("nav-lyapunov-shield");
+    if (navShield) {
+      navShield.style.color = isStable ? "var(--emerald)" : "var(--crimson)";
+      navShield.style.borderColor = isStable ? "rgba(52,211,153,0.35)" : "rgba(244,63,94,0.6)";
+      navShield.style.background = isStable ? "rgba(52,211,153,0.12)" : "rgba(244,63,94,0.2)";
+      navShield.classList.toggle("lyapunov-unstable-pulse", !isStable);
+    }
+
+    const stGain = document.getElementById("st-lyapunov-gain");
+    if (stGain) {
+      stGain.textContent = maxGain;
+      stGain.style.color = isStable ? "var(--emerald)" : "var(--crimson)";
+    }
+    const stCycles = document.getElementById("st-lyapunov-cycles");
+    if (stCycles) stCycles.textContent = cycles;
+    const stBadge = document.getElementById("st-lyapunov-badge");
+    if (stBadge) {
+      stBadge.textContent = isStable ? "BIBO STABLE" : "UNSTABLE GAIN";
+      stBadge.style.color = isStable ? "var(--emerald)" : "var(--crimson)";
+      stBadge.style.background = isStable ? "rgba(52,211,153,0.15)" : "rgba(244,63,94,0.2)";
+    }
+    const cardLyap = document.getElementById("card-evolution-axioms");
+    if (cardLyap) {
+      cardLyap.style.borderLeftColor = isStable ? "var(--emerald)" : "var(--crimson)";
+    }
+    const stShieldIcon = document.getElementById("st-shield-icon");
+    if (stShieldIcon) stShieldIcon.textContent = isStable ? "[BIBO]" : "[WARN]";
+  }
+
+  // 1.6 超细胞微柱 (Symbiotic Macro-Cells) 数量与标记
+  if (data.symbiotic_macro_cells) {
+    const macroCount = data.symbiotic_macro_cells_count || data.symbiotic_macro_cells.length;
+    const stMacroCount = document.getElementById("st-macro-count");
+    if (stMacroCount) stMacroCount.textContent = `${macroCount} 个微柱`;
+
+    const container = document.getElementById("macro-cells-badges");
+    if (container && org.lastMacroCount !== macroCount) {
+      org.lastMacroCount = macroCount;
+      container.innerHTML = "";
+      data.symbiotic_macro_cells.forEach(mc => {
+        const badge = document.createElement("span");
+        badge.className = "macro-badge";
+        badge.style.borderColor = mc.color || "var(--cyan)";
+        badge.style.color = mc.color || "var(--cyan)";
+        badge.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${mc.color||'var(--cyan)'}"></span>${mc.label} (${mc.cells_count}胞)`;
+        badge.title = `微柱ID: ${mc.id}\n内部元胞: ${mc.cells_count} 个\n感知输入端口: [${mc.sensory_ports?.join(',')||'无'}]\n效应输出端口: [${mc.effector_ports?.join(',')||'无'}]`;
+        badge.onclick = () => {
+          log(`[MACRO_FOCUS] 对焦超细胞共生微柱【${mc.label}】(${mc.cells_count} 内部元胞)`, true);
+        };
+        container.appendChild(badge);
+      });
+    }
+  }
+
+  // 1.7 接收到白垩纪大灭绝事件
+  if (data.last_extinction && data.last_extinction.triggered) {
+    const ext = data.last_extinction;
+    if (lastExtinctionTs !== ext.timestamp) {
+      lastExtinctionTs = ext.timestamp;
+      const repEl = document.getElementById("extinction-impact-report");
+      if (repEl) {
+        repEl.style.display = "block";
+        repEl.innerHTML = `<b>[EXTINCTION] 冲击波已生效:</b> 抹杀 <b>${ext.wiped_synapses_count}</b> 垄断突触，保留 <b>${ext.survivors_count}</b> 幸存体，增益: ${ext.pre_extinction_gain} &rarr; <b>${ext.post_extinction_gain}</b>`;
+      }
+      log(`[白垩纪大灭绝] ${ext.message}`, true);
+      triggerExtinctionVisualShock();
+    }
   }
 
   // 2. 平滑插值更新元胞 3D 坐标与放电电位 (零 GC 对象复用)
@@ -2740,6 +3666,48 @@ function animate(){
       if(!v.step(dt)){ v.dispose(); radRays.delete(id); }
     }
   }
+
+    // 连续相流体微粒与布朗对流模拟 (Multiphase Fluid Dynamics Step)
+  if (typeof airParticleCloud !== 'undefined' && airGeo && airParticleCloud.visible) {
+    const posAttr = airGeo.attributes.position;
+    const arr = posAttr.array;
+    const isHydro = (currentFluidPhase === 'hydro');
+    const speedMult = isHydro ? 0.35 : 1.0;
+    const buoyancy = isHydro ? 0.42 : 0.15;
+
+    for (let i = 0; i < AIR_PARTICLE_COUNT; i++) {
+      arr[i*3]   += airVel[i*3] * speedMult + (isHydro ? Math.cos(now * 0.0008 + i) * 0.12 : 0);
+      arr[i*3+1] += (airVel[i*3+1] * speedMult + buoyancy) + Math.sin(now * 0.001 + i) * 0.06;
+      arr[i*3+2] += airVel[i*3+2] * speedMult;
+
+      if (arr[i*3] > 600) arr[i*3] = -600;
+      if (arr[i*3] < -600) arr[i*3] = 600;
+      if (arr[i*3+1] > 450) arr[i*3+1] = -450;
+      if (arr[i*3+1] < -450) arr[i*3+1] = 450;
+      if (arr[i*3+2] > 600) arr[i*3+2] = -600;
+      if (arr[i*3+2] < -600) arr[i*3+2] = 600;
+    }
+    posAttr.needsUpdate = true;
+  }
+
+  // 空气介质高频电离电弧微放电巡检 (Continuous Dielectric Breakdown in Air Medium)
+  const dischargeProb = plasmaStormActive ? 0.28 : 0.07;
+  if (views && views.cells && views.cells.length > 2 && Math.random() < dischargeProb) {
+    const c1 = views.cells[Math.floor(Math.random() * views.cells.length)];
+    const c2 = views.cells[Math.floor(Math.random() * views.cells.length)];
+    if (c1 !== c2) {
+      const v1 = new THREE.Vector3(c1.cell.x, c1.cell.y, c1.cell.z);
+      const v2 = new THREE.Vector3(c2.cell.x, c2.cell.y, c2.cell.z);
+      const dist = v1.distanceTo(v2);
+      if (dist > 20 && dist < 260) {
+        const colors = [0x38bdf8, 0xa855f7, 0x00f0ff, 0xfbbf24];
+        const col = colors[Math.floor(Math.random() * colors.length)];
+        spawnDielectricBreakdownArc(v1, v2, col, 1.0);
+        playIonizationSpark(0.35);
+      }
+    }
+  }
+
   renderer.render(scene, camera);
 }
 
@@ -2951,82 +3919,145 @@ window.highlightBookSubcircuit = function(bookId, title, organismName) {
     leaf.classList.toggle('active-leaf', leaf.dataset.bookId === bookId);
   });
 
-  // 1. 确定该典籍对应的特定细胞簇与突触特征色彩
+  // 1. 确定该典籍对应的特定细胞簇，统一使用璀璨纯正黄金色 (Radiant Pure 24K Gold: #fbbf24 / 0xfbbf24)
   let targetCells = [];
-  let targetColor = 0xfbbf24; // 黄金光芒
+  const targetColor = 0xfbbf24; // 统一纯正耀眼金黄色
 
   if (bookId.includes("quant")) {
     targetCells = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 20, 21, 22, 23, 24];
-    targetColor = 0x10b981; // 翠绿量化动量
   } else if (bookId.includes("vehicle") || bookId.includes("adas")) {
     targetCells = [16, 17, 18, 19, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35];
-    targetColor = 0x38bdf8; // 智驾电光青
   } else if (bookId.includes("arithmetic") || bookId.includes("math")) {
     targetCells = [56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70];
-    targetColor = 0xa855f7; // 纯符号紫晶
   } else if (bookId.includes("laokexia")) {
     targetCells = Array.from({length: 96}, (_, i) => i);
-    targetColor = 0xf43f5e; // 十亿张量赤红
   } else if (bookId.includes("loco") || bookId.includes("cpg")) {
     targetCells = [0, 1, 2, 3, 4, 8, 9, 10, 11, 16, 17, 18, 19];
-    targetColor = 0xf59e0b; // 动力学琥珀
   } else if (bookId.includes("maze")) {
     targetCells = [20, 21, 22, 23, 24, 30, 31, 32, 40, 41, 42];
-    targetColor = 0x10b981; // 迷宫新奇绿
   } else if (bookId.includes("immune")) {
     targetCells = [10, 11, 12, 13, 25, 26, 27, 45, 46, 47];
-    targetColor = 0xa855f7; // 免疫淋巴紫
   } else if (bookId.includes("slingshot")) {
     targetCells = [3, 4, 5, 15, 16, 17, 35, 36, 37];
-    targetColor = 0x38bdf8; // 引力势阱青
   } else {
     targetCells = [0, 1, 2, 3, 10, 11, 20, 21, 30, 31];
-    targetColor = 0xfbbf24;
   }
 
   const targetSet = new Set(targetCells);
 
-  // 2. 将非目标细胞保留清晰可见基准透明度 (0.40)，将目标细胞强力高光点亮 (0.95)
+  // 2. 镜头平滑拉近至微观高亮尺度 (camR = 250)，保证实体细胞质膜与核质金光 100% 显现
+  let sumX = 0, sumY = 0, sumZ = 0, cnt = 0;
   for (const v of views.cells) {
     if (targetSet.has(v.cell.id)) {
-      v.membrane.material.color.setHex(targetColor);
-      v.membrane.material.opacity = 0.95;
-      v.cell.glow = 1.0;
+      sumX += v.cell.x; sumY += v.cell.y; sumZ += v.cell.z;
+      cnt++;
+    }
+  }
+  if (cnt > 0) {
+    targetLookAt.set(sumX / cnt, sumY / cnt, sumZ / cnt);
+    targetCamR = 240;
+    isCamTransitioning = true;
+  }
+
+  // 3. 点光源瞬间切换为纯金黄光芒并增强辐射
+  if (typeof cellPointLight !== 'undefined') {
+    cellPointLight.color.setHex(0xfbbf24);
+    cellPointLight.intensity = 3.6;
+  }
+
+  // 4. 将目标细胞赋予浓烈纯金辉光，非目标细胞大幅压暗透明度至 0.08 (15:1 极限高反差)
+  for (const v of views.cells) {
+    if (targetSet.has(v.cell.id)) {
+      v.membrane.material.color.setHex(0xfbbf24);
+      v.membrane.material.opacity = 1.0;
+      v.cell.glow = 3.5;
+      if (v.membraneMesh && v.membraneMesh.material) {
+        v.membraneMesh.material.color.setHex(0xfbbf24);
+        v.membraneMesh.material.emissive.setHex(0xf59e0b);
+        v.membraneMesh.material.emissiveIntensity = 2.8;
+      }
+      if (v.nucleus && v.nucleus.material) {
+        v.nucleus.material.color.setHex(0xffffff);
+        v.nucleus.material.emissive.setHex(0xfbbf24);
+        v.nucleus.material.emissiveIntensity = 3.2;
+      }
     } else {
       const fam = FAMILY(v.cell.type);
       v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
-      v.membrane.material.opacity = 0.40;
+      v.membrane.material.opacity = 0.08;
     }
   }
 
-  // 3. 将属于目标回路的突触轴突全速爆发金光动作电位，非目标突触保留可见底色 (0.35)
+  // 5. 将属于目标回路的突触轴突与光子全量爆发为 24K 耀眼金光，非目标突触压暗至 0.04
   for (const v of views.syns) {
     const isTarget = targetSet.has(v.syn.from) || targetSet.has(v.syn.to);
     if (isTarget) {
       v.lineMat.color.setHex(0xfbbf24);
       v.lineMat.opacity = 1.0;
-      v.photon1.material.color.setHex(0xfbbf24);
-      v.photon2.material.color.setHex(targetColor);
+      v.photon1.material.color.setHex(0xffffff);
+      v.photon2.material.color.setHex(0xfbbf24);
+      v.photon1.material.opacity = 1.0;
+      v.photon2.material.opacity = 1.0;
     } else {
-      v.lineMat.opacity = 0.35;
+      v.lineMat.opacity = 0.04;
+      v.photon1.material.opacity = 0.08;
+      v.photon2.material.opacity = 0.08;
     }
   }
 
-  // 4. 3.5 秒后平滑恢复整脑常态呼吸
+  // 6. 宏观点云流形 (lodPointsMesh) 同步注入金黄高光色相
+  if (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.color) {
+    const colAttr = lodPointsMesh.geometry.attributes.color;
+    const colArr = colAttr.array;
+    for (let i = 0; i < org.cells.length; i++) {
+      const cid = org.cells[i].id;
+      if (targetSet.has(cid)) {
+        colArr[i*3] = 1.0; colArr[i*3+1] = 0.75; colArr[i*3+2] = 0.14; // 金黄光辉
+      } else {
+        colArr[i*3] *= 0.15; colArr[i*3+1] *= 0.15; colArr[i*3+2] *= 0.15;
+      }
+    }
+    colAttr.needsUpdate = true;
+  }
+
+  // 7. 4.5 秒后平滑恢复整脑常态呼吸
   setTimeout(() => {
+    if (typeof cellPointLight !== 'undefined') {
+      cellPointLight.color.setHex(0x00f0ff);
+      cellPointLight.intensity = 1.6;
+    }
     for (const v of views.syns) {
       const w = v.syn.w || 1.0;
       v.lineMat.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);
       v.lineMat.opacity = 0.6;
       v.photon1.material.color.setHex(0x38bdf8);
       v.photon2.material.color.setHex(0xa855f7);
+      v.photon1.material.opacity = 0.8;
+      v.photon2.material.opacity = 0.8;
     }
     for (const v of views.cells) {
       const fam = FAMILY(v.cell.type);
       v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
       v.membrane.material.opacity = 0.4;
+      v.cell.glow = 0.0;
+      if (v.membraneMesh && v.membraneMesh.material) {
+        v.membraneMesh.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
+        v.membraneMesh.material.emissive.setHex(0x000000);
+        v.membraneMesh.material.emissiveIntensity = 0.25;
+      }
     }
-  }, 3500);
+    if (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.color) {
+      const colAttr = lodPointsMesh.geometry.attributes.color;
+      const colArr = colAttr.array;
+      for (let i = 0; i < org.cells.length; i++) {
+        const fam = FAMILY(org.cells[i].type);
+        const colHex = FAMILY_COLOR[fam] || 0x38bdf8;
+        const cObj = new THREE.Color(colHex);
+        colArr[i*3] = cObj.r; colArr[i*3+1] = cObj.g; colArr[i*3+2] = cObj.b;
+      }
+      colAttr.needsUpdate = true;
+    }
+  }, 4500);
 };
 
 // 8.5 硅基生命体神经对话舱交互 (Silicon Neural Dialogue Deck)

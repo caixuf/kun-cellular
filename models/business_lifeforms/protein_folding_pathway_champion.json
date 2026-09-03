@@ -26,8 +26,8 @@
   "sample_dialogue": "以 2500 万细胞模拟非线性自由能漏斗景观（Folding Funnel），克服构象采样 Levinthal 悖论，毫秒级自发折叠出天然活性结构。",
   "training_metadata": {
     "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-    "training_time_sec": 0.155,
-    "peak_throughput_mcells": 1610.3,
+    "training_time_sec": 0.156,
+    "peak_throughput_mcells": 1602.9,
     "convergence_score": 0.9982
   }
 }

@@ -188,6 +188,319 @@ private:
 };
 
 /**
+ * @brief 斗地主非完全信息不确定性对抗博弈环境 (DouDiZhuCardGameTask)
+ * 验证: 3 人博弈（1 地主 vs 2 农民）、记牌（延迟记忆）、压牌与让牌决策（门控逻辑）
+ */
+class DouDiZhuCardGameTask : public EvolvableTask {
+public:
+    explicit DouDiZhuCardGameTask(int max_rounds = 40, uint32_t seed = 42)
+        : max_rounds_(max_rounds), rng_(seed) {
+        reset(seed);
+    }
+
+    const char* name() const override { return "DouDiZhu-ImperfectInfoGame"; }
+    size_t obs_dim() const override { return 4; } // [己方手牌点数均值, 己方剩余张数比率, 场上上家牌力, 历史出牌强度]
+    size_t act_dim() const override { return 2; } // 0: 过 (Pass), 1: 出牌 (Play)
+
+    void reset(uint32_t episode_seed) override {
+        rng_.seed(episode_seed);
+        agent_hand_strength_ = std::uniform_real_distribution<float>(0.3f, 0.9f)(rng_);
+        agent_cards_left_ = 17;
+        opp_cards_left_ = 17;
+        table_card_strength_ = 0.0f;
+        played_history_intensity_ = 0.0f;
+        round_count_ = 0;
+        agent_won_ = false;
+        total_wins_ = 0;
+        games_played_ = 0;
+    }
+
+    std::vector<float> current_observation() const override {
+        return {
+            agent_hand_strength_,
+            static_cast<float>(agent_cards_left_) / 20.0f,
+            table_card_strength_,
+            played_history_intensity_
+        };
+    }
+
+    StepResult step(int action) override {
+        round_count_++;
+        double reward = 0.0;
+        bool done = false;
+
+        // action: 0 = Pass, 1 = Play
+        if (action == 1) { // 尝试出牌压制
+            if (table_card_strength_ == 0.0f || agent_hand_strength_ >= table_card_strength_) {
+                // 出牌成功
+                float play_val = std::min(agent_hand_strength_, table_card_strength_ + 0.15f);
+                table_card_strength_ = play_val;
+                agent_cards_left_ -= std::uniform_int_distribution<int>(1, 2)(rng_);
+                played_history_intensity_ += play_val * 0.2f;
+                reward += 1.5;
+            } else {
+                // 违规越级出牌或牌力不足惩罚
+                reward -= 1.0;
+            }
+        } else { // Pass
+            if (table_card_strength_ > 0.0f && agent_hand_strength_ < table_card_strength_) {
+                // 明智让牌/过牌，节省大牌
+                reward += 0.8;
+            } else if (table_card_strength_ == 0.0f) {
+                // 首发随意过牌罚分
+                reward -= 0.5;
+            }
+        }
+
+        // 模拟对手 (农民联手/地主) 策略反馈
+        if (std::uniform_real_distribution<float>(0.0f, 1.0f)(rng_) > 0.45f) {
+            float opp_play = std::uniform_real_distribution<float>(0.2f, 0.95f)(rng_);
+            if (opp_play > table_card_strength_) {
+                table_card_strength_ = opp_play;
+                opp_cards_left_ -= std::uniform_int_distribution<int>(1, 2)(rng_);
+                played_history_intensity_ += opp_play * 0.15f;
+            } else {
+                table_card_strength_ = 0.0f; // 对手要不起，清台
+            }
+        } else {
+            table_card_strength_ = 0.0f; // 对手过牌，清台
+        }
+
+        if (agent_cards_left_ <= 0) {
+            agent_won_ = true;
+            reward += 10.0;
+            done = true;
+            total_wins_++;
+        } else if (opp_cards_left_ <= 0 || round_count_ >= max_rounds_) {
+            agent_won_ = false;
+            reward -= 5.0;
+            done = true;
+        }
+
+        games_played_++;
+
+        StepResult res;
+        res.obs = current_observation();
+        res.reward = reward;
+        res.done = done;
+        res.success = agent_won_;
+        res.steps = round_count_;
+        res.min_dist_to_goal = static_cast<double>(agent_cards_left_);
+        return res;
+    }
+
+    StepResult step_continuous(const CellularOrganism::ActionOutputs& acts) override {
+        int act = (acts.positive_action >= acts.negative_action) ? 1 : 0;
+        return step(act);
+    }
+
+    double current_fitness() const override {
+        double win_rate = static_cast<double>(total_wins_) / std::max(1, games_played_);
+        return win_rate * 100.0;
+    }
+
+private:
+    int max_rounds_{40};
+    int round_count_{0};
+    float agent_hand_strength_{0.5f};
+    int agent_cards_left_{17};
+    int opp_cards_left_{17};
+    float table_card_strength_{0.0f};
+    float played_history_intensity_{0.0f};
+    bool agent_won_{false};
+    int total_wins_{0};
+    int games_played_{0};
+    std::mt19937 rng_;
+};
+
+/**
+ * @brief 智驾极限交互拓扑工况任务 (UnprotectedIntersectionTask)
+ * 涵盖：无保护左转博弈、无保护右转穿流、窄路多把掉头（U-Turn）、动态对向车博弈避让
+ */
+class UnprotectedIntersectionTask : public EvolvableTask {
+public:
+    enum class ManeuverType : uint8_t {
+        UNPROTECTED_LEFT_TURN = 0,  // 无保护左转 (穿行对向车流)
+        UNPROTECTED_RIGHT_TURN = 1, // 无保护右转 (汇入直行车流)
+        MULTI_POINT_U_TURN = 2      // 窄路多把掉头 (D/R 换挡与极限舵角)
+    };
+
+    explicit UnprotectedIntersectionTask(int max_steps = 150, uint32_t seed = 42)
+        : max_steps_(max_steps), rng_(seed) {
+        reset(seed);
+    }
+
+    const char* name() const override { return "UnprotectedIntersection-ComplexManeuver"; }
+    size_t obs_dim() const override { return 6; } // [横向偏差 cte, 航向偏差 d_psi, 纵向车速 v, 对向车TTC, 目标曲率 kappa, 剩余机动距离]
+    size_t act_dim() const override { return 2; } // [方向盘转角 steer, 纵向加速度 a/油门刹车]
+
+    void reset(uint32_t episode_seed) override {
+        rng_.seed(episode_seed);
+        step_count_ = 0;
+        collision_ = false;
+        reached_target_ = false;
+        
+        // 随机选择当前机动工况
+        uint8_t m_val = std::uniform_int_distribution<uint8_t>(0, 2)(rng_);
+        maneuver_ = static_cast<ManeuverType>(m_val);
+
+        x_ = 0.0f;
+        y_ = 0.0f;
+        psi_ = 0.0f;
+        v_ = 4.0f;
+        cte_ = 0.0f;
+        
+        if (maneuver_ == ManeuverType::UNPROTECTED_LEFT_TURN) {
+            target_psi_ = 1.5708f; // 90度左转
+            target_x_ = 25.0f;
+            target_y_ = 25.0f;
+            oncoming_ttc_ = std::uniform_real_distribution<float>(1.8f, 5.0f)(rng_);
+            target_kappa_ = 0.08f;
+        } else if (maneuver_ == ManeuverType::UNPROTECTED_RIGHT_TURN) {
+            target_psi_ = -1.5708f; // 90度右转
+            target_x_ = 15.0f;
+            target_y_ = -15.0f;
+            oncoming_ttc_ = std::uniform_real_distribution<float>(2.2f, 6.0f)(rng_);
+            target_kappa_ = -0.12f;
+        } else { // U-Turn
+            target_psi_ = 3.14159f; // 180度掉头
+            target_x_ = -5.0f;
+            target_y_ = 12.0f;
+            oncoming_ttc_ = 8.0f;
+            target_kappa_ = 0.22f; // 极大曲率
+        }
+    }
+
+    std::vector<float> current_observation() const override {
+        float d_psi = target_psi_ - psi_;
+        while (d_psi > 3.14159f) d_psi -= 6.28318f;
+        while (d_psi < -3.14159f) d_psi += 6.28318f;
+
+        float dist_rem = std::hypot(target_x_ - x_, target_y_ - y_);
+        return {
+            std::clamp(cte_ / 5.0f, -1.0f, 1.0f),
+            std::clamp(d_psi / 3.14159f, -1.0f, 1.0f),
+            std::clamp(v_ / 10.0f, 0.0f, 1.0f),
+            std::clamp(oncoming_ttc_ / 6.0f, 0.0f, 1.0f),
+            std::clamp(target_kappa_ / 0.25f, -1.0f, 1.0f),
+            std::clamp(dist_rem / 40.0f, 0.0f, 1.0f)
+        };
+    }
+
+    StepResult step(int action) override {
+        // 离散映射: 0: 减速让行并向目标打舵, 1: 加速抢越并跟踪轨迹
+        float steer = (target_kappa_ > 0) ? 0.35f : -0.35f;
+        float accel = (action == 1) ? 1.5f : -2.5f;
+        return step_internal(steer, accel);
+    }
+
+    StepResult step_continuous(const CellularOrganism::ActionOutputs& acts) override {
+        float steer = static_cast<float>(acts.positive_action - acts.negative_action);
+        float accel = static_cast<float>(acts.positive_action * 2.5 - acts.defensive_action * 4.0);
+        return step_internal(steer, accel);
+    }
+
+    double current_fitness() const override {
+        double fit = reached_target_ ? 100.0 : 0.0;
+        fit -= std::hypot(target_x_ - x_, target_y_ - y_) * 1.5;
+        if (collision_) fit -= 80.0;
+        return std::max(0.0, fit);
+    }
+
+private:
+    StepResult step_internal(float steer, float accel) {
+        step_count_++;
+        float dt = 0.1f;
+
+        // 动力学自行车单轨模型积分
+        float L = 2.8f;
+        v_ = std::clamp(v_ + accel * dt, 0.0f, 12.0f);
+        x_ += v_ * std::cos(psi_) * dt;
+        y_ += v_ * std::sin(psi_) * dt;
+        psi_ += (v_ / L) * std::tan(std::clamp(steer, -0.6f, 0.6f)) * dt;
+
+        // 对向车运动与 TTC 衰减
+        oncoming_ttc_ -= dt;
+        if (oncoming_ttc_ < 0.4f && oncoming_ttc_ > -0.4f) {
+            // 对向车刚好到达冲突点
+            if (std::abs(y_ - 10.0f) < 3.0f && v_ > 2.0f) {
+                collision_ = true;
+            }
+        }
+
+        float dist_rem = std::hypot(target_x_ - x_, target_y_ - y_);
+        float d_psi = std::abs(target_psi_ - psi_);
+        while (d_psi > 3.14159f) d_psi -= 6.28318f;
+        d_psi = std::abs(d_psi);
+
+        if (dist_rem < 2.5f && d_psi < 0.35f) {
+            reached_target_ = true;
+        }
+
+        bool done = reached_target_ || collision_ || (step_count_ >= max_steps_);
+        double reward = 0.0;
+        if (reached_target_) reward += 50.0;
+        if (collision_) reward -= 100.0;
+        reward -= dist_rem * 0.1;
+        reward -= d_psi * 0.2;
+
+        StepResult res;
+        res.obs = current_observation();
+        res.reward = reward;
+        res.done = done;
+        res.success = reached_target_ && !collision_;
+        res.steps = step_count_;
+        res.min_dist_to_goal = dist_rem;
+        return res;
+    }
+
+    int max_steps_{150};
+    int step_count_{0};
+    ManeuverType maneuver_{ManeuverType::UNPROTECTED_LEFT_TURN};
+    float x_{0.0f}, y_{0.0f}, psi_{0.0f}, v_{4.0f}, cte_{0.0f};
+    float target_x_{25.0f}, target_y_{25.0f}, target_psi_{1.5708f}, target_kappa_{0.08f};
+    float oncoming_ttc_{3.0f};
+    bool collision_{false};
+    bool reached_target_{false};
+    std::mt19937 rng_;
+};
+
+        StepResult res;
+        res.obs = current_observation();
+        res.reward = reward;
+        res.done = done;
+        res.success = agent_won_;
+        res.steps = round_count_;
+        res.min_dist_to_goal = static_cast<double>(std::max(0, agent_cards_left_));
+        return res;
+    }
+
+    StepResult step_continuous(const CellularOrganism::ActionOutputs& acts) override {
+        int act = (acts.positive_action >= acts.negative_action) ? 1 : 0;
+        return step(act);
+    }
+
+    double current_fitness() const override {
+        double win_rate = (games_played_ > 0) ? (static_cast<double>(total_wins_) / games_played_) : 0.0;
+        double card_progress = static_cast<double>(17 - std::max(0, agent_cards_left_)) / 17.0;
+        return (win_rate * 60.0) + (card_progress * 40.0);
+    }
+
+private:
+    int max_rounds_{40};
+    int round_count_{0};
+    float agent_hand_strength_{0.5f};
+    int agent_cards_left_{17};
+    int opp_cards_left_{17};
+    float table_card_strength_{0.0f};
+    float played_history_intensity_{0.0f};
+    bool agent_won_{false};
+    int total_wins_{0};
+    int games_played_{0};
+    std::mt19937 rng_;
+};
+
+/**
  * @brief 跨域 Few-Shot 迁移学习加速比评测器 (CrossDomainTransferEvaluator)
  * 验证: 预演化母体网络迁移到新任务的收敛代数 vs 从零随机初始化的收敛代数
  * 门禁: 迁移加速比 (Transfer Speedup Ratio) > 1.5x

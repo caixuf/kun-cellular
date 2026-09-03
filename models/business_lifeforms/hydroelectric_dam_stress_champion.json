@@ -26,8 +26,8 @@
   "sample_dialogue": "融合 300 米级特高拱坝内部上万支光纤应变测点，实时计算坝体李雅普诺夫弹性稳定包络线，实现百年一遇洪峰智能平抑。",
   "training_metadata": {
     "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-    "training_time_sec": 0.155,
-    "peak_throughput_mcells": 1933.0,
+    "training_time_sec": 0.156,
+    "peak_throughput_mcells": 1925.0,
     "convergence_score": 0.9982
   }
 }

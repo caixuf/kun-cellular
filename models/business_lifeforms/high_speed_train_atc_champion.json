@@ -26,8 +26,8 @@
   "sample_dialogue": "在 350km/h 极速运行与雨雪低粘着恶劣天气下，自组织调整轮轨蠕滑力，实现平稳加减速与停站对标精度小于 5 毫米。",
   "training_metadata": {
     "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-    "training_time_sec": 0.156,
-    "peak_throughput_mcells": 962.8,
+    "training_time_sec": 0.157,
+    "peak_throughput_mcells": 956.9,
     "convergence_score": 0.9982
   }
 }

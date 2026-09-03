@@ -1,9 +1,47 @@
 {
   "version": "2.0.0",
   "system": "Software-Defined Silicon Cellular Computer (SDSCC)",
-  "total_lifeforms": 12,
-  "total_active_cells": 315000000,
+  "total_lifeforms": 13,
+  "total_active_cells": 415000000,
   "lifeforms": [
+    {
+      "id": "apex_unified_driving_brain",
+      "name": "Apex 全场景统一智驾超级大脑生命体",
+      "domain": "全域自动驾驶与高阶神经认知合体中枢",
+      "cells_scale": 100000000,
+      "input_signals": [
+        "全向高精激光点云稠密流",
+        "多目立体视觉语义占用栅格",
+        "动态交通参与者TTC与意图场",
+        "道路拓扑曲率与高精导航参考线",
+        "底盘轮速/横摆角速度/俯仰状态"
+      ],
+      "action_outputs": [
+        "底盘前轮阿克曼转向闭环控制",
+        "驱动电机正反转力矩分配",
+        "电控制动毫秒级防抱死压力",
+        "全景博弈让行与穿流窗口裁决",
+        "D/R挡位自主切换与泊车掉头"
+      ],
+      "primitive_motif": [
+        "OP_EMA",
+        "OP_INTEGRAL",
+        "OP_DIFF",
+        "GATE_HYSTERESIS",
+        "GATE_DEADZONE",
+        "GATE_INHIBIT",
+        "ACT_PRIMARY_POSITIVE",
+        "ACT_IMMUNE_BLOCK",
+        "ACT_DEFENSIVE_RESET"
+      ],
+      "sample_dialogue": "融合 5 大专业功能柱，将微操循迹反射、无保护左右转穿流博弈、6米狭窄路段掉头与前额叶全局态势评估合体为单一 1 亿细胞统一流形，全场景零切换延迟。",
+      "training_metadata": {
+        "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
+        "training_time_sec": 0.9,
+        "peak_throughput_mcells": 111.12,
+        "convergence_score": 0.9999
+      }
+    },
     {
       "id": "medical_ecg_arrhythmia",
       "name": "心律失常与房颤微秒级预警生命体",
@@ -32,8 +70,8 @@
       "sample_dialogue": "实时解算 12 导联心电 P-QRS-T 毫秒级形态发生，基于 R-R 间期香农熵在 0.8 微秒内锁定阵发性房颤早期畸变信号。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.382,
-        "peak_throughput_mcells": 261.6,
+        "training_time_sec": 0.35,
+        "peak_throughput_mcells": 285.4,
         "convergence_score": 0.9982
       }
     },
@@ -65,8 +103,8 @@
       "sample_dialogue": "基于电化学极化阻抗与三维热动力学传导方程，在电芯内部析锂微短路初生阶段实现毫秒级自愈降载与热阻断。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.155,
-        "peak_throughput_mcells": 645.7,
+        "training_time_sec": 0.156,
+        "peak_throughput_mcells": 642.5,
         "convergence_score": 0.9982
       }
     },
@@ -98,8 +136,8 @@
       "sample_dialogue": "以 2000 万物理元胞模拟电网转动惯量与电磁暂态，实现工频偏差 $\\Delta f < 0.015\\text{Hz}$ 极限刚性保频。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.155,
-        "peak_throughput_mcells": 1286.7,
+        "training_time_sec": 0.156,
+        "peak_throughput_mcells": 1284.4,
         "convergence_score": 0.9982
       }
     },
@@ -132,7 +170,7 @@
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
         "training_time_sec": 0.155,
-        "peak_throughput_mcells": 965.8,
+        "peak_throughput_mcells": 965.7,
         "convergence_score": 0.9982
       }
     },
@@ -164,8 +202,8 @@
       "sample_dialogue": "5000 万细胞三维力场自组织映射 256 架无人机空间拓扑，在 GPS 拒止与复杂密林障碍中实现 0 碰撞自主穿越。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.155,
-        "peak_throughput_mcells": 3217.6,
+        "training_time_sec": 0.156,
+        "peak_throughput_mcells": 3214.8,
         "convergence_score": 0.9982
       }
     },
@@ -197,8 +235,8 @@
       "sample_dialogue": "在 3nm 环绕栅极 (GAA) 工艺中，基于单原子层材料剥离的光学发射光谱（OES）跃迁，将刻蚀过切误差控制在 0.2nm 以内。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.157,
-        "peak_throughput_mcells": 638.9,
+        "training_time_sec": 0.158,
+        "peak_throughput_mcells": 633.3,
         "convergence_score": 0.9982
       }
     },
@@ -230,8 +268,8 @@
       "sample_dialogue": "融合 300 米级特高拱坝内部上万支光纤应变测点，实时计算坝体李雅普诺夫弹性稳定包络线，实现百年一遇洪峰智能平抑。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.155,
-        "peak_throughput_mcells": 1933.0,
+        "training_time_sec": 0.156,
+        "peak_throughput_mcells": 1925.0,
         "convergence_score": 0.9982
       }
     },
@@ -263,8 +301,8 @@
       "sample_dialogue": "以亚纳秒级神经元算存一体回路实时抑制低频 1/f 磁通噪声，使超导量子比特相干寿命 $T_2^*$ 提升 3.4 倍。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.155,
-        "peak_throughput_mcells": 644.8,
+        "training_time_sec": 0.156,
+        "peak_throughput_mcells": 641.5,
         "convergence_score": 0.9982
       }
     },
@@ -296,8 +334,8 @@
       "sample_dialogue": "在马里亚纳海沟 10909 米挑战者深渊极限工况下，自适应抗衡复杂深海涡旋，实现厘米级海底微地形悬停采样。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.156,
-        "peak_throughput_mcells": 1285.1,
+        "training_time_sec": 0.157,
+        "peak_throughput_mcells": 1272.3,
         "convergence_score": 0.9982
       }
     },
@@ -330,7 +368,7 @@
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
         "training_time_sec": 0.156,
-        "peak_throughput_mcells": 6397.6,
+        "peak_throughput_mcells": 6424.2,
         "convergence_score": 0.9982
       }
     },
@@ -362,8 +400,8 @@
       "sample_dialogue": "在 350km/h 极速运行与雨雪低粘着恶劣天气下，自组织调整轮轨蠕滑力，实现平稳加减速与停站对标精度小于 5 毫米。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.156,
-        "peak_throughput_mcells": 962.8,
+        "training_time_sec": 0.157,
+        "peak_throughput_mcells": 956.9,
         "convergence_score": 0.9982
       }
     },
@@ -395,8 +433,8 @@
       "sample_dialogue": "以 2500 万细胞模拟非线性自由能漏斗景观（Folding Funnel），克服构象采样 Levinthal 悖论，毫秒级自发折叠出天然活性结构。",
       "training_metadata": {
         "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-        "training_time_sec": 0.155,
-        "peak_throughput_mcells": 1610.3,
+        "training_time_sec": 0.156,
+        "peak_throughput_mcells": 1602.9,
         "convergence_score": 0.9982
       }
     }

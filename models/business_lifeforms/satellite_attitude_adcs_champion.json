@@ -27,7 +27,7 @@
   "training_metadata": {
     "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
     "training_time_sec": 0.155,
-    "peak_throughput_mcells": 965.8,
+    "peak_throughput_mcells": 965.7,
     "convergence_score": 0.9982
   }
 }

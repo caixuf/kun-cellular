@@ -26,8 +26,8 @@
   "sample_dialogue": "在马里亚纳海沟 10909 米挑战者深渊极限工况下，自适应抗衡复杂深海涡旋，实现厘米级海底微地形悬停采样。",
   "training_metadata": {
     "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-    "training_time_sec": 0.156,
-    "peak_throughput_mcells": 1285.1,
+    "training_time_sec": 0.157,
+    "peak_throughput_mcells": 1272.3,
     "convergence_score": 0.9982
   }
 }

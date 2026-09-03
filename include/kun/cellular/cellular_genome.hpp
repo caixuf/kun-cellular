@@ -22,6 +22,8 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <functional>
+#include <queue>
 
 namespace kun {
 
@@ -1875,13 +1877,326 @@ public:
         return true;
     }
 
-    static CellularOrganism load_checkpoint_json(const std::string& filepath) {
-        std::ifstream ifs(filepath);
-        if (!ifs.is_open()) return CellularOrganism{};
-        std::stringstream buffer;
-        buffer << ifs.rdbuf();
-        return from_json(buffer.str());
+    // ========================================================================
+    // 7. 李雅普诺夫 BIBO 稳定性判定与自适应阻尼 (Lyapunov BIBO Stability Analyzer)
+    // 物理公理: 存在反馈环路的非线性动力系统若环增益 >= 1.0 且无耗散阻尼，必发生数值发散
+    // ========================================================================
+    struct LyapunovReport {
+        bool is_stable{true};
+        double max_loop_gain{0.0};
+        size_t detected_cycles_count{0};
+        std::vector<std::vector<uint32_t>> unstable_cycles;
+    };
+
+    static double get_cell_operator_gain(CellType t, double p1) {
+        (void)p1;
+        switch (t) {
+            case CellType::OP_EMA: return 0.85; // 指数衰减耗散
+            case CellType::GATE_HYSTERESIS: return 0.50; // 施密特迟滞强抗震颤
+            case CellType::GATE_DEADZONE: return 0.60;   // 死区滤波
+            case CellType::GATE_THRESHOLD: return 0.30;  // 阶跃开关
+            case CellType::OP_INTEGRAL: return 1.15;     // 累加器若无阻尼易发散
+            case CellType::OP_DIFF: return 1.35;         // 微分高频放大
+            case CellType::OP_SUM: return 1.0;
+            case CellType::OP_SUB: return 1.0;
+            case CellType::OP_MULTIPLY: return 1.0;
+            case CellType::OP_RATIO: return 1.0;
+            case CellType::OP_ABS: return 1.0;
+            case CellType::OP_QUADRATIC: return 1.0;
+            case CellType::OP_OSCILLATOR: return 0.95;   // 极限环自限
+            default: return 1.0;
+        }
     }
+
+    LyapunovReport check_lyapunov_stability() const {
+        LyapunovReport rep;
+        if (cells.empty() || synapses.empty()) return rep;
+
+        std::unordered_map<uint32_t, size_t> id_to_idx;
+        for (size_t i = 0; i < cells.size(); ++i) id_to_idx[cells[i].id] = i;
+
+        std::unordered_map<uint32_t, std::vector<std::pair<uint32_t, double>>> adj;
+        for (const auto& syn : synapses) {
+            if (!syn.is_active) continue;
+            if (id_to_idx.count(syn.from_cell_id) && id_to_idx.count(syn.to_cell_id)) {
+                adj[syn.from_cell_id].push_back({syn.to_cell_id, syn.weight});
+            }
+        }
+
+        std::unordered_map<uint32_t, int> visited;
+        std::vector<uint32_t> path;
+        std::vector<double> weights_path;
+
+        std::function<void(uint32_t)> dfs = [&](uint32_t u) {
+            visited[u] = 1;
+            path.push_back(u);
+
+            for (const auto& edge : adj[u]) {
+                uint32_t v = edge.first;
+                double w = edge.second;
+                weights_path.push_back(w);
+
+                if (visited[v] == 1) {
+                    rep.detected_cycles_count++;
+                    auto it = std::find(path.begin(), path.end(), v);
+                    size_t start_idx = std::distance(path.begin(), it);
+
+                    double cycle_gain = 1.0;
+                    bool has_dissipative_gate = false;
+                    std::vector<uint32_t> cycle_nodes;
+
+                    for (size_t k = start_idx; k < path.size(); ++k) {
+                        uint32_t cid = path[k];
+                        cycle_nodes.push_back(cid);
+                        const auto& cell = cells[id_to_idx.at(cid)];
+                        double node_gain = get_cell_operator_gain(cell.type, cell.param1);
+                        cycle_gain *= node_gain;
+                        if (cell.type == CellType::GATE_HYSTERESIS || 
+                            cell.type == CellType::GATE_DEADZONE ||
+                            cell.type == CellType::OP_EMA) {
+                            has_dissipative_gate = true;
+                        }
+                    }
+                    for (size_t k = start_idx; k < weights_path.size(); ++k) {
+                        cycle_gain *= std::fabs(weights_path[k]);
+                    }
+
+                    if (cycle_gain > rep.max_loop_gain) {
+                        rep.max_loop_gain = cycle_gain;
+                    }
+
+                    if (cycle_gain >= 1.0 && !has_dissipative_gate) {
+                        rep.is_stable = false;
+                        rep.unstable_cycles.push_back(cycle_nodes);
+                    }
+                } else if (visited[v] == 0) {
+                    dfs(v);
+                }
+                weights_path.pop_back();
+            }
+
+            path.pop_back();
+            visited[u] = 2;
+        };
+
+        for (const auto& c : cells) {
+            if (visited[c.id] == 0) {
+                dfs(c.id);
+            }
+        }
+
+        return rep;
+    }
+
+    void enforce_lyapunov_stability(double max_allowable_gain = 0.95) {
+        auto rep = check_lyapunov_stability();
+        if (rep.is_stable || rep.unstable_cycles.empty()) return;
+
+        for (const auto& cycle : rep.unstable_cycles) {
+            std::unordered_set<uint32_t> cycle_set(cycle.begin(), cycle.end());
+            for (auto& syn : synapses) {
+                if (!syn.is_active) continue;
+                if (cycle_set.count(syn.from_cell_id) && cycle_set.count(syn.to_cell_id)) {
+                    syn.weight *= (max_allowable_gain / std::max(1.0, rep.max_loop_gain));
+                    syn.initial_weight = syn.weight;
+                }
+            }
+        }
+        compile();
+    }
+
+    // 形式化风控连通性验证 (Inviolable Immune Path Reachability)
+    bool verify_immune_connectivity() const {
+        uint32_t immune_id = 0;
+        bool has_immune_block = false;
+        for (const auto& c : cells) {
+            if (c.type == CellType::ACT_IMMUNE_BLOCK) {
+                immune_id = c.id;
+                has_immune_block = true;
+                break;
+            }
+        }
+        if (!has_immune_block) return false;
+
+        std::unordered_map<uint32_t, std::vector<uint32_t>> adj;
+        for (const auto& syn : synapses) {
+            if (syn.is_active) {
+                adj[syn.from_cell_id].push_back(syn.to_cell_id);
+            }
+        }
+
+        for (const auto& c : cells) {
+            if (c.type == CellType::SENSE_RAW_INPUT_0 ||
+                c.type == CellType::SENSE_RAW_INPUT_1 ||
+                c.type == CellType::SENSE_RAW_INPUT_2 ||
+                c.type == CellType::SENSE_RAW_INPUT_3) {
+                std::unordered_set<uint32_t> visited;
+                std::vector<uint32_t> q = {c.id};
+                visited.insert(c.id);
+                size_t head = 0;
+                while (head < q.size()) {
+                    uint32_t curr = q[head++];
+                    if (curr == immune_id) return true;
+                    for (uint32_t nxt : adj[curr]) {
+                        if (visited.insert(nxt).second) {
+                            q.push_back(nxt);
+                        }
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    // ========================================================================
+    // 8. 原核到真核跃迁：超细胞共生封装 (Symbiotic Macro-Cell & Endosymbiosis)
+    // ========================================================================
+    struct SymbioticMacroCell {
+        uint32_t macro_id{0};
+        std::string label;
+        std::vector<uint32_t> internal_cell_ids;
+        std::vector<uint32_t> sensory_ports;
+        std::vector<uint32_t> effector_ports;
+    };
+    std::vector<SymbioticMacroCell> macro_cells;
+
+    bool form_symbiotic_macro_cell(const std::vector<uint32_t>& cluster_ids, const std::string& macro_label = "MacroCortex") {
+        if (cluster_ids.size() < 2) return false;
+        std::unordered_set<uint32_t> cluster_set(cluster_ids.begin(), cluster_ids.end());
+        for (uint32_t cid : cluster_ids) {
+            bool found = false;
+            for (const auto& c : cells) {
+                if (c.id == cid) { found = true; break; }
+            }
+            if (!found) return false;
+        }
+
+        SymbioticMacroCell mc;
+        mc.macro_id = static_cast<uint32_t>(macro_cells.size() + 1);
+        mc.label = macro_label;
+        mc.internal_cell_ids = cluster_ids;
+
+        for (const auto& syn : synapses) {
+            if (!syn.is_active) continue;
+            if (!cluster_set.count(syn.from_cell_id) && cluster_set.count(syn.to_cell_id)) {
+                mc.sensory_ports.push_back(syn.to_cell_id);
+            }
+            if (cluster_set.count(syn.from_cell_id) && !cluster_set.count(syn.to_cell_id)) {
+                mc.effector_ports.push_back(syn.from_cell_id);
+            }
+        }
+
+        macro_cells.push_back(std::move(mc));
+        return true;
+    }
+};
+
+// ============================================================================
+// 5.5 跨物种功能借用引擎与器官冷冻库 (Exaptation Engine & Organ Frozen Bank)
+// 理论原则: 进化不造新轮子，全靠旧零件改用途 (如听小骨来自下颌骨)
+// ============================================================================
+struct FrozenOrgan {
+    std::string name;
+    std::string domain;
+    std::vector<Cell> cells;
+    std::vector<Synapse> internal_synapses;
+    std::vector<uint32_t> input_ids;
+    std::vector<uint32_t> output_ids;
+};
+
+class OrganFrozenBank {
+public:
+    static OrganFrozenBank& instance() {
+        static OrganFrozenBank bank;
+        return bank;
+    }
+
+    void deposit(const std::string& name, const std::string& domain,
+                 const CellularOrganism& org, const std::vector<uint32_t>& cell_ids) {
+        FrozenOrgan organ;
+        organ.name = name;
+        organ.domain = domain;
+        std::unordered_set<uint32_t> cset(cell_ids.begin(), cell_ids.end());
+
+        for (const auto& c : org.cells) {
+            if (cset.count(c.id)) {
+                organ.cells.push_back(c);
+            }
+        }
+        for (const auto& s : org.synapses) {
+            if (s.is_active && cset.count(s.from_cell_id) && cset.count(s.to_cell_id)) {
+                organ.internal_synapses.push_back(s);
+            }
+        }
+        if (!organ.cells.empty()) {
+            organ.input_ids.push_back(organ.cells.front().id);
+            organ.output_ids.push_back(organ.cells.back().id);
+        }
+        vault_[name] = std::move(organ);
+    }
+
+    bool exaptation_splice(const std::string& name, CellularOrganism& target,
+                           uint32_t connect_from_sensor, uint32_t connect_to_actuator) {
+        auto it = vault_.find(name);
+        if (it == vault_.end()) return false;
+        const auto& organ = it->second;
+
+        uint32_t max_id = 0;
+        for (const auto& c : target.cells) max_id = std::max(max_id, c.id);
+
+        std::unordered_map<uint32_t, uint32_t> remap;
+        for (const auto& c : organ.cells) {
+            uint32_t new_id = ++max_id;
+            remap[c.id] = new_id;
+            Cell copied = c;
+            copied.id = new_id;
+            target.cells.push_back(copied);
+        }
+
+        for (const auto& s : organ.internal_synapses) {
+            Synapse syn = s;
+            syn.from_cell_id = remap[s.from_cell_id];
+            syn.to_cell_id = remap[s.to_cell_id];
+            target.synapses.push_back(syn);
+        }
+
+        if (!organ.input_ids.empty()) {
+            uint32_t target_in = remap[organ.input_ids.front()];
+            target.synapses.push_back({connect_from_sensor, target_in, 0, 1.0, true, 60.0f, -1.0f});
+        }
+        if (!organ.output_ids.empty()) {
+            uint32_t target_out = remap[organ.output_ids.back()];
+            target.synapses.push_back({target_out, connect_to_actuator, 0, 1.0, true, 60.0f, -1.0f});
+        }
+
+        target.compile();
+        return true;
+    }
+
+    bool has_organ(const std::string& name) const {
+        return vault_.find(name) != vault_.end();
+    }
+
+    std::vector<std::string> list_organs() const {
+        std::vector<std::string> names;
+        for (const auto& kv : vault_) names.push_back(kv.first);
+        return names;
+    }
+
+private:
+    OrganFrozenBank() {
+        FrozenOrgan damper;
+        damper.name = "schmitt_damping_column";
+        damper.domain = "universal_cybernetics";
+        Cell c1{1001, CellType::OP_EMA, 0.45, 0.0};
+        Cell c2{1002, CellType::GATE_HYSTERESIS, -0.3, 0.3};
+        damper.cells = {c1, c2};
+        damper.internal_synapses = {{1001, 1002, 0, 1.2, true, 60.0f, -1.0f}};
+        damper.input_ids = {1001};
+        damper.output_ids = {1002};
+        vault_[damper.name] = damper;
+    }
+    std::unordered_map<std::string, FrozenOrgan> vault_;
 };
 
 // ============================================================================
@@ -1960,6 +2275,61 @@ public:
     const EvolutionConstraintConfig& get_constraint_config() const { return constraint_cfg_; }
     EvolutionConstraintConfig& constraint_config() { return constraint_cfg_; }
     SeedInitMode get_init_mode() const { return constraint_cfg_.seed_mode; }
+
+    // ========================================================================
+    // 9. 白垩纪大灭绝算子 (Chicxulub Extinction Operator)
+    // 进化学原理: 恐龙不退场，哺乳类永为夜行小耗子。
+    // 当种群长期停滞内卷时，抹杀排名前 80% 的成熟垄断者，保留边缘奇异变异体并施加相变冲击
+    // ========================================================================
+    struct ChicxulubImpactReport {
+        uint32_t wiped_count{0};
+        uint32_t survivors_count{0};
+        double pre_extinction_best{0.0};
+        double post_extinction_best{0.0};
+        bool triggered{false};
+    };
+
+    ChicxulubImpactReport trigger_chicxulub_extinction(double wipeout_ratio = 0.8, double shock_scale = 2.5) {
+        ChicxulubImpactReport report;
+        if (population_.size() < 4) return report;
+
+        report.pre_extinction_best = population_[0].fitness_score;
+        size_t total = population_.size();
+        size_t wipe_count = static_cast<size_t>(total * std::clamp(wipeout_ratio, 0.5, 0.95));
+        size_t survivor_count = total - wipe_count;
+
+        std::vector<CellularOrganism> survivors;
+        for (size_t i = wipe_count; i < total; ++i) {
+            survivors.push_back(std::move(population_[i]));
+        }
+
+        for (auto& s : survivors) {
+            for (auto& syn : s.synapses) {
+                std::normal_distribution<double> dist_shock(0.0, shock_scale * 0.2);
+                syn.weight = std::clamp(syn.weight + dist_shock(rng_), -4.0, 4.0);
+            }
+            s.compile();
+        }
+
+        population_.clear();
+        for (auto& s : survivors) {
+            population_.push_back(s);
+        }
+        while (population_.size() < total) {
+            std::uniform_int_distribution<size_t> dist_s(0, survivors.size() - 1);
+            auto offspring = survivors[dist_s(rng_)];
+            mutate(offspring);
+            mutate(offspring);
+            population_.push_back(std::move(offspring));
+        }
+
+        stagnation_generations_ = 0;
+        adaptive_mutation_boost_ = shock_scale;
+        report.wiped_count = static_cast<uint32_t>(wipe_count);
+        report.survivors_count = static_cast<uint32_t>(survivor_count);
+        report.triggered = true;
+        return report;
+    }
 
     // ── 生物变异操作 1: 细胞分裂增殖 (Mitosis / Add Cell — 受资源预算与代谢平衡约束) ──
     bool mutate_add_cell(CellularOrganism& org) {
@@ -2468,8 +2838,8 @@ public:
     }
 
     CellularOrganism& get_champion() { return population_[0]; }
-    const CellularOrganism& get_champion() const { return population_[0]; }
     const std::vector<CellularOrganism>& get_population() const { return population_; }
+    std::vector<CellularOrganism>& get_population_mut() { return population_; }
     const std::vector<CellularOrganism>& population() const { return population_; }
     std::vector<CellularOrganism>& population() { return population_; }
     uint32_t get_stagnation_generations() const { return stagnation_generations_; }

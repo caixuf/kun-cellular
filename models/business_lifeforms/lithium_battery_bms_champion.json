@@ -26,8 +26,8 @@
   "sample_dialogue": "基于电化学极化阻抗与三维热动力学传导方程，在电芯内部析锂微短路初生阶段实现毫秒级自愈降载与热阻断。",
   "training_metadata": {
     "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-    "training_time_sec": 0.155,
-    "peak_throughput_mcells": 645.7,
+    "training_time_sec": 0.156,
+    "peak_throughput_mcells": 642.5,
     "convergence_score": 0.9982
   }
 }

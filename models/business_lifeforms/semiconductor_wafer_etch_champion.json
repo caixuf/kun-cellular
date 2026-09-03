@@ -26,8 +26,8 @@
   "sample_dialogue": "在 3nm 环绕栅极 (GAA) 工艺中，基于单原子层材料剥离的光学发射光谱（OES）跃迁，将刻蚀过切误差控制在 0.2nm 以内。",
   "training_metadata": {
     "device": "NVIDIA GeForce RTX 5060 Laptop GPU",
-    "training_time_sec": 0.157,
-    "peak_throughput_mcells": 638.9,
+    "training_time_sec": 0.158,
+    "peak_throughput_mcells": 633.3,
     "convergence_score": 0.9982
   }
 }

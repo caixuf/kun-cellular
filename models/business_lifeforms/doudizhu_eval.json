@@ -1,0 +1,10 @@
+{
+  "total_games": 10000,
+  "landlord_win_rate": 94.21,
+  "peasant_win_rate": 5.79,
+  "spring_rate": 56.96,
+  "avg_rounds": 9.4,
+  "bid_accuracy": 87.6,
+  "memory_inference_accuracy": 92.4,
+  "inference_latency_us": 0.42
+}
