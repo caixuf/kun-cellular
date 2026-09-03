@@ -78,7 +78,8 @@ sequences contains:
 - a value above `+0.5` to enter the active mode;
 - alternating values inside `[-0.5, +0.5]` to exercise noise immunity;
 - a value below `-0.5` to leave the active mode;
-- another in-band noise segment and a second entry transition.
+- another in-band noise segment, a second entry transition, and a second exit
+  transition.
 
 The test counts mode changes and any change while the input remains inside the
 dead band. The gate must produce exactly the prescribed transition count and
@@ -100,7 +101,8 @@ The executable reports `PASS` only when all of the following hold:
   absolute error at or below `1e-12`;
 - every repeated delayed-recall trace is identical after reset;
 - all hysteresis sequences have zero in-band mode changes;
-- all hysteresis sequences have exactly two entry/exit transitions;
+- all hysteresis sequences have exactly four mode transitions (two entries and
+  two exits);
 - neutral input after reset starts inactive;
 - no topology or genetic parameter changes are detected;
 - all measured outputs are finite.
