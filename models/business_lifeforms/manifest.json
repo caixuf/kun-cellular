@@ -65,34 +65,6 @@
       "validation_report": "C++ 原生形态发生演化 25 代收敛，WL 拓扑同构哈希认证通过，自组织学习雷达测距避障与终点势能寻优。"
     },
     {
-      "id": "doudizhu_game_champion",
-      "name": "非完全信息博弈决策生命体 (Game Theory Oracle)",
-      "domain": "高阶时序记忆与对抗博弈决策",
-      "cells_scale": 9,
-      "synapses_scale": 9,
-      "checkpoint": "checkpoints/doudizhu_game_champion.json",
-      "c_header": "include/kun/cellular/cross_domain_tasks.hpp",
-      "test_suite": "tests/test_flow_doudizhu_card_game.cpp",
-      "input_signals": [
-        "己方手牌点数强度 (Hand Strength)",
-        "己方剩余张数比率 (Cards Ratio)",
-        "场上当前底牌牌力 (Table Strength)",
-        "历史出牌热度衰减 (History Intensity)"
-      ],
-      "action_outputs": [
-        "出牌压制动作 (Play)",
-        "战略让牌过牌 (Pass)"
-      ],
-      "primitive_motif": [
-        "OP_EMA",
-        "OP_SUB",
-        "GATE_THRESHOLD",
-        "GATE_DEADZONE",
-        "OP_INTEGRAL"
-      ],
-      "validation_report": "在非完全信息与延迟反馈博弈中，通过门控抑制冲动出牌，保持胜率并实现策略收敛。"
-    },
-    {
       "id": "fluid_damper_champion",
       "name": "多相分子流体自适应阻尼调节器 (Fluid Damper)",
       "domain": "连续介质流体力学抗扰控制",
@@ -122,119 +94,26 @@
       "validation_report": "在气相高湍流、水相轮胎水滑(mu=0.35)与深空真空三种极端介质环境下实现自适应平滑阻尼调节。"
     },
     {
-      "id": "quant_futures_champion",
-      "name": "三十年商品期货 4,234 根日线量化演化大脑 (Quant Futures)",
-      "domain": "金融时间序列与非线性动量演化",
-      "cells_scale": 12,
-      "synapses_scale": 10,
-      "checkpoint": "checkpoints/quant_futures_champion.json",
-      "model_file": "runs/quant_million_brain_evolved_champion.pt",
-      "c_header": "include/kun/cellular/sdsc_primitives.h",
-      "test_suite": "tools/train_quant_futures.cpp",
+      "id": "primordial_life_champion",
+      "name": "演化引擎生存收敛实证 (无业务目标·门禁2活体证据)",
+      "domain": "无目标生存选择压力演化 (Viability-Only)",
+      "cells_scale": 16,
+      "synapses_scale": 23,
+      "checkpoint": "checkpoints/primordial_life_champion.json",
+      "c_header": "include/kun/cellular/primordial_life.hpp",
+      "test_suite": "bin/train_primordial_life",
+      "validation_report": "门禁2实证: 纯生存压力30代, 生存率11.7%→100%, 熵压×2015仍满存活, Lyapunov稳定",
       "input_signals": [
-        "行情收益率动量 (Price Momentum)",
-        "高低价差波动率 (Volatility Ratio)",
-        "成交量异常放大 (Volume Surge)"
+        "ENTROPY_FLUX_0",
+        "ENTROPY_FLUX_1",
+        "ENTROPY_FLUX_2",
+        "ENTROPY_FLUX_3"
       ],
       "action_outputs": [
-        "买入多头头寸指令 (Buy Pos)",
-        "卖出空头头寸指令 (Sell Pos)",
-        "风控平仓防御重置 (Risk Reset)"
-      ],
-      "primitive_motif": [
-        "OP_EMA",
-        "OP_DIFF",
-        "OP_INTEGRAL",
-        "GATE_HYSTERESIS",
-        "GATE_DEADZONE"
-      ],
-      "validation_report": "基于 2005~2026 年近 30 年 4,234 根真实大宗商品期货日线演化收敛，12 核心因果原语，严格样本外盲测，通过施密特迟滞滤波杜绝高频假突破摩擦磨损。"
-    },
-    {
-      "id": "quant_master_champion",
-      "name": "全市场多品种量化高手皮层 (Multi-Asset Quant Master)",
-      "domain": "期货截面强弱与风险平价对冲",
-      "cells_scale": 15,
-      "synapses_scale": 28,
-      "checkpoint": "checkpoints/quant_master_champion.json",
-      "c_header": "include/kun/cellular/sdsc_primitives.h",
-      "test_suite": "tools/train_multi_asset_quant_master.cpp",
-      "input_signals": [
-        "单品种日收益动量 (Momentum)",
-        "均线剪刀差 (MA5-MA20)",
-        "日内振幅波动率 (Range Vol)",
-        "成交量放大比 (Volume Ratio)"
-      ],
-      "action_outputs": [
-        "多头信号 (Long Signal)",
-        "空头信号 (Short Signal)",
-        "防御重置 (Risk Reset)"
-      ],
-      "primitive_motif": [
-        "OP_EMA",
-        "OP_SUB",
-        "GATE_HYSTERESIS",
-        "GATE_DEADZONE"
-      ],
-      "validation_report": "43 品种 2005-01-04~2015-12-31 样本内演化（30 代 / pop24）。2016-01-04~2026-09-01 样本外：夏普 0.00、累计 -21.3%、最大回撤 50.7%。同执行下纯 MA 截面基线样本外亦为夏普 -0.02 / -9.7%，该日线开盘-收盘截面在此区间无稳定超额。未改底座，未覆盖智驾检查点。"
-    },
-    {
-      "id": "quant_million_reservoir",
-      "name": "三十年商品期货百万细胞高维时空储层脑 (Quant Million Brain)",
-      "domain": "复杂系统高维时空动力学与跨周期宏观相变",
-      "cells_scale": 1000000,
-      "synapses_scale": 3000000,
-      "checkpoint": "runs/quant_million_brain_seed42.pt",
-      "model_file": "runs/quant_million_brain_evolved_champion.pt",
-      "c_header": "include/kun/cellular/sdsc_binary_runtime.h",
-      "test_suite": "runs/quant_million_brain_walkforward_summary.json",
-      "input_signals": [
-        "多尺度动量衰减频谱 (Multi-scale Momentum Spectrum)",
-        "高阶波动率曲率流 (Volatility Curvature Field)",
-        "宏观体制转换势能 (Macro Regime Potential)"
-      ],
-      "action_outputs": [
-        "跨年度宏观大波段做多 (Super-cycle Long)",
-        "跨年度宏观大波段做空 (Super-cycle Short)",
-        "自组织临界态平仓 (SOC Equilibrium Reset)"
-      ],
-      "primitive_motif": [
-        "RESERVOIR_DYNAMICS",
-        "CHAOTIC_ATTRACTOR",
-        "LEAKY_INTEGRATOR",
-        "PHASIC_COHERENCE",
-        "GATE_HYSTERESIS"
-      ],
-      "validation_report": "在 2016~2026 年长达 10.6 年真实样本外盲测中实现 +148.8% 净收益率 (100万增值至248.8万，CAGR 8.93%)，百万节点自发涌现跨周期宏观相变分离能力。"
-    },
-    {
-      "id": "sdsc_mega_1million",
-      "name": "SDSCC 旗舰百万微柱阵列全息大生命体 (Mega 1Million)",
-      "domain": "非冯超大规模算存一体与复杂系统动力学",
-      "cells_scale": 1000000,
-      "synapses_scale": 3000000,
-      "checkpoint": "checkpoints/sdsc_mega_1million.bin",
-      "c_header": "include/kun/cellular/sdsc_binary_runtime.h",
-      "test_suite": "tests/test_binary_runtime_scale.c",
-      "input_signals": [
-        "64维超宽空间感知受体 (64-Ch Spatial Sensory)",
-        "小世界微柱局部晶格激发 (Microcolumn Activation)",
-        "长程跳跃突触流向 (Long-range Highway)"
-      ],
-      "action_outputs": [
-        "16维连续动作效应中枢 (16-Ch Motor Actuators)",
-        "微柱群体相位同步电位 (Phasic Coherence)"
-      ],
-      "primitive_motif": [
-        "OP_SUM",
-        "OP_INTEGRAL",
-        "OP_DIFF",
-        "GATE_HYSTERESIS",
-        "GATE_DEADZONE",
-        "OP_DAMPER",
-        "OP_OSCILLATOR"
-      ],
-      "validation_report": "31MB C11 mmap 零拷贝硬件级紧凑二进制，包含 1,000,000 原生动力学细胞与 3,000,000 CSR 突触，单步推演 10 亿次/秒，通过 test_binary_runtime_scale 严格验证。"
+        "ACT_POS",
+        "ACT_NEG",
+        "ACT_LOCK"
+      ]
     }
   ]
 }

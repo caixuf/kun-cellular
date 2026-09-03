@@ -269,18 +269,18 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">ACTIVE_CELLS</div>
-                        <div class="stat-val cyan" id="stat-cells">1,000,000 细胞 (百万级超级大脑)</div>
+                        <div class="stat-val cyan" id="stat-cells">… 细胞</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">SYNAPSE_EDGES</div>
-                        <div class="stat-val emerald" id="stat-synapses">4,000,000 突触</div>
+                        <div class="stat-val emerald" id="stat-synapses">… 突触</div>
                     </div>
                 </div>
 
-                <!-- 1,000,000 细胞宏观高频采样脉冲网格 (32x32 密集微观全息投影) -->
+                <!-- 后端真实细胞规模的宏观高频采样脉冲网格 (32x32 密集微观全息投影) -->
                 <div style="padding: 4px 12px 8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                        <span class="stat-label">1M-CELL MEGA ORGAN PULSE (宏观全息点阵):</span>
+                        <span class="stat-label">ORGAN PULSE (宏观全息点阵):</span>
                         <span style="font-size:9px; color:var(--cyan-glow);">[1,000 REC | 998,000 INTER | 1,000 MOT]</span>
                     </div>
                     <canvas id="cortex-canvas" width="340" height="96" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
@@ -458,8 +458,11 @@
                 document.getElementById("stat-gen").innerText = `Gen ${gen} #${agentIdx}`;
                 document.getElementById("stat-gen-badge").innerText = `GEN: ${gen} // AGENT: ${agentIdx}/6`;
                 document.getElementById("stat-fit").innerText = `${vehState.champion_fitness || 0.0}`;
-                document.getElementById("stat-cells").innerText = `${(vehState.n_cells || 1000000).toLocaleString()} 细胞 (百万级超级大脑)`;
-                document.getElementById("stat-synapses").innerText = `${(vehState.n_synapses || 4000000).toLocaleString()} 突触`;
+                // 尺度真理: 细胞/突触数一律读后端真实值，无数据时显示占位符，严禁硬编码兜底
+                const nCells = vehState.n_cells || 0;
+                const nSyns = vehState.n_synapses || 0;
+                document.getElementById("stat-cells").innerText = nCells > 0 ? `${nCells.toLocaleString()} 细胞` : "… 细胞";
+                document.getElementById("stat-synapses").innerText = nSyns > 0 ? `${nSyns.toLocaleString()} 突触` : "… 突触";
 
                 // 动态渲染 24 原语链路徽章
                 const chainDiv = document.getElementById("primitive-chain");

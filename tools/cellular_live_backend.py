@@ -1679,6 +1679,36 @@ class SiliconCellularOrganism:
                     SymbioticMacroCell(3, "MotorExecutiveArray", list(range(mot_start, total_repr)), color="#f43f5e")
                 ]
 
+            # 8. 无目标原始进化生命体冠军 (16 细胞内稳态耗散结构, 纯生存选择压力演化)
+            elif oid == "primordial_life_champion":
+                raw_cells = ckpt.get("cells", [])
+                raw_syns = ckpt.get("synapses", [])
+                self.generation = ckpt.get("generation", 30)
+
+                for c in raw_cells:
+                    cid = int(c.get("id"))
+                    ctype = c.get("type", "Op_EMA")
+                    layer = "L1_SENSORY" if ctype.startswith("Sense") else ("L3_MOTOR" if ctype.startswith("Act") else "L2_ASSOCIATION")
+                    cell = PhysicalCell3D(cid, ctype, float(c.get("x", 0.0)), float(c.get("y", 0.0)), float(c.get("z", 0.0)), layer=layer)
+                    cell.gain = float(c.get("param1", 1.0) or 1.0)
+                    self.cells.append(cell)
+
+                for syn in raw_syns:
+                    u = int(syn.get("from"))
+                    v = int(syn.get("to"))
+                    w = float(syn.get("weight", syn.get("initial_weight", 1.0)))
+                    act = bool(syn.get("active", True))
+                    self.synapses.append({"from": u, "to": v, "weight": round(w, 4), "active": act})
+
+                sense_ids = [int(c.get("id")) for c in raw_cells if str(c.get("type", "")).startswith("Sense")]
+                act_ids = [int(c.get("id")) for c in raw_cells if str(c.get("type", "")).startswith("Act")]
+                core_ids = [int(c.get("id")) for c in raw_cells if not str(c.get("type", "")).startswith(("Sense", "Act"))]
+                self.symbiotic_macro_cells = [
+                    SymbioticMacroCell(1, "EntropyFluxSensory", sense_ids, color="#22d3ee"),
+                    SymbioticMacroCell(2, "HomeostaticDampingCore", core_ids, color="#34d399"),
+                    SymbioticMacroCell(3, "ViabilityActuatorRing", act_ids, color="#f43f5e")
+                ]
+
             # 统一对齐宏观与微观双尺度定义：宏观标称规模必须等同真实驱动的细胞数，
             # 严禁用 manifest 的 cells_scale 标称值（如 1,000,000）冒充真实几何（见尺度真理宪章）
             self.macro_cells = len(self.cells)
@@ -3412,6 +3442,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             elif "maze" in self.path: ptype = "maze"
             elif "doudizhu" in self.path or "game" in self.path: ptype = "doudizhu"
             elif "fluid" in self.path: ptype = "fluid"
+            elif "primordial" in self.path: ptype = "primordial"
             elif "quant" in self.path or "real" in self.path or "champion" in self.path: ptype = "quant"
             elif "adas" in self.path or "vehicle" in self.path: ptype = "adas"
 
@@ -3421,6 +3452,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             elif ptype == "doudizhu": organism.load_organism_by_id("doudizhu_game_champion")
             elif ptype == "fluid": organism.load_organism_by_id("fluid_damper_champion")
             elif ptype == "quant": organism.load_organism_by_id("quant_futures_champion")
+            elif ptype == "primordial": organism.load_organism_by_id("primordial_life_champion")
             else: organism.load_organism_by_id("adas_cortex_champion")
 
             body = json.dumps({
