@@ -214,5 +214,9 @@ static void test_hysteresis_modes() {
 int main() {
     test_delayed_recall();
     test_hysteresis_modes();
+    std::cout << "EVIDENCE_CLASS=REFERENCE_TOPOLOGY_EXPRESSIVITY\n";
+    std::cout << "EVOLUTION_DISCOVERY=NOT_TESTED\n";
+    std::cout << "GENERAL_INTELLIGENCE_CLAIM=NOT_MADE\n";
+    std::cout << "TEMPORAL_MEMORY_MODES=PASS\n";
     return 0;
 }
