@@ -1,6 +1,6 @@
 # Temporal Memory Evolutionary Discovery Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add a C++ evidence executable that compares reference, disconnected, random, and evolved organisms on delayed recall and hysteresis, then reports an evolutionary-discovery verdict without claiming general intelligence.
 
@@ -34,7 +34,7 @@ Default whitelist is already `FULL_24`. Set `seed_mode = DISCONNECTED_EMBRYO`.
 **Files:**
 - Create: `tests/test_flow_temporal_memory_evolution.cpp`
 
-- [ ] **Step 1: Write a compiling skeleton that fails at link/runtime until helpers exist**
+- [x] **Step 1: Write a compiling skeleton that fails at link/runtime until helpers exist**
 
 ```cpp
 #include <algorithm>
@@ -67,7 +67,7 @@ int main() {
 }
 ```
 
-- [ ] **Step 2: Configure and confirm the target is picked up**
+- [x] **Step 2: Configure and confirm the target is picked up**
 
 ```bash
 cmake -S . -B build
@@ -76,7 +76,7 @@ cmake --build build --target test_flow_temporal_memory_evolution
 
 Expected: link error `undefined reference to test_protocol_controls()` or equivalent.
 
-- [ ] **Step 3: Implement helpers, reference graphs, fitness, and control checks**
+- [x] **Step 3: Implement helpers, reference graphs, fitness, and control checks**
 
 Use this exact body after the includes and `using` aliases. Runtime checks must use `require`, not `assert`.
 
@@ -299,7 +299,7 @@ static void test_protocol_controls() {
 }
 ```
 
-- [ ] **Step 4: Build and run the focused test**
+- [x] **Step 4: Build and run the focused test**
 
 ```bash
 cmake --build build --target test_flow_temporal_memory_evolution
@@ -308,7 +308,7 @@ ctest --test-dir build --output-on-failure -R test_flow_temporal_memory_evolutio
 
 Expected: `PROTOCOL_CONTROLS=PASS`.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_flow_temporal_memory_evolution.cpp
@@ -328,7 +328,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 **Files:**
 - Modify: `tests/test_flow_temporal_memory_evolution.cpp`
 
-- [ ] **Step 1: Add `test_evolution_discovery()` declaration and call it from `main` after protocol controls**
+- [x] **Step 1: Add `test_evolution_discovery()` declaration and call it from `main` after protocol controls**
 
 ```cpp
 static void test_evolution_discovery();
@@ -345,7 +345,7 @@ int main() {
 
 The first rebuild must fail until the function exists.
 
-- [ ] **Step 2: Implement the evolution experiment**
+- [x] **Step 2: Implement the evolution experiment**
 
 Use `get_population_mut()` or non-const `population()` to write `fitness_score`, then `evolve_generation()`. Champion is the organism with best **train** fitness; report **holdout** fitness. Do not enable Hebbian during scoring.
 
@@ -441,7 +441,7 @@ static void test_evolution_discovery() {
 
 Then print the evidence labels from `main` after both tests. CTest return code stays 0 if `require()` never fired.
 
-- [ ] **Step 3: Run focused then full CTest**
+- [x] **Step 3: Run focused then full CTest**
 
 ```bash
 cmake --build build --target test_flow_temporal_memory_evolution
@@ -457,7 +457,7 @@ Expected:
 - existing tests still pass
 - if `test_binary_runtime_scale` fails on missing `checkpoints/sdsc_mega_1million.bin`, run `python3 tools/export_sdsc_binary.py` and rerun; that is not this feature's bug
 
-- [ ] **Step 4: Confirm protected files were not touched**
+- [x] **Step 4: Confirm protected files were not touched**
 
 ```bash
 git diff --name-only
@@ -465,7 +465,7 @@ git diff --name-only
 
 Must not include `include/kun/cellular/*` or ADAS checkpoint files.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/test_flow_temporal_memory_evolution.cpp
@@ -481,9 +481,9 @@ Include the Copilot trailer.
 **Files:**
 - Modify: `docs/superpowers/plans/2026-09-03-temporal-memory-evolution.md`
 
-- [ ] **Step 1: After the run, mark every checkbox `[x]`**
-- [ ] **Step 2: Append the exact printed labels under an Observed section**
-- [ ] **Step 3: Commit the plan status**
+- [x] **Step 1: After the run, mark every checkbox `[x]`**
+- [x] **Step 2: Append the exact printed labels under an Observed section**
+- [x] **Step 3: Commit the plan status**
 
 ```bash
 git add docs/superpowers/plans/2026-09-03-temporal-memory-evolution.md
@@ -491,3 +491,26 @@ git commit -m "docs: record temporal memory evolution verdict"
 ```
 
 Do not rewrite a FAIL into PASS. If discovery failed, leave `EVOLUTION_DISCOVERY=FAIL` and stop. The next phase is a new spec, not a silent threshold change.
+
+
+### Observed
+
+```text
+DELAY_REFERENCE_HOLDOUT=1
+DELAY_EMBRYO_HOLDOUT=0.5
+DELAY_RANDOM_HOLDOUT_MEAN=0.267059
+HYSTERESIS_REFERENCE_HOLDOUT=1
+PROTOCOL_CONTROLS=PASS
+EVOLVED_DELAY_SEED=7 HOLDOUT=0.54723 CELLS=12 SYNAPSES=18
+EVOLVED_HYSTERESIS_SEED=7 HOLDOUT=0 CELLS=8 SYNAPSES=0
+EVOLVED_DELAY_SEED=11 HOLDOUT=0.519362 CELLS=10 SYNAPSES=12
+EVOLVED_HYSTERESIS_SEED=11 HOLDOUT=0 CELLS=11 SYNAPSES=16
+EVOLVED_DELAY_SEED=19 HOLDOUT=0.518351 CELLS=9 SYNAPSES=9
+EVOLVED_HYSTERESIS_SEED=19 HOLDOUT=0 CELLS=8 SYNAPSES=0
+DELAY_EVOLUTION_WINS=0/3
+HYSTERESIS_EVOLUTION_WINS=0/3
+EVOLUTION_DISCOVERY=FAIL
+EVIDENCE_CLASS=EVOLUTIONARY_DISCOVERY
+REFERENCE_TOPOLOGY_EXPRESSIVITY=ALREADY_PROVEN_SEPARATELY
+GENERAL_INTELLIGENCE_CLAIM=NOT_MADE
+```
