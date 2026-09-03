@@ -24,7 +24,7 @@ standard library only.
 **Files:**
 - Create: `tests/test_flow_temporal_memory_modes.cpp`
 
-- [ ] **Step 1: Write the failing test skeleton**
+- [x] **Step 1: Write the failing test skeleton**
 
 Create the test file with the public core include, deterministic sequence
 helpers, and a delayed-recall test entry point:
@@ -56,7 +56,7 @@ int main() {
 }
 ```
 
-- [ ] **Step 2: Configure and run to verify the new target is not available**
+- [x] **Step 2: Configure and run to verify the new target is not available**
 
 Run:
 
@@ -69,7 +69,7 @@ Expected: the build reports that the target does not exist or that the
 declared helper is not defined. This confirms the test is not accidentally
 passing through an existing target.
 
-- [ ] **Step 3: Implement the reference graph and deterministic stream**
+- [x] **Step 3: Implement the reference graph and deterministic stream**
 
 Use zero-initialized public structs so all runtime fields are known, set
 `hebbian_rate` to zero for measurement, and compile before the first forward
@@ -187,7 +187,7 @@ static void test_delayed_recall() {
 }
 ```
 
-- [ ] **Step 4: Build and run the focused test**
+- [x] **Step 4: Build and run the focused test**
 
 Run:
 
@@ -200,7 +200,7 @@ ctest --test-dir build --output-on-failure -R test_flow_temporal_memory_modes
 Expected: this task's delayed recall cases pass and print
 `DELAY_RECALL_CASES=96` and `DELAY_RECALL=PASS`.
 
-- [ ] **Step 5: Commit the delayed recall benchmark**
+- [x] **Step 5: Commit the delayed recall benchmark**
 
 ```bash
 git add tests/test_flow_temporal_memory_modes.cpp
@@ -212,7 +212,7 @@ git commit -m "test: prove cellular delayed temporal recall"
 **Files:**
 - Modify: `tests/test_flow_temporal_memory_modes.cpp`
 
-- [ ] **Step 1: Add the hysteresis test before its implementation**
+- [x] **Step 1: Add the hysteresis test before its implementation**
 
 Add a test declaration and call it from `main`:
 
@@ -233,7 +233,7 @@ defined:
 cmake --build build --target test_flow_temporal_memory_modes
 ```
 
-- [ ] **Step 2: Implement a real hysteresis graph and a genome snapshot**
+- [x] **Step 2: Implement a real hysteresis graph and a genome snapshot**
 
 Construct `Sense_Input0 -> Gate_Hysteresis -> Act_PosAction`, with entry
 threshold `+0.5` and exit threshold `-0.5`. Capture the genome-only JSON before
@@ -306,7 +306,7 @@ static void test_hysteresis_modes() {
 }
 ```
 
-- [ ] **Step 3: Repeat the hysteresis sequence over 32 deterministic offsets**
+- [x] **Step 3: Repeat the hysteresis sequence over 32 deterministic offsets**
 
 To ensure the result is not a single hand-picked trace, run this exact helper
 for offsets from `-0.2` through `+0.2`. Only in-band values are changed and
@@ -390,7 +390,7 @@ static void test_hysteresis_modes() {
     std::cout << "HYSTERESIS_MODES=PASS\n";
 }
 
-- [ ] **Step 4: Run the focused test**
+- [x] **Step 4: Run the focused test**
 
 Run:
 
@@ -409,7 +409,7 @@ HYSTERESIS_IN_BAND_TRANSITIONS=0
 HYSTERESIS_MODES=PASS
 ```
 
-- [ ] **Step 5: Commit mode and isolation evidence**
+- [x] **Step 5: Commit mode and isolation evidence**
 
 ```bash
 git add tests/test_flow_temporal_memory_modes.cpp
@@ -421,7 +421,7 @@ git commit -m "test: prove hysteretic modes and episode isolation"
 **Files:**
 - Modify: `tests/test_flow_temporal_memory_modes.cpp`
 
-- [ ] **Step 1: Add machine-readable evidence labels**
+- [x] **Step 1: Add machine-readable evidence labels**
 
 Print a final summary only after all assertions pass:
 
@@ -435,7 +435,7 @@ std::cout << "TEMPORAL_MEMORY_MODES=PASS\n";
 Do not print a “champion”, “trained”, or profitability claim. Keep the
 benchmark's scope limited to stateful expressivity and reset isolation.
 
-- [ ] **Step 2: Run the focused CTest target**
+- [x] **Step 2: Run the focused CTest target**
 
 Run:
 
@@ -449,7 +449,7 @@ Expected: one test passes with 96 delayed-recall cases, 32 hysteresis
 variants, 128 total expected transitions, zero illegal transitions, and the
 explicit evidence labels.
 
-- [ ] **Step 3: Run the existing full regression suite**
+- [x] **Step 3: Run the existing full regression suite**
 
 Run:
 
@@ -458,11 +458,12 @@ cmake --build build -j4
 ctest --test-dir build --output-on-failure
 ```
 
-Expected: all pre-existing tests plus
-`test_flow_temporal_memory_modes` pass. No file under
-`include/kun/cellular/` is modified by this feature.
+Observed: `test_flow_temporal_memory_modes` and the other 23 existing tests
+pass. The pre-existing `test_binary_runtime_scale` remains the single failure
+because `checkpoints/sdsc_mega_1million.bin` is absent; no file under
+`include/kun/cellular/` was modified by this feature.
 
-- [ ] **Step 4: Commit the final evidence labeling**
+- [x] **Step 4: Commit the final evidence labeling**
 
 ```bash
 git add tests/test_flow_temporal_memory_modes.cpp
