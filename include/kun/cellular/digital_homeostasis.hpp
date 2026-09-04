@@ -31,12 +31,90 @@ inline const char* to_string(MetabolicState state) {
 }
 
 // ============================================================================
+// 1.5 细胞膜穿透孔道动力学状态 (8 Transmembrane Gated Porins & Ion Flux)
+// ============================================================================
+struct CellMembranePores {
+    // 8 个特征膜孔道开度 [0.0, 1.0]
+    // [0] Na+ 去极化快门 (Fast Voltage-Gated Na+ Influx)
+    // [1] K+  复极化慢门 (Delayed Rectifier K+ Channel)
+    // [2] Ca2+ 二次信使与可塑性激活孔 (Calcium Influx & Vesicle Priming)
+    // [3] Cl-  超极化侧向抑制门 (Chloride Influx / GABA-like Inhibition)
+    // [4] ATP-Binding Cassette 营养吸收通道 (Nutrient / Glucose Import Porin)
+    // [5] 代谢废物与质子外排泵 (Lactate / H+ Active Efflux Pump)
+    // [6] 膜外配体 / 病原体结合表位受体 A (Ligand / Pathogen Binding Epitope A)
+    // [7] 膜外配体 / 病原体结合表位受体 B (Ligand / Pathogen Binding Epitope B)
+    float pore_conductance[8]{0.20f, 0.20f, 0.10f, 0.10f, 0.40f, 0.30f, 0.05f, 0.05f};
+
+    // 穿膜电位与微观离子流
+    float membrane_potential{-70.0f};    // 跨膜静息电位基线 ~ -70 mV
+    float resting_potential{-70.0f};     // 稳态静息点
+    float threshold_potential{-50.0f};   // 去极化爆发动作电位阈值 ~ -50 mV
+    float peak_action_potential{+35.0f}; // 动作电位峰值 ~ +35 mV
+    float total_ion_flux{0.0f};          // 本拍瞬时穿膜净离子通量
+    float atp_coupling_damping{1.0f};    // K_ATP 能量门控放电衰减因子 [0.0, 1.0]
+
+    // 动态更新膜孔电导与跨膜电位 (Thermodynamic Gating & Ion Flux)
+    void update(float firing_input, float internal_atp, float external_nutrient, float external_toxin, float dt = 0.05f) {
+        // A. K_ATP 能量敏感门控：若 ATP 储备低于安全线 (e.g. 15.0)，K_ATP 通道大幅开放使膜超极化并压低增益
+        float atp_ratio = std::clamp(internal_atp / 50.0f, 0.0f, 2.0f);
+        if (atp_ratio < 0.30f) {
+            atp_coupling_damping = std::clamp(atp_ratio / 0.30f, 0.10f, 1.0f);
+            pore_conductance[1] = std::min(1.0f, pore_conductance[1] + 0.35f * (1.0f - atp_coupling_damping)); // K+ 开放超极化
+        } else {
+            atp_coupling_damping = 1.0f;
+        }
+
+        // B. 电位门控孔道 (Voltage-gated Na+, K+, Ca2+)
+        float drive = std::clamp(firing_input, -3.0f, 3.0f);
+        if (drive > 0.08f) {
+            // 去极化冲动激活 Na+ 孔道与 Ca2+ 激活孔
+            pore_conductance[0] = std::clamp(pore_conductance[0] * 0.70f + 0.30f * std::min(1.0f, drive * 0.5f), 0.05f, 1.0f);
+            pore_conductance[2] = std::clamp(pore_conductance[2] * 0.80f + 0.20f * std::min(1.0f, drive * 0.3f), 0.02f, 0.9f);
+            // 跨膜电位快速爬升向动作电位峰值
+            membrane_potential += (peak_action_potential - membrane_potential) * (pore_conductance[0] * 0.45f * dt);
+        } else {
+            // 快速复极化，K+ 开放并使电位回归静息电位
+            pore_conductance[0] = std::max(0.05f, pore_conductance[0] * 0.85f);
+            pore_conductance[1] = std::clamp(pore_conductance[1] * 0.80f + 0.20f * 0.4f, 0.1f, 0.8f);
+            membrane_potential += (resting_potential - membrane_potential) * (pore_conductance[1] * 0.35f * dt);
+        }
+
+        // 抑制性 Cl- 孔道：受负向输入或环境毒性刺激开放
+        if (drive < -0.08f || external_toxin > 5.0f) {
+            pore_conductance[3] = std::clamp(pore_conductance[3] + 0.15f, 0.1f, 0.95f);
+            membrane_potential = std::max(-90.0f, membrane_potential - 15.0f * dt * pore_conductance[3]);
+        } else {
+            pore_conductance[3] = std::max(0.05f, pore_conductance[3] * 0.90f);
+        }
+
+        // C. 代谢孔道：营养吸收通道根据外界底质浓度与需求开闭
+        pore_conductance[4] = std::clamp(0.2f + 0.6f * (external_nutrient / (external_nutrient + 500.0f)), 0.1f, 1.0f);
+        pore_conductance[5] = std::clamp(0.1f + 0.8f * (external_toxin / (external_toxin + 10.0f)), 0.1f, 1.0f);
+
+        // D. 穿膜净离子流通量 (Net Influx/Efflux Flux)
+        total_ion_flux = (pore_conductance[0] * 1.2f + pore_conductance[2] * 0.6f) 
+                       - (pore_conductance[1] * 0.9f + pore_conductance[3] * 0.8f);
+    }
+
+    // 调制前向输出：考虑跨膜电位激活程度与 ATP 衰减
+    float modulate_output(float raw_output) const {
+        // 当膜电位高于阈值且 ATP 充足时，充分传导；ATP 匮乏时通过阻尼衰减
+        float v_factor = (membrane_potential - resting_potential) / (peak_action_potential - resting_potential + 1e-4f);
+        v_factor = std::clamp(v_factor + 0.5f, 0.20f, 1.25f);
+        return raw_output * atp_coupling_damping * v_factor;
+    }
+};
+
+// ============================================================================
 // 2. 细胞内环境稳态属性 (Individual Cell Homeostatic Attributes)
 // ============================================================================
 struct CellHomeostasisNode {
     uint32_t cell_id{0};
     uint32_t compartment_id{0}; // 所属局部空间隔室
     MetabolicState state{MetabolicState::ACTIVE};
+
+    // 膜孔道动力学
+    CellMembranePores membrane_pores;
 
     // 能量与代谢
     double energy_reserve{100.0};       // 当前内部储能 (ATP 储备)
@@ -82,6 +160,9 @@ public:
         double global_nutrient_reserve{0.0};
         double global_waste_toxicity{0.0};
         uint32_t total_repairs_executed{0};
+        double avg_membrane_potential{-70.0}; // 平均跨膜电位 (mV)
+        double avg_ion_flux{0.0};             // 平均穿膜净离子流
+        double avg_atp_coupling{1.0};         // 平均 K_ATP 能量门控耦合因子
     };
 
     explicit DigitalHomeostasisEngine(size_t num_cells, size_t num_compartments = 4, double initial_nutrient = 500.0, double initial_cell_energy = 50.0) {
@@ -191,6 +272,15 @@ public:
             // 产生微量代谢废物排入局部隔室
             comp.waste_toxicity += current_cost * 0.05;
 
+            // 膜穿透孔道动力学演进与跨膜电位更新
+            float firing_input = (c.state == MetabolicState::ACTIVE) ? 0.60f : -0.20f;
+            c.membrane_pores.update(firing_input, static_cast<float>(c.energy_reserve),
+                                    static_cast<float>(comp.nutrient_concentration),
+                                    static_cast<float>(comp.waste_toxicity));
+            // 维持跨膜离子梯度的 Na+/K+ ATPase 泵能耗税 (主动运输能耗)
+            double pump_tax = 0.015 * (std::abs(c.membrane_pores.membrane_potential - c.membrane_pores.resting_potential) / 30.0);
+            c.energy_reserve = std::max(0.0, c.energy_reserve - pump_tax);
+
             // E. 自主状态机转换 (Autonomous State Transitions)
             if (c.energy_reserve <= 0.0 || c.damage_level >= 100.0) {
                 // 能量耗竭或致死损伤 -> 凋亡 (Apoptosis)
@@ -218,9 +308,19 @@ public:
         double total_internal_e = 0.0;
         double total_nutrient = 0.0;
         double total_waste = 0.0;
+        double sum_vm = 0.0;
+        double sum_flux = 0.0;
+        double sum_atp_coupling = 0.0;
+        size_t alive_count = 0;
 
         for (const auto& c : cells_) {
-            if (c.is_alive) total_internal_e += c.energy_reserve;
+            if (c.is_alive) {
+                total_internal_e += c.energy_reserve;
+                sum_vm += c.membrane_pores.membrane_potential;
+                sum_flux += c.membrane_pores.total_ion_flux;
+                sum_atp_coupling += c.membrane_pores.atp_coupling_damping;
+                alive_count++;
+            }
         }
         for (const auto& comp : compartments_) {
             total_nutrient += comp.nutrient_concentration;
@@ -236,7 +336,10 @@ public:
             total_internal_e,
             total_nutrient,
             total_waste,
-            repairs_in_tick
+            repairs_in_tick,
+            (alive_count > 0 ? sum_vm / alive_count : -70.0),
+            (alive_count > 0 ? sum_flux / alive_count : 0.0),
+            (alive_count > 0 ? sum_atp_coupling / alive_count : 1.0)
         };
         history_.push_back(frame);
         return frame;

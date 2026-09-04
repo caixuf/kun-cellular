@@ -1795,7 +1795,10 @@ class SiliconCellularOrganism:
                     "acts": c.acts,
                     "x": round(c.x, 1),
                     "y": round(c.y, 1),
-                    "z": round(c.z, 1)
+                    "z": round(c.z, 1),
+                    "organ": getattr(c, "organ", (0 if "Sense" in c.type or "REC_" in c.type else (2 if "Act_" in c.type else 1))),
+                    "vm": round(getattr(c, "vm", -70.0 + (c.out * 35.0 if c.out > 0 else c.out * 15.0)), 1),
+                    "morph": round(getattr(c, "morph", 0.5), 2)
                 }
                 for c in self.cells
             ]

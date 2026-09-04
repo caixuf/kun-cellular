@@ -248,6 +248,12 @@ struct Cell {
         return physical_stress * 0.05f + 2.0f * informational_strain;
     }
 
+    // === 膜孔道与微观跨膜电位及代谢动力学 (Transmembrane Pores & Metabolic Gating) ===
+    float membrane_potential{-70.0f};      // 跨膜电位 (mV)
+    float membrane_pores[8]{0.20f, 0.20f, 0.10f, 0.10f, 0.40f, 0.30f, 0.05f, 0.05f}; // 8 个膜孔道开度
+    uint8_t organ_type{1};                 // 所属器官归属 (0=Sensory, 1=Association, 2=Motor)
+    float morphogen_concentration{0.50f};  // 局部感受到的图灵形态发生素浓度
+
     const char* type_name() const {
         return to_string(type);
     }
@@ -1659,6 +1665,20 @@ public:
                 c.glow_charge = std::min(1.0f, c.glow_charge + 0.3f);
             }
 
+            // 膜穿透孔道微观动力学与跨膜电位演进 (Voltage & Gated Dynamics)
+            float drive = static_cast<float>(c.output_val);
+            if (drive > 0.05f) {
+                c.membrane_pores[0] = std::clamp(c.membrane_pores[0] * 0.75f + 0.25f * std::min(1.0f, drive * 0.8f), 0.05f, 1.0f);
+                c.membrane_pores[2] = std::clamp(c.membrane_pores[2] * 0.80f + 0.20f * std::min(1.0f, drive * 0.5f), 0.02f, 0.9f);
+                c.membrane_potential += (35.0f - c.membrane_potential) * (c.membrane_pores[0] * 0.25f);
+            } else {
+                c.membrane_pores[0] = std::max(0.05f, c.membrane_pores[0] * 0.88f);
+                c.membrane_pores[1] = std::clamp(c.membrane_pores[1] * 0.85f + 0.15f * 0.4f, 0.1f, 0.8f);
+                c.membrane_potential += (-70.0f - c.membrane_potential) * (c.membrane_pores[1] * 0.20f);
+            }
+            c.membrane_pores[4] = std::clamp(0.2f + 0.6f * c.glow_charge, 0.1f, 0.95f);
+            c.membrane_pores[5] = std::clamp(0.1f + 0.5f * (std::abs(drive) > 0.5f ? 0.6f : 0.1f), 0.05f, 0.85f);
+
             // 前向突触即时传递至后续位阶节点 (CSR 出边索引: O(出度))
             for (size_t k = out_start_[idx]; k < out_start_[idx + 1]; ++k) {
                 const auto& syn = syn_ptr[out_edges_[k]];
@@ -1791,7 +1811,10 @@ public:
                << "\"param2\": " << (std::isfinite(c.param2) ? c.param2 : 0.0) << ", "
                << "\"output\": " << safe_out << ", \"activations\": " << c.activation_count << ", "
                << "\"x\": " << safe_x << ", \"y\": " << safe_y << ", \"z\": " << safe_z << ", "
-               << "\"glow\": " << safe_glow << "}"
+               << "\"glow\": " << safe_glow << ", "
+               << "\"organ\": " << static_cast<int>(c.organ_type) << ", "
+               << "\"vm\": " << c.membrane_potential << ", "
+               << "\"morph\": " << c.morphogen_concentration << "}"
                << (i + 1 < cells.size() ? "," : "") << "\n";
         }
         ss << "  ],\n";
@@ -1904,6 +1927,12 @@ public:
                     float z = parse_field("z").empty() ? 0.0f : std::stof(parse_field("z"));
 
                     Cell c{cid, ctype, p1, p2, 0.0, 0.0, false, 0.0, 0, 0, x, y, z};
+                    std::string organ_str = parse_field("organ");
+                    if (!organ_str.empty()) c.organ_type = static_cast<uint8_t>(std::stoul(organ_str));
+                    std::string vm_str = parse_field("vm");
+                    if (!vm_str.empty()) c.membrane_potential = std::stof(vm_str);
+                    std::string morph_str = parse_field("morph");
+                    if (!morph_str.empty()) c.morphogen_concentration = std::stof(morph_str);
                     org.cells.push_back(c);
                     pos = end_brace + 1;
                 }

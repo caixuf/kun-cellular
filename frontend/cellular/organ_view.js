@@ -96,6 +96,12 @@ export function extractOrganList(org) {
   const motor = [];
 
   for (const c of org.cells) {
+    if (c.organ !== undefined && c.organ !== null) {
+      if (c.organ === 0) sensory.push(c.id);
+      else if (c.organ === 2) motor.push(c.id);
+      else association.push(c.id);
+      continue;
+    }
     const t = (c.type || '').toUpperCase();
     if (t.startsWith('SENSE') || t.startsWith('REC') || (c.layer && c.layer.includes('SENSORY'))) {
       sensory.push(c.id);
