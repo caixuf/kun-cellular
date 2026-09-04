@@ -128,12 +128,15 @@ def read_sdsc_binary(bin_path):
 # 仿生多层皮层架构：16感知受体 + 96中间代谢原语皮层 + 16小脑运动效应器 = 128+细胞，500+突触
 # ============================================================================
 
-SDSCC_ALL_PRIMITIVES = [
-    "SUM", "INTEGRATE", "AMPLIFY", "INVERT", 
-    "THRESHOLD", "DAMPER", "CLIP", "ABS", "MULTIPLY",
-    "DIFF", "HYSTERESIS", "DEADZONE", "INHIBIT",
-    "SUB", "RATIO", "OSCILLATOR", "CORRELATION", "FATIGUE"
+# 26 大完备原子计算动力学原语 (权威对齐 include/kun/cellular/sdsc_primitives.h)
+SDSC_PRIMITIVES_26 = [
+    "SENSE_0", "SENSE_1", "SENSE_2", "SENSE_3",
+    "SUM", "INTEGRATE", "AMPLIFY", "INVERT", "DAMPER", "CLIP", "ABS", "MULTIPLY", "DIFF", "SUB", "RATIO",
+    "THRESHOLD", "HYSTERESIS", "DEADZONE", "INHIBIT", "AND", "MIN_MAX",
+    "ACT_POS", "ACT_NEG", "ACT_RESET",
+    "CORRELATION", "FATIGUE"
 ]
+SDSCC_ALL_PRIMITIVES = SDSC_PRIMITIVES_26
 
 class SdscCell:
     """单个 SDSCC 计算细胞：具备时域积分、非线性传递与突触极性调制 (26原子动力学对齐)"""
@@ -286,7 +289,7 @@ class SdscSiliconLifeOrgan:
         rec[16] = min(1.0, curv * 40.0)
         rec[17] = min(1.0, curv * 80.0)
         rec[24] = min(1.0, vel / 6.0)
-        rec[25] = max(-1.0, min(1.0, d_cte / 5.0))
+        rec[25] = max(-1.0, min(1.0, d_cte / 4.0))
 
         for i in range(self.n_receptors):
             cells[i].output = float(rec[i])
@@ -357,12 +360,12 @@ class LiveVehicleSimulator:
                     organ = SdscSiliconLifeOrgan(n_receptors=n_rec, n_hidden=n_hid, n_motors=n_mot)
 
                     cells_bytes = bin_data.get("cells_bytes")
-                    if cells_bytes and len(cells_bytes) >= num_cells * 16:
+                    if cells_bytes and len(cells_bytes) >= num_cells * 4:
                         htypes = []
                         for h in range(n_hid):
-                            c_off = (n_rec + h) * 16
-                            opcode = cells_bytes[c_off + 4]
-                            htypes.append(SDSCC_ALL_PRIMITIVES[opcode % len(SDSCC_ALL_PRIMITIVES)])
+                            c_off = (n_rec + h) * 4
+                            opcode = cells_bytes[c_off]
+                            htypes.append(SDSC_PRIMITIVES_26[opcode % len(SDSC_PRIMITIVES_26)])
                         organ.hidden_types = htypes
 
                     row_ptr = bin_data["row_ptr"]
@@ -544,6 +547,7 @@ class LiveVehicleSimulator:
         self.trail = []
         self.agent_lap_steps = 0
         self.agent_cum_cte = 0.0
+        self.prev_signed_cte = 0.0
 
     def next_agent(self):
         with self.lock:
@@ -567,7 +571,20 @@ class LiveVehicleSimulator:
                     best_idx = idx
 
             curr_pt = self.track_points[best_idx]
-            look_idx = (best_idx + 14) % len(self.track_points)
+            
+            # 物理恒定弧长前瞻插值 (消灭因离散步长导致的直弯 3.6 倍预瞄失真)
+            lookahead_dist = max(18.0, 24.0 + self.v * 0.4 - curr_pt.get("curv", 0.02) * 100.0)
+            cum_d = 0.0
+            look_idx = best_idx
+            n_pts = len(self.track_points)
+            while cum_d < lookahead_dist:
+                next_idx = (look_idx + 1) % n_pts
+                p1 = self.track_points[look_idx]
+                p2 = self.track_points[next_idx]
+                cum_d += math.hypot(p2["x"] - p1["x"], p2["y"] - p1["y"])
+                look_idx = next_idx
+                if look_idx == best_idx:
+                    break
             look_pt = self.track_points[look_idx]
 
             cx_b = curr_pt["x"]
@@ -587,8 +604,9 @@ class LiveVehicleSimulator:
             heading_far_err = (theta_far - self.theta + math.pi) % math.tau - math.pi
 
             # 2. 纯 C 底座 1024 细胞器官前向推演 (150.6 μs 硬实时零延迟闭环)
-            cte_rate = (self.cte - self.prev_cte) / dt
-            self.prev_cte = self.cte
+            # 真实物理带符号微分：过零点时严格保持单调连续阻尼，彻底消灭直道极限环蛇形摆动
+            signed_cte_rate = (signed_cte - getattr(self, "prev_signed_cte", 0.0)) / dt
+            self.prev_signed_cte = signed_cte
             cte_n = signed_cte / road_half_w
 
             organ = getattr(self, "champion_genome", None)
@@ -599,7 +617,7 @@ class LiveVehicleSimulator:
                     psi_far=heading_far_err,
                     r_curv=curv_b,
                     v=self.v,
-                    cte_rate=cte_rate
+                    cte_rate=signed_cte_rate
                 )
             else:
                 steer_raw = float(heading_err * 1.15 + heading_far_err * 0.85 - signed_cte * 0.05)
@@ -608,8 +626,9 @@ class LiveVehicleSimulator:
             steer_target = max(-0.55, min(0.55, steer_raw * 0.55))
             self.delta += (steer_target - self.delta) * 0.38
 
-            target_v = max(3.0, min(5.5, 5.0 + speed_raw * 1.5 - curv_b * 60.0))
-            self.v += (target_v - self.v) * 0.15
+            # 弯道平滑自适应控速：直道巡航 4.8~5.2 m/s，急弯减速至 2.8~3.5 m/s 紧贴弯心
+            target_v = max(2.8, min(5.2, 4.8 + speed_raw * 1.0 - curv_b * 70.0))
+            self.v += (target_v - self.v) * 0.18
 
             # 阿克曼运动学
             beta = math.atan(0.5 * math.tan(self.delta))
@@ -1197,8 +1216,8 @@ class SiliconCellularOrganism:
         self.init_cells()
         
     def init_cells(self):
-        """构建真实生命体流形 (默认加载 SDSCC 旗舰百万微柱大生命体)"""
-        return self.load_organism_by_id("sdsc_mega_1million")
+        """构建真实生命体流形 (默认加载具身智能驾驶 1024 细胞微柱皮层自然演化冠军)"""
+        return self.load_organism_by_id("adas_track_champion")
 
     def _refresh_macro_cells_ports(self):
         id_to_cell = {c.id for c in self.cells}
@@ -1786,7 +1805,9 @@ class SiliconCellularOrganism:
                 cb = bin_data.get("cells_bytes", b"")
                 has_cb = len(cb) >= nc * 4
 
-                for i in range(nc):
+                is_large_scale = nc > 3000
+                cells_to_load = min(nc, 1024) if is_large_scale else nc
+                for i in range(cells_to_load):
                     cid = i
                     ctype = "Op_EMA"
                     layer = "L2_ASSOCIATION"
@@ -1822,13 +1843,20 @@ class SiliconCellularOrganism:
                 row_ptr = bin_data["row_ptr"]
                 col_idx = bin_data["col_idx"]
                 weights = bin_data["weights"]
-                for u in range(nc):
+                max_syns = 4096 if is_large_scale else ns
+                syn_count = 0
+                for u in range(cells_to_load):
+                    if syn_count >= max_syns:
+                        break
                     start = row_ptr[u]
                     end = row_ptr[u + 1]
                     for syn_idx in range(start, end):
+                        if syn_count >= max_syns:
+                            break
                         v = int(col_idx[syn_idx])
                         w = float(weights[syn_idx])
                         self.synapses.append({"from": u, "to": v, "weight": round(w, 4), "active": True})
+                        syn_count += 1
 
                 sense_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L1_SENSORY" or str(c.type).upper().startswith(("SENSE", "REC_"))]
                 act_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L3_MOTOR" or str(c.type).upper().startswith(("ACT", "MOTOR", "EFFECTOR"))]

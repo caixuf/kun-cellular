@@ -32,7 +32,7 @@ def export_binary_cortex(num_cells, num_synapses, input_dim, output_dim,
     assert len(col_idx) == num_synapses
     assert len(weights) == num_synapses
 
-    header_size = 64
+    header_size = 72
     cells_offset = header_size
     cells_size = num_cells * 4 # 4 bytes per cell
     

@@ -141,7 +141,7 @@ def evaluate_controller(controller, env, max_steps=1000):
     delta = 0.0
     dt = 0.04
     L = 18.0
-    prev_cte = 0.0
+    prev_signed_cte = 0.0
     prev_delta = 0.0
     total_cte = 0.0
     max_cte = 0.0
@@ -165,7 +165,22 @@ def evaluate_controller(controller, env, max_steps=1000):
                 best_idx = idx
 
         pt = env.pts[best_idx]
-        look_pt = env.pts[(best_idx + 14) % len(env.pts)]
+        
+        # 物理恒定弧长前瞻插值 (消灭因参数化步长不均导致的直弯 3.6 倍预瞄失真)
+        lookahead_dist = max(18.0, 24.0 + v * 0.4 - pt["curv"] * 100.0)
+        cum_d = 0.0
+        look_idx = best_idx
+        n_pts = len(env.pts)
+        while cum_d < lookahead_dist:
+            next_idx = (look_idx + 1) % n_pts
+            p1 = env.pts[look_idx]
+            p2 = env.pts[next_idx]
+            cum_d += math.hypot(p2["x"] - p1["x"], p2["y"] - p1["y"])
+            look_idx = next_idx
+            if look_idx == best_idx:
+                break
+        look_pt = env.pts[look_idx]
+
         cx, cy, r_theta, r_curv = pt["x"], pt["y"], pt["theta"], pt["curv"]
         theta_far = look_pt["theta"]
 
@@ -173,8 +188,10 @@ def evaluate_controller(controller, env, max_steps=1000):
         dy = y - cy
         signed_cte = math.cos(r_theta) * dy - math.sin(r_theta) * dx
         cte = abs(signed_cte)
-        cte_rate = (cte - prev_cte) / dt
-        prev_cte = cte
+        
+        # 真实物理带符号微分：过零点时严格保持单调连续阻尼，彻底消灭直道极限环蛇形摆动
+        signed_cte_rate = (signed_cte - prev_signed_cte) / dt
+        prev_signed_cte = signed_cte
 
         if cte > max_cte:
             max_cte = cte
@@ -199,7 +216,7 @@ def evaluate_controller(controller, env, max_steps=1000):
         rec[16] = min(1.0, r_curv * 40.0)
         rec[17] = min(1.0, r_curv * 80.0)
         rec[24] = min(1.0, v / 6.0)
-        rec[25] = max(-1.0, min(1.0, cte_rate / 5.0))
+        rec[25] = max(-1.0, min(1.0, signed_cte_rate / 4.0))
 
         steer_raw, speed_raw = controller.forward(rec)
 
@@ -209,8 +226,9 @@ def evaluate_controller(controller, env, max_steps=1000):
         jerk_sum += abs(delta - prev_delta)
         prev_delta = delta
 
-        target_v = max(3.0, min(5.5, 5.0 + speed_raw * 1.5 - r_curv * 60.0))
-        v += (target_v - v) * 0.15
+        # 弯道平滑自适应控速：直道巡航 4.8~5.2 m/s，急弯减速至 2.8~3.5 m/s 紧贴弯心
+        target_v = max(2.8, min(5.2, 4.8 + speed_raw * 1.0 - r_curv * 70.0))
+        v += (target_v - v) * 0.18
 
         beta = math.atan(0.5 * math.tan(delta))
         x += v * math.cos(theta + beta) * dt * 25.0
@@ -233,10 +251,10 @@ def evaluate_controller(controller, env, max_steps=1000):
     avg_curve_cte = curve_cte / max(1, curve_steps)
     avg_jerk = jerk_sum / max(1, steps)
     
-    # 严格多目标适应度：直道压到极限小，弯道顺滑不越界，平稳无抖动
-    fitness = (steps * 3.0) - (avg_cte * 20.0) - (avg_straight_cte * 35.0) - (max_cte * 10.0) - (avg_jerk * 40.0)
+    # 严格多目标适应度：重度压制直道 CTE 蛇形漂移与急打舵 Jerk
+    fitness = (steps * 3.5) - (avg_cte * 25.0) - (avg_straight_cte * 50.0) - (max_cte * 15.0) - (avg_jerk * 45.0)
     if steps >= max_steps:
-        fitness += 500.0 # 满分通关完赛加分
+        fitness += 600.0 # 满分通关完赛加分
 
     return {
         "fitness": fitness,

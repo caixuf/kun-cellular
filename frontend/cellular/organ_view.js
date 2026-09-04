@@ -13,7 +13,6 @@ let _organRootGroup = null;
 const _organViewsMap = new Map();
 let _isOrganVisible = false;
 
-const _sharedEnvelopeGeo = new THREE.SphereGeometry(1.0, 24, 16);
 const _sharedRingGeo = new THREE.TorusGeometry(1.0, 0.022, 8, 48);
 
 const ORGAN_BADGE_CACHE = new Map();
@@ -141,26 +140,11 @@ class OrganView {
     this.pulseTime = 0;
     this.highlightPulse = 0;
 
-    // 1. 半透明生物组织外包膜 (Translucent Organ Morphological Envelope)
-    this.envelopeMat = new THREE.MeshStandardMaterial({
-      color: this.color,
-      emissive: this.color,
-      emissiveIntensity: 0.10,
-      roughness: 0.18,
-      metalness: 0.08,
-      transparent: true,
-      opacity: 0.13,
-      side: THREE.DoubleSide,
-      depthWrite: false
-    });
-    this.envelopeMesh = new THREE.Mesh(_sharedEnvelopeGeo, this.envelopeMat);
-    this.group.add(this.envelopeMesh);
-
-    // 2. 赤道全息生物共振环 (Equatorial Holographic Lattice Ring)
+    // 1. 赤道全息生物共振环 (Equatorial Holographic Lattice Ring - 纯净轮廓，杜绝遮光球膜)
     this.ringMat = new THREE.MeshBasicMaterial({
       color: this.color,
       transparent: true,
-      opacity: 0.32,
+      opacity: 0.40,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
@@ -213,7 +197,6 @@ class OrganView {
 
     // 有机代谢呼吸节奏 (Organic Metabolic Breathing)
     const breath = 1.0 + Math.sin(t * 1.6 + this.id * 0.8) * 0.035;
-    this.envelopeMesh.scale.set(rx * breath, ry * breath, rz * breath);
     this.ringMesh.scale.set(rx * 1.03 * breath, rz * 1.03 * breath, 1.0);
 
     // 全息浮动铭牌悬浮在器官正上方
@@ -223,8 +206,7 @@ class OrganView {
     if (this.highlightPulse > 0) {
       this.highlightPulse -= 0.02;
       if (this.highlightPulse < 0) this.highlightPulse = 0;
-      this.envelopeMat.opacity = 0.13 + this.highlightPulse * 0.35;
-      this.envelopeMat.emissiveIntensity = 0.10 + this.highlightPulse * 1.5;
+      this.ringMat.opacity = 0.40 + this.highlightPulse * 0.45;
     }
   }
 
@@ -234,7 +216,6 @@ class OrganView {
 
   dispose(parentGroup) {
     if (parentGroup) parentGroup.remove(this.group);
-    if (this.envelopeMat) this.envelopeMat.dispose();
     if (this.ringMat) this.ringMat.dispose();
     if (this.badgeMat) this.badgeMat.dispose();
   }
