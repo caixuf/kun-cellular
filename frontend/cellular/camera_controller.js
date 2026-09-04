@@ -7,6 +7,7 @@ import { org as defaultOrg } from './organism_model.js';
 import { currentOrganismBounds } from './spatial_bounds.js';
 import { views as defaultViews } from './lod_system.js';
 import { log as defaultLog } from './network_sync.js';
+import { patchClampHUD } from './patch_clamp_hud.js';
 
 export const camState = {
   camTheta: 0,
@@ -188,6 +189,33 @@ export function initCameraController(
       camState.targetLookAt.lerp(_zoomHit, 1.0 - camState.targetCamR / oldCamR);
     }
   }, { passive: false });
+
+  r.domElement.addEventListener('click', e => {
+    mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    raycaster.setFromCamera(mouseNDC, cam);
+
+    const views = getViewsFn();
+    let clickedCell = null;
+    let minD = Infinity;
+
+    if (views && views.cells) {
+      for (const v of views.cells) {
+        if (!v.group || !v.group.visible) continue;
+        const wp = new THREE.Vector3(v.curX, v.curY, v.curZ);
+        const rayD = raycaster.ray.distanceToPoint(wp);
+        if (rayD < 20 && rayD < minD) {
+          minD = rayD;
+          clickedCell = v.cell;
+        }
+      }
+    }
+
+    if (clickedCell) {
+      patchClampHUD.selectCell(clickedCell, null);
+      if (logFn) logFn(`[膜片钳电生理探针] 成功挂载细胞 #${clickedCell.id} [${clickedCell.type}]，启动实时膜电位示波`, true);
+    }
+  });
 
   r.domElement.addEventListener('dblclick', e => {
     mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;

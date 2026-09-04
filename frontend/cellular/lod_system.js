@@ -10,6 +10,7 @@ import { getGlowTexture } from './texture_cache.js';
 import { getCellWorldRadius } from './spatial_bounds.js';
 import { CellView } from './cell_view.js';
 import { SynapseView } from './synapse_view.js';
+import { tractography } from './tractography.js';
 
 export const MIN_CELL_PIXELS = 20.0;
 export const MAX_SOLID_CELLS = 3000;
@@ -268,6 +269,9 @@ export function rebuildViews(s = scene, o = defaultOrg, b = currentOrganismBound
   }
   views.cells = [];
   views.syns = [];
+
+  // 重构宏观白质纤维束流形
+  tractography.rebuildTracts(orgObj, bnds);
 }
 
 const _lodCamPos = new THREE.Vector3();

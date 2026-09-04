@@ -102,15 +102,16 @@ export class SynapseView {
     const isDense = synCount > 80;
     const baseLineOp = isDense ? 0.14 : 0.28;
     this.lineMat.color.setHex(w >= 0 ? (hot ? 0x38bdf8 : 0x0284c7) : (hot ? 0xf43f5e : 0xbe123c));
-    this.lineMat.opacity = baseLineOp + Math.min(0.12, Math.abs(w) * 0.10);
+    this.lineMat.opacity = baseLineOp + Math.min(0.18, Math.abs(w) * 0.12);
 
-    const speed = (0.012 + Math.min(0.04, Math.abs(w) * 0.025)) * warpMultiplier;
+    const actA = Math.min(2.0, Math.abs(a.out || 0) + (a.glow || 0));
+    const speed = (0.014 + Math.min(0.065, actA * 0.038 + Math.abs(w) * 0.022)) * warpMultiplier;
     this.flowT1 = (this.flowT1 + speed) % 1.0;
-    this.flowT2 = (this.flowT2 + speed * 1.1) % 1.0;
+    const tailT = (this.flowT1 - 0.07 + 1.0) % 1.0; // 孤子彗尾
 
     const rBase = getCellWorldRadius(this.org);
 
-    // 囊泡 1 采样 (微透轻盈电脉冲光子，避免遮蔽体素流形)
+    // 1. 孤子波前脉冲头 (Soliton Wavefront Laser Head)
     {
       const t = this.flowT1, it = 1.0 - t;
       this.photon1.position.set(
@@ -118,31 +119,35 @@ export class SynapseView {
         it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
         it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
       );
-      const pScale1 = Math.max(0.4, (rBase * 0.28 + Math.sin(t * Math.PI) * (rBase * 0.12)) * (0.8 + Math.abs(w) * 0.2));
+      const intensity = Math.sin(t * Math.PI) * (0.8 + actA * 0.6);
+      const pScale1 = Math.max(0.6, (rBase * 0.35 + intensity * (rBase * 0.30)) * (0.9 + Math.abs(w) * 0.3));
       this.photon1.scale.set(pScale1, pScale1, 1);
-      this.photon1.material.opacity = (0.18 + Math.sin(t * Math.PI) * 0.32) * (isDense ? 0.75 : 1.0);
+      this.photon1.material.opacity = Math.min(0.95, 0.25 + intensity * 0.65);
+      this.photon1.material.color.setHex(actA > 0.6 ? 0xffffff : (w >= 0 ? 0x38bdf8 : 0xf43f5e));
     }
 
-    // 囊泡 2 采样
+    // 2. 孤子尾迹彗尾粒子 (Soliton Comet Tail)
     {
-      const t = this.flowT2, it = 1.0 - t;
+      const t = tailT, it = 1.0 - t;
       this.photon2.position.set(
         it * it * _tmpP0.x + 2.0 * it * t * _tmpP1.x + t * t * _tmpP2.x,
         it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
         it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
       );
-      const pScale2 = Math.max(0.3, (rBase * 0.22 + Math.sin(t * Math.PI) * (rBase * 0.10)) * (0.8 + Math.abs(w) * 0.2));
+      const pScale2 = Math.max(0.4, rBase * 0.24 * (0.8 + Math.abs(w) * 0.2));
       this.photon2.scale.set(pScale2, pScale2, 1);
-      this.photon2.material.opacity = (0.15 + Math.sin(t * Math.PI) * 0.28) * (isDense ? 0.75 : 1.0);
+      this.photon2.material.opacity = Math.min(0.60, 0.15 + Math.sin(t * Math.PI) * 0.35);
+      this.photon2.material.color.setHex(w >= 0 ? 0x0284c7 : 0xbe123c);
     }
 
-    // 突触终端小体 (严格依照细胞质膜物理尺度，作为微末接触点)
+    // 3. 突触终扣放电闪爆 (Synaptic Bouton Exocytosis Flash)
     this.bouton.position.copy(_tmpP2);
-    const boutonFlash = (1.0 - Math.min(1.0, this.flowT1)) * (a.glow || 0.2);
-    const bScale = Math.max(0.5, rBase * 0.36 + boutonFlash * (rBase * 0.20));
+    const isArriving = (this.flowT1 > 0.88);
+    const exocytosisPulse = isArriving ? Math.sin((this.flowT1 - 0.88) / 0.12 * Math.PI) * (1.2 + actA) : 0.0;
+    const bScale = Math.max(0.6, rBase * 0.40 + exocytosisPulse * (rBase * 0.35));
     this.bouton.scale.set(bScale, bScale, 1);
-    this.bouton.material.opacity = (0.18 + boutonFlash * 0.25) * (isDense ? 0.75 : 1.0);
-    this.bouton.material.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);
+    this.bouton.material.opacity = Math.min(0.95, 0.20 + exocytosisPulse * 0.65);
+    this.bouton.material.color.setHex(exocytosisPulse > 0.5 ? 0xffffff : (w >= 0 ? 0x38bdf8 : 0xf43f5e));
   }
 
   dispose() {

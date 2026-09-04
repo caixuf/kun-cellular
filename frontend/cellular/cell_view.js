@@ -351,15 +351,25 @@ export class CellView {
     this.label.position.set(0, -18, 0);
 
     const breath = Math.sin(time * 2.2 + this.phase) * 0.08;
-    const actIntensity = Math.min(1.5, Math.abs(c.out || 0) + (c.glow || 0));
+    const actIntensity = Math.min(2.0, Math.abs(c.out || 0) + (c.glow || 0));
 
-    // 1. 3D 外层质膜呼吸形变与发光
-    const memScale = (1.0 + breath) * (1.0 + actIntensity * 0.18);
+    // 因果脉冲去极化击穿闪光检测 (Depolarization Flash Trigger)
+    if (this.lastOut === undefined) this.lastOut = c.out || 0;
+    if (this.flashIntensity === undefined) this.flashIntensity = 0.0;
+    const deltaOut = Math.abs((c.out || 0) - this.lastOut);
+    this.lastOut = c.out || 0;
+    if (deltaOut > 0.12 || Math.abs(c.out || 0) > 0.45) {
+      this.flashIntensity = Math.min(2.8, this.flashIntensity + deltaOut * 2.5 + (Math.abs(c.out || 0) > 0.6 ? 0.8 : 0.2));
+    }
+    this.flashIntensity *= 0.90;
+
+    // 1. 3D 外层质膜呼吸形变与电位击穿发光
+    const memScale = (1.0 + breath) * (1.0 + actIntensity * 0.18 + this.flashIntensity * 0.08);
     this.outerMembraneMesh.scale.set(memScale, memScale, memScale);
-    this.outerMembraneMesh.rotation.y += 0.006;
+    this.outerMembraneMesh.rotation.y += 0.006 + this.flashIntensity * 0.02;
     this.outerMembraneMesh.rotation.x += 0.003;
-    this.outerMembraneMesh.material.emissiveIntensity = 0.06 + actIntensity * 0.30;
-    this.outerMembraneMesh.material.opacity = 0.38 + Math.min(0.20, actIntensity * 0.15);
+    this.outerMembraneMesh.material.emissiveIntensity = 0.06 + actIntensity * 0.35 + this.flashIntensity * 0.85;
+    this.outerMembraneMesh.material.opacity = 0.38 + Math.min(0.35, actIntensity * 0.18 + this.flashIntensity * 0.30);
 
     // 1.2 内层膜同步呼吸 (保持在膜间质腔内侧)
     if (this.innerMembraneMesh && this.innerMembraneMesh.visible) {

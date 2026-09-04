@@ -8,6 +8,7 @@ import { org, compile, forward } from './organism_model.js';
 import { currentOrganismBounds, updateOrganismBounds } from './spatial_bounds.js';
 import { rebuildViews, views, lodPointsMesh } from './lod_system.js';
 import { camState } from './camera_controller.js';
+import { embodiedPIP } from './embodied_pip.js';
 
 export let serverOnline = false;
 export let wsConnected = false;
@@ -731,5 +732,10 @@ export function updateFromBackendState(data) {
         if (remote.gain !== undefined) v.cell.gain = remote.gain;
       }
     }
+  }
+
+  // 具身画中画数字孪生实时渲染同步
+  if (data.embodied_twin) {
+    embodiedPIP.update(data);
   }
 }

@@ -18,6 +18,8 @@ import { startAutoTour, showTourStep, nextTourStep, prevTourStep, endAutoTour, i
 import { currentSelectedOrgId, currentHighlightedBookId, currentRenderMode, currentLOD, ORGAN_DESCRIPTIONS, onOrganSelectionChange, onRowClick, toggleTreeNode, toggleDock, openLibraryDrawer, toggleHabitatMenu, selectOrganism, highlightBookSubcircuit, loadPreset, switchLOD, setRenderMode, pollLibrary } from './organism_library.js';
 import { currentFluidPhase, setFluidPhase, generateFractalLightningPoints, spawnDielectricBreakdownArc, triggerExtinctionLightningBurst, triggerExtinctionVisualShock } from './plasma_effects.js';
 import { initOrganSystem, updateOrganSystem, toggleOrganVisibility, focusOrgan } from './organ_view.js';
+import { patchClampHUD } from './patch_clamp_hud.js';
+import { tractography } from './tractography.js';
 
 // 1. 初始化后处理通道与镜头控制
 initPostprocessing(renderer, scene, camera);
@@ -151,6 +153,10 @@ function animate() {
       if (v.bouton && v.bouton.material) v.bouton.material.opacity = closeLook ? 0.75 : 0.40;
     }
   }
+
+  // 3.8 膜片钳实时电位示波与白质纤维束伴随光子流推进
+  patchClampHUD.update(now * 0.001);
+  tractography.update(now * 0.001, clientWarpMultiplier);
 
   const ptCount = (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.position) ? lodPointsMesh.geometry.attributes.position.count : totalCellCount;
   const realCellsEl = document.getElementById("st-real-cells");
