@@ -18,3 +18,4 @@ runs/
 *.tmp
 bin/
 checkpoints/vehicle_cortex_champion.json
+scratch/
