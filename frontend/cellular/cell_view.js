@@ -1,5 +1,6 @@
 /* ============================================================
- * cell_view.js - 生物拟真 3D 实体多层细胞计算结构
+ * cell_view.js - 生物拟真 3D 实体多层细胞计算结构与相空间显微透视
+ * 包含：双脂质质膜、微管蛋白细胞骨架、16阶环形时滞轮盘、相空间极限环吸引子、核仁与线粒体
  * ============================================================ */
 import * as THREE from 'three';
 import { FAMILY, FAMILY_COLOR } from './config.js';
@@ -24,19 +25,30 @@ export class CellView {
     const col = FAMILY_COLOR[fam] || 0x38bdf8;
     const glow = getGlowTexture();
 
-    // 1. 3D 半透明双脂质细胞质膜
+    // 1. 3D 半透明双脂质细胞质膜 (Lipid Bilayer Shell)
     const membraneGeo = new THREE.IcosahedronGeometry(13, 3);
     const membraneMat = new THREE.MeshStandardMaterial({
       color: col,
       roughness: 0.35,
       metalness: 0.12,
       transparent: true,
-      opacity: 0.52,
+      opacity: 0.48,
       emissive: col,
       emissiveIntensity: 0.08,
       depthWrite: false
     });
     this.membraneMesh = new THREE.Mesh(membraneGeo, membraneMat);
+
+    // 1.5 细胞微管蛋白骨架晶格 (Cytoskeleton Microtubule Lattice)
+    const cytoGeo = new THREE.IcosahedronGeometry(12.5, 2);
+    const cytoMat = new THREE.MeshBasicMaterial({
+      color: col,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.14,
+      depthWrite: false
+    });
+    this.cytoMesh = new THREE.Mesh(cytoGeo, cytoMat);
 
     // 2. 外层生物发光晕
     const haloMat = new THREE.SpriteMaterial({
@@ -50,8 +62,8 @@ export class CellView {
     this.membrane = new THREE.Sprite(haloMat);
     this.membrane.scale.set(24, 24, 1);
 
-    // 3. 细胞核中枢与致密核仁
-    const coreGeo = new THREE.SphereGeometry(6.0, 20, 20);
+    // 3. 细胞核中枢与致密核仁 (26类动力学原语内核)
+    const coreGeo = new THREE.SphereGeometry(5.8, 20, 20);
     const coreMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       emissive: col,
@@ -61,9 +73,53 @@ export class CellView {
     });
     this.nucleus = new THREE.Mesh(coreGeo, coreMat);
 
+    // 3.5 16阶环形时滞数据轮盘 (16-step Ring Delay Buffer Carousel)
+    const delayPoints = new Float32Array(16 * 3);
+    const delayRadius = 8.4;
+    for (let i = 0; i < 16; i++) {
+      const th = (i / 16) * Math.PI * 2;
+      delayPoints[i * 3]     = Math.cos(th) * delayRadius;
+      delayPoints[i * 3 + 1] = Math.sin(th) * delayRadius;
+      delayPoints[i * 3 + 2] = 0;
+    }
+    const delayGeo = new THREE.BufferGeometry();
+    delayGeo.setAttribute('position', new THREE.BufferAttribute(delayPoints, 3));
+    const delayMat = new THREE.PointsMaterial({
+      size: 2.0,
+      map: glow,
+      color: col,
+      transparent: true,
+      opacity: 0.42,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.delayRing = new THREE.Points(delayGeo, delayMat);
+
+    // 3.8 动力学相空间极限环吸引子 (Phase-Space Limit Cycle Ribbon)
+    const ATTR_SEGS = 36;
+    const attrPoints = new Float32Array((ATTR_SEGS + 1) * 3);
+    for (let i = 0; i <= ATTR_SEGS; i++) {
+      const t = (i / ATTR_SEGS) * Math.PI * 2;
+      const a = 6.2;
+      const denom = 1.0 + Math.sin(t) * Math.sin(t);
+      attrPoints[i * 3]     = (a * Math.cos(t)) / denom;
+      attrPoints[i * 3 + 1] = (a * Math.sin(t) * Math.cos(t)) / denom;
+      attrPoints[i * 3 + 2] = Math.sin(t * 2.0) * 2.0;
+    }
+    const attrGeo = new THREE.BufferGeometry();
+    attrGeo.setAttribute('position', new THREE.BufferAttribute(attrPoints, 3));
+    const attrMat = new THREE.LineBasicMaterial({
+      color: col,
+      transparent: true,
+      opacity: 0.32,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.attrRibbon = new THREE.Line(attrGeo, attrMat);
+
     // 4. 围绕细胞核公转的 3 颗线粒体/能量细胞器
     this.organelles = [];
-    const orgGeo = new THREE.SphereGeometry(1.8, 12, 12);
+    const orgGeo = new THREE.SphereGeometry(1.6, 12, 12);
     for (let k = 0; k < 3; ++k) {
       const orgMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
@@ -74,7 +130,7 @@ export class CellView {
       const orgMesh = new THREE.Mesh(orgGeo, orgMat);
       this.organelles.push({
         mesh: orgMesh,
-        orbitR: 9.5 + k * 1.5,
+        orbitR: 9.8 + k * 1.5,
         speed: 2.2 + k * 0.8,
         tilt: (k * Math.PI) / 3
       });
@@ -101,8 +157,11 @@ export class CellView {
 
     this.group = new THREE.Group();
     this.group.add(this.membraneMesh);
+    this.group.add(this.cytoMesh);
     this.group.add(this.membrane);
     this.group.add(this.nucleus);
+    this.group.add(this.delayRing);
+    this.group.add(this.attrRibbon);
     this.group.add(this.shockwaveRing);
     for (const o of this.organelles) {
       this.group.add(o.mesh);
@@ -148,6 +207,12 @@ export class CellView {
     this.membraneMesh.material.emissiveIntensity = 0.06 + actIntensity * 0.30;
     this.membraneMesh.material.opacity = 0.45 + Math.min(0.20, actIntensity * 0.15);
 
+    // 1.5 细胞微管骨架随动慢旋
+    this.cytoMesh.scale.set(memScale, memScale, memScale);
+    this.cytoMesh.rotation.y += 0.004;
+    this.cytoMesh.rotation.z += 0.002;
+    this.cytoMesh.material.opacity = 0.10 + actIntensity * 0.15;
+
     // 2. 最外层氛围光晕
     const haloScale = (22 + breath * 4) * (1.0 + actIntensity * 0.20);
     this.membrane.scale.set(haloScale, haloScale, 1);
@@ -157,6 +222,19 @@ export class CellView {
     const nScale = 1.0 + actIntensity * 0.20;
     this.nucleus.scale.set(nScale, nScale, nScale);
     this.nucleus.material.emissiveIntensity = 0.45 + actIntensity * 0.65;
+
+    // 3.5 16阶环形时滞数据轮盘旋转自旋
+    this.delayRing.rotation.z += (0.012 + actIntensity * 0.03) * warpMultiplier;
+    this.delayRing.rotation.x = Math.sin(time * 0.5 + this.phase) * 0.25;
+    this.delayRing.material.opacity = 0.25 + actIntensity * 0.35;
+    this.delayRing.material.size = 1.8 + actIntensity * 1.2;
+
+    // 3.8 相空间极限环双纽吸引子实时翻滚
+    this.attrRibbon.rotation.x += 0.010 * warpMultiplier;
+    this.attrRibbon.rotation.y += 0.016 * warpMultiplier;
+    const ribScale = 1.0 + Math.sin(time * 3.0 + this.phase) * 0.12 + Math.min(0.3, Math.abs(c.state || 0) * 0.15);
+    this.attrRibbon.scale.set(ribScale, ribScale, ribScale);
+    this.attrRibbon.material.opacity = 0.22 + actIntensity * 0.45;
 
     // 4. 线粒体能量颗粒公转
     for (let k = 0; k < this.organelles.length; ++k) {
@@ -188,8 +266,14 @@ export class CellView {
     if (this.labelMat) this.labelMat.dispose();
     if (this.membraneMesh.geometry) this.membraneMesh.geometry.dispose();
     if (this.membraneMesh.material) this.membraneMesh.material.dispose();
+    if (this.cytoMesh.geometry) this.cytoMesh.geometry.dispose();
+    if (this.cytoMesh.material) this.cytoMesh.material.dispose();
     if (this.nucleus.geometry) this.nucleus.geometry.dispose();
     if (this.nucleus.material) this.nucleus.material.dispose();
+    if (this.delayRing.geometry) this.delayRing.geometry.dispose();
+    if (this.delayRing.material) this.delayRing.material.dispose();
+    if (this.attrRibbon.geometry) this.attrRibbon.geometry.dispose();
+    if (this.attrRibbon.material) this.attrRibbon.material.dispose();
     if (this.shockwaveRing.geometry) this.shockwaveRing.geometry.dispose();
     if (this.shockwaveRing.material) this.shockwaveRing.material.dispose();
     for (const o of this.organelles) {
