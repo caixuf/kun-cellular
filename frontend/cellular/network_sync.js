@@ -535,7 +535,7 @@ export function updateFromBackendState(data) {
     currentSelectedOrgId = data.organism_id;
   }
 
-  const topoFingerprint = `${data.organism_id || ''}_${data.cells.length}_${(data.synapses || []).length}`;
+  const topoFingerprint = `${data.organism_id || ''}_${data.cells.length}_${data.macro_synapses || (data.synapses || []).length}`;
   if (org.lastFingerprint !== topoFingerprint) {
     org.lastFingerprint = topoFingerprint;
     org.generation = data.generation;

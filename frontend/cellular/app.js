@@ -301,7 +301,7 @@ pollBiosphere();
 setInterval(pollBiosphere, 2000);
 pollLibrary();
 setInterval(pollLibrary, 5000);
-setInterval(syncBackendState, 33);
+setInterval(syncBackendState, 100);
 connectWebSocket();
 
 setInterval(() => { if (!paused && !serverOnline) { mitosis(org); rebuildViews(scene, org, currentOrganismBounds); } }, 14000);

@@ -372,8 +372,10 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
       if (adj) {
         for (const key of adj) {
           wantSyn.add(key);
+          if (wantSyn.size >= MAX_MACRO_SYNS) break;
         }
       }
+      if (wantSyn.size >= MAX_MACRO_SYNS) break;
     }
   }
 

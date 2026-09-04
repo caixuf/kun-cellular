@@ -2320,8 +2320,8 @@ class SiliconCellularOrganism:
                 "organ_bank": organ_bank_summary,
                 "last_extinction": getattr(self, "last_extinction_report", None),
                 "cells": cells_data,
-                "synapses": self.synapses,
-                "syns": self.synapses,
+                "synapses": self.synapses[:256] if len(self.synapses) > 256 else self.synapses,
+                "syns": self.synapses[:256] if len(self.synapses) > 256 else self.synapses,
                 "stats": {
                     "steps": self.phy_steps,
                     "active_cells": getattr(self, "macro_cells", len(self.cells)),
