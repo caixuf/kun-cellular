@@ -1432,6 +1432,9 @@
 
   <!-- 右侧极简状态与具身生境抽屉 -->
   <div class="header-right-bar">
+    <button class="nav-tab-btn" onclick="openLibraryDrawer()" id="btn-open-library" title="打开生命体树状谱系与工程规格书架，切换生命体或研读源码" style="border-color:rgba(56,189,248,0.55);color:var(--cyan);font-weight:bold;background:rgba(56,189,248,0.12);">
+      [ 切换生命体 / 规格书 ]
+    </button>
     <div class="habitat-dropdown-container">
       <button class="nav-tab-btn" onclick="toggleHabitatMenu()" id="btn-habitat-menu">
         <span>具身生境</span>
@@ -1490,7 +1493,7 @@
 <div id="stage"></div>
 
 <!-- 侧边坞浮动折叠控制器 (Collapsible Dock Toggles) -->
-<button id="btn-toggle-left" class="dock-toggle-btn collapsed" onclick="toggleDock('left')" title="展开/收起左侧控制坞">[ 控制坞 ]</button>
+<button id="btn-toggle-left" class="dock-toggle-btn collapsed" onclick="toggleDock('left')" title="展开/收起左侧生命体谱系与工程规格书架">[ 切换生命体 / 规格书 ]</button>
 <button id="btn-toggle-right" class="dock-toggle-btn collapsed" onclick="toggleDock('right')" title="展开/收起右侧遥测坞">[ 遥测坞 ]</button>
 
 <!-- 左侧控制坞 (Left Dock) - 默认折叠收纳 -->
@@ -4157,7 +4160,7 @@ window.toggleDock = function(side) {
     if (dock && btn) {
       const isCol = dock.classList.toggle('collapsed');
       btn.classList.toggle('collapsed', isCol);
-      btn.textContent = isCol ? '[ 控制坞 ]' : '[ ◀ 收起 ]';
+      btn.textContent = isCol ? '[ 切换生命体 / 规格书 ]' : '[ ◀ 收起 ]';
     }
   } else if (side === 'right') {
     const dock = document.querySelector('.dock-right');
@@ -4168,6 +4171,29 @@ window.toggleDock = function(side) {
       btn.textContent = isCol ? '[ 遥测坞 ]' : '[ 收起 ▶ ]';
     }
   }
+};
+
+window.openLibraryDrawer = function() {
+  const dock = document.querySelector('.dock-left');
+  const btn = document.getElementById('btn-toggle-left');
+  if (dock) {
+    dock.classList.remove('collapsed');
+    if (btn) {
+      btn.classList.remove('collapsed');
+      btn.textContent = '[ ◀ 收起 ]';
+    }
+  }
+  const libCard = document.getElementById('card-library');
+  if (libCard) {
+    libCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    libCard.style.outline = '2px solid var(--cyan)';
+    libCard.style.boxShadow = '0 0 24px rgba(56,189,248,0.5)';
+    setTimeout(() => {
+      libCard.style.outline = '';
+      libCard.style.boxShadow = '';
+    }, 2000);
+  }
+  log('[书架] 已展开【生命体谱系树与工程规格书架】，点击任一生命体可切换形态，点击 [查源码] 可研读真实规格书！', true);
 };
 
 window.toggleHabitatMenu = function() {
