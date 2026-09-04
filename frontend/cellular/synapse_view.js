@@ -108,16 +108,9 @@ export class SynapseView {
     this.flowT1 = (this.flowT1 + speed) % 1.0;
     this.flowT2 = (this.flowT2 + speed * 1.1) % 1.0;
 
-    // 囊泡 1 采样 (微透轻盈电脉冲光子，避免遮蔽体素流形)
-    {
-      const t = this.flowT1, it = 1.0 - t;
-      this.photon1.position.set(
-        it * it * _tmpP0.x + 2.0 * it * t * _tmpP1.x + t * t * _tmpP2.x,
-        it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
-        it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
-      );
     const rBase = getCellWorldRadius(this.org);
-    // 动作电位囊泡与终扣大小严格遵循真实物理细胞比例 (光子 ~ 0.25 rBase, 终扣 ~ 0.35 rBase)
+
+    // 囊泡 1 采样 (微透轻盈电脉冲光子，避免遮蔽体素流形)
     {
       const t = this.flowT1, it = 1.0 - t;
       this.photon1.position.set(

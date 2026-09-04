@@ -101,6 +101,10 @@ def check_es_modules(dir_path: Path) -> list[str]:
     exports_map = {}
 
     for js_file in js_files:
+        res = subprocess.run(["node", "--check", str(js_file)], capture_output=True, text=True)
+        if res.returncode != 0:
+            errors.append(f"{js_file.name}: Syntax error:\n{res.stderr.strip()}")
+
         content = js_file.read_text(encoding="utf-8")
         exps = set()
         for m in re.finditer(r'export\s+(?:function|const|let|var|class|async\s+function)\s+([a-zA-Z0-9_$]+)', content):
