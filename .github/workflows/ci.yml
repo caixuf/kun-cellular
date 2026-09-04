@@ -25,6 +25,9 @@ jobs:
     - name: Run Substrate Purity Guard
       run: python3 tools/ci/check_substrate_purity.py
 
+    - name: Run Architectural Discipline & Binary LOD Guard
+      run: python3 tools/ci/check_architecture_discipline.py
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
