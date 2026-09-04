@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { org } from './organism_model.js';
 import { currentOrganismBounds, updateOrganismBounds } from './spatial_bounds.js';
 import { camState } from './camera_controller.js';
-import { views, lodPointsMesh } from './lod_system.js';
+import { views, lodPointsMesh, rebuildViews } from './lod_system.js';
 import { FAMILY, FAMILY_COLOR } from './config.js';
 import { log, syncBackendState, setCurrentSelectedOrgId } from './network_sync.js';
 import { cellPointLight } from './scene_setup.js';
@@ -225,9 +225,22 @@ export async function selectOrganism(organismId, organismName) {
       }
 
       updateOrganismBounds(data.result);
-      camState.targetLookAt.copy(currentOrganismBounds.center);
-      camState.targetCamR = currentOrganismBounds.macroDist;
-      camState.isCamTransitioning = true;
+      const targetScale = data.result.cells_scale || data.result.macro_cells || data.result.cells_count || 1024;
+      const isTargetLarge = (targetScale >= 100000) || (data.result.cells_count > 3000);
+      if (isTargetLarge) {
+        // 超大规模生命体：立即清理上一生命体残留的实体网格，直接将镜头闪切到宏观全景视距，开局 100% 纯点云流形
+        rebuildViews();
+        camState.targetLookAt.copy(currentOrganismBounds.center);
+        camState.targetCamR = currentOrganismBounds.macroDist;
+        camState.camR = currentOrganismBounds.macroDist;
+        camState.camTheta = 0;
+        camState.camPhi = Math.PI / 2;
+        camState.isCamTransitioning = false;
+      } else {
+        camState.targetLookAt.copy(currentOrganismBounds.center);
+        camState.targetCamR = currentOrganismBounds.macroDist;
+        camState.isCamTransitioning = true;
+      }
       syncBackendState().catch(() => {});
     }
   } catch (e) {
@@ -457,8 +470,10 @@ export function switchLOD(mode) {
     log(" 聚焦至: 流形过渡视距");
   } else if (mode === "1m") {
     camState.targetCamR = currentOrganismBounds.macroDist || 580;
-    loadPreset("adas");
-    log(" 聚焦至: 宏观点云视距 (按屏幕像素密度自动 LOD 实化)");
+    camState.camR = currentOrganismBounds.macroDist || 580;
+    camState.isCamTransitioning = false;
+    loadPreset("1m");
+    log(" 聚焦至: 1M 宏观点云流形 (纯点云流形呈现，推近按像素门禁局部实化)");
   }
 }
 

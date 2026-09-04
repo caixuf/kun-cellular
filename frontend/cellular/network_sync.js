@@ -575,7 +575,15 @@ export function updateFromBackendState(data) {
     if (isNewOrg) {
       camState.targetLookAt.copy(currentOrganismBounds.center);
       camState.targetCamR = currentOrganismBounds.macroDist;
-      camState.isCamTransitioning = true;
+      const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || org.cells.length;
+      if (cellScale >= 100000 || org.cells.length > 3000) {
+        camState.camR = currentOrganismBounds.macroDist;
+        camState.camTheta = 0;
+        camState.camPhi = Math.PI / 2;
+        camState.isCamTransitioning = false;
+      } else {
+        camState.isCamTransitioning = true;
+      }
     }
     log(`[GROWTH] 通用拓扑流形与宇宙相对空间重构: ${data.organism_id || 'SDSCC'} (${(currentOrganismBounds.cellScale || org.cells.length).toLocaleString()} 细胞 · 半径 ${currentOrganismBounds.radius.toFixed(1)}m · 宇宙体积占比 ${((currentOrganismBounds.volumeRatio || 0) * 100).toFixed(4)}%)`, true);
   }

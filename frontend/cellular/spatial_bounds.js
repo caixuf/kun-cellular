@@ -121,7 +121,8 @@ export function getCellWorldRadius(org = defaultOrg) {
   const R = (currentOrganismBounds && currentOrganismBounds.radius) || 180;
   const n = (o && o.cells && o.cells.length) ? o.cells.length : 12;
   const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || n;
-  if (cellScale >= 10000000) return 2.0;
-  if (cellScale >= 1000000) return 2.6;
-  return Math.max(2.8, Math.min(6.5, (R / Math.cbrt(n)) * 0.42));
+  if (cellScale >= 100000000) return 0.35;
+  if (cellScale >= 10000000) return 0.55;
+  if (cellScale >= 1000000) return 0.85;
+  return Math.max(2.8, Math.min(6.5, (R / Math.cbrt(cellScale)) * 0.42));
 }
