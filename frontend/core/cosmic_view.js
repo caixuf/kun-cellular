@@ -222,7 +222,8 @@ export class CosmicView {
     this.blowoutCarCyan = null;
     this.blowoutCarRed = null;
 
-    this.targetCameraPos = new THREE.Vector3(0, 120, 260);
+    this.isFirstOrganismLoad = true;
+    this.targetCameraPos = new THREE.Vector3(0, 400, 950);
     this.targetControlsTarget = new THREE.Vector3(0, 0, 0);
 
     this.phaseCanvas = null;
@@ -242,7 +243,7 @@ export class CosmicView {
     const height = this.container.clientHeight || window.innerHeight;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x02040a, 0.00015);
+    this.scene.fog = new THREE.FogExp2(0x02040a, 0.00005);
 
     this.camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 50000);
     this.camera.position.copy(this.targetCameraPos);
@@ -684,14 +685,14 @@ export class CosmicView {
     pcGeom.setAttribute("position", new THREE.BufferAttribute(geo.positions, 3));
     pcGeom.setAttribute("color", new THREE.BufferAttribute(geo.colors, 3));
 
-    // 视觉尺寸自适应：大尺度形成细腻星云，微观尺度形成璀璨星团
-    const pcSize = org.nominalScale > 10000000 ? 3.2 : (org.nominalScale > 100000 ? 4.6 : (isMicroScale ? 8.5 : 6.0));
+    // 视觉尺寸自适应：确保无论距离远近，点阵都如繁星闪耀
+    const pcSize = org.nominalScale > 10000000 ? Math.max(6.5, geo.trueRadius * 0.024) : (org.nominalScale > 100000 ? 8.0 : (isMicroScale ? 12.0 : 9.0));
     const pcMat = new THREE.PointsMaterial({
       size: pcSize,
       map: this.glowTexture,
       vertexColors: true,
       transparent: true,
-      opacity: 0.88,
+      opacity: 0.95,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
       sizeAttenuation: true
@@ -754,7 +755,7 @@ export class CosmicView {
     console.log(`[CosmicView] Organism Loaded: ${geo.numCells} cells (scale: ${org.nominalScale}), trueRadius=${geo.trueRadius.toFixed(1)}m. Pure point cloud & neural filaments rendered.`);
   }
 
-  _adjustCameraToOrganism(org) {
+  _adjustCameraToOrganism(org, immediate = false) {
     if (!org || !org.geometry) return;
     const r = org.geometry.trueRadius;
 
@@ -762,6 +763,14 @@ export class CosmicView {
     const viewDist = Math.max(16.0, r * 2.2);
     this.targetCameraPos.set(0, viewDist * 0.45, viewDist * 1.05);
     this.targetControlsTarget.set(0, 0, 0);
+
+    // 初次加载或大尺度切换时直接瞬移，彻底消除相机由近及远慢速移动导致的开屏黑屏感
+    if (this.isFirstOrganismLoad || immediate || Math.abs(this.camera.position.length() - this.targetCameraPos.length()) > 80) {
+      this.camera.position.copy(this.targetCameraPos);
+      this.controls.target.copy(this.targetControlsTarget);
+      this.controls.update();
+      this.isFirstOrganismLoad = false;
+    }
   }
 
   _updateHUDDetails(org) {

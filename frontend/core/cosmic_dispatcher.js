@@ -47,8 +47,8 @@ export class CosmicDispatcher {
       }
     });
 
-    // 5. 启动遥测流式监听 (40Hz 轮询，计算移交 Worker)
-    this._startTelemetryPolling();
+    // 5. 启动遥测流式监听 (优先 WebSocket，降级为非阻塞防拥塞 HTTP 轮询)
+    this._startTelemetryStream();
 
     console.log("[CosmicDispatcher] SDSCC MVD Engine initialized successfully.");
   }
@@ -97,29 +97,69 @@ export class CosmicDispatcher {
     });
   }
 
-  /**
-   * 启动遥测流拉取与解算
-   */
-  _startTelemetryPolling() {
-    if (this.telemetryInterval) clearInterval(this.telemetryInterval);
+  _startTelemetryStream() {
+    this._initWebSocketTelemetry();
+  }
 
-    this.telemetryInterval = setInterval(async () => {
-      if (!this.model.status.isPlaying) return;
+  _initWebSocketTelemetry() {
+    try {
+      const loc = window.location;
+      const wsProtocol = loc.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${wsProtocol}//${loc.host}/ws`;
+      this.ws = new WebSocket(wsUrl);
 
+      this.ws.onopen = () => {
+        console.log("[CosmicDispatcher] WebSocket telemetry stream connected.");
+      };
+
+      this.ws.onmessage = (e) => {
+        if (!this.model.status.isPlaying) return;
+        try {
+          const rawFrame = JSON.parse(e.data);
+          this.worker.postMessage({
+            type: "PROCESS_TELEMETRY_FRAME",
+            payload: rawFrame
+          });
+        } catch (err) {}
+      };
+
+      this.ws.onerror = () => {
+        this.ws = null;
+        this._startHttpPollingFallback();
+      };
+
+      this.ws.onclose = () => {
+        this.ws = null;
+        this._startHttpPollingFallback();
+      };
+    } catch (e) {
+      this._startHttpPollingFallback();
+    }
+  }
+
+  _startHttpPollingFallback() {
+    if (this.telemetryTimeout) clearTimeout(this.telemetryTimeout);
+
+    const poll = async () => {
+      if (!this.model.status.isPlaying) {
+        this.telemetryTimeout = setTimeout(poll, 250);
+        return;
+      }
       try {
         const res = await fetch("/api/state", { cache: "no-store" });
         if (res.ok) {
           const rawFrame = await res.json();
-          // 将高频遥测帧投递给 Worker 处理相空间解算
           this.worker.postMessage({
             type: "PROCESS_TELEMETRY_FRAME",
             payload: rawFrame
           });
         }
-      } catch (err) {
-        // 静默处理轮询异常（例如后端离线）
-      }
-    }, 25); // 40Hz
+      } catch (err) {}
+      // 严格串行防拥塞：前一个请求彻底返回后，延迟 150ms (约6.6Hz) 再发起下一个
+      this.telemetryTimeout = setTimeout(poll, 150);
+    };
+
+    this.telemetryTimeout = setTimeout(poll, 150);
   }
 
   /**

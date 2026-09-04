@@ -617,40 +617,62 @@
     startApp();
   }
 
-  // 全局交互暴露
+  const LIFEFORM_SCALES = {
+    "adas_world_model_100m": 100000000,
+    "adas_occupancy_10m": 10000000,
+    "adas_transient_1m": 1000000,
+    "adas_cortex_champion": 210,
+    "fluid_damper_champion": 40,
+    "primordial_life_champion": 16,
+    "maze_navigation_champion": 13,
+    "cartpole_balance_champion": 12
+  };
+
+  // 全局交互暴露：零延迟毫秒级直出
   window.selectOrganism = async function(orgId) {
     document.querySelectorAll(".org-btn").forEach(b => {
       const isSel = (b.getAttribute("onclick") || "").includes(orgId);
       b.classList.toggle("active", isSel);
     });
 
+    let loadedFast = false;
+    // 1. 优先极速读取本地检查点文件 (毫秒级直出，杜绝黑屏等待)
     try {
-      const res = await fetch("/api/organism/switch?id=" + encodeURIComponent(orgId));
-      const resData = await res.json();
-      if (resData.status === "ok") {
+      const ckptRes = await fetch(`/checkpoints/${orgId}.json`, { cache: "force-cache" });
+      if (ckptRes.ok) {
+        const rawCkpt = await ckptRes.json();
+        if (!rawCkpt.cells_scale && LIFEFORM_SCALES[orgId]) {
+          rawCkpt.cells_scale = LIFEFORM_SCALES[orgId];
+        }
+        dispatcher.loadOrganism({
+          id: orgId,
+          name: rawCkpt.name || orgId,
+          domain: rawCkpt.domain || "具身智能",
+          rawCells: rawCkpt.cells || [],
+          rawSynapses: rawCkpt.synapses || []
+        }, rawCkpt);
+        switchScenario("cosmic");
+        loadedFast = true;
+      }
+    } catch (e) {}
+
+    // 2. 后台异步通知后端仿真引擎同步 (非阻塞)
+    try {
+      fetch("/api/organism/switch?id=" + encodeURIComponent(orgId)).catch(() => {});
+      if (!loadedFast) {
         const stateRes = await fetch("/api/cellular/organism");
         const rawTopo = await stateRes.json();
         dispatcher.loadOrganism({
           id: orgId,
-          name: resData.result.name || orgId,
-          domain: resData.result.domain || "具身控制",
+          name: orgId,
+          domain: "具身控制",
           rawCells: rawTopo.cells || [],
           rawSynapses: rawTopo.synapses || []
         }, rawTopo);
-
-        // 默认进入算力宇宙空间呈现真实生命体
         switchScenario("cosmic");
       }
     } catch (e) {
-      console.warn("加载生命体异常，使用离线兜底:", e);
-      try {
-        const ckptRes = await fetch(`/checkpoints/${orgId}.json`);
-        if (ckptRes.ok) {
-          const rawCkpt = await ckptRes.json();
-          dispatcher.loadOrganism({ id: orgId, name: orgId }, rawCkpt);
-          switchScenario("cosmic");
-        }
-      } catch (err) {}
+      console.warn("[Observatory] Organism sync warning:", e);
     }
   };
 
