@@ -3480,6 +3480,7 @@ window.setVisualBloomMode = function(mode) {
 
   if (mode === 'scientific') {
     if (bloomPass) {
+      bloomPass.enabled = true;
       bloomPass.strength = 0.22;
       bloomPass.threshold = 0.88;
       bloomPass.radius = 0.20;
@@ -3488,6 +3489,7 @@ window.setVisualBloomMode = function(mode) {
     log('[视觉调光] 已切换为【舒适科研模式】：适度微泛光，细胞质膜棱角与突触因果纤毫毕现。', true);
   } else if (mode === 'cinematic') {
     if (bloomPass) {
+      bloomPass.enabled = true;
       bloomPass.strength = 0.38;
       bloomPass.threshold = 0.82;
       bloomPass.radius = 0.28;
@@ -3496,10 +3498,11 @@ window.setVisualBloomMode = function(mode) {
     log('[视觉调光] 已切换为【柔和微光模式】：深空生物荧光氛围，温润不刺眼。', true);
   } else if (mode === 'off') {
     if (bloomPass) {
+      bloomPass.enabled = false;
       bloomPass.strength = 0.0;
     }
     renderer.toneMappingExposure = 0.95;
-    log('[视觉调光] 已【关闭辉光】：100% 原始三维渲染，杜绝任何泛光。', true);
+    log('[视觉调光] 已【关闭辉光】：完全跳过后处理泛光通道，100% 原始三维高性能渲染。', true);
   }
 };
 
