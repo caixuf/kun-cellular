@@ -179,6 +179,8 @@ function processOrganismTopology(data) {
     gpuName: HARDWARE_SPECS.gpuName,
     vramMB: HARDWARE_SPECS.vramMB,
     parseDurationMs: parseDurationMs.toFixed(2),
+    rawCells: cells.slice(0, 400),
+    rawSynapses: synapses.slice(0, 800),
     numCells,
     synCount,
     positions,

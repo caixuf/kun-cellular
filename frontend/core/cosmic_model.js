@@ -97,6 +97,8 @@ export class CosmicModel {
     this.organism.volumeRatio = workerPayload.volumeRatio;
     this.organism.volumeRatioPercent = workerPayload.volumeRatioPercent;
     this.organism.trueRadius = workerPayload.trueRadius;
+    this.organism.rawCells = workerPayload.rawCells || meta.rawCells || [];
+    this.organism.rawSynapses = workerPayload.rawSynapses || meta.rawSynapses || [];
     this.organism.geometry = workerPayload;
 
     this.emit("ORGANISM_LOADED", this.organism);

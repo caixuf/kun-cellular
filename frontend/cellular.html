@@ -633,7 +633,9 @@
         dispatcher.loadOrganism({
           id: orgId,
           name: resData.result.name || orgId,
-          domain: resData.result.domain || "具身控制"
+          domain: resData.result.domain || "具身控制",
+          rawCells: rawTopo.cells || [],
+          rawSynapses: rawTopo.synapses || []
         }, rawTopo);
 
         // 默认进入算力宇宙空间呈现真实生命体
