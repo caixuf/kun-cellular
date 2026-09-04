@@ -51,13 +51,13 @@ export async function sendDialogueMsg(views, FAMILY, FAMILY_COLOR, logFn) {
     const r = await fetch("/api/dialogue?q=" + encodeURIComponent(q));
     const d = await r.json();
     if (box) {
-      box.innerHTML += `<div class="msg-bot"><span class="bot-badge">[SDSCC-100M-ORGAN]</span>${d.response || '电位传导完成。'}</div>`;
+      box.innerHTML += `<div class="msg-bot"><span class="bot-badge">[硅基冠军生命体]</span>${d.response || '电位传导完成。'}</div>`;
       box.scrollTop = box.scrollHeight;
     }
     if (logFn) logFn(`[神经对话] 细胞动作电位已解码为自然语言输出`, true);
   } catch (e) {
     if (box) {
-      box.innerHTML += `<div class="msg-bot" style="color:var(--rose);"><span class="bot-badge">[ERROR]</span>网络电位传导受阻。</div>`;
+      box.innerHTML += `<div class="msg-bot" style="color:var(--rose);"><span class="bot-badge">[网络受阻]</span>网络电位传导受阻。</div>`;
     }
   }
 

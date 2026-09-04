@@ -14,14 +14,14 @@
       "test_suite": "tests/test_adas_scales.cpp",
       "validation_report": "一亿细胞常驻显存仅 2.76GB，单步延迟 14.8ms (67.4 Hz)，5.07s 预测地平线，视线盲区反事实因果分裂探索达标",
       "input_signals": [
-        "VOXEL_GEOMETRY_1024CH",
-        "OCCLUSION_MASK",
-        "EGO_KINEMATICS"
+        "1024通道体素时空几何",
+        "动态视线遮挡感知掩膜",
+        "本车高维运动学状态"
       ],
       "action_outputs": [
-        "COUNTERFACTUAL_ROLLOUT_128CH",
-        "RISK_POTENTIAL_FIELD",
-        "LONG_HORIZON_TRAJECTORY"
+        "128通道反事实因果推演",
+        "全域时空风险势能场",
+        "长时序可行轨迹流"
       ]
     },
     {
@@ -35,14 +35,14 @@
       "test_suite": "tests/test_adas_scales.cpp",
       "validation_report": "128m 视野 0.25m 等效流场，显存 276.5MB，单步延迟 1.237ms (808 Hz)，1.5s~3.0s 动态波前外推",
       "input_signals": [
-        "RING_LIDAR_256CH",
-        "RADAR_DOPPLER_STREAM",
-        "DYNAMIC_CLUSTER_MASK"
+        "256线环视激光雷达",
+        "4D毫米波多普勒流",
+        "动态聚类分割掩膜"
       ],
       "action_outputs": [
-        "OCCUPANCY_FLOW_64CH",
-        "WAVEFRONT_EXTRAPOLATION",
-        "COLLISION_ISOLINE"
+        "64通道占用时空流",
+        "动态波前外推预警",
+        "碰撞风险等值线"
       ]
     },
     {
@@ -56,15 +56,15 @@
       "test_suite": "tests/test_adas_scales.cpp",
       "validation_report": "100km/h 极速爆胎横摆抑制，显存 27.6MB，单步延迟 103μs (~10 kHz)，300ms 收敛，侧偏仅 0.238m",
       "input_signals": [
-        "IMU_YAW_RATE",
-        "WHEEL_SLIP_RATIO_4W",
-        "TIRE_PRESSURE_DELTA",
-        "LATERAL_ACCEL"
+        "惯导偏航角速率",
+        "四轮滑移率观测",
+        "胎压突变差分感知",
+        "侧向加速度传感器"
       ],
       "action_outputs": [
-        "DIFFERENTIAL_TORQUE_4W",
-        "ACTIVE_DAMPER_STIFFNESS",
-        "COUNTER_STEER_RATE"
+        "四轮差动扭矩分配",
+        "自适应阻尼刚度指令",
+        "反打舵角速率代偿"
       ]
     },
     {
@@ -168,15 +168,15 @@
       "test_suite": "bin/train_primordial_life",
       "validation_report": "门禁2实证: 纯生存压力30代, 生存率11.7%→100%, 熵压×2015仍满存活, Lyapunov稳定",
       "input_signals": [
-        "ENTROPY_FLUX_0",
-        "ENTROPY_FLUX_1",
-        "ENTROPY_FLUX_2",
-        "ENTROPY_FLUX_3"
+        "环境熵通量 0",
+        "环境熵通量 1",
+        "环境熵通量 2",
+        "环境熵通量 3"
       ],
       "action_outputs": [
-        "ACT_POS",
-        "ACT_NEG",
-        "ACT_LOCK"
+        "正向促动动作 (ACT_POS)",
+        "负向抑制动作 (ACT_NEG)",
+        "闭锁阻断保护 (ACT_LOCK)"
       ]
     },
     {
@@ -190,14 +190,14 @@
       "test_suite": "tests/test_adas_cortex_contract.py",
       "validation_report": "M1门禁: 随机基线0%→100%满生存, ID留出比1.00, 跨物理OOD(摆锤2x重/摆杆1.4x长/推力噪声)100%, 训练2.6s",
       "input_signals": [
-        "POLE_THETA",
-        "POLE_THETA_DOT",
-        "CART_X",
-        "CART_X_DOT"
+        "摆杆倾角 (Theta)",
+        "摆杆角速度 (Omega)",
+        "小车位移 (X)",
+        "小车速度 (V)"
       ],
       "action_outputs": [
-        "ACT_POS",
-        "ACT_NEG"
+        "右向推力 (ACT_POS)",
+        "左向推力 (ACT_NEG)"
       ]
     },
     {

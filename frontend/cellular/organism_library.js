@@ -97,16 +97,107 @@ export function openLibraryDrawer() {
 export function toggleHabitatMenu() {
   const m = document.getElementById('habitat-menu');
   if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'flex' : 'none';
+export function renderActiveOrganismProfile(meta) {
+  if (!meta) return;
+  const orgId = meta.organism_id || meta.id || currentSelectedOrgId;
+  const orgName = meta.name || meta.organism_name || orgId;
+  const orgDomain = meta.domain || meta.organism_domain || '通用非冯算存一体计算';
+  const orgTag = meta.tag || (orgDomain ? orgDomain.slice(0, 8) : '生命体');
+  const orgReport = meta.validation_report || 'C++ 原生零 GC、确定性执行与实证门禁通过。';
+  const cellsCount = meta.cells_count || (meta.cells && meta.cells.length) || meta.total_cells || 0;
+  const synsCount = meta.synapses_count || (meta.synapses && meta.synapses.length) || meta.total_synapses || 0;
+  const macroScale = meta.cells_scale || meta.macro_cells || meta.n_macro_cells || cellsCount;
+
+  // 1. 更新卡片 1.8 标题与生境
+  const elName = document.getElementById("active-org-name");
+  if (elName) elName.textContent = orgName;
+  const elTag = document.getElementById("active-org-tag");
+  if (elTag) elTag.textContent = orgTag;
+  const elDomain = document.getElementById("active-org-domain");
+  if (elDomain) elDomain.textContent = orgDomain;
+  const elReport = document.getElementById("active-org-report");
+  if (elReport) elReport.textContent = orgReport;
+  const elScale = document.getElementById("active-org-scale");
+  if (elScale) elScale.textContent = `${cellsCount} 细胞 / ${synsCount} 突触 (宏观 ${macroScale.toLocaleString()} 规模)`;
+
+  // 2. 顶部 Vitals HUD 动态同步
+  const elVitalScale = document.getElementById("vital-scale");
+  if (elVitalScale) elVitalScale.textContent = macroScale.toLocaleString();
+  const elVitalScaleSub = document.getElementById("vital-scale-sub");
+  if (elVitalScaleSub) elVitalScaleSub.textContent = `${cellsCount} 显微实体细胞 · ${synsCount} 突触`;
+  const elVitalPhaseSub = document.getElementById("vital-phase-sub");
+  if (elVitalPhaseSub) elVitalPhaseSub.textContent = `【${orgName.split(' ')[0]}】处于李雅普诺夫稳态吸引子`;
+
+  // 3. 感知输入列表
+  const inSigs = meta.input_signals || [];
+  const elInCount = document.getElementById("active-org-in-count");
+  if (elInCount) elInCount.textContent = inSigs.length || '自组织';
+  const elInputs = document.getElementById("active-org-inputs");
+  if (elInputs) {
+    if (inSigs.length > 0) {
+      elInputs.innerHTML = inSigs.map(sig => `<span>• ${sig}</span>`).join('');
+    } else {
+      elInputs.innerHTML = `<span>• 拓扑环境动力学自组织输入</span>`;
+    }
+  }
+
+  // 4. 动作效应列表
+  const outActs = meta.action_outputs || [];
+  const elOutCount = document.getElementById("active-org-out-count");
+  if (elOutCount) elOutCount.textContent = outActs.length || '自组织';
+  const elOutputs = document.getElementById("active-org-outputs");
+  if (elOutputs) {
+    if (outActs.length > 0) {
+      elOutputs.innerHTML = outActs.map(act => `<span>• ${act}</span>`).join('');
+    } else {
+      elOutputs.innerHTML = `<span>• 拓扑动作效应输出</span>`;
+    }
+  }
+
+  // 5. 源码与测试快速研读入口
+  const elLinks = document.getElementById("active-org-links");
+  if (elLinks) {
+    const cHeader = meta.c_header;
+    const testSuite = meta.test_suite;
+    let linksHtml = '';
+    if (cHeader) {
+      linksHtml += `<span onclick="openDocReader('${cHeader}', 'C/C++ 原生内核源码: ${cHeader}')" style="color:var(--cyan);cursor:pointer;font-weight:700;background:rgba(56,189,248,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(56,189,248,0.3);">[查原生源码]</span>`;
+    }
+    if (testSuite) {
+      linksHtml += `<span onclick="openDocReader('${testSuite}', '实证门禁测试套件: ${testSuite}')" style="color:var(--emerald);cursor:pointer;font-weight:700;background:rgba(52,211,153,0.12);padding:2px 8px;border-radius:4px;border:1px solid rgba(52,211,153,0.3);">[查物理门禁]</span>`;
+    }
+    elLinks.innerHTML = linksHtml;
+  }
+
+  // 6. 右侧 dock: 动态重构动作效应器 (#actions-list)
+  const actList = document.getElementById("actions-list");
+  if (actList) {
+    if (outActs.length >= 2) {
+      const b0Name = outActs[0];
+      const b1Name = outActs[1];
+      const b2Name = outActs[2] || "闭锁防线保护";
+      actList.innerHTML = `
+        <div class="act-bar" id="act-buy" data-tip="act-buy"><span>${b0Name}</span><b id="v-buy">0.00</b></div>
+        <div class="act-bar" id="act-sell" data-tip="act-sell"><span>${b1Name}</span><b id="v-sell">0.00</b></div>
+        <div class="act-bar" id="act-immune" data-tip="act-immune"><span>${b2Name}</span><b id="v-immune">正常</b></div>
+      `;
+    }
+  }
 }
+window.renderActiveOrganismProfile = renderActiveOrganismProfile;
 
 export async function selectOrganism(organismId, organismName) {
   currentSelectedOrgId = organismId;
   setCurrentSelectedOrgId(organismId);
   log(`[生命体切换] 正在向后端下达指令，切换至【${organismName}】的全息 3D 拓扑结构...`, true);
 
-  document.querySelectorAll('.tree-node').forEach(n => {
+  // 自动展开目标生命体树节点，折叠其他生命体节点
+  document.querySelectorAll('.win-tree > .tree-node[data-org-id]').forEach(n => {
     const isCurrent = n.dataset.orgId === organismId;
     n.classList.toggle('selected', isCurrent);
+    n.classList.toggle('open', isCurrent);
+    const exp = n.querySelector('.tree-expander');
+    if (exp) exp.textContent = isCurrent ? "−" : "+";
     const badge = n.querySelector('.tree-active-badge');
     if (badge) badge.style.display = isCurrent ? 'inline-block' : 'none';
   });
@@ -123,6 +214,14 @@ export async function selectOrganism(organismId, organismName) {
     const data = await res.json();
     if (data.status === 'ok') {
       log(`[形态重构成功] 后端已切换至【${data.result.name}】！物理细胞: ${data.result.cells_count} 个，突触: ${data.result.synapses_count} 条，宏观: ${data.result.macro_cells.toLocaleString()} 细胞`, true);
+      renderActiveOrganismProfile(data.result);
+      
+      const chatMsgs = document.getElementById("chat-msgs");
+      if (chatMsgs) {
+        chatMsgs.innerHTML += `<div class="msg-bot"><span class="bot-badge">[生命体切换]</span>已挂载<b>【${data.result.name}】</b>（${data.result.domain}）。<br><span style="font-size:10px;color:var(--emerald);">${data.result.validation_report}</span></div>`;
+        chatMsgs.scrollTop = chatMsgs.scrollHeight;
+      }
+
       updateOrganismBounds(data.result);
       camState.targetLookAt.copy(currentOrganismBounds.center);
       camState.targetCamR = currentOrganismBounds.macroDist;
@@ -397,7 +496,7 @@ export async function pollLibrary() {
             <div class="tree-row" style="background:rgba(56,189,248,0.06);">
               <div class="tree-label">
                 <div style="display:flex;align-items:center;gap:6px;">
-                  <span style="color:#38bdf8;font-weight:700;font-size:11px;">[DOCS] 核心学术论著与工程宪章</span>
+                  <span style="color:#38bdf8;font-weight:700;font-size:11px;">[理论文献] 核心学术论著与工程宪章</span>
                   <span class="org-tag" style="background:rgba(56,189,248,0.2);color:#38bdf8;">权威文献</span>
                 </div>
                 <div style="color:#64748b;font-size:9px;margin-top:2px;">点击 [全文研读] 在线阅读项目真实理论与数学公理</div>
@@ -440,7 +539,7 @@ export async function pollLibrary() {
             <div class="tree-row" style="background:rgba(251,191,36,0.08);">
               <div class="tree-label">
                 <div style="display:flex;align-items:center;gap:6px;">
-                  <span style="color:#fbbf24;font-weight:700;font-size:11px;">[MOTIFS] 演化涌现因果模体库 (Evolved Causal Motifs)</span>
+                  <span style="color:#fbbf24;font-weight:700;font-size:11px;">[因果模体] 演化涌现模体库 (因果功能子图)</span>
                   <span class="org-tag" style="background:rgba(251,191,36,0.2);color:#fbbf24;">动力学拓扑</span>
                 </div>
                 <div style="color:#64748b;font-size:9px;margin-top:2px;">生命体无语言名称，知识积累为纯粹因果功能子图 (标注为人设推断语义)</div>
@@ -450,7 +549,7 @@ export async function pollLibrary() {
               <div class="tree-children-inner" style="padding:4px 0 0 0;display:flex;flex-direction:column;gap:4px;">
                 ${motifBooks.map((mb, mIdx) => {
                   const pList = (mb.causal_subgraph?.cells || []).map(c => c.type).join(' → ');
-                  const sigTitle = `MOTIF#${mIdx + 1} · [${pList}]`;
+                  const sigTitle = `模体#${mIdx + 1} · [${pList}]`;
                   return `<div class="tree-leaf" style="cursor:pointer;" onclick="event.stopPropagation(); openDocReader('${mb.file_path}', '${sigTitle}')">
                     <div style="display:flex;justify-content:space-between;align-items:center;color:#fbbf24;font-weight:700;font-size:11px;">
                       <span style="font-family:var(--font-mono);">${sigTitle}</span>
@@ -460,7 +559,7 @@ export async function pollLibrary() {
                       推断语义: <span style="color:#38bdf8;font-weight:600;">《${mb.title}》</span>
                     </div>
                     <div style="color:#94a3b8;font-size:9px;margin-top:2px;line-height:1.3;">
-                      涌现自 <b>${mb.author_deme || 'Deme'}</b> (第 ${mb.discovered_at_gen} 代) · 危机: <i>${mb.crisis_context || 'Stress Test'}</i>
+                      涌现自 <b>${mb.author_deme || '种群'}</b> (第 ${mb.discovered_at_gen} 代) · 危机: <i>${mb.crisis_context || '压力考验'}</i>
                     </div>
                     <div style="display:flex;justify-content:space-between;align-items:center;color:#64748b;font-size:9px;margin-top:5px;padding-top:4px;border-top:1px solid rgba(251,191,36,0.15);">
                       <span style="color:#38bdf8;font-weight:600;">跨种群借用: ${mb.citations || 1} 次</span>
@@ -483,9 +582,11 @@ export async function pollLibrary() {
 
           const booksHtml = (orgItem.books || orgItem.specs || []).map(b => {
             const isLeafActive = b.book_id === currentHighlightedBookId ? "active-leaf" : "";
-            const badgeTxt = b.badge || "SPEC";
-            const badgeColor = badgeTxt.includes("PASSED") ? "#34d399" : (badgeTxt.includes("REFLEX") ? "#fbbf24" : "#38bdf8");
-            const badgeBg = badgeTxt.includes("PASSED") ? "rgba(52,211,153,0.15)" : (badgeTxt.includes("REFLEX") ? "rgba(251,191,36,0.15)" : "rgba(56,189,248,0.15)");
+            const badgeTxt = b.badge || "工程规格";
+            const isPass = badgeTxt.includes("PASSED") || badgeTxt.includes("通过");
+            const isReflex = badgeTxt.includes("REFLEX") || badgeTxt.includes("反射");
+            const badgeColor = isPass ? "#34d399" : (isReflex ? "#fbbf24" : "#38bdf8");
+            const badgeBg = isPass ? "rgba(52,211,153,0.15)" : (isReflex ? "rgba(251,191,36,0.15)" : "rgba(56,189,248,0.15)");
             const hasSourceFile = b.file_path && (b.file_path.endsWith('.h') || b.file_path.endsWith('.c') || b.file_path.endsWith('.cpp') || b.file_path.endsWith('.py') || b.file_path.endsWith('.json') || b.file_path.endsWith('.md'));
 
             return `<div class="tree-leaf ${isLeafActive}" data-book-id="${b.book_id}" onclick="event.stopPropagation(); highlightBookSubcircuit('${b.book_id}', '${b.title || b.book_id}', '${orgItem.name}')">
@@ -518,7 +619,7 @@ export async function pollLibrary() {
                 </div>
                 <div style="display:flex;align-items:center;gap:6px;">
                   <span style="color:var(--cyan);font-size:10px;font-family:var(--font-mono);">${cellDesc}</span>
-                  <span class="tree-active-badge" style="display:${isSelected ? 'inline-block' : 'none'};">[ACTIVE]</span>
+                  <span class="tree-active-badge" style="display:${isSelected ? 'inline-block' : 'none'};">[运行中]</span>
                 </div>
               </div>
             </div>

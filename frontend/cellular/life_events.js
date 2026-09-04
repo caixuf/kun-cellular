@@ -4,10 +4,30 @@
 import { playIonizationSpark, playChicxulubAtmosphericThunder } from './audio_system.js';
 import { cameraShake, setCameraPreset, camState } from './camera_controller.js';
 
-let epicTourTimer = null;
+import { syncBackendState } from './network_sync.js';
+
+let epicTourTimers = [];
 let isEpicTourPlaying = false;
 let plasmaStormActive = false;
 let plasmaStormInterval = null;
+
+function clearAllEpicTimers() {
+  epicTourTimers.forEach(t => clearTimeout(t));
+  epicTourTimers = [];
+}
+
+async function requestEpicStage(stageNum) {
+  try {
+    const res = await fetch(`/api/story/stage?stage=${stageNum}`);
+    if (res.ok) {
+      await syncBackendState().catch(() => {});
+      return true;
+    }
+  } catch (e) {
+    console.warn("Backend story stage fetch failed:", e);
+  }
+  return false;
+}
 
 export function triggerGlobalLifeEvent(type, views, bounds, logFn, triggerExtinctionWS, triggerOrganSplice) {
   const shockwave = document.getElementById('global-shockwave');
@@ -129,15 +149,17 @@ export function triggerGlobalLifeEvent(type, views, bounds, logFn, triggerExtinc
 
 export function playLifeEpicStory(views, bounds, logFn, triggerExtinctionWS, triggerOrganSplice) {
   if (isEpicTourPlaying) {
-    clearTimeout(epicTourTimer);
+    clearAllEpicTimers();
     isEpicTourPlaying = false;
     const btn = document.getElementById('btn-epic-tour');
     if (btn) btn.innerHTML = '<span class="pulse-dot"></span><span>播放生命五阶段演化</span>';
-    if (logFn) logFn('[演示] 已退出生命演化史诗演示，恢复自由观测模式。');
+    if (logFn) logFn('[演示] 已退出生命演化史诗演示，恢复自由观测模式。', true);
+    requestEpicStage(5);
     return;
   }
 
   isEpicTourPlaying = true;
+  clearAllEpicTimers();
   const btn = document.getElementById('btn-epic-tour');
   if (btn) btn.innerHTML = '<span style="color:var(--rose);font-weight:bold;">■ 结束演化演示</span>';
 
@@ -145,57 +167,87 @@ export function playLifeEpicStory(views, bounds, logFn, triggerExtinctionWS, tri
   const phaseSubEl = document.getElementById('vital-phase-sub');
   const stabilityEl = document.getElementById('vital-stability');
 
-  if (logFn) logFn('【第一幕：静息自发搏动 (Resting Pulse)】生命体在深空暗夜中沉睡，微弱生物荧光自发节律呼吸...', true);
-  if (phaseEl) { phaseEl.textContent = '第一幕 · 静息自发搏动'; phaseEl.style.color = 'var(--cyan)'; }
-  if (phaseSubEl) phaseSubEl.textContent = '微观能量基线守恒 · 动力学处于亚稳态吸引子';
-  if (stabilityEl) stabilityEl.textContent = 'BIBO 渐近收敛 (F=0.082)';
+  // 第一幕 (0s): 始祖原细胞静息自发呼吸 (1 细胞)
+  requestEpicStage('1');
+  if (logFn) logFn('【第一幕：原核生命肇始 · 孤独的始祖原细胞 (Progenitor Single Cell)】深空暗夜中唯一的原始生命质，自发节律微弱呼吸 (1 细胞 · 0 突触)...', true);
+  if (phaseEl) { phaseEl.textContent = '第一幕 · 始祖原细胞静息自发呼吸'; phaseEl.style.color = 'var(--cyan)'; }
+  if (phaseSubEl) phaseSubEl.textContent = '深空暗夜中唯一的生命火种 · 能量基线守恒 (1 细胞 · 0 突触)';
+  if (stabilityEl) stabilityEl.textContent = '原核孤立稳态 (F=0.009)';
   setCameraPreset('front', bounds);
+  camState.targetCamR = 150;
   camState.autoOrbitEnabled = true;
 
-  epicTourTimer = setTimeout(() => {
+  // 一生三 (3.5s): 始祖三联体非对称分化 (1 -> 3 细胞最小反射弧)
+  epicTourTimers.push(setTimeout(async () => {
     if (!isEpicTourPlaying) return;
-    if (logFn) logFn('【第二幕：因果拓扑聚合 (Causal Aggregation)】外界刺激注入，突触前向投影生长，小世界回路结网！', true);
-    if (phaseEl) { phaseEl.textContent = '第二幕 · 因果拓扑聚合'; phaseEl.style.color = '#38bdf8'; }
-    if (phaseSubEl) phaseSubEl.textContent = '神经微柱拓扑结网 · 聚类系数上升 C/L=0.72';
-    setCameraPreset('side', bounds);
-    camState.targetCamR = Math.max(60, ((bounds && bounds.macroDist) || 400) * 0.55);
-  }, 8000);
+    await requestEpicStage('1_triad');
+    cameraShake(3.5);
+    playIonizationSpark(0.6);
+    if (logFn) logFn('【一生三：始祖三联体非对称分化 (Tripartite Mitosis)】始祖原细胞发生有丝分裂，分化为感官受体、代谢联络与动作效应器，生命建立宇宙中第一个因果反射弧 (1生3 · 2条先锋突触)！', true);
+    if (phaseEl) { phaseEl.textContent = '一生三 · 始祖三联体分化达成'; phaseEl.style.color = '#38bdf8'; }
+    if (phaseSubEl) phaseSubEl.textContent = '感官-代谢-效应不可约闭环成形 (3 细胞 · 2 突触反射弧)';
+    if (stabilityEl) stabilityEl.textContent = '三联体因果闭环达成 (F=0.021)';
+    setCameraPreset('front', bounds);
+    camState.targetCamR = 210;
+  }, 3500));
 
-  epicTourTimer = setTimeout(() => {
+  // 第二幕 (9s): 有丝分裂与因果拓扑聚合
+  epicTourTimers.push(setTimeout(async () => {
     if (!isEpicTourPlaying) return;
-    if (logFn) logFn('【第三幕：全脑高能放电 (Plasma Discharge)】突触电位击穿临界阈值，神经电荷雪崩爆发！', true);
+    await requestEpicStage('2');
+    if (logFn) logFn('【第二幕：有丝分裂与因果拓扑聚合 (Mitosis & Causal Growth)】外界刺激注入，细胞快速有丝分裂增殖！突触生长连通，小世界回路结网 (24细胞 · 80突触)！', true);
+    if (phaseEl) { phaseEl.textContent = '第二幕 · 因果拓扑聚合结网'; phaseEl.style.color = '#38bdf8'; }
+    if (phaseSubEl) phaseSubEl.textContent = '神经微柱拓扑结网 · 聚类系数上升 C/L=0.72 · 细胞数 24 个';
+    setCameraPreset('side', bounds);
+    camState.targetCamR = 260;
+  }, 9000));
+
+  // 第三幕 (18s): 全脑高能放电涌现
+  epicTourTimers.push(setTimeout(async () => {
+    if (!isEpicTourPlaying) return;
+    await requestEpicStage(3);
+    if (logFn) logFn('【第三幕：全脑高能放电涌现 (Plasma Discharge)】突触电位击穿临界阈值，神经电荷雪崩爆发 (48细胞 · 120突触高能雪崩)！', true);
     triggerGlobalLifeEvent('discharge', views, bounds, logFn, triggerExtinctionWS, triggerOrganSplice);
     setCameraPreset('top', bounds);
-  }, 18000);
+    camState.targetCamR = 340;
+  }, 18000));
 
-  epicTourTimer = setTimeout(() => {
+  // 第四幕 (28s): 白垩纪危机与大灭绝借用重组
+  epicTourTimers.push(setTimeout(async () => {
     if (!isEpicTourPlaying) return;
-    if (logFn) logFn('【第四幕：危机与大灭绝淘汰 (Extinction Crisis)】宇宙选择压力风暴降临！残存核心展开借用重组！', true);
+    await requestEpicStage(4);
+    if (logFn) logFn('【第四幕：白垩纪大灭绝与器官借用重组 (Extinction & Exaptation)】宇宙极端选择压力风暴降临！淘汰弱劣突触，借用剪裁抗震颤阻尼器官 (60细胞)！', true);
     triggerGlobalLifeEvent('extinction', views, bounds, logFn, triggerExtinctionWS, triggerOrganSplice);
     setCameraPreset('front', bounds);
-    camState.targetCamR = (bounds && bounds.macroDist) || 540;
-  }, 28000);
+    camState.targetCamR = 400;
+  }, 28000));
 
-  epicTourTimer = setTimeout(() => {
+  // 第五幕 (40s): 自组织稳态重生与成体驾驶皮层
+  epicTourTimers.push(setTimeout(async () => {
     if (!isEpicTourPlaying) return;
-    if (logFn) logFn('【第五幕：李雅普诺夫稳态重组 (BIBO Stabilization)】非线性耗散吸收冲击，生命体收敛至全新超稳吸引子！', true);
-    if (phaseEl) { phaseEl.textContent = '第五幕 · 自组织稳态重生'; phaseEl.style.color = 'var(--emerald)'; }
-    if (phaseSubEl) phaseSubEl.textContent = '极限环能量收敛 · 经历危机后的更强生命形态';
-    if (stabilityEl) { stabilityEl.textContent = '超稳吸引子达成'; stabilityEl.style.color = 'var(--emerald)'; }
+    await requestEpicStage(5);
+    if (logFn) logFn('【第五幕：李雅普诺夫稳态重组 (BIBO Stabilization)】非线性耗散吸收冲击，演化收敛至 ASIL-D 210 细胞车规级驾驶皮层冠军！', true);
+    if (phaseEl) { phaseEl.textContent = '第五幕 · 210细胞驾驶皮层重生'; phaseEl.style.color = 'var(--emerald)'; }
+    if (phaseSubEl) phaseSubEl.textContent = '极限环能量收敛 · 经历危机后的更强成熟生命形态 (210 细胞 · 630 突触)';
+    if (stabilityEl) { stabilityEl.textContent = '超稳吸引子达成 (BIBO Stable)'; stabilityEl.style.color = 'var(--emerald)'; }
     const shockwave = document.getElementById('global-shockwave');
     if (shockwave) {
       shockwave.className = 'flash-bibo';
       setTimeout(() => { shockwave.className = ''; }, 1000);
     }
-  }, 42000);
+    setCameraPreset('front', bounds);
+    camState.targetCamR = ((bounds && bounds.macroDist) || 480);
+  }, 40000));
 
-  epicTourTimer = setTimeout(() => {
+  // 演示圆满完成 (52s)
+  epicTourTimers.push(setTimeout(() => {
     isEpicTourPlaying = false;
+    clearAllEpicTimers();
     if (btn) btn.innerHTML = '<span class="pulse-dot"></span><span>播放生命五阶段演化</span>';
-    if (phaseEl) { phaseEl.textContent = '静息自发搏动'; phaseEl.style.color = 'var(--cyan)'; }
-    if (phaseSubEl) phaseSubEl.textContent = '因果微柱处于亚稳态吸引子';
-    if (logFn) logFn('【演化史诗演示圆满完成】硅基生命体已完成一次全周期自我进化！');
-  }, 54000);
+    if (phaseEl) { phaseEl.textContent = '成体稳态自发搏动'; phaseEl.style.color = 'var(--cyan)'; }
+    if (phaseSubEl) phaseSubEl.textContent = 'ASIL-D 210 细胞微柱皮层处于亚稳态吸引子';
+    if (logFn) logFn('【演化史诗演示圆满完成】硅基生命体已完成一次全周期自我进化！', true);
+  }, 52000));
 }
 
 export function triggerManualDischargeBurst(views, bounds, logFn, triggerExtinctionWS, triggerOrganSplice) {

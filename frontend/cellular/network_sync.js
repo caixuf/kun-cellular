@@ -236,7 +236,7 @@ export async function pollBiosphere() {
     const j = await r.json();
     bioStep = j.step;
     const _setT = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-    _setT('bio-step', `step ${j.step}`);
+    _setT('bio-step', `世代 ${j.step}`);
     _setT('bio-shannon', (j.shannon_diversity ?? 0).toFixed(2));
     _setT('bio-prod', j.niche_counts?.producers ?? 0);
     _setT('bio-herb', j.niche_counts?.herbivores ?? 0);
@@ -246,7 +246,7 @@ export async function pollBiosphere() {
     const biomesEl = document.getElementById('bio-biomes');
     if (biomesEl) {
       biomesEl.innerHTML = (j.biomes || []).map(b => {
-        const tag = b.climate.startsWith('Spring') ? '[SPRING]' : b.climate.startsWith('Summer') ? '[SUMMER]' : b.climate.startsWith('Autumn') ? '[AUTUMN]' : '[WINTER]';
+        const tag = b.climate.startsWith('Spring') ? '[春季]' : b.climate.startsWith('Summer') ? '[夏季]' : b.climate.startsWith('Autumn') ? '[秋季]' : '[冬季]';
         const pct = Math.min(100, b.nutrient / 12);
         return `<div><span style="color:var(--cyan);font-weight:bold">${tag}</span> ${b.name.replace('Biome-', '')} · ${b.climate.split('(')[1] || ''}
           <div style="height:3px;background:#1e293b;border-radius:2px;margin-top:2px">
@@ -531,11 +531,8 @@ export async function syncBackendState() {
 
 export function updateFromBackendState(data) {
   if (!data || !data.cells) return;
-  if (!currentSelectedOrgId && data.organism_id) {
+  if (data.organism_id) {
     currentSelectedOrgId = data.organism_id;
-  }
-  if (currentSelectedOrgId && data.organism_id && data.organism_id !== currentSelectedOrgId) {
-    return;
   }
 
   const topoFingerprint = `${data.organism_id || ''}_${data.cells.length}_${(data.synapses || []).length}`;
@@ -650,7 +647,7 @@ export function updateFromBackendState(data) {
     const navGain = document.getElementById("nav-shield-gain");
     if (navGain) navGain.textContent = maxGain;
     const navIcon = document.getElementById("nav-shield-icon");
-    if (navIcon) navIcon.textContent = isStable ? "[BIBO]" : "[WARN]";
+    if (navIcon) navIcon.textContent = isStable ? "[稳态]" : "[失稳]";
     const navShield = document.getElementById("nav-lyapunov-shield");
     if (navShield) {
       navShield.style.color = isStable ? "var(--emerald)" : "var(--crimson)";
@@ -668,7 +665,7 @@ export function updateFromBackendState(data) {
     if (stCycles) stCycles.textContent = cycles;
     const stBadge = document.getElementById("st-lyapunov-badge");
     if (stBadge) {
-      stBadge.textContent = isStable ? "BIBO STABLE" : "UNSTABLE GAIN";
+      stBadge.textContent = isStable ? "超稳态收敛" : "正反馈失稳";
       stBadge.style.color = isStable ? "var(--emerald)" : "var(--crimson)";
       stBadge.style.background = isStable ? "rgba(52,211,153,0.15)" : "rgba(244,63,94,0.2)";
     }
@@ -677,7 +674,7 @@ export function updateFromBackendState(data) {
       cardLyap.style.borderLeftColor = isStable ? "var(--emerald)" : "var(--crimson)";
     }
     const stShieldIcon = document.getElementById("st-shield-icon");
-    if (stShieldIcon) stShieldIcon.textContent = isStable ? "[BIBO]" : "[WARN]";
+    if (stShieldIcon) stShieldIcon.textContent = isStable ? "[稳态]" : "[失稳]";
   }
 
   if (data.symbiotic_macro_cells) {
@@ -717,7 +714,7 @@ export function updateFromBackendState(data) {
       const repEl = document.getElementById("extinction-impact-report");
       if (repEl) {
         repEl.style.display = "block";
-        repEl.innerHTML = `<b>[EXTINCTION] 冲击波已生效:</b> 抹杀 <b>${ext.wiped_synapses_count}</b> 垄断突触，保留 <b>${ext.survivors_count}</b> 幸存体，增益: ${ext.pre_extinction_gain} &rarr; <b>${ext.post_extinction_gain}</b>`;
+        repEl.innerHTML = `<b>[灭绝冲击] 冲击波已生效:</b> 抹杀 <b>${ext.wiped_synapses_count}</b> 垄断突触，保留 <b>${ext.survivors_count}</b> 幸存体，增益: ${ext.pre_extinction_gain} &rarr; <b>${ext.post_extinction_gain}</b>`;
       }
       log(`[白垩纪大灭绝] ${ext.message}`, true);
     }

@@ -550,7 +550,7 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
-    padding: 14px;
+    padding: 14px 14px 64px 14px;
     z-index: 50;
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -783,6 +783,9 @@
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
     white-space: nowrap;
     user-select: none;
+    max-width: calc(100vw - 32px);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .legend-dot {
     display: inline-block;
@@ -831,6 +834,9 @@
     white-space: nowrap;
     user-select: none;
     transition: all 0.25s ease;
+    max-width: calc(100vw - 32px);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .cam-btn {
     background: rgba(18, 26, 44, 0.8);
@@ -1162,7 +1168,7 @@
     .dialogue-deck {
       width: 300px;
       right: calc(var(--dock-right-w) + 10px);
-      bottom: 20px;
+      bottom: 80px;
     }
     .card { padding: 8px 10px; gap: 6px; }
   }
@@ -1252,9 +1258,10 @@
   /* 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) - 锚定在右侧栏左侧，决不遮挡侧边栏 */
   .dialogue-deck {
     position: fixed;
-    bottom: 24px;
+    bottom: 84px;
     right: calc(var(--dock-right-w) + 14px);
     width: 360px;
+    max-width: calc(100vw - 32px);
     background: rgba(10, 16, 28, 0.95);
     backdrop-filter: blur(16px);
     border: 1px solid rgba(56, 189, 248, 0.4);
@@ -1262,7 +1269,7 @@
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 16px rgba(56, 189, 248, 0.15);
     display: flex;
     flex-direction: column;
-    z-index: 100;
+    z-index: 60;
     transition: all 0.25s ease;
   }
   .dock-right.collapsed ~ #dialogue-deck {
@@ -1390,11 +1397,11 @@
   <!-- 中央控制：生命时间流速、光感调控与史诗演化演示 -->
   <div class="header-center-bar">
     <div class="warp-pill">
-      <span class="warp-label">WARP:</span>
+      <span class="warp-label">时间流速:</span>
       <button class="warp-btn active" onclick="setWarp('1x')" id="hw-1x">1x 物理</button>
       <button class="warp-btn" onclick="setWarp('100x')" id="hw-100x">100x 演化</button>
       <button class="warp-btn" onclick="setWarp('1000x')" id="hw-1000x">1000x 涡轮</button>
-      <button class="warp-btn" onclick="setWarp('unlimited')" id="hw-max">MAX 狂飙</button>
+      <button class="warp-btn" onclick="setWarp('unlimited')" id="hw-max">极速狂飙</button>
     </div>
 
     <!-- 视觉舒适度 / 光感控制药丸 -->
@@ -1455,7 +1462,7 @@
     </div>
 
     <div id="nav-audio-toggle" style="display:flex;align-items:center;gap:4px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.35);padding:2px 8px;border-radius:4px;color:var(--purple);cursor:pointer;transition:all 0.2s;" title="空气介质声学与离子电弧 (点击开启/静音)" onclick="toggleBioAcoustics()">
-      <span id="nav-audio-text" style="font-size:10px;font-weight:700;">AUDIO</span>
+      <span id="nav-audio-text" style="font-size:10px;font-weight:700;">生物音效</span>
     </div>
   </div>
 </header>
@@ -1466,20 +1473,20 @@
 <!-- 首屏核心“生命三指标”悬浮 HUD (Exhibition Vitals HUD) -->
 <div id="vitals-hud" class="vitals-hud">
   <div class="vital-block">
-    <div class="vital-label">细胞实体规模 SCALE</div>
+    <div class="vital-label">细胞实体规模</div>
     <div class="vital-val" id="vital-scale">100,000,000</div>
     <div class="vital-sub" id="vital-scale-sub">全量点云流变拓扑 (LOD)</div>
   </div>
   <div class="vital-sep"></div>
   <div class="vital-block">
-    <div class="vital-label">生命动力学阶段 PHASE</div>
+    <div class="vital-label">生命动力学阶段</div>
     <div class="vital-val" id="vital-phase" style="color:var(--cyan)">静息自发搏动</div>
     <div class="vital-sub" id="vital-phase-sub">因果微柱处于亚稳态吸引子</div>
   </div>
   <div class="vital-sep"></div>
   <div class="vital-block">
-    <div class="vital-label">李雅普诺夫稳态 STABILITY</div>
-    <div class="vital-val" id="vital-stability" style="color:var(--emerald)">BIBO 渐近收敛</div>
+    <div class="vital-label">李雅普诺夫稳态</div>
+    <div class="vital-val" id="vital-stability" style="color:var(--emerald)">超稳态收敛 (BIBO)</div>
     <div class="vital-sub" id="vital-stability-sub">预测自由能 F: 0.084</div>
   </div>
 </div>
@@ -1498,18 +1505,18 @@
   <div class="card">
     <div class="card-title">
       <span>计算拓扑遥测</span>
-      <span class="card-title-badge">SDSCC Core</span>
+      <span class="card-title-badge">计算核心</span>
     </div>
-    <div class="kv" data-tip="st-gen"><span>演化世代 Generation</span><b id="st-gen">0</b></div>
-    <div class="kv" data-tip="st-cells"><span>活跃细胞 Cells</span><b id="st-cells" style="color:var(--cyan)">0</b></div>
-    <div class="kv" data-tip="st-real-cells"><span>真实渲染细胞 Rendered</span><b id="st-real-cells" style="color:var(--emerald)">0</b></div>
-    <div class="kv" data-tip="st-universe-rad"><span>宇宙占据半径 Radius</span><b id="st-universe-rad" style="color:#a855f7">0.0 m</b></div>
-    <div class="kv" data-tip="st-universe-vol"><span>算力宇宙体积占比 Vol%</span><b id="st-universe-vol" style="color:#34d399">0.0000%</b></div>
-    <div class="kv"><span>神经突触 Synapses</span><b id="st-syn" style="color:var(--purple)">0</b></div>
-    <div class="kv" data-tip="st-free-energy"><span>预测自由能 Free Energy</span><b id="st-fe" style="color:var(--emerald)">0.084</b></div>
-    <div class="kv" data-tip="st-plasticity"><span>突触塑性 STDP Flux</span><b id="st-flux" style="color:var(--amber)">0.035</b></div>
+    <div class="kv" data-tip="st-gen"><span>演化世代</span><b id="st-gen">0</b></div>
+    <div class="kv" data-tip="st-cells"><span>活跃细胞数</span><b id="st-cells" style="color:var(--cyan)">0</b></div>
+    <div class="kv" data-tip="st-real-cells"><span>显微实体细胞</span><b id="st-real-cells" style="color:var(--emerald)">0</b></div>
+    <div class="kv" data-tip="st-universe-rad"><span>宇宙占据半径</span><b id="st-universe-rad" style="color:#a855f7">0.0 m</b></div>
+    <div class="kv" data-tip="st-universe-vol"><span>算力宇宙体积占比</span><b id="st-universe-vol" style="color:#34d399">0.0000%</b></div>
+    <div class="kv"><span>神经突触数</span><b id="st-syn" style="color:var(--purple)">0</b></div>
+    <div class="kv" data-tip="st-free-energy"><span>预测自由能</span><b id="st-fe" style="color:var(--emerald)">0.084</b></div>
+    <div class="kv" data-tip="st-plasticity"><span>突触动态塑性通量</span><b id="st-flux" style="color:var(--amber)">0.035</b></div>
     <div class="kv" data-tip="st-small-world"><span>小世界 C / L 流形</span><b id="st-sw" style="color:var(--cyan)">0.68 / 2.41</b></div>
-    <div class="kv"><span>力场积分步 Force Steps</span><b id="st-phys">0</b></div>
+    <div class="kv"><span>物理力场积分步</span><b id="st-phys">0</b></div>
     <div class="kv"><span>代谢放电次数</span><b id="st-act">0</b></div>
     <div id="src" style="font-size:10px;padding:4px 6px;border-radius:4px;background:rgba(56,189,248,.1);color:var(--cyan);margin-top:4px;">
       数据源: 连接中...
@@ -1521,17 +1528,17 @@
   <div class="card" id="card-evolution-axioms" style="border-left: 3px solid var(--emerald); transition: all 0.3s ease;">
     <div class="card-title">
       <span style="display:flex;align-items:center;gap:6px;">
-        <span id="st-shield-icon" style="font-size:14px;">[BIBO]</span>
-        <span>李雅普诺夫 BIBO 稳定性</span>
+        <span id="st-shield-icon" style="font-size:14px;">[稳态]</span>
+        <span>李雅普诺夫稳态收敛</span>
       </span>
-      <span class="card-title-badge" id="st-lyapunov-badge" style="background:rgba(52,211,153,0.15);color:var(--emerald);font-weight:bold;">BIBO STABLE</span>
+      <span class="card-title-badge" id="st-lyapunov-badge" style="background:rgba(52,211,153,0.15);color:var(--emerald);font-weight:bold;">超稳态收敛</span>
     </div>
     <div class="kv" data-tip="st-lyapunov-gain">
-      <span>最大环路增益 Max Loop Gain</span>
+      <span>最大环路增益</span>
       <b id="st-lyapunov-gain" style="color:var(--emerald)">0.000</b>
     </div>
     <div class="kv">
-      <span>拓扑有向环数 Detected Cycles</span>
+      <span>拓扑有向环数</span>
       <b id="st-lyapunov-cycles">0</b>
     </div>
     <div class="kv">
@@ -1540,14 +1547,14 @@
     </div>
     <div style="display:flex;gap:4px;margin-top:2px;">
       <button class="btn-ctrl" onclick="triggerLyapunovEnforce()" id="btn-enforce-lyap" style="flex:1;border-color:rgba(52,211,153,0.4);color:var(--emerald);padding:4px 6px;">
-        [PULSE] 施加自适应阻尼抑制 (BIBO Enforce)
+        [阻尼脉冲] 施加自适应阻尼抑制 (稳态收敛)
       </button>
     </div>
 
     <!-- 超细胞共生微柱部分 -->
     <div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(56,189,248,0.2);">
       <div class="card-title" style="margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
-        <span style="font-size:10px;color:var(--text-main);">超细胞微柱与器官 (3D Organs)</span>
+        <span style="font-size:10px;color:var(--text-main);">超细胞微柱与器官</span>
         <div style="display:flex;gap:4px;align-items:center;">
           <button class="btn-ctrl" onclick="if(window.toggleOrganVisibility)window.toggleOrganVisibility()" style="font-size:9px;padding:2px 6px;border-color:rgba(56,189,248,0.4);color:var(--cyan);" title="在 3D 视野中切换显示/隐藏器官生物外包膜与全息微柱铭牌">[3D器官包膜]</button>
           <span class="card-title-badge" id="st-macro-count" style="color:var(--purple);background:rgba(168,85,247,0.15)">3 个微柱</span>
@@ -1556,6 +1563,52 @@
       <div id="macro-cells-badges" style="display:flex;flex-wrap:wrap;gap:4px;max-height:85px;overflow-y:auto;padding-right:2px;">
         <!-- 动态徽章注入 -->
       </div>
+    </div>
+  </div>
+
+  <!-- 卡片 1.8: 当前挂载生命体画像与物理门禁报告 (动态同步当前运行模型) -->
+  <div class="card" id="card-active-organism" style="border: 1px solid rgba(56,189,248,0.35); background: linear-gradient(180deg, rgba(56,189,248,0.08), rgba(15,23,42,0.85));">
+    <div class="card-title" style="margin-bottom:4px;">
+      <span style="color:var(--cyan);font-weight:bold;display:flex;align-items:center;gap:6px;">
+        <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);"></span>
+        <span id="active-org-name">SDSCC 车规级 ASIL-D 微柱皮层</span>
+      </span>
+      <span class="card-title-badge" id="active-org-tag" style="background:rgba(56,189,248,0.2);color:var(--cyan);">车规智驾</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:4px;line-height:1.4;">
+      <b>生境应用:</b> <span id="active-org-domain" style="color:#e2e8f0;">商用车/乘用车纵横向轨迹规划与自适应巡航</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:4px;line-height:1.4;">
+      <b>神经规模:</b> <span id="active-org-scale" style="color:var(--cyan);font-family:var(--font-mono);">210 细胞 / 630 突触 (宏观 210 规模)</span>
+    </div>
+    <div style="font-size:10px;color:#94a3b8;margin-bottom:6px;line-height:1.4;background:rgba(0,0,0,0.25);padding:6px;border-radius:4px;border-left:2px solid var(--emerald);">
+      <div style="color:var(--emerald);font-weight:700;margin-bottom:2px;">[实证门禁校验报告]</div>
+      <div id="active-org-report" style="color:#cbd5e1;line-height:1.4;">
+        60 代演化 + L3 CMA-ES 参数解耦调优: 16 工况 100% 通过，直道巡航 CTE 仅 3.38 cm，全场景零脱轨。
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:9px;margin-top:4px;">
+      <div style="background:rgba(56,189,248,0.06);padding:4px 6px;border-radius:4px;border:1px solid rgba(56,189,248,0.15);">
+        <div style="color:var(--cyan);font-weight:bold;margin-bottom:2px;">感知输入通道 (<span id="active-org-in-count">6</span>)</div>
+        <div id="active-org-inputs" style="color:#94a3b8;max-height:55px;overflow-y:auto;line-height:1.3;display:flex;flex-direction:column;gap:2px;">
+          <span>• 归一化横向位置偏差 (CTE)</span>
+          <span>• 航向角偏差 (Heading Error)</span>
+          <span>• 道路前方曲率前瞻 (Kappa)</span>
+          <span>• 本车实时纵向速度 (Velocity)</span>
+          <span>• 巡航速度跟踪差 (Speed Err)</span>
+          <span>• 前车时距与急刹风险 (TTC Hazard)</span>
+        </div>
+      </div>
+      <div style="background:rgba(244,63,94,0.06);padding:4px 6px;border-radius:4px;border:1px solid rgba(244,63,94,0.15);">
+        <div style="color:var(--rose);font-weight:bold;margin-bottom:2px;">动作效应输出 (<span id="active-org-out-count">2</span>)</div>
+        <div id="active-org-outputs" style="color:#94a3b8;max-height:55px;overflow-y:auto;line-height:1.3;display:flex;flex-direction:column;gap:2px;">
+          <span>• 阿克曼转向角阻尼指令</span>
+          <span>• 驱动/电制动纵向加速度</span>
+        </div>
+      </div>
+    </div>
+    <div id="active-org-links" style="margin-top:6px;display:flex;justify-content:flex-end;gap:6px;font-size:9px;">
+      <!-- 动态注入源码与测试查验按钮 -->
     </div>
   </div>
 
@@ -1573,7 +1626,7 @@
   <div class="card">
     <div class="card-title">
       <span>生命体快捷挂载</span>
-      <span class="card-title-badge" id="st-presets-badge">Dynamic</span>
+      <span class="card-title-badge" id="st-presets-badge">动态挂载</span>
     </div>
     <div id="preset-buttons-deck" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;">
       <!-- 动态从 /api/library 注入全部生命体快捷挂载按钮 -->
@@ -1583,7 +1636,7 @@
   <!-- 卡片 4: 多生境岛屿演化 -->
   <div class="card" style="min-height:110px;">
     <div class="card-title">
-      <span>8 岛多生境演化拓扑 (Demes)</span>
+      <span>8 岛多生境演化拓扑 (隔离种群)</span>
       <span class="card-title-badge" id="st-total-mig">0 迁徙</span>
     </div>
     <div id="islands-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:9px;"></div>
@@ -1593,15 +1646,17 @@
 
 <!-- 右侧遥测坞 (Right Dock) - 默认折叠收纳 -->
 <aside class="dock-right collapsed">
-  <!-- 卡片 1: 动作效应器 -->
+  <!-- 卡片 1: 动作效应器 (动态适配当前挂载生命体的真实通道) -->
   <div class="card" id="actions">
     <div class="card-title">
       <span>效应器动作决策输出</span>
-      <span class="card-title-badge">Actions</span>
+      <span class="card-title-badge" id="actions-mode-badge">效应输出</span>
     </div>
-    <div class="act-bar" id="act-buy" data-tip="act-buy"><span>买开 / 加速 ACT_POS</span><b id="v-buy">0.00</b></div>
-    <div class="act-bar" id="act-sell" data-tip="act-sell"><span>卖开 / 制动 ACT_NEG</span><b id="v-sell">0.00</b></div>
-    <div class="act-bar" id="act-immune" data-tip="act-immune"><span>免疫阻断 ACT_LOCK</span><b id="v-immune">NORMAL</b></div>
+    <div id="actions-list">
+      <div class="act-bar" id="act-buy" data-tip="act-buy"><span>买开 / 加速动作</span><b id="v-buy">0.00</b></div>
+      <div class="act-bar" id="act-sell" data-tip="act-sell"><span>卖开 / 制动动作</span><b id="v-sell">0.00</b></div>
+      <div class="act-bar" id="act-immune" data-tip="act-immune"><span>免疫阻断保护</span><b id="v-immune">正常</b></div>
+    </div>
   </div>
 
   <!-- 卡片 1.6: 白垩纪大灭绝算子 (Chicxulub Extinction Operator) -->
@@ -1609,10 +1664,10 @@
   <div class="card" id="card-fluid-physics" style="border: 1px solid rgba(56,189,248,0.4); background: linear-gradient(180deg, rgba(56,189,248,0.1), rgba(18,26,44,0.85));">
     <div class="card-title">
       <span style="color:var(--cyan);display:flex;align-items:center;gap:6px;">
-        <span>[FLUID_BIOSPHERE]</span>
+        <span>[流体生境]</span>
         <span>连续相分子流体介质</span>
       </span>
-      <span class="card-title-badge" id="st-fluid-phase-badge" style="background:rgba(56,189,248,0.2);color:var(--cyan);font-weight:bold;">AERO // 气相</span>
+      <span class="card-title-badge" id="st-fluid-phase-badge" style="background:rgba(56,189,248,0.2);color:var(--cyan);font-weight:bold;">气相介质</span>
     </div>
 
     <!-- 介质多相态切换器 (气相 / 原始水相 / 深空真空) -->
@@ -1622,17 +1677,17 @@
       <button class="nav-tab-btn" id="btn-phase-vacuum" onclick="setFluidPhase('vacuum')" style="flex:1;padding:3px 2px;font-size:10px;text-align:center;color:var(--rose);">深空真空</button>
     </div>
 
-    <div class="kv"><span>介质相态 Phase</span><b id="st-fluid-phase-name" style="color:var(--cyan)">气相分子气溶胶</b></div>
-    <div class="kv"><span>分子数密度 Density</span><b id="st-fluid-density" style="color:var(--emerald)">1.225 kg/m³</b></div>
-    <div class="kv"><span>击穿临界场强 Breakdown</span><b id="st-fluid-breakdown" style="color:var(--amber)">3.0 kV/mm</b></div>
-    <div class="kv"><span>流体动力粘度 Viscosity</span><b id="st-fluid-viscosity" style="color:var(--purple)">0.018 mPa·s</b></div>
+    <div class="kv"><span>介质相态</span><b id="st-fluid-phase-name" style="color:var(--cyan)">气相分子气溶胶</b></div>
+    <div class="kv"><span>分子数密度</span><b id="st-fluid-density" style="color:var(--emerald)">1.225 kg/m³</b></div>
+    <div class="kv"><span>击穿临界场强</span><b id="st-fluid-breakdown" style="color:var(--amber)">3.0 kV/mm</b></div>
+    <div class="kv"><span>流体动力粘度</span><b id="st-fluid-viscosity" style="color:var(--purple)">0.018 mPa·s</b></div>
 
     <div style="display:flex;gap:5px;margin-top:6px;">
       <button class="btn-ctrl" onclick="triggerManualDischargeBurst()" style="flex:1;padding:6px 4px;font-weight:bold;font-size:10px;background:rgba(56,189,248,0.25);border-color:var(--cyan);color:var(--cyan);">
-        [DISCHARGE] 激发介质击穿放电
+        [高能放电] 激发介质击穿放电
       </button>
       <button class="btn-ctrl" onclick="togglePlasmaStorm()" id="btn-plasma-storm" style="flex:1;padding:6px 4px;font-weight:bold;font-size:10px;background:rgba(168,85,247,0.2);border-color:var(--purple);color:#d8b4fe;">
-        [STORM] 开启放电风暴
+        [离子风暴] 开启放电风暴
       </button>
     </div>
   </div>
@@ -1640,17 +1695,17 @@
   <div class="card" id="card-extinction" style="border: 1px solid rgba(244,63,94,0.45); background: linear-gradient(180deg, rgba(244,63,94,0.1), rgba(18,26,44,0.85));">
     <div class="card-title">
       <span style="color:var(--crimson);display:flex;align-items:center;gap:6px;">
-        <span>[CHICXULUB]</span>
+        <span>[灭绝冲击]</span>
         <span>白垩纪大灭绝算子</span>
       </span>
-      <span class="card-title-badge" style="background:rgba(244,63,94,0.2);color:var(--crimson);font-weight:bold;">Chicxulub Impact</span>
+      <span class="card-title-badge" style="background:rgba(244,63,94,0.2);color:var(--crimson);font-weight:bold;">自然选择大灭绝</span>
     </div>
     <div style="font-size:10px;color:var(--text-dim);line-height:1.45;">
       进化学公理：恐龙不退场，哺乳类永为夜行耗子。抹杀排名前 80% 成熟垄断拓扑，强激发 20% 边缘幸存异变体！
     </div>
     <div style="display:flex;gap:6px;margin-top:4px;">
       <button class="btn-ctrl btn-danger" onclick="triggerChicxulubExtinction()" id="btn-extinction-shock" style="flex:1;padding:8px 6px;font-weight:bold;font-size:11px;background:rgba(244,63,94,0.22);box-shadow:0 0 12px rgba(244,63,94,0.3);letter-spacing:0.5px;">
-        [EXTINCTION] 触发白垩纪大灭绝 (80% 头部抹杀)
+        [灭绝冲击] 触发白垩纪大灭绝 (80% 头部抹杀)
       </button>
     </div>
     <div id="extinction-impact-report" style="display:none;font-size:10px;color:var(--amber);background:rgba(251,191,36,0.1);padding:6px 8px;border-radius:4px;border:1px dashed rgba(251,191,36,0.4);line-height:1.4;">
@@ -1661,10 +1716,10 @@
   <div class="card" id="card-organ-bank" style="border: 1px solid rgba(168,85,247,0.45); background: linear-gradient(180deg, rgba(168,85,247,0.1), rgba(18,26,44,0.85));">
     <div class="card-title">
       <span style="color:#c084fc;display:flex;align-items:center;gap:6px;">
-        <span>[VAULT]</span>
+        <span>[冷冻器官库]</span>
         <span>跨物种器官冷冻库</span>
       </span>
-      <span class="card-title-badge" id="st-organ-bank-badge" style="background:rgba(168,85,247,0.2);color:#c084fc;">Exaptation Bank</span>
+      <span class="card-title-badge" id="st-organ-bank-badge" style="background:rgba(168,85,247,0.2);color:#c084fc;">器官借用库</span>
     </div>
     <div style="font-size:10px;color:var(--text-dim);line-height:1.45;">
       进化学公理：进化不造新轮子，全靠旧零件改用途。从冷冻库借用成熟器官并剪裁重组。
@@ -1681,7 +1736,7 @@
         施密特迟滞强抗震颤阻尼柱 (EMA滤波 + 双阈值迟滞比较，消除高频抖动)
       </div>
       <button class="btn-ctrl" onclick="triggerOrganSplice()" id="btn-splice-organ" style="background:rgba(168,85,247,0.22);border-color:rgba(168,85,247,0.55);color:#d8b4fe;font-weight:bold;padding:7px 8px;font-size:11px;box-shadow:0 0 10px rgba(168,85,247,0.25);">
-        [SPLICE] 借用剪裁接入器官 (Exaptation Splice)
+        [器官借用] 剪裁接入器官 (外适应借用)
       </button>
     </div>
   </div>
@@ -1690,7 +1745,7 @@
   <div class="card" id="bio">
     <div class="card-title">
       <span>生态圈与香农熵</span>
-      <span class="card-title-badge" id="bio-step">Step 0</span>
+      <span class="card-title-badge" id="bio-step">世代 0</span>
     </div>
     <div class="kv"><span>香农多样性 H</span><b id="bio-shannon" style="color:var(--emerald)">--</b></div>
     <div class="kv"><span>辐射诱变事件</span><b id="bio-rad-ev">0</b></div>
@@ -1704,10 +1759,10 @@
   </div>
 
   <!-- 卡片 3: 全息事件流终端 -->
-  <div class="card" style="flex:1;">
+  <div class="card" style="flex-shrink:0;min-height:220px;">
     <div class="card-title">
       <span>全息事件流终端</span>
-      <span class="card-title-badge">Live Log</span>
+      <span class="card-title-badge">实时事件流</span>
     </div>
     <div id="eventlog"></div>
     <div style="display:flex;gap:4px;margin-top:4px;">
@@ -1744,7 +1799,7 @@
 <!-- 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) - 默认折叠收纳 -->
 <div id="dialogue-deck" class="dialogue-deck collapsed">
   <div class="deck-header" onclick="toggleDialogueDeck()">
-    <span style="color:var(--cyan);font-weight:bold;font-size:11px;">[SILICON_NEURAL_CHAT] 硅基生命体神经交互舱 (全息多生境中枢)</span>
+    <span style="color:var(--cyan);font-weight:bold;font-size:11px;">[神经交互] 硅基生命体交互舱 (全息多生境中枢)</span>
     <span id="deck-toggle-icon" style="color:var(--text-dim);font-size:10px;">[折叠/展开]</span>
   </div>
   <div id="deck-body" class="deck-body">
@@ -1756,7 +1811,7 @@
     </div>
     <div id="chat-msgs" class="chat-msgs">
       <div class="msg-bot">
-        <span class="bot-badge">[SDSCC-CHAMPION-ORGAN]</span>
+        <span class="bot-badge">[硅基冠军生命体]</span>
         我是软件定义硅基细胞计算机（SDSCC）演化出的具身生命体。你可以向我发问，我将通过时空动作电位与你对话。
       </div>
     </div>
@@ -1765,6 +1820,8 @@
       <button class="btn-send" onclick="sendDialogueMsg()">发送电位</button>
     </div>
   </div>
+</div>
+
 <!-- 3D 视角与渲染视界罗盘 (Bottom Orbit & Horizon Deck) -->
 <div class="cam-controls">
   <span style="color:var(--text-dim);font-size:10px;margin-right:2px;font-family:var(--font-mono);">视角:</span>
@@ -1818,7 +1875,7 @@ setTimeout(function(){
   <div style="width:90%;max-width:1000px;height:86vh;background:rgba(15,23,42,0.96);border:1px solid rgba(56,189,248,0.35);border-radius:12px;box-shadow:0 25px 50px -12px rgba(0,0,0,0.85);display:flex;flex-direction:column;overflow:hidden;">
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:rgba(30,41,59,0.85);border-bottom:1px solid rgba(56,189,248,0.25);">
       <div style="display:flex;align-items:center;gap:12px;">
-        <span style="font-size:14px;color:var(--cyan);font-family:var(--font-mono);font-weight:bold;">[DOC]</span>
+        <span style="font-size:14px;color:var(--cyan);font-family:var(--font-mono);font-weight:bold;">[工程规范]</span>
         <div>
           <div id="reader-title" style="color:#f8fafc;font-weight:700;font-size:14px;">文献标题</div>
           <div id="reader-meta" style="color:#64748b;font-size:10px;font-family:var(--font-mono);margin-top:2px;">文件路径</div>
@@ -1831,7 +1888,7 @@ setTimeout(function(){
     </div>
     <div style="padding:10px 20px;background:rgba(15,23,42,0.95);border-top:1px solid rgba(56,189,248,0.2);display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#64748b;">
       <span id="reader-stats">共 0 行</span>
-      <span style="color:var(--emerald);">[VERIFIED] 物理源文件校验通过 (Single Source of Truth)</span>
+      <span style="color:var(--emerald);">[认证通过] 物理源文件校验通过 (单一真相源)</span>
     </div>
   </div>
 </div>
