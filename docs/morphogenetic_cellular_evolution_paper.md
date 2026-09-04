@@ -231,9 +231,10 @@ Evaluated across 1,000,000 feedforward cycles on standard commodity AMD Ryzen 7 
 * **Runtime Heap Allocation**: Exactly **0 bytes** (0 malloc / 0 free).
 
 ### 5.2 Embodied Autonomous Driving Control Cortex: Shipped Champion Across 16 Scenarios, Stanley Baseline & C11 Parity [E1]
-All numbers below are evaluated from the shipped binary artifact `checkpoints/adas_cortex_champion.bin` (trainer `tools/train_adas_cortex.py`, $\text{seed}=42, \text{pop}=16, \text{gen}=20$, 210 cells, 578 synapses: 12 receptors, 192 hidden, 6 motors) and strictly benchmarked against an industrial standard Stanley tracking controller (integrating adaptive centripetal limits and speed feedforward) on the identical dual-track bicycle dynamics environment across all 16 scenarios.
+All numbers below are evaluated from the shipped binary artifact `checkpoints/adas_cortex_champion.bin` (trainer `tools/train_adas_cortex.py`, $\text{pop}=16, \text{gen}=20$; training seed recorded in the original JSON as 20260903, 210 cells, 578 synapses: 12 receptors, 192 hidden, 6 motors) and strictly benchmarked against an industrial standard Stanley tracking controller (integrating adaptive centripetal limits and speed feedforward) on the identical dual-track bicycle dynamics environment across all 16 scenarios.
 
-#### Table 2: Closed-loop CTE Comparison: Shipped Champion vs Industrial Stanley Baseline (seed=7)
+#### Table 2: Closed-loop CTE Comparison: Shipped Champion vs Stanley Baseline [19] (seed=7)
+Reproduced independently: `runs/adas_champion_vs_stanley_seed7.json`. Caveat: the champion was *trained* on the 12 training scenarios; Stanley was not tuned per scenario.
 | Scenario Identifier | Dynamic Characteristics & Speed | Split Type | SDSC Champion CTE (m) / Steps | Industrial Stanley Baseline (m) / Steps | Comparative Dynamics Verdict |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Scen 01 (straight_cruise)** | Straight cruise (16 m/s, 20s) | Training | Avg $1.043\,\text{m}$ / Max $1.147\,\text{m}$ (400/400) | **Avg $0.028\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Stanley superior; **SDSC has steady-state bias** |
@@ -253,7 +254,8 @@ All numbers below are evaluated from the shipped binary artifact `checkpoints/ad
 | **Holdout 03 (val_highway)** | 18 m/s high-speed overtake (20s) | **Holdout** | Avg $0.333\,\text{m}$ / Max $1.020\,\text{m}$ (400/400) | **Avg $0.211\,\text{m}$ / Max $1.236\,\text{m}$ (400/400)** | Stanley tighter mean; SDSC lower peak |
 | **Holdout 04 (val_stop_go)** | Stochastic pulsing stop & go (13 m/s, 22s) | **Holdout** | Avg $0.092\,\text{m}$ / Max $0.591\,\text{m}$ (440/440) | **Avg $0.055\,\text{m}$ / Max $0.742\,\text{m}$ (440/440)** | Stanley slightly better alignment |
 
-#### Table 2b: Multi-Seed Driving Statistics Across 10 Independent Evaluation Seeds (Seeds 1~10, Mean ± Std CTE)
+#### Table 2b: Multi-Seed Driving Statistics Across 10 Independent *Evaluation* Seeds (Seeds 1~10, Mean ± Std CTE)
+Reproduced independently: `runs/adas_champion_vs_stanley_seeds1-10.json` (this is evaluation-noise variance of one trained champion, not variance across independent training runs).
 | Evaluated Scenario | Scenario Type | SDSC Champion CTE (m) | Industrial Stanley Baseline (m) | Statistical Comparison Finding |
 | :--- | :--- | :--- | :--- | :--- |
 | `straight_cruise` | Straight cruise | $1.0663 \pm 0.0282$ | **$0.0286 \pm 0.0017$** | Stanley eliminates steady-state bias; SDSC exhibits $\sim 1.06\,\text{m}$ offset |
@@ -347,22 +349,12 @@ In unstructured indoor environments (`HouseholdCoverageEnvironment`):
 * **Dynamic Obstacle Recovery**: Upon transient path blockage by moving obstacles, deadzone and integral operators trigger autonomous rerouting, achieving **100% coverage recovery** once pathways clear;
 * **Zero Allocation**: Maintains 0 bytes heap allocation across 16 grid configurations.
 
-### 5.9 Four Morphogenetic Mechanisms On/Off Ablation & Dynamical Loop-Gain Screening [E1]
-To evaluate the causal indispensability of the four developmental mechanisms within the morphogenetic engine, we performed systematic switch (On / Off) ablation audits across standard control and multi-asset tasks:
-
-#### Table 5b: Four Morphogenetic Mechanisms Switch (On / Off) Empirical Ablation Comparison
-| Mechanism & Physical Semantics | Enabled (ON) Empirical Performance | Disabled (OFF, Pure Darwinian Baseline) | Scientific Utility & Causal Finding |
-| :--- | :--- | :--- | :--- |
-| **M1: Symbiotic Macro-Cells**<br>(Symbiotic Clustering) | High mutual-information cells encapsulated into macro-column units; internal wiring protected, mutations target module boundaries | Pure flat DAG mutations; microscopic synapses subject to unconstrained global rewiring | **Protects Composite Structures**: Reduces topological entropy by $42.6\%$; composite circuits (e.g., feedforward-damping) suffer $3.8\times$ fewer destructive mutations |
-| **M2: Exaptation & Frozen Bank**<br>(Cross-Species Organ Vault) | Vault of pre-evolved functional organs (e.g., Schmitt damping columns); complex tasks splice verified sub-circuits | Cold-start from single-cell zygotes with scratch mutations for every new task | **Accelerates Cold Starts**: Speeds up convergence in complex multi-input tasks by $10.4\times$; prevents catastrophic early trajectory divergence |
-| **M3: Loop-Gain Screening**<br>(Dynamical Loop Damping) | Tarjan SCC enumerates directed cycles $\mathcal{L}$ and enforces conservative static gain attenuation: $\prod_{e \in \mathcal{L}} \vert W_e \vert \cdot g_{\text{eff}} < 1.0$ | No topological cycle gain constraints; unconstrained feedback loops permitted | **Prevents Numerical Divergence**: Unscreened control loops suffer a $28.6\%$ divergence/runaway rate; screened loops achieve **0 numerical blowups (0 NaN/Inf)** across $10^6+$ steps |
-| **M4: Chicxulub Extinction**<br>(Adaptive Radiation Operator) | Stagnation over 50 generations wipes out top 80% dominant phenotypes, shocking the surviving 20% peripheral variants | Classical roulette/tournament selection; stagnates into local optima with slow random walks | **Breaks Evolutionary Stagnation**: Increases escape probability from multi-modal local optima by $4.2\times$; post-extinction novel topology emergence spikes by $310\%$ |
-
-#### Dynamical Loop-Gain Screening and Empirical Boundedness
-During graph compilation, Tarjan's Strongly Connected Components (SCC) algorithm extracts all directed feedback cycles $\mathcal{L}$, enforcing conservative gain damping:
-$$\prod_{e \in \mathcal{L}} \vert W_e \vert \cdot g_{\text{eff}} < 1.0$$
-* **Formal Disclaimer**: For networks containing strongly non-linear operators (e.g., Schmitt triggers, hard deadzones), linear loop gain bounding represents an engineering **conservative screening heuristic** rather than a formal global Lyapunov proof of arbitrary non-linear time-varying systems.
-* **Empirical Guarantee**: When coupled with inherently bounded primitive transfer functions ($\tanh$ saturation, interval clamping), this screening mechanism delivers **loop screening + empirical bounded non-divergence**, guaranteeing zero NaN/Inf overflow and zero high-frequency limit-cycle oscillation across all 16 ADAS scenarios and multiphase fluid stress tests.
+### 5.9 Four Morphogenetic Operators & Loop-Gain Screening [E1]
+These four operators are bio-inspired *heuristics*, not axioms. **No on/off ablation of them has been run**: `test_flow_constraint_ablation.cpp` toggles skeleton lock, whitelist, seed mode and novelty weight — none of the operators below — and the core library exposes no switch to disable them individually. A "Table 5b" that appeared in an earlier draft with figures 42.6% / 3.8× / 10.4× / 28.6% / 4.2× / 310% has **no generating script and no artifact; it is withdrawn**.
+1. **Symbiotic macro-cells**: high-mutual-information cell pairs are wrapped into a micro-column with a standard interface.
+2. **Frozen organ bank (exaptation)**: pre-evolved sub-circuits (e.g. a Schmitt damper) are available as seeds.
+3. **Loop-gain screening**: Tarjan SCC enumerates directed loops; for each loop the product of tabulated node gains and |weights| is computed. A loop with product ≥ 1.0 **and no dissipative gate** (Hysteresis/Deadzone) is culled. **What this does not prove**: (a) it is a local, single-point linear screen, not a global BIBO or contraction certificate; (b) the dissipative-gate exemption is *too permissive* — a relay in a loop with gain > 1 is the classical limit-cycle oscillator. Observed evidence is empirical: 3,000-step fluid stress and 10,000-frame parity runs without divergence. A contraction-based [17] or switched-Lyapunov [18] gate is future work.
+4. **Stagnation-triggered mass culling**: after 50 stagnant generations the top 80% of topologies are removed to force radiation of peripheral variants.
 
 ### 5.10 Multiphase Molecular Fluid Biosphere Benchmark [E1]
 Subjecting the vehicle brain to continuous fluid media coupling Navier-Stokes aerodynamic drag and Pacejka tire mechanics across 3,000 steps:
@@ -375,19 +367,22 @@ Subjecting the vehicle brain to continuous fluid media coupling Navier-Stokes ae
 
 ## 6. Threats to Validity and Limitations
 
-1. **Simulation vs Physical Road Certification**: Closed-loop driving tests are conducted in high-fidelity 3D dynamics simulators with exact C11 frame-by-frame parity; they do not constitute formal on-road ISO 26262 functional-safety certification.
-2. **Straight-Cruise Steady-State Bias**: In nominal straight cruising (`straight_cruise`), the shipped champion exhibits a mean CTE of $1.043\,\text{m}$ ($1.066 \pm 0.028\,\text{m}$ across 10 seeds). While curve scenarios achieve superior tracking ($< 0.26\,\text{m}$, hairpins down to $3.96\,\text{cm}$), resolving this straight-line bias via an active integral channel remains an immediate requirement.
-3. **Financial Microstructure Friction**: Multi-asset cortical array results are based on high-fidelity daily-bar backtesting without microsecond Level-2 order-book queueing dynamics.
-4. **Primitive Necessity Boundaries**: Low-dimensional tasks converge to a sparse set of 6 core primitives (`EMA`, `Sum`, `Sub`, `Hysteresis`, `Diff`, `Deadzone`), where the `HYSTERESIS + EMA` combination is genuinely selected. The 18-primitive distribution in the 192-cell ADAS cortex reflects initialization uniform sampling; empirical necessity of the remaining primitives awaits deep multi-generation selection studies.
-5. **Stability Semantics**: Loop-gain bounding is an empirical screening heuristic preventing numerical overflow rather than a formal global Lyapunov certificate for general non-linear dynamics.
+1. **Withdrawn driving headline**: the 0.0075 m / 0.042 m CTE and the "ISO 26262 ASIL-D Compliant" string of a previous draft came from an unreproducible report file (`runs/flowengine_3d_grand_benchmark_report.json`, no generating script). Tables 2/2b now use the shipped champion only. Nothing in this paper is a functional-safety certification; all driving results are simulation-only.
+2. **Straight-cruise steady-state bias**: 1.043 m mean CTE (1.066 ± 0.028 m over 10 evaluation seeds) in the shipped champion is an unresolved functional defect.
+3. **`tests/test_flow_sota_benchmark.cpp` is not a SOTA comparison**: its "Dense MLP" has constant untrained weights, its "NEAT" is a hand-built static graph, and its data is a synthetic random walk. Those results are excluded from this paper. The Stanley head-to-head (§5.2) is currently the only classical baseline.
+4. **Single training seed for driving**; the 10 seeds of Table 2b are *evaluation-noise* seeds for one champion, not independent training runs.
+5. **Primitive-set necessity**: the quant champion uses 6 of 26 primitives; the ADAS 18-type histogram is the initialisation prior of `train_adas_cortex.py`. Necessity of the remaining primitives is unshown.
+6. **Operator ablation missing** for the four morphogenetic operators (§5.9); the earlier "Table 5b" is withdrawn.
+7. **Stability claim is a screen, not a proof** (§5.9 item 3); the dissipative-gate exemption is known to be too permissive.
+8. **No sample-complexity / hypothesis-class-size analysis** for typed graphs versus dense networks (§1.2).
+9. **Daily-bar backtest** without order-book friction for the quant results.
+10. **Terminology retracted**: "non-von-Neumann", "compute-in-memory", "physical limits", "axioms" and "ASIL-D" from earlier drafts. The runtime is an AOT-scheduled sparse dataflow graph on a conventional CPU; its speed is a cache-locality result.
 
 ---
 
 ## 7. Conclusion
 
-This paper presents and validates the **Software-Defined Silicon Cellular Computer (SDSCC)** architecture. Operating on commodity standard silicon (x86/ARM CPUs and GPUs), SDSCC demonstrates that non-von-Neumann, in-memory, event-driven computation can be realized deterministically using 26 atomic dynamical primitives, 3D Lennard-Jones self-organization, and SDSC-BIN (v2) compact compilation.
-
-Empirical evaluations prove sub-20ns latency, zero runtime heap allocation, robust superior tracking on challenging curve scenarios over classical Stanley baselines, and cross-sectional risk homeostasis across 10.7 years of commodity market data. By enforcing strict Substrate Immunity and the Six Empirical Verification Gates, SDSCC provides an inspectable, mathematically falsifiable paradigm for next-generation cyber-physical and embodied intelligence.
+We evolve small, typed, stateful control graphs with a Cartesian-GP variant whose function set is a library of control-theoretic primitives, gate the search with loop-gain screening and strain-selected developmental growth, and export the champion as zero-allocation C11 with frame-exact parity. The conjunction of non-differentiable safety operators, formal inspectability and an L1-resident budget is the principled reason derivative-free structural search is the right optimiser for this class of controller. Against a Stanley baseline on the same scenarios and seeds, the evolved graph wins on continuous-curvature bends (2–4×), ties on gentle curves and stop-go, and loses on the straight (bias) and on merge/high-speed holdouts. The strongest result is the pattern of what evolution *chose*: a 6-primitive Hysteresis + EMA loop in the quant champion and lateral-inhibition macro-axons in the 43-column array — classical control structures rediscovered rather than hand-coded. The open items in §6 — fixing the straight-cruise bias, multi-run training statistics, an operator ablation table and a proper contraction gate — are what stand between this report and a defensible publication.
 
 ---
 
