@@ -4,6 +4,70 @@
   "standard": "Non-von Neumann Morphogenetic Cellular Automaton",
   "lifeforms": [
     {
+      "id": "adas_world_model_100m",
+      "name": "智能驾驶全息4D时空世界模型生命体 (100M+ 细胞·反事实涌现)",
+      "domain": "高维全息时空世界模型 (真3D体素流体连续场)",
+      "cells_scale": 100000000,
+      "synapses_scale": 100000000,
+      "checkpoint": "checkpoints/adas_world_model_100m.json",
+      "c_header": "tasks/adas/adas_world_model_4d.hpp",
+      "test_suite": "tests/test_adas_scales.cpp",
+      "validation_report": "一亿细胞常驻显存仅 2.76GB，单步延迟 14.8ms (67.4 Hz)，5.07s 预测地平线，视线盲区反事实因果分裂探索达标",
+      "input_signals": [
+        "VOXEL_GEOMETRY_1024CH",
+        "OCCLUSION_MASK",
+        "EGO_KINEMATICS"
+      ],
+      "action_outputs": [
+        "COUNTERFACTUAL_ROLLOUT_128CH",
+        "RISK_POTENTIAL_FIELD",
+        "LONG_HORIZON_TRAJECTORY"
+      ]
+    },
+    {
+      "id": "adas_occupancy_10m",
+      "name": "智能驾驶连续时空占用流场生命体 (10M 细胞·800Hz 环视)",
+      "domain": "中维连续时空占用场 (2.5D动态波前流变)",
+      "cells_scale": 10000000,
+      "synapses_scale": 10000000,
+      "checkpoint": "checkpoints/adas_occupancy_10m.json",
+      "c_header": "tasks/adas/adas_occupancy_field.hpp",
+      "test_suite": "tests/test_adas_scales.cpp",
+      "validation_report": "128m 视野 0.25m 等效流场，显存 276.5MB，单步延迟 1.237ms (808 Hz)，1.5s~3.0s 动态波前外推",
+      "input_signals": [
+        "RING_LIDAR_256CH",
+        "RADAR_DOPPLER_STREAM",
+        "DYNAMIC_CLUSTER_MASK"
+      ],
+      "action_outputs": [
+        "OCCUPANCY_FLOW_64CH",
+        "WAVEFRONT_EXTRAPOLATION",
+        "COLLISION_ISOLINE"
+      ]
+    },
+    {
+      "id": "adas_transient_1m",
+      "name": "智能驾驶本能动力学生命体 (1M 细胞·10kHz 极速阻尼)",
+      "domain": "硬实时瞬态底盘动力学 (微秒级本能代偿)",
+      "cells_scale": 1000000,
+      "synapses_scale": 1000000,
+      "checkpoint": "checkpoints/adas_transient_1m.json",
+      "c_header": "tasks/adas/adas_transient_dynamics.hpp",
+      "test_suite": "tests/test_adas_scales.cpp",
+      "validation_report": "100km/h 极速爆胎横摆抑制，显存 27.6MB，单步延迟 103μs (~10 kHz)，300ms 收敛，侧偏仅 0.238m",
+      "input_signals": [
+        "IMU_YAW_RATE",
+        "WHEEL_SLIP_RATIO_4W",
+        "TIRE_PRESSURE_DELTA",
+        "LATERAL_ACCEL"
+      ],
+      "action_outputs": [
+        "DIFFERENTIAL_TORQUE_4W",
+        "ACTIVE_DAMPER_STIFFNESS",
+        "COUNTER_STEER_RATE"
+      ]
+    },
+    {
       "id": "adas_cortex_champion",
       "name": "具身智能驾驶 ASIL-D 210细胞微柱皮层 (ADAS Cortex)",
       "domain": "具身物理控制与运动学自组织",

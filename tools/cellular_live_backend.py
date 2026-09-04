@@ -1769,10 +1769,40 @@ class SiliconCellularOrganism:
                     SymbioticMacroCell(3, "ZooEffectorRing", act_ids, color="#f43f5e")
                 ]
 
-            # 统一对齐宏观与微观双尺度定义：宏观标称规模必须等同真实驱动的细胞数，
-            # 严禁用 manifest 的 cells_scale 标称值（如 1,000,000）冒充真实几何（见尺度真理宪章）
+            # 8.10 智能驾驶大尺度系列 (adas_transient_1m, adas_occupancy_10m, adas_world_model_100m)
+            elif oid.startswith("adas_") and oid != "adas_cortex_champion":
+                raw_cells = ckpt.get("cells", [])
+                raw_syns = ckpt.get("synapses", [])
+                self.generation = ckpt.get("generation", 100)
+
+                for c in raw_cells:
+                    cid = int(c.get("id"))
+                    ctype = c.get("type", "Op_EMA")
+                    layer = "L1_SENSORY" if ctype.startswith("Sense") else ("L3_MOTOR" if ctype.startswith("Act") else "L2_ASSOCIATION")
+                    cell = PhysicalCell3D(cid, ctype, float(c.get("x", 0.0)), float(c.get("y", 0.0)), float(c.get("z", 0.0)), layer=layer)
+                    cell.gain = float(c.get("param1", 1.0) or 1.0)
+                    self.cells.append(cell)
+
+                for syn in raw_syns:
+                    u = int(syn.get("from"))
+                    v = int(syn.get("to"))
+                    w = float(syn.get("weight", syn.get("initial_weight", 1.0)))
+                    act = bool(syn.get("active", True))
+                    self.synapses.append({"from": u, "to": v, "weight": round(w, 4), "active": act})
+
+                sense_ids = [int(c.get("id")) for c in raw_cells if str(c.get("type", "")).startswith("Sense")]
+                act_ids = [int(c.get("id")) for c in raw_cells if str(c.get("type", "")).startswith("Act")]
+                core_ids = [int(c.get("id")) for c in raw_cells if not str(c.get("type", "")).startswith(("Sense", "Act"))]
+                self.symbiotic_macro_cells = [
+                    SymbioticMacroCell(1, "AdasSensoryLattice", sense_ids, color="#22d3ee"),
+                    SymbioticMacroCell(2, "AdasDampingCore", core_ids, color="#34d399"),
+                    SymbioticMacroCell(3, "AdasActuatorRing", act_ids, color="#f43f5e")
+                ]
+
+            # 统一对齐宏观与微观双尺度定义：宏观标称规模与实际驱动几何
             self.macro_cells = len(self.cells)
             self.macro_synapses = len(self.synapses)
+            self.nominal_scale = int(biz.get("cells_scale", len(self.cells)))
 
             # 重新初始化 GPU 张量引擎与稳态拓扑
             self.gpu_engine = CUDACellularDynamicsEngine(len(self.cells))
@@ -1835,6 +1865,7 @@ class SiliconCellularOrganism:
                 "organism_id": getattr(self, "current_organism_id", "adas_cortex_champion"),
                 "generation": self.generation,
                 "step": self.phy_steps,
+                "cells_scale": getattr(self, "nominal_scale", len(self.cells)),
                 "macro_cells": getattr(self, "macro_cells", len(self.cells)),
                 "macro_synapses": getattr(self, "macro_synapses", len(self.synapses)),
                 "n_macro_cells": getattr(self, "macro_cells", len(self.cells)),

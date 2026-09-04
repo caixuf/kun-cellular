@@ -1,0 +1,5080 @@
+{
+  "organism_id": "adas_transient_1m",
+  "generation": 100,
+  "cells": [
+    {
+      "id": 0,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 81.39,
+      "y": -100.0,
+      "z": -4.75
+    },
+    {
+      "id": 1,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 77.75,
+      "y": -95.0,
+      "z": -2.77
+    },
+    {
+      "id": 2,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 82.36,
+      "y": -90.0,
+      "z": 1.77
+    },
+    {
+      "id": 3,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 83.92,
+      "y": -85.0,
+      "z": -4.13
+    },
+    {
+      "id": 4,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 79.22,
+      "y": -80.0,
+      "z": -4.7
+    },
+    {
+      "id": 5,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 77.19,
+      "y": -75.0,
+      "z": 0.05
+    },
+    {
+      "id": 6,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 75.27,
+      "y": -70.0,
+      "z": -3.01
+    },
+    {
+      "id": 7,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 81.5,
+      "y": -65.0,
+      "z": 0.45
+    },
+    {
+      "id": 8,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 77.2,
+      "y": -60.0,
+      "z": 0.89
+    },
+    {
+      "id": 9,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 83.09,
+      "y": -55.0,
+      "z": -4.94
+    },
+    {
+      "id": 10,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 83.06,
+      "y": -50.0,
+      "z": 1.98
+    },
+    {
+      "id": 11,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 78.4,
+      "y": -45.0,
+      "z": -3.45
+    },
+    {
+      "id": 12,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 84.57,
+      "y": -40.0,
+      "z": -1.63
+    },
+    {
+      "id": 13,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 75.93,
+      "y": -35.0,
+      "z": -4.03
+    },
+    {
+      "id": 14,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 83.47,
+      "y": -30.0,
+      "z": 1.04
+    },
+    {
+      "id": 15,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 83.07,
+      "y": -25.0,
+      "z": 2.3
+    },
+    {
+      "id": 16,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 80.36,
+      "y": -20.0,
+      "z": 4.73
+    },
+    {
+      "id": 17,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 78.79,
+      "y": -15.0,
+      "z": 0.52
+    },
+    {
+      "id": 18,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 83.29,
+      "y": -10.0,
+      "z": 1.19
+    },
+    {
+      "id": 19,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 83.62,
+      "y": -5.0,
+      "z": 0.77
+    },
+    {
+      "id": 20,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 82.05,
+      "y": 0.0,
+      "z": -4.54
+    },
+    {
+      "id": 21,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 77.28,
+      "y": 5.0,
+      "z": -2.11
+    },
+    {
+      "id": 22,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 75.8,
+      "y": 10.0,
+      "z": -2.67
+    },
+    {
+      "id": 23,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 76.01,
+      "y": 15.0,
+      "z": -2.22
+    },
+    {
+      "id": 24,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 81.36,
+      "y": 20.0,
+      "z": -1.35
+    },
+    {
+      "id": 25,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 78.7,
+      "y": 25.0,
+      "z": -2.9
+    },
+    {
+      "id": 26,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 77.67,
+      "y": 30.0,
+      "z": 4.37
+    },
+    {
+      "id": 27,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 81.48,
+      "y": 35.0,
+      "z": 1.09
+    },
+    {
+      "id": 28,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 76.71,
+      "y": 40.0,
+      "z": 2.29
+    },
+    {
+      "id": 29,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 76.63,
+      "y": 45.0,
+      "z": -1.21
+    },
+    {
+      "id": 30,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 84.9,
+      "y": 50.0,
+      "z": 1.4
+    },
+    {
+      "id": 31,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 80.57,
+      "y": 55.0,
+      "z": 1.85
+    },
+    {
+      "id": 32,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 83.43,
+      "y": 60.0,
+      "z": 2.76
+    },
+    {
+      "id": 33,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 77.29,
+      "y": 65.0,
+      "z": -4.68
+    },
+    {
+      "id": 34,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 78.15,
+      "y": 70.0,
+      "z": -2.32
+    },
+    {
+      "id": 35,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 77.11,
+      "y": 75.0,
+      "z": 4.43
+    },
+    {
+      "id": 36,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 83.76,
+      "y": 80.0,
+      "z": -1.85
+    },
+    {
+      "id": 37,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 81.55,
+      "y": 85.0,
+      "z": -1.04
+    },
+    {
+      "id": 38,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 84.15,
+      "y": 90.0,
+      "z": -0.41
+    },
+    {
+      "id": 39,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 77.65,
+      "y": 95.0,
+      "z": -2.53
+    },
+    {
+      "id": 40,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 57.18,
+      "y": -100.0,
+      "z": 54.2
+    },
+    {
+      "id": 41,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 57.41,
+      "y": -95.0,
+      "z": 60.55
+    },
+    {
+      "id": 42,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 55.56,
+      "y": -90.0,
+      "z": 53.76
+    },
+    {
+      "id": 43,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 61.54,
+      "y": -85.0,
+      "z": 56.66
+    },
+    {
+      "id": 44,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.48,
+      "y": -80.0,
+      "z": 52.04
+    },
+    {
+      "id": 45,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.67,
+      "y": -75.0,
+      "z": 57.84
+    },
+    {
+      "id": 46,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 59.49,
+      "y": -70.0,
+      "z": 55.79
+    },
+    {
+      "id": 47,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.2,
+      "y": -65.0,
+      "z": 55.38
+    },
+    {
+      "id": 48,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 61.53,
+      "y": -60.0,
+      "z": 56.86
+    },
+    {
+      "id": 49,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 61.28,
+      "y": -55.0,
+      "z": 60.18
+    },
+    {
+      "id": 50,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 51.68,
+      "y": -50.0,
+      "z": 58.78
+    },
+    {
+      "id": 51,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 58.39,
+      "y": -45.0,
+      "z": 56.94
+    },
+    {
+      "id": 52,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.24,
+      "y": -40.0,
+      "z": 57.98
+    },
+    {
+      "id": 53,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.68,
+      "y": -35.0,
+      "z": 55.92
+    },
+    {
+      "id": 54,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.11,
+      "y": -30.0,
+      "z": 61.11
+    },
+    {
+      "id": 55,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 60.33,
+      "y": -25.0,
+      "z": 54.2
+    },
+    {
+      "id": 56,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.57,
+      "y": -20.0,
+      "z": 53.36
+    },
+    {
+      "id": 57,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 60.69,
+      "y": -15.0,
+      "z": 60.27
+    },
+    {
+      "id": 58,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.55,
+      "y": -10.0,
+      "z": 57.96
+    },
+    {
+      "id": 59,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 57.66,
+      "y": -5.0,
+      "z": 53.1
+    },
+    {
+      "id": 60,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 59.19,
+      "y": 0.0,
+      "z": 56.96
+    },
+    {
+      "id": 61,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 59.35,
+      "y": 5.0,
+      "z": 56.87
+    },
+    {
+      "id": 62,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 51.57,
+      "y": 10.0,
+      "z": 54.81
+    },
+    {
+      "id": 63,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 51.76,
+      "y": 15.0,
+      "z": 60.86
+    },
+    {
+      "id": 64,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 60.36,
+      "y": 20.0,
+      "z": 59.89
+    },
+    {
+      "id": 65,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.64,
+      "y": 25.0,
+      "z": 52.15
+    },
+    {
+      "id": 66,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 60.35,
+      "y": 30.0,
+      "z": 61.04
+    },
+    {
+      "id": 67,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.43,
+      "y": 35.0,
+      "z": 56.43
+    },
+    {
+      "id": 68,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.26,
+      "y": 40.0,
+      "z": 59.17
+    },
+    {
+      "id": 69,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 59.23,
+      "y": 45.0,
+      "z": 52.85
+    },
+    {
+      "id": 70,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.32,
+      "y": 50.0,
+      "z": 57.07
+    },
+    {
+      "id": 71,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.22,
+      "y": 55.0,
+      "z": 60.29
+    },
+    {
+      "id": 72,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 55.8,
+      "y": 60.0,
+      "z": 53.69
+    },
+    {
+      "id": 73,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.96,
+      "y": 65.0,
+      "z": 58.87
+    },
+    {
+      "id": 74,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 53.58,
+      "y": 70.0,
+      "z": 54.69
+    },
+    {
+      "id": 75,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 61.52,
+      "y": 75.0,
+      "z": 58.07
+    },
+    {
+      "id": 76,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 55.95,
+      "y": 80.0,
+      "z": 56.74
+    },
+    {
+      "id": 77,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.78,
+      "y": 85.0,
+      "z": 53.82
+    },
+    {
+      "id": 78,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.95,
+      "y": 90.0,
+      "z": 57.45
+    },
+    {
+      "id": 79,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 53.87,
+      "y": 95.0,
+      "z": 53.77
+    },
+    {
+      "id": 80,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -4.29,
+      "y": -100.0,
+      "z": 81.31
+    },
+    {
+      "id": 81,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -2.71,
+      "y": -95.0,
+      "z": 84.05
+    },
+    {
+      "id": 82,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 3.6,
+      "y": -90.0,
+      "z": 75.71
+    },
+    {
+      "id": 83,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -2.62,
+      "y": -85.0,
+      "z": 81.69
+    },
+    {
+      "id": 84,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -2.86,
+      "y": -80.0,
+      "z": 76.32
+    },
+    {
+      "id": 85,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 4.36,
+      "y": -75.0,
+      "z": 80.71
+    },
+    {
+      "id": 86,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.27,
+      "y": -70.0,
+      "z": 82.85
+    },
+    {
+      "id": 87,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 3.07,
+      "y": -65.0,
+      "z": 76.9
+    },
+    {
+      "id": 88,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -4.03,
+      "y": -60.0,
+      "z": 79.31
+    },
+    {
+      "id": 89,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.76,
+      "y": -55.0,
+      "z": 79.67
+    },
+    {
+      "id": 90,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 2.29,
+      "y": -50.0,
+      "z": 81.73
+    },
+    {
+      "id": 91,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 4.84,
+      "y": -45.0,
+      "z": 75.98
+    },
+    {
+      "id": 92,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.97,
+      "y": -40.0,
+      "z": 78.39
+    },
+    {
+      "id": 93,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 3.62,
+      "y": -35.0,
+      "z": 77.49
+    },
+    {
+      "id": 94,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -3.1,
+      "y": -30.0,
+      "z": 79.49
+    },
+    {
+      "id": 95,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.78,
+      "y": -25.0,
+      "z": 77.79
+    },
+    {
+      "id": 96,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -2.5,
+      "y": -20.0,
+      "z": 84.23
+    },
+    {
+      "id": 97,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.57,
+      "y": -15.0,
+      "z": 83.61
+    },
+    {
+      "id": 98,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 0.5,
+      "y": -10.0,
+      "z": 75.51
+    },
+    {
+      "id": 99,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 4.99,
+      "y": -5.0,
+      "z": 83.36
+    },
+    {
+      "id": 100,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 4.69,
+      "y": 0.0,
+      "z": 84.26
+    },
+    {
+      "id": 101,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 3.49,
+      "y": 5.0,
+      "z": 76.66
+    },
+    {
+      "id": 102,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.14,
+      "y": 10.0,
+      "z": 77.14
+    },
+    {
+      "id": 103,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.99,
+      "y": 15.0,
+      "z": 75.59
+    },
+    {
+      "id": 104,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -1.21,
+      "y": 20.0,
+      "z": 84.85
+    },
+    {
+      "id": 105,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -2.35,
+      "y": 25.0,
+      "z": 82.84
+    },
+    {
+      "id": 106,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.45,
+      "y": 30.0,
+      "z": 79.23
+    },
+    {
+      "id": 107,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 4.57,
+      "y": 35.0,
+      "z": 84.95
+    },
+    {
+      "id": 108,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 0.56,
+      "y": 40.0,
+      "z": 82.18
+    },
+    {
+      "id": 109,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -3.45,
+      "y": 45.0,
+      "z": 77.97
+    },
+    {
+      "id": 110,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 4.69,
+      "y": 50.0,
+      "z": 80.79
+    },
+    {
+      "id": 111,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 0.42,
+      "y": 55.0,
+      "z": 82.48
+    },
+    {
+      "id": 112,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -4.43,
+      "y": 60.0,
+      "z": 80.84
+    },
+    {
+      "id": 113,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 0.03,
+      "y": 65.0,
+      "z": 83.53
+    },
+    {
+      "id": 114,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -3.43,
+      "y": 70.0,
+      "z": 84.61
+    },
+    {
+      "id": 115,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -4.2,
+      "y": 75.0,
+      "z": 76.86
+    },
+    {
+      "id": 116,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 0.95,
+      "y": 80.0,
+      "z": 81.75
+    },
+    {
+      "id": 117,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -2.65,
+      "y": 85.0,
+      "z": 76.2
+    },
+    {
+      "id": 118,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 3.9,
+      "y": 90.0,
+      "z": 77.46
+    },
+    {
+      "id": 119,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 0.95,
+      "y": 95.0,
+      "z": 81.19
+    },
+    {
+      "id": 120,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.38,
+      "y": -100.0,
+      "z": 57.41
+    },
+    {
+      "id": 121,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -56.34,
+      "y": -95.0,
+      "z": 60.92
+    },
+    {
+      "id": 122,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.53,
+      "y": -90.0,
+      "z": 58.73
+    },
+    {
+      "id": 123,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.18,
+      "y": -85.0,
+      "z": 55.53
+    },
+    {
+      "id": 124,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -54.85,
+      "y": -80.0,
+      "z": 54.57
+    },
+    {
+      "id": 125,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -58.41,
+      "y": -75.0,
+      "z": 59.09
+    },
+    {
+      "id": 126,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.84,
+      "y": -70.0,
+      "z": 56.15
+    },
+    {
+      "id": 127,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -51.58,
+      "y": -65.0,
+      "z": 61.53
+    },
+    {
+      "id": 128,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.84,
+      "y": -60.0,
+      "z": 53.7
+    },
+    {
+      "id": 129,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -58.92,
+      "y": -55.0,
+      "z": 60.9
+    },
+    {
+      "id": 130,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -52.76,
+      "y": -50.0,
+      "z": 60.36
+    },
+    {
+      "id": 131,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.87,
+      "y": -45.0,
+      "z": 53.15
+    },
+    {
+      "id": 132,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.23,
+      "y": -40.0,
+      "z": 58.6
+    },
+    {
+      "id": 133,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -55.45,
+      "y": -35.0,
+      "z": 61.44
+    },
+    {
+      "id": 134,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -55.03,
+      "y": -30.0,
+      "z": 51.65
+    },
+    {
+      "id": 135,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.4,
+      "y": -25.0,
+      "z": 54.56
+    },
+    {
+      "id": 136,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -54.93,
+      "y": -20.0,
+      "z": 60.96
+    },
+    {
+      "id": 137,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.23,
+      "y": -15.0,
+      "z": 52.72
+    },
+    {
+      "id": 138,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.5,
+      "y": -10.0,
+      "z": 57.1
+    },
+    {
+      "id": 139,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -58.85,
+      "y": -5.0,
+      "z": 57.62
+    },
+    {
+      "id": 140,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -54.39,
+      "y": 0.0,
+      "z": 53.6
+    },
+    {
+      "id": 141,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -55.23,
+      "y": 5.0,
+      "z": 54.21
+    },
+    {
+      "id": 142,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -56.68,
+      "y": 10.0,
+      "z": 60.62
+    },
+    {
+      "id": 143,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.11,
+      "y": 15.0,
+      "z": 52.49
+    },
+    {
+      "id": 144,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.33,
+      "y": 20.0,
+      "z": 54.34
+    },
+    {
+      "id": 145,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -61.53,
+      "y": 25.0,
+      "z": 59.28
+    },
+    {
+      "id": 146,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -55.2,
+      "y": 30.0,
+      "z": 54.19
+    },
+    {
+      "id": 147,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -54.16,
+      "y": 35.0,
+      "z": 57.09
+    },
+    {
+      "id": 148,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.29,
+      "y": 40.0,
+      "z": 51.67
+    },
+    {
+      "id": 149,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.82,
+      "y": 45.0,
+      "z": 60.4
+    },
+    {
+      "id": 150,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -52.53,
+      "y": 50.0,
+      "z": 57.02
+    },
+    {
+      "id": 151,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.22,
+      "y": 55.0,
+      "z": 57.39
+    },
+    {
+      "id": 152,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.09,
+      "y": 60.0,
+      "z": 52.84
+    },
+    {
+      "id": 153,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -58.49,
+      "y": 65.0,
+      "z": 60.56
+    },
+    {
+      "id": 154,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.61,
+      "y": 70.0,
+      "z": 60.18
+    },
+    {
+      "id": 155,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -52.58,
+      "y": 75.0,
+      "z": 53.67
+    },
+    {
+      "id": 156,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.07,
+      "y": 80.0,
+      "z": 52.6
+    },
+    {
+      "id": 157,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.77,
+      "y": 85.0,
+      "z": 60.41
+    },
+    {
+      "id": 158,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.5,
+      "y": 90.0,
+      "z": 57.78
+    },
+    {
+      "id": 159,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.02,
+      "y": 95.0,
+      "z": 60.87
+    },
+    {
+      "id": 160,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -76.35,
+      "y": -100.0,
+      "z": 4.76
+    },
+    {
+      "id": 161,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -76.89,
+      "y": -95.0,
+      "z": 3.81
+    },
+    {
+      "id": 162,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -84.75,
+      "y": -90.0,
+      "z": 2.37
+    },
+    {
+      "id": 163,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -81.68,
+      "y": -85.0,
+      "z": 4.31
+    },
+    {
+      "id": 164,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -76.98,
+      "y": -80.0,
+      "z": 3.64
+    },
+    {
+      "id": 165,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -76.89,
+      "y": -75.0,
+      "z": -2.33
+    },
+    {
+      "id": 166,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -77.13,
+      "y": -70.0,
+      "z": -3.92
+    },
+    {
+      "id": 167,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -76.28,
+      "y": -65.0,
+      "z": 3.59
+    },
+    {
+      "id": 168,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -82.78,
+      "y": -60.0,
+      "z": 3.17
+    },
+    {
+      "id": 169,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -80.4,
+      "y": -55.0,
+      "z": -1.95
+    },
+    {
+      "id": 170,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -77.05,
+      "y": -50.0,
+      "z": -2.72
+    },
+    {
+      "id": 171,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -84.76,
+      "y": -45.0,
+      "z": -3.07
+    },
+    {
+      "id": 172,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -81.72,
+      "y": -40.0,
+      "z": 3.64
+    },
+    {
+      "id": 173,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -75.33,
+      "y": -35.0,
+      "z": -2.21
+    },
+    {
+      "id": 174,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -78.59,
+      "y": -30.0,
+      "z": -1.0
+    },
+    {
+      "id": 175,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -75.19,
+      "y": -25.0,
+      "z": 0.36
+    },
+    {
+      "id": 176,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -75.61,
+      "y": -20.0,
+      "z": -3.85
+    },
+    {
+      "id": 177,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -75.3,
+      "y": -15.0,
+      "z": -3.21
+    },
+    {
+      "id": 178,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -75.37,
+      "y": -10.0,
+      "z": -2.35
+    },
+    {
+      "id": 179,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -83.92,
+      "y": -5.0,
+      "z": -0.65
+    },
+    {
+      "id": 180,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -77.71,
+      "y": 0.0,
+      "z": -1.86
+    },
+    {
+      "id": 181,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -78.94,
+      "y": 5.0,
+      "z": 0.11
+    },
+    {
+      "id": 182,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -81.15,
+      "y": 10.0,
+      "z": 0.77
+    },
+    {
+      "id": 183,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -82.45,
+      "y": 15.0,
+      "z": 2.09
+    },
+    {
+      "id": 184,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -84.98,
+      "y": 20.0,
+      "z": 4.26
+    },
+    {
+      "id": 185,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -79.62,
+      "y": 25.0,
+      "z": 2.19
+    },
+    {
+      "id": 186,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -77.58,
+      "y": 30.0,
+      "z": 1.71
+    },
+    {
+      "id": 187,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -81.36,
+      "y": 35.0,
+      "z": -4.3
+    },
+    {
+      "id": 188,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -78.36,
+      "y": 40.0,
+      "z": -1.7
+    },
+    {
+      "id": 189,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -81.86,
+      "y": 45.0,
+      "z": 3.48
+    },
+    {
+      "id": 190,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -77.8,
+      "y": 50.0,
+      "z": -2.0
+    },
+    {
+      "id": 191,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -81.91,
+      "y": 55.0,
+      "z": -0.92
+    },
+    {
+      "id": 192,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -80.98,
+      "y": 60.0,
+      "z": -2.04
+    },
+    {
+      "id": 193,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -83.73,
+      "y": 65.0,
+      "z": -0.8
+    },
+    {
+      "id": 194,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -75.6,
+      "y": 70.0,
+      "z": 1.77
+    },
+    {
+      "id": 195,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -75.97,
+      "y": 75.0,
+      "z": 1.16
+    },
+    {
+      "id": 196,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -81.99,
+      "y": 80.0,
+      "z": 0.48
+    },
+    {
+      "id": 197,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -85.0,
+      "y": 85.0,
+      "z": -2.13
+    },
+    {
+      "id": 198,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -80.7,
+      "y": 90.0,
+      "z": 0.8
+    },
+    {
+      "id": 199,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -78.45,
+      "y": 95.0,
+      "z": -0.35
+    },
+    {
+      "id": 200,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.15,
+      "y": -100.0,
+      "z": -59.43
+    },
+    {
+      "id": 201,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -56.84,
+      "y": -95.0,
+      "z": -52.56
+    },
+    {
+      "id": 202,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.61,
+      "y": -90.0,
+      "z": -59.87
+    },
+    {
+      "id": 203,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.72,
+      "y": -85.0,
+      "z": -56.41
+    },
+    {
+      "id": 204,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -55.24,
+      "y": -80.0,
+      "z": -58.22
+    },
+    {
+      "id": 205,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.38,
+      "y": -75.0,
+      "z": -54.06
+    },
+    {
+      "id": 206,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -54.84,
+      "y": -70.0,
+      "z": -59.32
+    },
+    {
+      "id": 207,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.58,
+      "y": -65.0,
+      "z": -61.32
+    },
+    {
+      "id": 208,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.12,
+      "y": -60.0,
+      "z": -56.82
+    },
+    {
+      "id": 209,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.07,
+      "y": -55.0,
+      "z": -60.84
+    },
+    {
+      "id": 210,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.42,
+      "y": -50.0,
+      "z": -55.27
+    },
+    {
+      "id": 211,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.62,
+      "y": -45.0,
+      "z": -54.6
+    },
+    {
+      "id": 212,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -56.62,
+      "y": -40.0,
+      "z": -59.13
+    },
+    {
+      "id": 213,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -55.01,
+      "y": -35.0,
+      "z": -61.51
+    },
+    {
+      "id": 214,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -54.06,
+      "y": -30.0,
+      "z": -53.87
+    },
+    {
+      "id": 215,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.5,
+      "y": -25.0,
+      "z": -57.32
+    },
+    {
+      "id": 216,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.81,
+      "y": -20.0,
+      "z": -51.99
+    },
+    {
+      "id": 217,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -56.39,
+      "y": -15.0,
+      "z": -61.07
+    },
+    {
+      "id": 218,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.08,
+      "y": -10.0,
+      "z": -53.09
+    },
+    {
+      "id": 219,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.0,
+      "y": -5.0,
+      "z": -53.55
+    },
+    {
+      "id": 220,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -54.89,
+      "y": 0.0,
+      "z": -51.69
+    },
+    {
+      "id": 221,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -55.61,
+      "y": 5.0,
+      "z": -52.07
+    },
+    {
+      "id": 222,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -52.65,
+      "y": 10.0,
+      "z": -55.44
+    },
+    {
+      "id": 223,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -54.38,
+      "y": 15.0,
+      "z": -56.52
+    },
+    {
+      "id": 224,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.26,
+      "y": 20.0,
+      "z": -56.09
+    },
+    {
+      "id": 225,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -52.6,
+      "y": 25.0,
+      "z": -54.13
+    },
+    {
+      "id": 226,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -56.82,
+      "y": 30.0,
+      "z": -58.98
+    },
+    {
+      "id": 227,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.1,
+      "y": 35.0,
+      "z": -55.19
+    },
+    {
+      "id": 228,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.91,
+      "y": 40.0,
+      "z": -56.36
+    },
+    {
+      "id": 229,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -55.3,
+      "y": 45.0,
+      "z": -58.82
+    },
+    {
+      "id": 230,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -60.79,
+      "y": 50.0,
+      "z": -58.71
+    },
+    {
+      "id": 231,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -58.85,
+      "y": 55.0,
+      "z": -58.37
+    },
+    {
+      "id": 232,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -56.17,
+      "y": 60.0,
+      "z": -60.18
+    },
+    {
+      "id": 233,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -59.26,
+      "y": 65.0,
+      "z": -54.63
+    },
+    {
+      "id": 234,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -54.5,
+      "y": 70.0,
+      "z": -60.93
+    },
+    {
+      "id": 235,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.49,
+      "y": 75.0,
+      "z": -56.14
+    },
+    {
+      "id": 236,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.41,
+      "y": 80.0,
+      "z": -59.5
+    },
+    {
+      "id": 237,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -57.37,
+      "y": 85.0,
+      "z": -52.52
+    },
+    {
+      "id": 238,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -55.73,
+      "y": 90.0,
+      "z": -54.61
+    },
+    {
+      "id": 239,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -53.0,
+      "y": 95.0,
+      "z": -53.91
+    },
+    {
+      "id": 240,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -1.2,
+      "y": -100.0,
+      "z": -84.94
+    },
+    {
+      "id": 241,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -1.48,
+      "y": -95.0,
+      "z": -77.47
+    },
+    {
+      "id": 242,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 3.53,
+      "y": -90.0,
+      "z": -75.47
+    },
+    {
+      "id": 243,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.81,
+      "y": -85.0,
+      "z": -77.52
+    },
+    {
+      "id": 244,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 0.46,
+      "y": -80.0,
+      "z": -78.97
+    },
+    {
+      "id": 245,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -2.79,
+      "y": -75.0,
+      "z": -82.81
+    },
+    {
+      "id": 246,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.64,
+      "y": -70.0,
+      "z": -84.71
+    },
+    {
+      "id": 247,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -1.64,
+      "y": -65.0,
+      "z": -78.21
+    },
+    {
+      "id": 248,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.96,
+      "y": -60.0,
+      "z": -83.35
+    },
+    {
+      "id": 249,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -0.33,
+      "y": -55.0,
+      "z": -83.72
+    },
+    {
+      "id": 250,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 1.22,
+      "y": -50.0,
+      "z": -84.73
+    },
+    {
+      "id": 251,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -1.06,
+      "y": -45.0,
+      "z": -79.36
+    },
+    {
+      "id": 252,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -4.73,
+      "y": -40.0,
+      "z": -78.57
+    },
+    {
+      "id": 253,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -3.64,
+      "y": -35.0,
+      "z": -80.38
+    },
+    {
+      "id": 254,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -4.5,
+      "y": -30.0,
+      "z": -81.21
+    },
+    {
+      "id": 255,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -2.88,
+      "y": -25.0,
+      "z": -81.73
+    },
+    {
+      "id": 256,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 2.61,
+      "y": -20.0,
+      "z": -81.21
+    },
+    {
+      "id": 257,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 2.52,
+      "y": -15.0,
+      "z": -76.68
+    },
+    {
+      "id": 258,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -2.48,
+      "y": -10.0,
+      "z": -84.18
+    },
+    {
+      "id": 259,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -4.81,
+      "y": -5.0,
+      "z": -79.61
+    },
+    {
+      "id": 260,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 5.0,
+      "y": 0.0,
+      "z": -81.5
+    },
+    {
+      "id": 261,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 1.5,
+      "y": 5.0,
+      "z": -77.19
+    },
+    {
+      "id": 262,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 1.52,
+      "y": 10.0,
+      "z": -77.46
+    },
+    {
+      "id": 263,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 4.5,
+      "y": 15.0,
+      "z": -83.01
+    },
+    {
+      "id": 264,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -4.8,
+      "y": 20.0,
+      "z": -83.48
+    },
+    {
+      "id": 265,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -3.74,
+      "y": 25.0,
+      "z": -78.31
+    },
+    {
+      "id": 266,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 0.64,
+      "y": 30.0,
+      "z": -82.82
+    },
+    {
+      "id": 267,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 1.99,
+      "y": 35.0,
+      "z": -77.33
+    },
+    {
+      "id": 268,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -3.32,
+      "y": 40.0,
+      "z": -78.93
+    },
+    {
+      "id": 269,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 2.48,
+      "y": 45.0,
+      "z": -83.85
+    },
+    {
+      "id": 270,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 3.19,
+      "y": 50.0,
+      "z": -75.35
+    },
+    {
+      "id": 271,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -3.92,
+      "y": 55.0,
+      "z": -84.74
+    },
+    {
+      "id": 272,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -1.88,
+      "y": 60.0,
+      "z": -78.23
+    },
+    {
+      "id": 273,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 4.58,
+      "y": 65.0,
+      "z": -81.03
+    },
+    {
+      "id": 274,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 2.15,
+      "y": 70.0,
+      "z": -84.24
+    },
+    {
+      "id": 275,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 1.91,
+      "y": 75.0,
+      "z": -78.73
+    },
+    {
+      "id": 276,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -3.98,
+      "y": 80.0,
+      "z": -77.28
+    },
+    {
+      "id": 277,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 3.5,
+      "y": 85.0,
+      "z": -79.0
+    },
+    {
+      "id": 278,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": -3.79,
+      "y": 90.0,
+      "z": -75.16
+    },
+    {
+      "id": 279,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 2.83,
+      "y": 95.0,
+      "z": -81.53
+    },
+    {
+      "id": 280,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 55.85,
+      "y": -100.0,
+      "z": -57.86
+    },
+    {
+      "id": 281,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.63,
+      "y": -95.0,
+      "z": -58.16
+    },
+    {
+      "id": 282,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 60.06,
+      "y": -90.0,
+      "z": -53.35
+    },
+    {
+      "id": 283,
+      "type": "Sense_Sensor",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.62,
+      "y": -85.0,
+      "z": -51.96
+    },
+    {
+      "id": 284,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 57.92,
+      "y": -80.0,
+      "z": -53.28
+    },
+    {
+      "id": 285,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 58.64,
+      "y": -75.0,
+      "z": -57.21
+    },
+    {
+      "id": 286,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 58.91,
+      "y": -70.0,
+      "z": -51.91
+    },
+    {
+      "id": 287,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.27,
+      "y": -65.0,
+      "z": -53.49
+    },
+    {
+      "id": 288,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.95,
+      "y": -60.0,
+      "z": -56.73
+    },
+    {
+      "id": 289,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 55.92,
+      "y": -55.0,
+      "z": -54.26
+    },
+    {
+      "id": 290,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.25,
+      "y": -50.0,
+      "z": -53.05
+    },
+    {
+      "id": 291,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 59.88,
+      "y": -45.0,
+      "z": -60.7
+    },
+    {
+      "id": 292,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 60.38,
+      "y": -40.0,
+      "z": -59.13
+    },
+    {
+      "id": 293,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.22,
+      "y": -35.0,
+      "z": -55.47
+    },
+    {
+      "id": 294,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 55.36,
+      "y": -30.0,
+      "z": -61.28
+    },
+    {
+      "id": 295,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 60.08,
+      "y": -25.0,
+      "z": -59.75
+    },
+    {
+      "id": 296,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 53.69,
+      "y": -20.0,
+      "z": -53.59
+    },
+    {
+      "id": 297,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.97,
+      "y": -15.0,
+      "z": -52.77
+    },
+    {
+      "id": 298,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 58.58,
+      "y": -10.0,
+      "z": -58.81
+    },
+    {
+      "id": 299,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 51.67,
+      "y": -5.0,
+      "z": -52.09
+    },
+    {
+      "id": 300,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.42,
+      "y": 0.0,
+      "z": -54.37
+    },
+    {
+      "id": 301,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.45,
+      "y": 5.0,
+      "z": -53.99
+    },
+    {
+      "id": 302,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 58.47,
+      "y": 10.0,
+      "z": -55.11
+    },
+    {
+      "id": 303,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.48,
+      "y": 15.0,
+      "z": -53.64
+    },
+    {
+      "id": 304,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 52.5,
+      "y": 20.0,
+      "z": -59.35
+    },
+    {
+      "id": 305,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 58.49,
+      "y": 25.0,
+      "z": -58.51
+    },
+    {
+      "id": 306,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 57.38,
+      "y": 30.0,
+      "z": -56.84
+    },
+    {
+      "id": 307,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.88,
+      "y": 35.0,
+      "z": -57.31
+    },
+    {
+      "id": 308,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 59.03,
+      "y": 40.0,
+      "z": -58.26
+    },
+    {
+      "id": 309,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 58.6,
+      "y": 45.0,
+      "z": -58.86
+    },
+    {
+      "id": 310,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.08,
+      "y": 50.0,
+      "z": -60.36
+    },
+    {
+      "id": 311,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 53.49,
+      "y": 55.0,
+      "z": -60.37
+    },
+    {
+      "id": 312,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.93,
+      "y": 60.0,
+      "z": -53.95
+    },
+    {
+      "id": 313,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 53.42,
+      "y": 65.0,
+      "z": -59.4
+    },
+    {
+      "id": 314,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.41,
+      "y": 70.0,
+      "z": -54.32
+    },
+    {
+      "id": 315,
+      "type": "Op_Damping",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 61.33,
+      "y": 75.0,
+      "z": -56.32
+    },
+    {
+      "id": 316,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 54.4,
+      "y": 80.0,
+      "z": -60.56
+    },
+    {
+      "id": 317,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 53.51,
+      "y": 85.0,
+      "z": -59.29
+    },
+    {
+      "id": 318,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 53.36,
+      "y": 90.0,
+      "z": -61.43
+    },
+    {
+      "id": 319,
+      "type": "Act_Effector",
+      "param1": 1.0,
+      "param2": 0.1,
+      "output": 0.0,
+      "x": 56.91,
+      "y": 95.0,
+      "z": -58.83
+    }
+  ],
+  "synapses": [
+    {
+      "from": 0,
+      "to": 1,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 1,
+      "to": 2,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 2,
+      "to": 3,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 3,
+      "to": 4,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 4,
+      "to": 5,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 5,
+      "to": 6,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 6,
+      "to": 7,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 7,
+      "to": 8,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 8,
+      "to": 9,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 9,
+      "to": 10,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 10,
+      "to": 11,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 11,
+      "to": 12,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 12,
+      "to": 13,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 13,
+      "to": 14,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 14,
+      "to": 15,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 15,
+      "to": 16,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 16,
+      "to": 17,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 17,
+      "to": 18,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 18,
+      "to": 19,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 19,
+      "to": 20,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 20,
+      "to": 21,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 21,
+      "to": 22,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 22,
+      "to": 23,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 23,
+      "to": 24,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 24,
+      "to": 25,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 25,
+      "to": 26,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 26,
+      "to": 27,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 27,
+      "to": 28,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 28,
+      "to": 29,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 29,
+      "to": 30,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 30,
+      "to": 31,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 31,
+      "to": 32,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 32,
+      "to": 33,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 33,
+      "to": 34,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 34,
+      "to": 35,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 35,
+      "to": 36,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 36,
+      "to": 37,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 37,
+      "to": 38,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 38,
+      "to": 39,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 40,
+      "to": 41,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 41,
+      "to": 42,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 42,
+      "to": 43,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 43,
+      "to": 44,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 44,
+      "to": 45,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 45,
+      "to": 46,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 46,
+      "to": 47,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 47,
+      "to": 48,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 48,
+      "to": 49,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 49,
+      "to": 50,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 50,
+      "to": 51,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 51,
+      "to": 52,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 52,
+      "to": 53,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 53,
+      "to": 54,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 54,
+      "to": 55,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 55,
+      "to": 56,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 56,
+      "to": 57,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 57,
+      "to": 58,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 58,
+      "to": 59,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 59,
+      "to": 60,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 60,
+      "to": 61,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 61,
+      "to": 62,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 62,
+      "to": 63,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 63,
+      "to": 64,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 64,
+      "to": 65,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 65,
+      "to": 66,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 66,
+      "to": 67,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 67,
+      "to": 68,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 68,
+      "to": 69,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 69,
+      "to": 70,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 70,
+      "to": 71,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 71,
+      "to": 72,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 72,
+      "to": 73,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 73,
+      "to": 74,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 74,
+      "to": 75,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 75,
+      "to": 76,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 76,
+      "to": 77,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 77,
+      "to": 78,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 78,
+      "to": 79,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 80,
+      "to": 81,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 81,
+      "to": 82,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 82,
+      "to": 83,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 83,
+      "to": 84,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 84,
+      "to": 85,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 85,
+      "to": 86,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 86,
+      "to": 87,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 87,
+      "to": 88,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 88,
+      "to": 89,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 89,
+      "to": 90,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 90,
+      "to": 91,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 91,
+      "to": 92,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 92,
+      "to": 93,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 93,
+      "to": 94,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 94,
+      "to": 95,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 95,
+      "to": 96,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 96,
+      "to": 97,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 97,
+      "to": 98,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 98,
+      "to": 99,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 99,
+      "to": 100,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 100,
+      "to": 101,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 101,
+      "to": 102,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 102,
+      "to": 103,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 103,
+      "to": 104,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 104,
+      "to": 105,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 105,
+      "to": 106,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 106,
+      "to": 107,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 107,
+      "to": 108,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 108,
+      "to": 109,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 109,
+      "to": 110,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 110,
+      "to": 111,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 111,
+      "to": 112,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 112,
+      "to": 113,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 113,
+      "to": 114,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 114,
+      "to": 115,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 115,
+      "to": 116,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 116,
+      "to": 117,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 117,
+      "to": 118,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 118,
+      "to": 119,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 120,
+      "to": 121,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 121,
+      "to": 122,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 122,
+      "to": 123,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 123,
+      "to": 124,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 124,
+      "to": 125,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 125,
+      "to": 126,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 126,
+      "to": 127,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 127,
+      "to": 128,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 128,
+      "to": 129,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 129,
+      "to": 130,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 130,
+      "to": 131,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 131,
+      "to": 132,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 132,
+      "to": 133,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 133,
+      "to": 134,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 134,
+      "to": 135,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 135,
+      "to": 136,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 136,
+      "to": 137,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 137,
+      "to": 138,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 138,
+      "to": 139,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 139,
+      "to": 140,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 140,
+      "to": 141,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 141,
+      "to": 142,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 142,
+      "to": 143,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 143,
+      "to": 144,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 144,
+      "to": 145,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 145,
+      "to": 146,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 146,
+      "to": 147,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 147,
+      "to": 148,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 148,
+      "to": 149,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 149,
+      "to": 150,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 150,
+      "to": 151,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 151,
+      "to": 152,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 152,
+      "to": 153,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 153,
+      "to": 154,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 154,
+      "to": 155,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 155,
+      "to": 156,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 156,
+      "to": 157,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 157,
+      "to": 158,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 158,
+      "to": 159,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 160,
+      "to": 161,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 161,
+      "to": 162,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 162,
+      "to": 163,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 163,
+      "to": 164,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 164,
+      "to": 165,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 165,
+      "to": 166,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 166,
+      "to": 167,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 167,
+      "to": 168,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 168,
+      "to": 169,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 169,
+      "to": 170,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 170,
+      "to": 171,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 171,
+      "to": 172,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 172,
+      "to": 173,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 173,
+      "to": 174,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 174,
+      "to": 175,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 175,
+      "to": 176,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 176,
+      "to": 177,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 177,
+      "to": 178,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 178,
+      "to": 179,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 179,
+      "to": 180,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 180,
+      "to": 181,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 181,
+      "to": 182,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 182,
+      "to": 183,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 183,
+      "to": 184,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 184,
+      "to": 185,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 185,
+      "to": 186,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 186,
+      "to": 187,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 187,
+      "to": 188,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 188,
+      "to": 189,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 189,
+      "to": 190,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 190,
+      "to": 191,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 191,
+      "to": 192,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 192,
+      "to": 193,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 193,
+      "to": 194,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 194,
+      "to": 195,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 195,
+      "to": 196,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 196,
+      "to": 197,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 197,
+      "to": 198,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 198,
+      "to": 199,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 200,
+      "to": 201,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 201,
+      "to": 202,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 202,
+      "to": 203,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 203,
+      "to": 204,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 204,
+      "to": 205,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 205,
+      "to": 206,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 206,
+      "to": 207,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 207,
+      "to": 208,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 208,
+      "to": 209,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 209,
+      "to": 210,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 210,
+      "to": 211,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 211,
+      "to": 212,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 212,
+      "to": 213,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 213,
+      "to": 214,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 214,
+      "to": 215,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 215,
+      "to": 216,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 216,
+      "to": 217,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 217,
+      "to": 218,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 218,
+      "to": 219,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 219,
+      "to": 220,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 220,
+      "to": 221,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 221,
+      "to": 222,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 222,
+      "to": 223,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 223,
+      "to": 224,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 224,
+      "to": 225,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 225,
+      "to": 226,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 226,
+      "to": 227,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 227,
+      "to": 228,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 228,
+      "to": 229,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 229,
+      "to": 230,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 230,
+      "to": 231,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 231,
+      "to": 232,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 232,
+      "to": 233,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 233,
+      "to": 234,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 234,
+      "to": 235,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 235,
+      "to": 236,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 236,
+      "to": 237,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 237,
+      "to": 238,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 238,
+      "to": 239,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 240,
+      "to": 241,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 241,
+      "to": 242,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 242,
+      "to": 243,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 243,
+      "to": 244,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 244,
+      "to": 245,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 245,
+      "to": 246,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 246,
+      "to": 247,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 247,
+      "to": 248,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 248,
+      "to": 249,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 249,
+      "to": 250,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 250,
+      "to": 251,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 251,
+      "to": 252,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 252,
+      "to": 253,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 253,
+      "to": 254,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 254,
+      "to": 255,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 255,
+      "to": 256,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 256,
+      "to": 257,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 257,
+      "to": 258,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 258,
+      "to": 259,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 259,
+      "to": 260,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 260,
+      "to": 261,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 261,
+      "to": 262,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 262,
+      "to": 263,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 263,
+      "to": 264,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 264,
+      "to": 265,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 265,
+      "to": 266,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 266,
+      "to": 267,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 267,
+      "to": 268,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 268,
+      "to": 269,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 269,
+      "to": 270,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 270,
+      "to": 271,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 271,
+      "to": 272,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 272,
+      "to": 273,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 273,
+      "to": 274,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 274,
+      "to": 275,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 275,
+      "to": 276,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 276,
+      "to": 277,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 277,
+      "to": 278,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 278,
+      "to": 279,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 280,
+      "to": 281,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 281,
+      "to": 282,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 282,
+      "to": 283,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 283,
+      "to": 284,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 284,
+      "to": 285,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 285,
+      "to": 286,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 286,
+      "to": 287,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 287,
+      "to": 288,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 288,
+      "to": 289,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 289,
+      "to": 290,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 290,
+      "to": 291,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 291,
+      "to": 292,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 292,
+      "to": 293,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 293,
+      "to": 294,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 294,
+      "to": 295,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 295,
+      "to": 296,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 296,
+      "to": 297,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 297,
+      "to": 298,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 298,
+      "to": 299,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 299,
+      "to": 300,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 300,
+      "to": 301,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 301,
+      "to": 302,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 302,
+      "to": 303,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 303,
+      "to": 304,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 304,
+      "to": 305,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 305,
+      "to": 306,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 306,
+      "to": 307,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 307,
+      "to": 308,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 308,
+      "to": 309,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 309,
+      "to": 310,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 310,
+      "to": 311,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 311,
+      "to": 312,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 312,
+      "to": 313,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 313,
+      "to": 314,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 314,
+      "to": 315,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 315,
+      "to": 316,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 316,
+      "to": 317,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 317,
+      "to": 318,
+      "weight": 0.85,
+      "active": true
+    },
+    {
+      "from": 318,
+      "to": 319,
+      "weight": 0.85,
+      "active": true
+    }
+  ]
+}
