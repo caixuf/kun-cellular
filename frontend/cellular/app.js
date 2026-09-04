@@ -78,25 +78,47 @@ function animate() {
   updateDetailLOD(_frustum, scene, camera, org, currentOrganismBounds, currentRenderMode);
 
   let visibleMicroCount = 0;
+  const isDenseCells = views.cells.length > 50;
   for (const v of views.cells) {
     visibleMicroCount++;
     v.group.visible = true;
     v.update(now * 0.001, clientWarpMultiplier);
+
+    // 宏观远景下隐藏繁琐的大圆环/色带/线粒体，避免遮挡画布；特写近视距时才展示微观内部结构
+    if (v.delayRing) v.delayRing.visible = !isDenseCells || closeLook;
+    if (v.attrRibbon) v.attrRibbon.visible = !isDenseCells || closeLook;
+    for (const o of v.organelles) {
+      if (o.mesh) o.mesh.visible = !isDenseCells || closeLook;
+    }
+
+    // 标签显示：避免几十个巨大文字漂浮遮挡画面。只在近距特写或少量细胞下针对前排受体显示
     if (v.label) {
-      v.label.visible = visibleMicroCount < 80;
-      if (v.label.material) v.label.material.opacity = v.label.visible ? 0.95 : 0;
+      const showLabel = closeLook ? (visibleMicroCount <= 12) : (!isDenseCells && visibleMicroCount <= 8);
+      v.label.visible = showLabel;
+      if (v.label.material) v.label.material.opacity = showLabel ? 0.90 : 0;
     }
   }
 
+  const isDenseSyn = views.syns.length > 60;
   for (const v of views.syns) {
     v.group.visible = true;
     v.update(now * 0.001, clientWarpMultiplier);
-    v.lineMat.opacity = closeLook ? 0.72 : 0.38;
-    v.photon1.material.opacity = closeLook ? 0.9 : 0.55;
-    v.photon2.material.opacity = closeLook ? 0.9 : 0.55;
-    if (v.bouton) {
-      v.bouton.visible = true;
-      if (v.bouton.material) v.bouton.material.opacity = closeLook ? 0.85 : 0.45;
+    // 大规模与密集突触网络下线条与光子轻盈微透（隐隐若现），避免强光刺眼糊屏
+    if (isDenseSyn && !closeLook) {
+      v.lineMat.opacity = 0.12;
+      v.photon1.material.opacity = 0.32;
+      v.photon2.material.opacity = 0.32;
+      if (v.bouton && v.bouton.material) v.bouton.material.opacity = 0.22;
+    } else if (isDenseSyn && closeLook) {
+      v.lineMat.opacity = 0.35;
+      v.photon1.material.opacity = 0.60;
+      v.photon2.material.opacity = 0.60;
+      if (v.bouton && v.bouton.material) v.bouton.material.opacity = 0.45;
+    } else {
+      v.lineMat.opacity = closeLook ? 0.65 : 0.32;
+      v.photon1.material.opacity = closeLook ? 0.85 : 0.50;
+      v.photon2.material.opacity = closeLook ? 0.85 : 0.50;
+      if (v.bouton && v.bouton.material) v.bouton.material.opacity = closeLook ? 0.75 : 0.40;
     }
   }
 

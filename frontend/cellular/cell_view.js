@@ -169,7 +169,9 @@ export class CellView {
     this.group.add(this.label);
 
     const rBase = getCellWorldRadius(this.org);
-    const sf = Math.max(0.12, Math.min(1.0, rBase / 13.0));
+    const nCells = (this.org && this.org.cells) ? this.org.cells.length : 12;
+    const isLargeScale = nCells > 120;
+    const sf = Math.max(0.08, Math.min(1.0, (rBase / 13.0) * (isLargeScale ? 0.65 : 1.0)));
     this.group.scale.set(sf, sf, sf);
 
     if (this.scene) {
@@ -184,7 +186,9 @@ export class CellView {
     this.targetY = cell.y;
     this.targetZ = cell.z || 0;
     const rBase = getCellWorldRadius(this.org);
-    const sf = Math.max(0.12, Math.min(1.0, rBase / 13.0));
+    const nCells = (this.org && this.org.cells) ? this.org.cells.length : 12;
+    const isLargeScale = nCells > 120;
+    const sf = Math.max(0.08, Math.min(1.0, (rBase / 13.0) * (isLargeScale ? 0.65 : 1.0)));
     this.group.scale.set(sf, sf, sf);
 
     const fam = FAMILY(cell.type);
@@ -192,6 +196,7 @@ export class CellView {
     if (this.membraneMesh && this.membraneMesh.material) {
       this.membraneMesh.material.color.setHex(col);
       this.membraneMesh.material.emissive.setHex(col);
+      this.membraneMesh.material.opacity = isLargeScale ? 0.35 : 0.48;
     }
     if (this.cytoMesh && this.cytoMesh.material) {
       this.cytoMesh.material.color.setHex(col);

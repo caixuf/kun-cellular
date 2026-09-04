@@ -97,14 +97,17 @@ export class SynapseView {
 
     const w = this.syn.w !== undefined ? this.syn.w : (this.syn.weight !== undefined ? this.syn.weight : 1.0);
     const hot = Math.abs(w) > 0.6;
+    const synCount = (this.org && this.org.syns) ? this.org.syns.length : 10;
+    const isDense = synCount > 80;
+    const baseLineOp = isDense ? 0.14 : 0.28;
     this.lineMat.color.setHex(w >= 0 ? (hot ? 0x38bdf8 : 0x0284c7) : (hot ? 0xf43f5e : 0xbe123c));
-    this.lineMat.opacity = 0.25 + Math.min(0.35, Math.abs(w) * 0.25);
+    this.lineMat.opacity = baseLineOp + Math.min(0.12, Math.abs(w) * 0.10);
 
     const speed = (0.012 + Math.min(0.04, Math.abs(w) * 0.025)) * warpMultiplier;
     this.flowT1 = (this.flowT1 + speed) % 1.0;
     this.flowT2 = (this.flowT2 + speed * 1.1) % 1.0;
 
-    // 囊泡 1 采样
+    // 囊泡 1 采样 (微透轻盈电脉冲光子，避免遮蔽体素流形)
     {
       const t = this.flowT1, it = 1.0 - t;
       this.photon1.position.set(
@@ -112,9 +115,11 @@ export class SynapseView {
         it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
         it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
       );
-      const pScale1 = (6 + Math.sin(t * Math.PI) * 4) * (0.8 + Math.abs(w) * 0.3);
+      const pScale1 = isDense
+        ? (2.2 + Math.sin(t * Math.PI) * 1.4) * (0.8 + Math.abs(w) * 0.25)
+        : (5.2 + Math.sin(t * Math.PI) * 3.2) * (0.8 + Math.abs(w) * 0.3);
       this.photon1.scale.set(pScale1, pScale1, 1);
-      this.photon1.material.opacity = 0.28 + Math.sin(t * Math.PI) * 0.5;
+      this.photon1.material.opacity = (0.18 + Math.sin(t * Math.PI) * 0.32) * (isDense ? 0.75 : 1.0);
     }
 
     // 囊泡 2 采样
@@ -125,17 +130,21 @@ export class SynapseView {
         it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
         it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
       );
-      const pScale2 = (5 + Math.sin(t * Math.PI) * 3) * (0.8 + Math.abs(w) * 0.3);
+      const pScale2 = isDense
+        ? (1.8 + Math.sin(t * Math.PI) * 1.2) * (0.8 + Math.abs(w) * 0.25)
+        : (4.2 + Math.sin(t * Math.PI) * 2.4) * (0.8 + Math.abs(w) * 0.3);
       this.photon2.scale.set(pScale2, pScale2, 1);
-      this.photon2.material.opacity = 0.22 + Math.sin(t * Math.PI) * 0.45;
+      this.photon2.material.opacity = (0.15 + Math.sin(t * Math.PI) * 0.28) * (isDense ? 0.75 : 1.0);
     }
 
-    // 突触终端小体
+    // 突触终端小体 (精致微末结节，隐隐若现)
     this.bouton.position.copy(_tmpP2);
     const boutonFlash = (1.0 - Math.min(1.0, this.flowT1)) * (a.glow || 0.2);
-    const bScale = 7 + boutonFlash * 7;
+    const bScale = isDense
+      ? 2.4 + boutonFlash * 2.0
+      : 6.0 + boutonFlash * 5.0;
     this.bouton.scale.set(bScale, bScale, 1);
-    this.bouton.material.opacity = 0.25 + boutonFlash * 0.45;
+    this.bouton.material.opacity = (0.18 + boutonFlash * 0.25) * (isDense ? 0.75 : 1.0);
     this.bouton.material.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);
   }
 

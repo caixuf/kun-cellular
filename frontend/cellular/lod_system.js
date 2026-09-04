@@ -12,7 +12,7 @@ import { CellView } from './cell_view.js';
 import { SynapseView } from './synapse_view.js';
 
 export const MIN_CELL_PIXELS = 26.0;
-export const MAX_SOLID_CELLS = 700;
+export const MAX_SOLID_CELLS = 220;
 
 export const cellViewPool = [];
 export const synViewPool = [];
@@ -303,7 +303,7 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
 
   _lodCamPos.copy(cam.position);
 
-  const isCompact = n <= MAX_SOLID_CELLS; // <= 500 个细胞全部全量实化渲染
+  const isCompact = n <= 220; // <= 220 个细胞全部全量实化渲染 (如 210 细胞 ADAS Cortex、Quant等)
   const isLODMode = (renderMode === 'lod');
 
   const cellRadius = getCellWorldRadius(orgObj);
@@ -314,7 +314,7 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   _lodCandidates.length = 0;
 
   if (isCompact) {
-    // 紧凑生命体 (<= 500 细胞，如 210 细胞 ADAS Cortex)：全量实化展示全部拓扑细胞，视锥剔除保底
+    // 紧凑生命体 (<= 220 细胞)：全量实化展示全部拓扑细胞，视锥剔除保底
     for (const c of orgObj.cells) {
       _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
       const d = _lodCamPos.distanceTo(_lodCellPos);
@@ -325,24 +325,21 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
     }
     _lodCandidates.sort((a, b) => a.d - b.d);
   } else {
-    // 超大规模生命体 (如百万微柱点云)：根据距离与视锥筛选最近的代表性微柱实化
-    const orgR = (bnds && bnds.radius) || 180;
-    const camToCtr = _lodCamPos.distanceTo(bnds.center);
-    if (camToCtr <= solidMaxDist + orgR || !isLODMode) {
-      for (const arr of cellSpatialHash.values()) {
-        for (const c of arr) {
-          _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
-          const d = _lodCamPos.distanceTo(_lodCellPos);
-          if (isLODMode && d > solidMaxDist) continue;
-          _lodSphere.center.copy(_lodCellPos);
-          _lodSphere.radius = 52.0;
-          if (!frustum.intersectsSphere(_lodSphere)) continue;
-          _lodCandidates.push({ id: c.id, d });
-        }
+    // 超大规模生命体 (320~1536+ 细胞)：宏观以细腻点云流形为主，精确实化 64~80 个视锥核心代表细胞，绝不让巨球霸屏
+    const maxLargeSolid = 80;
+    for (const arr of cellSpatialHash.values()) {
+      for (const c of arr) {
+        _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
+        const d = _lodCamPos.distanceTo(_lodCellPos);
+        if (isLODMode && d > solidMaxDist) continue;
+        _lodSphere.center.copy(_lodCellPos);
+        _lodSphere.radius = 35.0;
+        if (!frustum.intersectsSphere(_lodSphere)) continue;
+        _lodCandidates.push({ id: c.id, d });
       }
-      _lodCandidates.sort((a, b) => a.d - b.d);
-      if (_lodCandidates.length > MAX_SOLID_CELLS) _lodCandidates.length = MAX_SOLID_CELLS;
     }
+    _lodCandidates.sort((a, b) => a.d - b.d);
+    if (_lodCandidates.length > maxLargeSolid) _lodCandidates.length = maxLargeSolid;
   }
 
   const wantIds = new Set();
@@ -364,12 +361,12 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   }
   views.cells = Array.from(cellViewsMap.values());
 
-  // 2. 突触实化：对于 <= 800 突触的生命体，100% 全量实化所有拓扑突触连接与电位光子
+  // 2. 突触实化：紧凑生命体全量实化；超大规模生命体实化核心突触高速公路 (160 条隐隐若现，其余由点云承载)
   const wantSyn = new Set();
   const totalSynCount = orgObj.syns ? orgObj.syns.length : 0;
-  const maxSyns = Math.min(totalSynCount, 800);
+  const maxSyns = isCompact ? Math.min(totalSynCount, 650) : Math.min(totalSynCount, 160);
 
-  if (totalSynCount <= 800 && orgObj.syns) {
+  if (isCompact && orgObj.syns) {
     for (const s of orgObj.syns) {
       const key = `${s.from}->${s.to}:${s.port || 0}`;
       wantSyn.add(key);
@@ -382,10 +379,10 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
         if (adj) {
           for (const key of adj) {
             wantSyn.add(key);
-            if (wantSyn.size >= 500) break;
+            if (wantSyn.size >= 120) break;
           }
         }
-        if (wantSyn.size >= 500) break;
+        if (wantSyn.size >= 120) break;
       }
     }
 
