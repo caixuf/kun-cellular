@@ -450,7 +450,7 @@
                     <button class="maze-top-btn primary" id="btn-toggle-top" onclick="document.getElementById('btn-toggle').click()">[PAUSE / RESUME]</button>
                     <button class="maze-top-btn" onclick="document.getElementById('btn-new-maze').click()">[GEN_NEW_MAZE]</button>
                     <button class="maze-top-btn" onclick="document.getElementById('btn-step').click()">[STEP_NEXT_GEN]</button>
-                    <button class="maze-top-btn" id="btn-no-backtrack" onclick="toggleNoBacktrack()" style="color:#ff0055;border-color:#ff0055;background:rgba(255,0,85,0.15);font-weight:bold;">[💀 绝死无回头: ON]</button>
+                    <button class="maze-top-btn" id="btn-no-backtrack" onclick="toggleNoBacktrack()" style="color:#ff0055;border-color:#ff0055;background:rgba(255,0,85,0.15);font-weight:bold;">[绝死无回头: ON]</button>
                 </div>
                 <div style="display:flex;gap:6px;align-items:center;">
                     <span style="font-size:12px;font-weight:bold;color:var(--cyan-glow);margin-right:4px;">[WARP_SPEED]:</span>
@@ -606,7 +606,7 @@
             const btnNb = document.getElementById('btn-no-backtrack');
             if (btnNb) {
                 if (mazeState.no_backtrack_mode) {
-                    btnNb.innerText = "[💀 绝死无回头: ON]";
+                    btnNb.innerText = "[绝死无回头: ON]";
                     btnNb.style.color = "#ff0055";
                     btnNb.style.borderColor = "#ff0055";
                     btnNb.style.background = "rgba(255, 0, 85, 0.22)";
@@ -808,7 +808,7 @@
                 const ax = ag.x * cellW;
                 const ay = ag.y * cellH;
 
-                // 死亡智能体残骸渲染 (走回头路触死标志 ✕)
+                // 死亡智能体残骸渲染 (走回头路触死标志 X)
                 if (ag.alive === 0) {
                     ctx.save();
                     ctx.translate(ax, ay);

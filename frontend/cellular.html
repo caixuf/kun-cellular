@@ -1411,13 +1411,13 @@
     <!-- 高能生命事件爆发 -->
     <div class="quick-events-group">
       <button class="btn-event-pill btn-event-discharge" onclick="triggerLifeEvent('discharge')" title="全脑突触高能放电雪崩涌现 (Discharge)">
-        ⚡ 高能放电
+        高能放电
       </button>
       <button class="btn-event-pill btn-event-extinction" onclick="triggerLifeEvent('extinction')" title="白垩纪大灭绝自然选择冲击波 (Chicxulub Extinction)">
-        ☄ 白垩纪大灭绝
+        白垩纪大灭绝
       </button>
       <button class="btn-event-pill btn-event-splice" onclick="triggerLifeEvent('splice')" title="跨物种器官嫁接空间共振 (Organ Splicing)">
-        🧬 器官嫁接
+        器官嫁接
       </button>
     </div>
   </div>
@@ -1482,8 +1482,8 @@
 <div id="stage"></div>
 
 <!-- 侧边坞浮动折叠控制器 (Collapsible Dock Toggles) -->
-<button id="btn-toggle-left" class="dock-toggle-btn collapsed" onclick="toggleDock('left')" title="展开/收起左侧控制坞">[⚙ 控制坞]</button>
-<button id="btn-toggle-right" class="dock-toggle-btn collapsed" onclick="toggleDock('right')" title="展开/收起右侧遥测坞">[📊 遥测坞]</button>
+<button id="btn-toggle-left" class="dock-toggle-btn collapsed" onclick="toggleDock('left')" title="展开/收起左侧控制坞">[ 控制坞 ]</button>
+<button id="btn-toggle-right" class="dock-toggle-btn collapsed" onclick="toggleDock('right')" title="展开/收起右侧遥测坞">[ 遥测坞 ]</button>
 
 <!-- 左侧控制坞 (Left Dock) - 默认折叠收纳 -->
 <aside class="dock-left collapsed">
@@ -4110,7 +4110,7 @@ window.toggleDock = function(side) {
     if (dock && btn) {
       const isCol = dock.classList.toggle('collapsed');
       btn.classList.toggle('collapsed', isCol);
-      btn.textContent = isCol ? '[ ⚙ 控制坞 ]' : '[ ◀ 收起 ]';
+      btn.textContent = isCol ? '[ 控制坞 ]' : '[ ◀ 收起 ]';
     }
   } else if (side === 'right') {
     const dock = document.querySelector('.dock-right');
@@ -4118,7 +4118,7 @@ window.toggleDock = function(side) {
     if (dock && btn) {
       const isCol = dock.classList.toggle('collapsed');
       btn.classList.toggle('collapsed', isCol);
-      btn.textContent = isCol ? '[ 📊 遥测坞 ]' : '[ 收起 ▶ ]';
+      btn.textContent = isCol ? '[ 遥测坞 ]' : '[ 收起 ▶ ]';
     }
   }
 };
@@ -4160,7 +4160,7 @@ window.triggerGlobalLifeEvent = async function(type) {
       setTimeout(() => { vitalsHud.className = 'vitals-hud'; }, 3000);
     }
     if (phaseEl) {
-      phaseEl.textContent = '⚡ 全脑高能放电';
+      phaseEl.textContent = '全脑高能放电';
       phaseEl.style.color = '#fbbf24';
     }
     if (phaseSubEl) {
@@ -4183,7 +4183,7 @@ window.triggerGlobalLifeEvent = async function(type) {
       setTimeout(() => playIonizationSpark(0.7), 90);
       setTimeout(() => playIonizationSpark(0.5), 180);
     }
-    log('[⚡ 全脑高能放电] 突触网络突发雪崩级动作电位放电，全场光子脉冲激荡！', true);
+    log('[全脑高能放电] 突触网络突发雪崩级动作电位放电，全场光子脉冲激荡！', true);
 
     // 2.8秒后平滑渐变回稳
     setTimeout(() => {
@@ -4208,7 +4208,7 @@ window.triggerGlobalLifeEvent = async function(type) {
       setTimeout(() => { vitalsHud.className = 'vitals-hud'; }, 4000);
     }
     if (phaseEl) {
-      phaseEl.textContent = '☄ 白垩纪大灭绝';
+      phaseEl.textContent = '白垩纪大灭绝';
       phaseEl.style.color = '#f43f5e';
     }
     if (phaseSubEl) {
@@ -4224,7 +4224,7 @@ window.triggerGlobalLifeEvent = async function(type) {
     if (typeof triggerExtinctionWS === 'function') {
       triggerExtinctionWS(0.8, 2.5).catch(() => {});
     }
-    log('[☄ 白垩纪大灭绝] 外部宇宙发生极端选择压力冲击！弱连接突触被强制修剪，生命体进入危机自适应！', true);
+    log('[白垩纪大灭绝] 外部宇宙发生极端选择压力冲击！弱连接突触被强制修剪，生命体进入危机自适应！', true);
 
     // 3.5秒后进入重组态
     setTimeout(() => {
@@ -4249,7 +4249,7 @@ window.triggerGlobalLifeEvent = async function(type) {
       setTimeout(() => { vitalsHud.className = 'vitals-hud'; }, 3500);
     }
     if (phaseEl) {
-      phaseEl.textContent = '🧬 跨物种器官嫁接';
+      phaseEl.textContent = '跨物种器官嫁接';
       phaseEl.style.color = '#c084fc';
     }
     if (phaseSubEl) {
@@ -4265,7 +4265,7 @@ window.triggerGlobalLifeEvent = async function(type) {
     if (typeof window.triggerOrganSplice === 'function') {
       window.triggerOrganSplice().catch(() => {});
     }
-    log('[🧬 跨物种器官嫁接] 冷冻库异源功能微柱借用剪裁成功！拓扑受体正在融合！', true);
+    log('[跨物种器官嫁接] 冷冻库异源功能微柱借用剪裁成功！拓扑受体正在融合！', true);
 
     // 3秒后恢复
     setTimeout(() => {
