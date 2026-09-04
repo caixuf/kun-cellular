@@ -25,7 +25,6 @@ import struct
 import sys
 import time
 import types
-import multiprocessing as mp
 
 import numpy as np
 
@@ -43,16 +42,7 @@ def load_trainer():
 
 T = load_trainer()
 from export_sdsc_cortex import load_cortex_from_bin  # noqa: E402
-
-_ORGAN_SER = None
-_ORGAN = None
-
-
-def _init_worker(organ_ser):
-    global _ORGAN_SER, _ORGAN
-    _ORGAN_SER = organ_ser
-    _ORGAN = T.AdasCortexOrgan.deserialize(organ_ser)
-
+from adas_eval_native import NativeEvaluator  # noqa: E402
 
 def apply_params(organ, x, n_cells):
     for i, c in enumerate(organ.cells):
@@ -60,16 +50,6 @@ def apply_params(organ, x, n_cells):
     ws = x[n_cells:]
     organ.synapses = [(f, t, float(w)) for (f, t, _), w in zip(organ.synapses, ws)]
     organ.compile_incoming()
-
-
-def _eval(args):
-    x, seeds = args
-    apply_params(_ORGAN, x, len(_ORGAN.cells))
-    tot = 0.0
-    for s in seeds:
-        c, _, _ = T.evaluate(_ORGAN, noise_seed=s)
-        tot += c
-    return tot / len(seeds)
 
 
 def params_from_organ(organ):
@@ -84,7 +64,7 @@ def table(organ, seeds):
     for split, scn in (("train", T.SCENARIOS), ("val", T.VAL_SCENARIOS)):
         for name, path, spd, v0, dur, lead in scn:
             v = [T.run_scenario(organ, path, spd, v0, dur, lead_on=lead, seed=s)[2]
-                 for s in seeds]
+                 for s in seeds]  # 报表用 Python 参考实现，与原生位级一致
             out[name] = {
                 "split": split,
                 "avg_cte_mean": float(np.mean([m["avg_cte"] for m in v])),
@@ -202,7 +182,6 @@ def main():
     ap.add_argument("--sigma0", type=float, default=0.15)
     ap.add_argument("--seed", type=int, default=20260904)
     ap.add_argument("--eval-seeds", type=int, default=2, help="每个候选平均几个噪声种子")
-    ap.add_argument("--workers", type=int, default=max(1, mp.cpu_count() - 1))
     args = ap.parse_args()
 
     ck = load_cortex_from_bin(args.inp)
@@ -214,7 +193,7 @@ def main():
     print("  L3 结构/参数分离调参 (sep-CMA-ES)  —— 拓扑冻结, 仅调 gain + weight")
     print(f"  输入: {args.inp}")
     print(f"  细胞={n_cells} 突触={len(organ.synapses)} 参数维度={len(x0)}")
-    print(f"  pop={args.pop} iters={args.iters} sigma0={args.sigma0} workers={args.workers}")
+    print(f"  pop={args.pop} iters={args.iters} sigma0={args.sigma0}")
     print("=" * 72)
 
     print("[before] 10 种子 avg_cte (m):")
@@ -224,31 +203,35 @@ def main():
 
     rng = np.random.default_rng(args.seed)
     es = SepCMAES(x0, args.sigma0, args.pop, rng)
-    pool = mp.Pool(args.workers, initializer=_init_worker, initargs=(organ_ser,))
+    ev = NativeEvaluator(T).bind(organ)
+    print(f"  原生评估器: {ev.threads} 线程, 与 Python 位级一致 (tools/adas_eval_native.py)")
     best_x, best_f = x0.copy(), float("inf")
     t0 = time.time()
     hist = []
-    try:
-        for it in range(1, args.iters + 1):
-            seeds = [args.seed + it * 7919 + k * 104729 for k in range(args.eval_seeds)]
-            X = es.ask()
-            # 精英与当前均值一并用当代种子复评，避免旧种子上的偶然好成绩霸位
-            cand = list(X) + [best_x, es.m.copy()]
-            fit = pool.map(_eval, [(x, seeds) for x in cand])
-            es.tell(np.array(fit[: args.pop]))
-            j = int(np.argmin(fit))
-            if fit[j] < fit[args.pop]:      # 比复评后的精英更好才替换
-                best_x, best_f = cand[j].copy(), fit[j]
-            else:
-                best_f = fit[args.pop]
-            hist.append({"iter": it, "best": best_f, "gen_min": float(min(fit[: args.pop])),
-                         "sigma": es.sigma})
-            if it % 10 == 0 or it == 1:
-                print(f"  iter {it:4d}  best {best_f:8.2f}  gen_min {min(fit[:args.pop]):8.2f}"
-                      f"  sigma {es.sigma:.4f}  {time.time() - t0:6.0f}s")
-    finally:
-        pool.close()
-        pool.join()
+
+    def batch(cands, seeds):
+        X = np.asarray(cands)
+        G = np.exp(X[:, :n_cells])
+        W = X[:, n_cells:]
+        return ev.evaluate_batch(G, W, seeds)
+
+    for it in range(1, args.iters + 1):
+        seeds = [args.seed + it * 7919 + k * 104729 for k in range(args.eval_seeds)]
+        X = es.ask()
+        # 精英与当前均值一并用当代种子复评，避免旧种子上的偶然好成绩霸位
+        cand = list(X) + [best_x, es.m.copy()]
+        fit = batch(cand, seeds)
+        es.tell(np.array(fit[: args.pop]))
+        j = int(np.argmin(fit))
+        if fit[j] < fit[args.pop]:      # 比复评后的精英更好才替换
+            best_x, best_f = cand[j].copy(), float(fit[j])
+        else:
+            best_f = float(fit[args.pop])
+        hist.append({"iter": it, "best": best_f, "gen_min": float(min(fit[: args.pop])),
+                     "sigma": es.sigma})
+        if it % 10 == 0 or it == 1:
+            print(f"  iter {it:4d}  best {best_f:8.2f}  gen_min {min(fit[:args.pop]):8.2f}"
+                  f"  sigma {es.sigma:.4f}  {time.time() - t0:6.1f}s", flush=True)
 
     apply_params(organ, best_x, n_cells)
     print("[after] 10 种子 avg_cte (m):")
