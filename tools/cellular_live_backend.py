@@ -611,27 +611,29 @@ class LiveVehicleSimulator:
             heading_far_err = (theta_far - self.theta + math.pi) % math.tau - math.pi
 
             # 2. 纯 C 底座 1024 细胞器官前向推演 (150.6 μs 硬实时零延迟闭环)
-            # 连续物理微分与阻尼：过零点严格阻尼衰减，消灭画龙极限环
-            signed_cte_rate = (signed_cte - getattr(self, "prev_signed_cte", 0.0)) / dt
+            # 连续前瞻预瞄与解析侧向阻尼：超前抵消积分滞后，彻底消灭蛇形极限环
+            beta = math.atan(0.5 * math.tan(self.delta))
+            v_lateral = self.v * math.sin(self.theta + beta - theta_b)
+            L_lead = 8.0
+            pred_cte = signed_cte + L_lead * math.sin(self.theta - theta_b)
             self.prev_signed_cte = signed_cte
-            cte_n = signed_cte / road_half_w
 
             organ = getattr(self, "champion_genome", None)
             if organ is not None and organ.W1 is not None and organ.W2 is not None:
                 steer_raw, speed_raw = organ.forward(
-                    signed_cte=signed_cte,
+                    signed_cte=pred_cte,
                     heading_err=heading_err,
                     psi_far=heading_far_err,
                     r_curv=curv_b,
                     v=self.v,
-                    cte_rate=signed_cte_rate
+                    cte_rate=v_lateral
                 )
             else:
-                steer_raw = float(heading_err * 1.15 + heading_far_err * 0.85 - signed_cte * 0.05)
+                steer_raw = float(heading_err * 0.85 + heading_far_err * 0.45 - pred_cte * 0.04)
                 speed_raw = float(-curv_b * 30.0)
 
-            steer_target = max(-0.55, min(0.55, steer_raw * 0.55))
-            delta_diff = (steer_target - self.delta) * 0.35
+            steer_target = max(-0.55, min(0.55, steer_raw * 0.48))
+            delta_diff = (steer_target - self.delta) * 0.28
             self.delta += max(-0.06, min(0.06, delta_diff))
 
             # 弯道平滑自适应控速：直道巡航 4.8~5.2 m/s，急弯减速至 2.8~3.5 m/s 紧贴弯心

@@ -177,20 +177,37 @@ export class EmbodiedPIPTwin {
     }
 
     const cx = w * 0.50;
-    const cy = h * 0.68;
+    const cy = h * 0.72;
     const carX = car.x || 0;
     const carY = car.y || 0;
     const carTheta = car.theta || 0;
     const scale = 0.22;
 
-    // 2. 变换到车辆前瞻坐标系 (车头向上指引)
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(-carTheta - Math.PI * 0.5);
+    // 2. 惯性阻尼平滑跟踪虚拟摄像机 (消灭镜头与道路因打舵产生的狂晃/假画龙)
+    if (this.camTheta === undefined) this.camTheta = carTheta;
+    const dTheta = ((carTheta - this.camTheta + Math.PI) % (Math.PI * 2)) - Math.PI;
+    this.camTheta += dTheta * 0.08;
+
+    const cosC = Math.cos(this.camTheta);
+    const sinC = Math.sin(this.camTheta);
+
+    // 正交右手系屏幕投影函数 (消灭 Canvas Y轴向下导致的左右反转镜像)
+    // 前方 (沿 camTheta) -> 向上 (-Y)
+    // 左方 (垂直 camTheta 向左) -> 向左 (-X)
+    // 右方 (垂直 camTheta 向右) -> 向右 (+X)
+    const toScreen = (wx, wy) => {
+      const dx = wx - carX;
+      const dy = wy - carY;
+      const fwd = dx * cosC + dy * sinC;
+      const lat = -dx * sinC + dy * cosC;
+      return {
+        x: cx - lat * scale,
+        y: cy - fwd * scale
+      };
+    };
 
     // 2.1 沿车辆运动方向连续提取赛道切片并绘制道路
     if (track.length > 0) {
-      // 找到最近的赛道参考点索引
       let closestIdx = 0;
       let minD2 = Infinity;
       for (let i = 0; i < track.length; i++) {
@@ -203,8 +220,7 @@ export class EmbodiedPIPTwin {
         }
       }
 
-      // 取车后 15 点到车前 85 点的连续道路序列 (按道路弧长顺序遍历，彻底消灭穿心飞线与圆环)
-      const roadHalfW = 23.0 * scale;
+      const roadHalfW = 23.0;
       const nPts = track.length;
       const startIdx = closestIdx - 15;
       const endIdx = closestIdx + 85;
@@ -216,17 +232,13 @@ export class EmbodiedPIPTwin {
       for (let k = startIdx; k <= endIdx; k++) {
         const idx = ((k % nPts) + nPts) % nPts;
         const pt = track[idx];
-        const px = (pt.x - carX) * scale;
-        const py = (pt.y - carY) * scale;
-
-        // 切向与法向计算双边车道线
         const th = pt.theta !== undefined ? pt.theta : 0;
         const nx = -Math.sin(th) * roadHalfW;
         const ny = Math.cos(th) * roadHalfW;
 
-        centerPts.push({ x: px, y: py });
-        leftPts.push({ x: px + nx, y: py + ny });
-        rightPts.push({ x: px - nx, y: py - ny });
+        centerPts.push(toScreen(pt.x, pt.y));
+        leftPts.push(toScreen(pt.x + nx, pt.y + ny));
+        rightPts.push(toScreen(pt.x - nx, pt.y - ny));
       }
 
       // 绘制道路沥青底色带
@@ -278,11 +290,10 @@ export class EmbodiedPIPTwin {
       let trailStarted = false;
       for (let i = 0; i < trail.length; i++) {
         const pt = trail[i];
-        const px = (pt.x - carX) * scale;
-        const py = (pt.y - carY) * scale;
-        if (Math.hypot(px, py) < 140) {
-          if (!trailStarted) { ctx.moveTo(px, py); trailStarted = true; }
-          else ctx.lineTo(px, py);
+        if (Math.hypot(pt.x - carX, pt.y - carY) < 140 / scale) {
+          const sPt = toScreen(pt.x, pt.y);
+          if (!trailStarted) { ctx.moveTo(sPt.x, sPt.y); trailStarted = true; }
+          else ctx.lineTo(sPt.x, sPt.y);
         } else {
           trailStarted = false;
         }
@@ -290,24 +301,29 @@ export class EmbodiedPIPTwin {
       ctx.stroke();
     }
 
-    // 2.3 绘制车辆本体 (车头朝前 Y < 0 方向，消除倒退反向错觉)
+    // 2.3 绘制车辆本体 (根据车身相对于平滑摄像机航向的相对角度优雅微转)
+    const relTheta = ((carTheta - this.camTheta + Math.PI) % (Math.PI * 2)) - Math.PI;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(relTheta);
+
     ctx.fillStyle = "#38bdf8";
     ctx.shadowColor = "#38bdf8";
     ctx.shadowBlur = 8;
     ctx.beginPath();
-    ctx.moveTo(0, -9);
+    ctx.moveTo(0, -10);
     ctx.lineTo(-5, 6);
     ctx.lineTo(5, 6);
     ctx.closePath();
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // 2.4 前视感知预瞄射线 (正前方射出)
+    // 2.4 前视感知预瞄射线 (车头前方射出)
     ctx.strokeStyle = "rgba(251, 191, 36, 0.85)";
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.moveTo(0, -9);
+    ctx.moveTo(0, -10);
     ctx.lineTo(0, -38);
     ctx.stroke();
     ctx.setLineDash([]);
@@ -317,7 +333,7 @@ export class EmbodiedPIPTwin {
     // 3. 绘制方向盘仪表
     const deltaDeg = car.delta_deg !== undefined ? car.delta_deg : 0;
     this.targetSteerAngle = THREE_DEG_TO_RAD(deltaDeg);
-    this.steerAngle += (this.targetSteerAngle - this.steerAngle) * 0.35;
+    this.steerAngle += (this.targetSteerAngle - this.steerAngle) * 0.20;
     this.renderSteeringWheel(this.steerAngle, deltaDeg);
 
     // 4. 更新文本指标
