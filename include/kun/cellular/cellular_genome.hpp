@@ -34,10 +34,10 @@ namespace kun {
 // ============================================================================
 enum class CellType : uint8_t {
     // 【感知受体细胞 (Receptor / Sensory)】
-    SENSE_RAW_INPUT_0 = 0,   // 输入通道 0 (量化: 价格 / 智驾: 目标物距离)
-    SENSE_RAW_INPUT_1 = 1,   // 输入通道 1 (量化: 成交量 / 智驾: 相对速度)
-    SENSE_RAW_INPUT_2 = 2,   // 输入通道 2 (量化: 盘口价差 / 智驾: 车道线偏离)
-    SENSE_RAW_INPUT_3 = 3,   // 输入通道 3 (量化: 委托不平衡 / 智驾: TTC碰撞时距)
+    SENSE_RAW_INPUT_0 = 0,   // 输入通道 0 (基础空间观测通道 0)
+    SENSE_RAW_INPUT_1 = 1,   // 输入通道 1 (基础空间观测通道 1)
+    SENSE_RAW_INPUT_2 = 2,   // 输入通道 2 (基础空间观测通道 2)
+    SENSE_RAW_INPUT_3 = 3,   // 输入通道 3 (基础空间观测通道 3)
     SENSE_CHANNEL     = 4,   // 任意维受体: output = inputs[floor(param2)] * param1
     
     // 【代谢运算细胞 (Metabolic Math Operators)】
@@ -62,10 +62,10 @@ enum class CellType : uint8_t {
     GATE_MIN_MAX = 29,       // 极值包络门 (Extremum envelope gate)
     
     // 【效应/动作细胞 (Effector / Action)】
-    ACT_PRIMARY_POSITIVE = 30, // 正向激发动作 (量化: 买开仓 / 智驾: 变道加速)
-    ACT_PRIMARY_NEGATIVE = 31, // 反向激发动作 (量化: 卖开仓 / 智驾: 减速避让)
-    ACT_DEFENSIVE_RESET  = 32, // 防御性归零 (量化: 平仓清空 / 智驾: 保持车道居中)
-    ACT_IMMUNE_BLOCK     = 33, // 免疫阻断刹车 (量化: 熔断锁定 / 智驾: AEB紧急制动)
+    ACT_PRIMARY_POSITIVE = 30, // 正向激发效应器 (Primary Positive Actuator)
+    ACT_PRIMARY_NEGATIVE = 31, // 反向激发效应器 (Primary Negative Actuator)
+    ACT_DEFENSIVE_RESET  = 32, // 防御性复位/阻尼归零效应器 (Defensive Reset / Damping Effector)
+    ACT_IMMUNE_BLOCK     = 33, // 免疫阻断效应器 (Immune Inhibit / Safety Cutoff Effector)
     ACT_CHANNEL          = 34, // 任意维效应器: 写入动作张量槽 floor(param2)
 
     // 【认知联络与预测受体 (Cognitive & Predictive World Model)】
@@ -260,7 +260,7 @@ enum class SeedInitMode : uint8_t {
     HANDCRAFTED_PROGENITOR = 0, // Mode A: 9-cell Genesis seed (2 receptors, 3 metabolic, 1 gating, 3 effectors, 7 synapses)
     MINIMAL_RANDOM_GRAPH = 1,   // Mode B: 3-4 cells (2 receptors + 1 random metabolic/gating + 1-2 effectors with random weights U(-2, 2))
     DISCONNECTED_EMBRYO = 2,    // Mode C: Pure receptors and effectors with no intermediate connections at gen-0
-    ADAS_PROGENITOR = 3         // Mode D: 15-cell ADAS seed progenitor (4 sensors, 4 actuators, 7 internal ops/gates)
+    CONTRACT_PROGENITOR = 3     // Mode D: 15-cell contract progenitor (4 sensors, 4 actuators, 7 internal ops/gates)
 };
 
 inline const char* to_string(SeedInitMode mode) {
@@ -268,7 +268,7 @@ inline const char* to_string(SeedInitMode mode) {
         case SeedInitMode::HANDCRAFTED_PROGENITOR: return "Handcrafted_Progenitor";
         case SeedInitMode::MINIMAL_RANDOM_GRAPH: return "Minimal_Random_Graph";
         case SeedInitMode::DISCONNECTED_EMBRYO: return "Disconnected_Embryo";
-        case SeedInitMode::ADAS_PROGENITOR: return "ADAS_Progenitor";
+        case SeedInitMode::CONTRACT_PROGENITOR: return "Contract_Progenitor";
         default: return "Unknown_Mode";
     }
 }
@@ -288,6 +288,18 @@ enum class FitnessDriverMode : uint8_t {
     TASK_FITNESS_ONLY = 0, // 纯外部任务目标打分
     NOVELTY_SEARCH = 1,    // 纯内在动机：行为空间 KNN 稀缺度搜索
     HYBRID_CURIOSITY = 2   // 混合驱动：任务适应度 + 好奇心新颖性奖励
+};
+
+struct FunctionalCoverageContract {
+    uint32_t active_sources_mask{0};
+    uint32_t active_actuators_mask{0};
+    size_t reachable_cells{0};
+    uint32_t actuator_source_masks[8]{0};
+
+    bool satisfies(uint32_t required_sources, uint32_t required_actuators) const {
+        return ((active_sources_mask & required_sources) == required_sources) &&
+               ((active_actuators_mask & required_actuators) == required_actuators);
+    }
 };
 
 class CellularOrganism;
@@ -311,6 +323,7 @@ struct EvolutionConstraintConfig {
     // ── 事务性变异与依赖保护 (Transactional Mutation & Dependency Guard) ──
     bool enable_transaction_rollback{true};// 变异事务原子回滚：编译/预算/契约校验失败时自动回滚
     bool enable_dependency_guard{false};   // 严禁默认开启业务依赖守卫
+    std::function<bool(const FunctionalCoverageContract&)> viability_contract_filter{nullptr}; // 通用功能图覆盖度契约过滤钩子
     std::function<bool(const CellularOrganism&)> topology_contract_guard{nullptr}; // 通用外围拓扑契约校验钩子 (底座完全解耦)
     std::function<bool(const CellularOrganism&)> viability_filter{nullptr};        // 通用外围生存力/准入过滤钩子 (例如亏损时不分裂)
     std::function<std::vector<double>(const CellularOrganism&)> behavior_extractor{nullptr}; // 通用外围行为特征提取钩子 (多样性/新颖性搜索)
@@ -392,6 +405,12 @@ struct SpatialHashGrid3D {
     }
 };
 
+struct OrganismBlueprint {
+    std::string lineage_name{"Contract-Progenitor"};
+    std::vector<Cell> cells;
+    std::vector<Synapse> synapses;
+};
+
 // ============================================================================
 // 4. 多细胞有机体 (CellularOrganism): 细胞拓扑决策图 (DAG) + 力场物理引擎
 // ============================================================================
@@ -406,9 +425,9 @@ public:
     std::vector<Cell> cells;
     std::vector<Synapse> synapses;
     
-    // 适应度评估 (夏普比率、胜率、稳定性)
+    // 适应度评估 (综合回报、稳定性)
     double fitness_score{0.0};
-    double total_pnl{0.0};
+    double cumulative_reward{0.0};
     double max_drawdown{0.0};
     uint32_t trade_count{0};
     std::unordered_map<std::string, double> custom_metrics; // 外围 Task 自定义业务度量挂载容器 (杜绝向基座增添业务字段)
@@ -579,53 +598,64 @@ public:
         return org;
     }
 
-    // 智驾原基：4 感受器 + 纵横向/免疫通路都在图内，适配器只做单位换算。
-    static CellularOrganism create_adas_seed_organism(uint64_t id = 1) {
+    static CellularOrganism create_from_blueprint(const OrganismBlueprint& bp, uint64_t id = 1) {
         CellularOrganism org;
         org.organism_id = id;
         org.generation = 0;
-        org.lineage_name = "ADAS-Progenitor";
-
-        org.cells.push_back({0, CellType::SENSE_RAW_INPUT_0, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -120.0f, -60.0f, 0.0f});
-        org.cells.push_back({1, CellType::SENSE_RAW_INPUT_1, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -120.0f, -20.0f, 0.0f});
-        org.cells.push_back({2, CellType::SENSE_RAW_INPUT_2, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -120.0f,  20.0f, 0.0f});
-        org.cells.push_back({3, CellType::SENSE_RAW_INPUT_3, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -120.0f,  60.0f, 0.0f});
-
-        org.cells.push_back({4, CellType::GATE_THRESHOLD, -1.0e9, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -40.0f, 0.0f, 0.0f});
-        org.cells.push_back({5, CellType::OP_SUM, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 20.0f, -40.0f, 0.0f});
-        org.cells.push_back({6, CellType::ACT_PRIMARY_POSITIVE, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 140.0f, -60.0f, 0.0f});
-        org.cells.push_back({7, CellType::ACT_PRIMARY_NEGATIVE, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 140.0f, -20.0f, 0.0f});
-        org.cells.push_back({8, CellType::ACT_DEFENSIVE_RESET, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 140.0f,  20.0f, 0.0f});
-        org.cells.push_back({9, CellType::OP_SUB, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 20.0f, 40.0f, 0.0f});
-        org.cells.push_back({10, CellType::GATE_THRESHOLD, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 60.0f, 40.0f, 0.0f});
-        org.cells.push_back({11, CellType::OP_SUB, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 20.0f, 80.0f, 0.0f});
-        org.cells.push_back({12, CellType::GATE_THRESHOLD, 3.5, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 60.0f, 80.0f, 0.0f});
-        org.cells.push_back({13, CellType::OP_SUM, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 100.0f, 60.0f, 0.0f});
-        org.cells.push_back({14, CellType::ACT_IMMUNE_BLOCK, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 140.0f, 100.0f, 0.0f});
-
-        org.synapses.push_back({0, 4, 0, 1.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({0, 5, 0, 0.35, true, 60.0f, -1.0f});
-        org.synapses.push_back({1, 5, 1, 0.95, true, 60.0f, -1.0f});
-        org.synapses.push_back({4, 5, 0, -5.25, true, 60.0f, -1.0f});
-        org.synapses.push_back({5, 6, 0, 1.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({2, 8, 0, 0.45, true, 60.0f, -1.0f});
-        org.synapses.push_back({4, 9, 0, 2.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({3, 9, 1, 1.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({9, 10, 0, 1.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({1, 11, 1, 1.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({11, 12, 0, 1.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({10, 13, 0, 1.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({12, 13, 1, 1.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({13, 14, 0, 1.0, true, 60.0f, -1.0f});
-        org.synapses.push_back({13, 7, 0, -1.0, true, 60.0f, -1.0f});
-
+        org.lineage_name = bp.lineage_name;
+        org.cells = bp.cells;
+        org.synapses = bp.synapses;
         for (auto& s : org.synapses) {
             s.initial_weight = s.weight;
-            s.hebbian_rate = 0.0; // 反射弧不在线改权重，否则跟车几百步会把免疫锁焊死
         }
-
         org.compile();
         return org;
+    }
+
+    // 通用契约原基：4 感受器 + 4 效应器 + 7 内部算子/门控
+    static CellularOrganism create_contract_progenitor(uint64_t id = 1) {
+        OrganismBlueprint bp;
+        bp.lineage_name = "Contract-Progenitor";
+
+        bp.cells.push_back({0, CellType::SENSE_RAW_INPUT_0, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -120.0f, -60.0f, 0.0f});
+        bp.cells.push_back({1, CellType::SENSE_RAW_INPUT_1, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -120.0f, -20.0f, 0.0f});
+        bp.cells.push_back({2, CellType::SENSE_RAW_INPUT_2, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -120.0f,  20.0f, 0.0f});
+        bp.cells.push_back({3, CellType::SENSE_RAW_INPUT_3, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -120.0f,  60.0f, 0.0f});
+
+        bp.cells.push_back({4, CellType::GATE_THRESHOLD, -1.0e9, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -40.0f, 0.0f, 0.0f});
+        bp.cells.push_back({5, CellType::OP_SUM, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 20.0f, -40.0f, 0.0f});
+        bp.cells.push_back({6, CellType::ACT_PRIMARY_POSITIVE, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 140.0f, -60.0f, 0.0f});
+        bp.cells.push_back({7, CellType::ACT_PRIMARY_NEGATIVE, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 140.0f, -20.0f, 0.0f});
+        bp.cells.push_back({8, CellType::ACT_DEFENSIVE_RESET, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 140.0f,  20.0f, 0.0f});
+        bp.cells.push_back({9, CellType::OP_SUB, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 20.0f, 40.0f, 0.0f});
+        bp.cells.push_back({10, CellType::GATE_THRESHOLD, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 60.0f, 40.0f, 0.0f});
+        bp.cells.push_back({11, CellType::OP_SUB, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 20.0f, 80.0f, 0.0f});
+        bp.cells.push_back({12, CellType::GATE_THRESHOLD, 3.5, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 60.0f, 80.0f, 0.0f});
+        bp.cells.push_back({13, CellType::OP_SUM, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 100.0f, 60.0f, 0.0f});
+        bp.cells.push_back({14, CellType::ACT_IMMUNE_BLOCK, 0.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 140.0f, 100.0f, 0.0f});
+
+        bp.synapses.push_back({0, 4, 0, 1.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({0, 5, 0, 0.35, true, 60.0f, -1.0f});
+        bp.synapses.push_back({1, 5, 1, 0.95, true, 60.0f, -1.0f});
+        bp.synapses.push_back({4, 5, 0, -5.25, true, 60.0f, -1.0f});
+        bp.synapses.push_back({5, 6, 0, 1.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({2, 8, 0, 0.45, true, 60.0f, -1.0f});
+        bp.synapses.push_back({4, 9, 0, 2.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({3, 9, 1, 1.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({9, 10, 0, 1.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({1, 11, 1, 1.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({11, 12, 0, 1.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({10, 13, 0, 1.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({12, 13, 1, 1.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({13, 14, 0, 1.0, true, 60.0f, -1.0f});
+        bp.synapses.push_back({13, 7, 0, -1.0, true, 60.0f, -1.0f});
+
+        for (auto& s : bp.synapses) {
+            s.initial_weight = s.weight;
+            s.hebbian_rate = 0.0;
+        }
+
+        return create_from_blueprint(bp, id);
     }
 
     // 通用模式工厂分发器
@@ -637,8 +667,8 @@ public:
                 return create_minimal_random_graph(id, seed);
             case SeedInitMode::DISCONNECTED_EMBRYO:
                 return create_disconnected_embryo(id);
-            case SeedInitMode::ADAS_PROGENITOR:
-                return create_adas_seed_organism(id);
+            case SeedInitMode::CONTRACT_PROGENITOR:
+                return create_contract_progenitor(id);
         }
         return create_seed_organism(id);
     }
@@ -1180,31 +1210,11 @@ public:
         return mean_pair / mean_syn;
     }
 
-    struct AdasGraphContract {
-        bool positive_action{false};
-        bool negative_action{false};
-        bool defensive_reset{false};
-        bool immune_block{false};
-        bool longitudinal_input{false};
-        bool relative_velocity_input{false};
-        bool lateral_input{false};
-        bool ttc_input{false};
-        uint8_t positive_source_mask{0};
-        uint8_t negative_source_mask{0};
-        uint8_t defensive_source_mask{0};
-        uint8_t immune_source_mask{0};
-        size_t reachable_cells{0};
+    using FunctionalCoverageContract = kun::FunctionalCoverageContract;
 
-        bool valid() const {
-            return positive_action && negative_action && defensive_reset &&
-                   immune_block && longitudinal_input && relative_velocity_input &&
-                   lateral_input && ttc_input;
-        }
-    };
-
-    // Derive functional coverage from the active graph; cell IDs have no role.
-    AdasGraphContract evaluate_adas_contract() const {
-        AdasGraphContract result;
+    // 通用功能图拓扑覆盖度分析 (Derive functional coverage from DAG reachability)
+    FunctionalCoverageContract evaluate_coverage_contract() const {
+        FunctionalCoverageContract result;
         std::unordered_map<uint32_t, size_t> id_to_index;
         std::vector<std::vector<size_t>> outgoing(cells.size());
         for (size_t i = 0; i < cells.size(); ++i) {
@@ -1219,18 +1229,18 @@ public:
             }
         }
 
-        std::vector<uint8_t> source_mask(cells.size(), 0);
+        std::vector<uint32_t> source_mask(cells.size(), 0);
         std::vector<size_t> queue;
         for (size_t i = 0; i < cells.size(); ++i) {
-            uint8_t mask = 0;
+            uint32_t mask = 0;
             switch (cells[i].type) {
                 case CellType::SENSE_RAW_INPUT_0: mask = 1u << 0; break;
                 case CellType::SENSE_RAW_INPUT_1: mask = 1u << 1; break;
                 case CellType::SENSE_RAW_INPUT_2: mask = 1u << 2; break;
                 case CellType::SENSE_RAW_INPUT_3: mask = 1u << 3; break;
                 case CellType::SENSE_CHANNEL: {
-                    const size_t ch = receptor_channel_index(cells[i].type, cells[i].param2) & 7u;
-                    mask = static_cast<uint8_t>(1u << ch);
+                    const size_t ch = receptor_channel_index(cells[i].type, cells[i].param2) & 31u;
+                    mask = 1u << ch;
                     break;
                 }
                 default: break;
@@ -1244,7 +1254,7 @@ public:
         for (size_t head = 0; head < queue.size(); ++head) {
             const size_t current = queue[head];
             for (size_t next : outgoing[current]) {
-                const uint8_t merged = static_cast<uint8_t>(source_mask[next] | source_mask[current]);
+                const uint32_t merged = source_mask[next] | source_mask[current];
                 if (merged != source_mask[next]) {
                     source_mask[next] = merged;
                     queue.push_back(next);
@@ -1255,33 +1265,34 @@ public:
         for (size_t i = 0; i < cells.size(); ++i) {
             if (source_mask[i] == 0) continue;
             ++result.reachable_cells;
+            result.active_sources_mask |= source_mask[i];
             switch (cells[i].type) {
                 case CellType::ACT_PRIMARY_POSITIVE:
-                    result.positive_action = true;
-                    result.positive_source_mask |= source_mask[i];
+                    result.active_actuators_mask |= (1u << 0);
+                    result.actuator_source_masks[0] |= source_mask[i];
                     break;
                 case CellType::ACT_PRIMARY_NEGATIVE:
-                    result.negative_action = true;
-                    result.negative_source_mask |= source_mask[i];
+                    result.active_actuators_mask |= (1u << 1);
+                    result.actuator_source_masks[1] |= source_mask[i];
                     break;
                 case CellType::ACT_DEFENSIVE_RESET:
-                    result.defensive_reset = true;
-                    result.defensive_source_mask |= source_mask[i];
+                    result.active_actuators_mask |= (1u << 2);
+                    result.actuator_source_masks[2] |= source_mask[i];
                     break;
                 case CellType::ACT_IMMUNE_BLOCK:
-                    result.immune_block = true;
-                    result.immune_source_mask |= source_mask[i];
+                    result.active_actuators_mask |= (1u << 3);
+                    result.actuator_source_masks[3] |= source_mask[i];
                     break;
+                case CellType::ACT_CHANNEL: {
+                    const size_t slot = static_cast<size_t>(std::clamp(std::floor(cells[i].param2), 0.0, 7.0));
+                    result.active_actuators_mask |= (1u << slot);
+                    result.actuator_source_masks[slot] |= source_mask[i];
+                    break;
+                }
                 default:
                     break;
             }
         }
-        result.longitudinal_input =
-            ((result.positive_source_mask | result.negative_source_mask) & (1u << 0)) != 0;
-        result.relative_velocity_input =
-            ((result.positive_source_mask | result.negative_source_mask) & (1u << 1)) != 0;
-        result.lateral_input = (result.defensive_source_mask & (1u << 2)) != 0;
-        result.ttc_input = (result.immune_source_mask & (1u << 3)) != 0;
         return result;
     }
 
@@ -2934,7 +2945,8 @@ public:
         if (constraint_cfg_.enable_dependency_guard) {
             contract_ok = constraint_cfg_.topology_contract_guard ?
                           constraint_cfg_.topology_contract_guard(org) :
-                          org.evaluate_adas_contract().valid();
+                          (!constraint_cfg_.viability_contract_filter ||
+                           constraint_cfg_.viability_contract_filter(org.evaluate_coverage_contract()));
         }
 
         if (constraint_cfg_.enable_transaction_rollback) {
@@ -2971,7 +2983,8 @@ public:
                 if (constraint_cfg_.enable_dependency_guard) {
                     bool valid = constraint_cfg_.topology_contract_guard ?
                                  constraint_cfg_.topology_contract_guard(org) :
-                                 org.evaluate_adas_contract().valid();
+                                 (!constraint_cfg_.viability_contract_filter ||
+                                  constraint_cfg_.viability_contract_filter(org.evaluate_coverage_contract()));
                     if (!valid) {
                         org.fitness_score = -1e12;
                         continue;
@@ -3004,7 +3017,8 @@ public:
             for (auto& org : population_) {
                 bool valid = constraint_cfg_.topology_contract_guard ?
                              constraint_cfg_.topology_contract_guard(org) :
-                             org.evaluate_adas_contract().valid();
+                             (!constraint_cfg_.viability_contract_filter ||
+                              constraint_cfg_.viability_contract_filter(org.evaluate_coverage_contract()));
                 if (!valid) {
                     org.fitness_score = -1e12;
                 }

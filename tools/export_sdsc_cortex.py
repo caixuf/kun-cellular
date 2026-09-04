@@ -115,20 +115,9 @@ def build_header(ck):
     cell_list_block = "\n".join(cell_lines)
 
     return f"""/**
- * sdsc_cortex.h - SDSC ADAS 细胞皮层 C11 零 GC 推理内核
+ * sdsc_cortex.h - SDSC 细胞皮层 C11 零 GC 推理内核
  *
- * 自动生成代码 - 严禁手动修改。
- * 由 kun-cellular/tools/export_sdsc_cortex.py 从演化冠军检查点编译而来：
- *   trainer          : {ck.get('trainer', 'unknown')}
- *   generations      : {ck.get('generations', -1)}  population: {ck.get('population', -1)}
- *   seed             : {ck.get('seed', -1)}
- *   trained_seconds  : {ck.get('trained_time_seconds', -1)}
- *   champion_cost    : {ck.get('champion_cost', -1)}
- *   all_scenarios_ok : {ck.get('all_scenarios_passed', False)}
- *
- * 闭环训练指标（Python 仿真，车体模型对齐 physics.cpp 运动学自行车）：
-{metrics_block}
- *
+ * 零堆分配确定性 C11 拓扑前向计算内核。
  * 结构：{n_cells} 细胞（{n_rec} 感受器 / {n_hid} 隐藏 / {n_mot} 运动器）, {n_syn} 突触。
  * 前向按细胞索引序单遍推进，反向边天然读到上一拍输出（等价循环突触）。
  * 零堆分配、无分支不确定性、64 字节对齐，确定性硬实时执行。
@@ -163,8 +152,8 @@ def build_header(ck):
 #define SDSC_RECEPTOR_COUNT  {n_rec}
 #define SDSC_IN_DIM          6
 #define SDSC_OUT_DIM         2
-#define SDSC_STEER_CELL      {steer_id}
-#define SDSC_ACCEL_CELL      {accel_id}
+#define SDSC_OUT_CELL_PRIMARY   {steer_id}
+#define SDSC_OUT_CELL_SECONDARY {accel_id}
 
 /* 细胞原语（与 sdsc_primitives.h 及 train_adas_cortex.py SDSC_PRIMITIVES 一致） */
 typedef enum {{
@@ -234,7 +223,7 @@ static inline void sdsc_cortex_reset(SdscCortex* ctx) {{
     ctx->output_count  = SDSC_OUT_DIM;
 }}
 
-static inline void sdsc_cortex_init_default_adas(SdscCortex* ctx) {{
+static inline void sdsc_cortex_init(SdscCortex* ctx) {{
     sdsc_cortex_reset(ctx);
 }}
 
@@ -343,59 +332,8 @@ static inline SDSC_HOT void sdsc_cortex_forward_receptors(
     }}
 
     /* 3. 动作效应器提取 */
-    outputs[0] = fminf(fmaxf(ctx->outputs[SDSC_STEER_CELL], -1.0f), 1.0f);
-    outputs[1] = fminf(fmaxf(ctx->outputs[SDSC_ACCEL_CELL], -1.0f), 1.0f);
-}}
-
-/**
- * ── 【具身适配层】ADAS 自动驾驶轨迹跟踪感知编码适配器 ───────────────
- * 将车规 6 维物理感知量打包投影至 12 通道细胞受体
- */
-static inline void sdsc_adas_encode_receptors(
-    const float* SDSC_RESTRICT inputs,
-    float* SDSC_RESTRICT receptors
-) {{
-    const float cte_n    = inputs[0];
-    const float dpsi_n   = inputs[1];
-    const float kappa_n  = inputs[2];
-    const float v_n      = inputs[3];
-    const float verr_n   = inputs[4];
-    const float danger_n = inputs[5];
-
-    receptors[0]  = fmaxf(0.0f, -cte_n);
-    receptors[1]  = fmaxf(0.0f,  cte_n);
-    receptors[2]  = fmaxf(0.0f, -cte_n * 2.0f - 0.5f);
-    receptors[3]  = fmaxf(0.0f,  cte_n * 2.0f - 0.5f);
-    receptors[4]  = fminf(fmaxf(dpsi_n, -1.0f), 1.0f);
-    receptors[5]  = fminf(fmaxf(dpsi_n * 1.5f, -1.0f), 1.0f);
-    receptors[6]  = fminf(fmaxf(kappa_n, -1.0f), 1.0f);
-    receptors[7]  = fminf(fmaxf(kappa_n * v_n, -1.0f), 1.0f);
-    receptors[8]  = fminf(fmaxf(v_n, 0.0f), 1.0f);
-    receptors[9]  = fminf(fmaxf(verr_n, -1.0f), 1.0f);
-    receptors[10] = fminf(fmaxf(-verr_n, 0.0f), 1.0f);
-    receptors[11] = fminf(fmaxf(danger_n, 0.0f), 1.0f);
-}}
-
-/**
- * 具身端到端便捷接口（自动调用感知编码器 + 通用受体内核）
- */
-static inline SDSC_HOT void sdsc_cortex_forward(
-    SdscCortex* SDSC_RESTRICT ctx,
-    const float* SDSC_RESTRICT inputs,
-    float* SDSC_RESTRICT outputs
-) {{
-    float recs[SDSC_RECEPTOR_COUNT];
-    sdsc_adas_encode_receptors(inputs, recs);
-    sdsc_cortex_forward_receptors(ctx, recs, outputs);
-}}
-
-/** 速度相关转向限幅，与 control_node.cpp steer_limit_for_speed 一致。 */
-static inline float sdsc_cortex_steer_limit(float v_mps, float max_lat_accel) {{
-    float s = (v_mps < 2.0f) ? 2.0f : v_mps;
-    float lim = atanf(max_lat_accel * 2.7f / (s * s));
-    if (lim < 0.016f) lim = 0.016f;
-    if (lim > 0.16f)  lim = 0.16f;
-    return lim;
+    outputs[0] = fminf(fmaxf(ctx->outputs[SDSC_OUT_CELL_PRIMARY], -1.0f), 1.0f);
+    outputs[1] = fminf(fmaxf(ctx->outputs[SDSC_OUT_CELL_SECONDARY], -1.0f), 1.0f);
 }}
 
 #ifdef __cplusplus

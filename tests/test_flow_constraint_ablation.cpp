@@ -147,7 +147,7 @@ ConstraintExperimentResult run_constraint_ablation_run(
                 }
 
                 org.fitness_score = pnl;
-                org.total_pnl = pnl;
+                org.cumulative_reward = pnl;
 
                 if (pnl > best_fit) {
                     best_fit = pnl;

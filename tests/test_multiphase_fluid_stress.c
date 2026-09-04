@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <stdbool.h>
 #include "kun/cellular/sdsc_cortex.h"
+#include "tasks/adas/sdsc_adas_adapter.h"
 
 #ifndef SDSC_PI
 #define SDSC_PI 3.14159265358979323846f

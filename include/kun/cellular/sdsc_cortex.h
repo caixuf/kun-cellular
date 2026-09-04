@@ -1,29 +1,7 @@
 /**
- * sdsc_cortex.h - SDSC ADAS 细胞皮层 C11 零 GC 推理内核
+ * sdsc_cortex.h - SDSC 细胞皮层 C11 零 GC 推理内核
  *
- * 自动生成代码 - 严禁手动修改。
- * 由 kun-cellular/tools/export_sdsc_cortex.py 从演化冠军检查点编译而来：
- *   trainer          : train_adas_cortex.py
- *   generations      : 40  population: 20
- *   seed             : 20260903
- *   trained_seconds  : 378.43
- *   champion_cost    : 62.632
- *   all_scenarios_ok : True
- *
- * 闭环训练指标（Python 仿真，车体模型对齐 physics.cpp 运动学自行车）：
- *   straight_cruise  avg_cte=  7.90cm max_cte= 60.00cm avg_verr= 0.62m/s steps=400/400
- *   gentle_s         avg_cte= 15.24cm max_cte= 85.36cm avg_verr= 0.53m/s steps=440/440
- *   s_curve          avg_cte= 29.35cm max_cte= 63.84cm avg_verr= 0.65m/s steps=500/500
- *   s_curve_mid      avg_cte= 21.61cm max_cte= 59.92cm avg_verr= 1.54m/s steps=440/440
- *   s_curve_hard     avg_cte= 21.91cm max_cte= 58.83cm avg_verr= 1.53m/s steps=440/440
- *   curve_easy       avg_cte= 23.24cm max_cte= 60.00cm avg_verr= 0.41m/s steps=400/400
- *   tight_curve      avg_cte= 13.79cm max_cte= 61.51cm avg_verr= 1.35m/s steps=400/400
- *   tight_curve_max  avg_cte= 31.98cm max_cte= 73.21cm avg_verr= 1.18m/s steps=400/400
- *   stop_go          avg_cte= 19.48cm max_cte= 65.67cm avg_verr= 1.01m/s steps=440/440
- *   follow           avg_cte= 21.95cm max_cte= 76.32cm avg_verr= 0.53m/s steps=440/440
- *   highway          avg_cte= 31.20cm max_cte=117.63cm avg_verr= 0.75m/s steps=440/440
- *   ramp_merge       avg_cte= 25.13cm max_cte= 60.00cm avg_verr= 0.43m/s steps=440/440
- *
+ * 零堆分配确定性 C11 拓扑前向计算内核。
  * 结构：210 细胞（12 感受器 / 192 隐藏 / 6 运动器）, 610 突触。
  * 前向按细胞索引序单遍推进，反向边天然读到上一拍输出（等价循环突触）。
  * 零堆分配、无分支不确定性、64 字节对齐，确定性硬实时执行。
@@ -267,8 +245,8 @@
 #define SDSC_RECEPTOR_COUNT  12
 #define SDSC_IN_DIM          6
 #define SDSC_OUT_DIM         2
-#define SDSC_STEER_CELL      208
-#define SDSC_ACCEL_CELL      209
+#define SDSC_OUT_CELL_PRIMARY   208
+#define SDSC_OUT_CELL_SECONDARY 209
 
 /* 细胞原语（与 sdsc_primitives.h 及 train_adas_cortex.py SDSC_PRIMITIVES 一致） */
 typedef enum {
@@ -575,7 +553,7 @@ static inline void sdsc_cortex_reset(SdscCortex* ctx) {
     ctx->output_count  = SDSC_OUT_DIM;
 }
 
-static inline void sdsc_cortex_init_default_adas(SdscCortex* ctx) {
+static inline void sdsc_cortex_init(SdscCortex* ctx) {
     sdsc_cortex_reset(ctx);
 }
 
@@ -684,59 +662,8 @@ static inline SDSC_HOT void sdsc_cortex_forward_receptors(
     }
 
     /* 3. 动作效应器提取 */
-    outputs[0] = fminf(fmaxf(ctx->outputs[SDSC_STEER_CELL], -1.0f), 1.0f);
-    outputs[1] = fminf(fmaxf(ctx->outputs[SDSC_ACCEL_CELL], -1.0f), 1.0f);
-}
-
-/**
- * ── 【具身适配层】ADAS 自动驾驶轨迹跟踪感知编码适配器 ───────────────
- * 将车规 6 维物理感知量打包投影至 12 通道细胞受体
- */
-static inline void sdsc_adas_encode_receptors(
-    const float* SDSC_RESTRICT inputs,
-    float* SDSC_RESTRICT receptors
-) {
-    const float cte_n    = inputs[0];
-    const float dpsi_n   = inputs[1];
-    const float kappa_n  = inputs[2];
-    const float v_n      = inputs[3];
-    const float verr_n   = inputs[4];
-    const float danger_n = inputs[5];
-
-    receptors[0]  = fmaxf(0.0f, -cte_n);
-    receptors[1]  = fmaxf(0.0f,  cte_n);
-    receptors[2]  = fmaxf(0.0f, -cte_n * 2.0f - 0.5f);
-    receptors[3]  = fmaxf(0.0f,  cte_n * 2.0f - 0.5f);
-    receptors[4]  = fminf(fmaxf(dpsi_n, -1.0f), 1.0f);
-    receptors[5]  = fminf(fmaxf(dpsi_n * 1.5f, -1.0f), 1.0f);
-    receptors[6]  = fminf(fmaxf(kappa_n, -1.0f), 1.0f);
-    receptors[7]  = fminf(fmaxf(kappa_n * v_n, -1.0f), 1.0f);
-    receptors[8]  = fminf(fmaxf(v_n, 0.0f), 1.0f);
-    receptors[9]  = fminf(fmaxf(verr_n, -1.0f), 1.0f);
-    receptors[10] = fminf(fmaxf(-verr_n, 0.0f), 1.0f);
-    receptors[11] = fminf(fmaxf(danger_n, 0.0f), 1.0f);
-}
-
-/**
- * 具身端到端便捷接口（自动调用感知编码器 + 通用受体内核）
- */
-static inline SDSC_HOT void sdsc_cortex_forward(
-    SdscCortex* SDSC_RESTRICT ctx,
-    const float* SDSC_RESTRICT inputs,
-    float* SDSC_RESTRICT outputs
-) {
-    float recs[SDSC_RECEPTOR_COUNT];
-    sdsc_adas_encode_receptors(inputs, recs);
-    sdsc_cortex_forward_receptors(ctx, recs, outputs);
-}
-
-/** 速度相关转向限幅，与 control_node.cpp steer_limit_for_speed 一致。 */
-static inline float sdsc_cortex_steer_limit(float v_mps, float max_lat_accel) {
-    float s = (v_mps < 2.0f) ? 2.0f : v_mps;
-    float lim = atanf(max_lat_accel * 2.7f / (s * s));
-    if (lim < 0.016f) lim = 0.016f;
-    if (lim > 0.16f)  lim = 0.16f;
-    return lim;
+    outputs[0] = fminf(fmaxf(ctx->outputs[SDSC_OUT_CELL_PRIMARY], -1.0f), 1.0f);
+    outputs[1] = fminf(fmaxf(ctx->outputs[SDSC_OUT_CELL_SECONDARY], -1.0f), 1.0f);
 }
 
 #ifdef __cplusplus

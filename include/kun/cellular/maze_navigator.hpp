@@ -2,7 +2,6 @@
 
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/evolvable_task.hpp"
-#include "kun/core/types.hpp"
 #include <vector>
 #include <cmath>
 #include <string>
@@ -178,20 +177,20 @@ public:
 
         agent.steps++;
 
-        // 动力学控制: positive_action 驱动前进, negative_action 驱动转向
+        // 动力学控制: positive_action 驱动前进, negative_action 驱动旋转角速度
         // 护栏: 积分细胞可能溢出至 inf/NaN, 先截断到有限区间
         float thrust = std::clamp(static_cast<float>(acts.positive_action), -5.0f, 5.0f) * 2.5f;
-        float steer  = std::clamp(static_cast<float>(acts.negative_action), -5.0f, 5.0f) * 3.0f;
+        float turn_rate = std::clamp(static_cast<float>(acts.negative_action), -5.0f, 5.0f) * 3.0f;
         if (!std::isfinite(thrust)) thrust = 0.0f;
-        if (!std::isfinite(steer)) steer = 0.0f;
+        if (!std::isfinite(turn_rate)) turn_rate = 0.0f;
 
         if (acts.immune_lock) {
             // 碰撞免疫自锁：触发倒车与原地旋转脱困
             thrust = -1.0f;
-            steer = 3.14f;
+            turn_rate = 3.14f;
         }
 
-        agent.theta += steer * dt;
+        agent.theta += turn_rate * dt;
         // 角度归一化: while 循环对 inf 会死循环 (inf -= 2π 仍为 inf), 必须用 fmod + 有限性检查
         if (!std::isfinite(agent.theta)) agent.theta = 0.0f;
         agent.theta = std::fmod(agent.theta + 3.14159265f, 6.2831853f);

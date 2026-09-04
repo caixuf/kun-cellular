@@ -331,8 +331,8 @@ public:
     }
 
     const char* name() const override { return "UnprotectedIntersection-ComplexManeuver"; }
-    size_t obs_dim() const override { return 6; } // [横向偏差 cte, 航向偏差 d_psi, 纵向车速 v, 对向车TTC, 目标曲率 kappa, 剩余机动距离]
-    size_t act_dim() const override { return 2; } // [方向盘转角 steer, 纵向加速度 a/油门刹车]
+    size_t obs_dim() const override { return 6; } // [横向偏差 cte, 航向偏差 d_psi, 纵向速度 v, 冲突物TTC, 目标曲率 kappa, 剩余机动距离]
+    size_t act_dim() const override { return 2; } // [侧向控制角 lat_cmd, 纵向加速度 a/加减速]
 
     void reset(uint32_t episode_seed) override {
         rng_.seed(episode_seed);
@@ -388,16 +388,16 @@ public:
     }
 
     StepResult step(int action) override {
-        // 离散映射: 0: 减速让行并向目标打舵, 1: 加速抢越并跟踪轨迹
-        float steer = (target_kappa_ > 0) ? 0.35f : -0.35f;
+        // 离散映射: 0: 减速让行并向目标偏转, 1: 加速抢越并跟踪轨迹
+        float lat_cmd = (target_kappa_ > 0) ? 0.35f : -0.35f;
         float accel = (action == 1) ? 1.5f : -2.5f;
-        return step_internal(steer, accel);
+        return step_internal(lat_cmd, accel);
     }
 
     StepResult step_continuous(const CellularOrganism::ActionOutputs& acts) override {
-        float steer = static_cast<float>(acts.positive_action - acts.negative_action);
+        float lat_cmd = static_cast<float>(acts.positive_action - acts.negative_action);
         float accel = static_cast<float>(acts.positive_action * 2.5 - acts.defensive_reset * 4.0);
-        return step_internal(steer, accel);
+        return step_internal(lat_cmd, accel);
     }
 
     double current_fitness() const override {
@@ -408,16 +408,16 @@ public:
     }
 
 private:
-    StepResult step_internal(float steer, float accel) {
+    StepResult step_internal(float lat_cmd, float accel) {
         step_count_++;
         float dt = 0.1f;
 
-        // 动力学自行车单轨模型积分
+        // 动力学单轨模型积分
         float L = 2.8f;
         v_ = std::clamp(v_ + accel * dt, 0.0f, 12.0f);
         x_ += v_ * std::cos(psi_) * dt;
         y_ += v_ * std::sin(psi_) * dt;
-        psi_ += (v_ / L) * std::tan(std::clamp(steer, -0.6f, 0.6f)) * dt;
+        psi_ += (v_ / L) * std::tan(std::clamp(lat_cmd, -0.6f, 0.6f)) * dt;
 
         // 对向车运动与 TTC 衰减
         oncoming_ttc_ -= dt;

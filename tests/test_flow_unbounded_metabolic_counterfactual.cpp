@@ -35,11 +35,11 @@ void test_unbounded_dynamic_metabolism() {
     for (size_t i = 0; i < pop.size(); ++i) {
         if (i < 5) {
             // 头部精英：赚取超额收益
-            pop[i].total_pnl = 500.0 + i * 50.0;
+            pop[i].cumulative_reward = 500.0 + i * 50.0;
             pop[i].fitness_score = 1000.0 + i * 100.0;
         } else {
             // 平庸与亏损个体
-            pop[i].total_pnl = -100.0;
+            pop[i].cumulative_reward = -100.0;
             pop[i].fitness_score = 10.0;
         }
     }

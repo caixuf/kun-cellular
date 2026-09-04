@@ -4,6 +4,7 @@
 #include <time.h>
 #include <assert.h>
 #include "kun/cellular/sdsc_cortex.h"
+#include "tasks/adas/sdsc_adas_adapter.h"
 
 int main(void) {
     printf("============================================================\n");
@@ -19,21 +20,19 @@ int main(void) {
     printf("  - Input Count: %d, Output Count: %d\n", cortex.input_count, cortex.output_count);
 
     // 1. 功能性正确性验证
-    float in[4] = {50.0f, -2.0f, 0.15f, 3.5f}; // 正常跟车
-    float out[4] = {0};
+    float in[6] = {0.05f, -0.02f, 0.01f, 10.0f, 0.2f, 0.0f}; // 正常工况
+    float out[2] = {0};
 
     sdsc_cortex_forward(&cortex, in, out);
-    printf("  - Step 1 Normal Follow: Accel=%.3f, Decel=%.3f, Steer=%.3f, Immune=%d\n",
-           out[0], out[1], out[2], (int)out[3]);
-    assert((int)out[3] == 0 && "Normal condition must not trigger immune lock!");
+    printf("  - Step 1 Normal: Steer=%.3f, Accel=%.3f\n", out[0], out[1]);
+    assert(out[0] >= -1.0f && out[0] <= 1.0f && "Steer must be clamped in [-1, 1]!");
+    assert(out[1] >= -1.0f && out[1] <= 1.0f && "Accel must be clamped in [-1, 1]!");
 
-    // 极危加塞工况 (TTC 0.35s 突发危险)
-    float danger_in[4] = {8.0f, -12.0f, 0.5f, 0.35f};
+    // 突发工况
+    float danger_in[6] = {0.8f, -0.4f, 0.05f, 15.0f, 2.0f, 0.9f};
     sdsc_cortex_forward(&cortex, danger_in, out);
-    printf("  - Step 2 Cut-in Danger: Accel=%.3f, Decel=%.3f, Steer=%.3f, Immune=%d\n",
-           out[0], out[1], out[2], (int)out[3]);
-    assert((int)out[3] == 1 && "Extreme cut-in hazard must immediately trigger immune block!");
-    printf("  ✓ C11 functional hazard inference logic PASSED!\n\n");
+    printf("  - Step 2 Hazard: Steer=%.3f, Accel=%.3f\n", out[0], out[1]);
+    printf("  ✓ C11 functional inference logic PASSED!\n\n");
 
     // 2. 1,000,000 次超高频前向推理微基准压测
     const int NUM_ITERATIONS = 1000000;
@@ -43,11 +42,13 @@ int main(void) {
     clock_gettime(CLOCK_MONOTONIC, &start);
 
     for (int i = 0; i < NUM_ITERATIONS; ++i) {
-        float test_in[4] = {
-            30.0f + (float)(i % 10),
-            -1.0f - (float)(i % 5),
-            0.1f * (float)((i % 3) - 1),
-            2.0f + (float)(i % 4)
+        float test_in[6] = {
+            (float)(i % 10) * 0.05f,
+            -0.02f * (float)(i % 5),
+            0.005f * (float)((i % 3) - 1),
+            10.0f + (float)(i % 4),
+            0.1f * (float)(i % 3),
+            0.0f
         };
         sdsc_cortex_forward(&cortex, test_in, out);
     }

@@ -273,14 +273,14 @@ public:
             auto actions = org.forward(inputs);
             deme.inferences_count.fetch_add(1, std::memory_order_relaxed);
 
-            // 适应度评估 (多头收益 - 空头损失 - 免疫锁惩罚/奖励)
-            double pnl = (actions.positive_action - actions.negative_action) * actual_delta * 100.0;
+            // 适应度评估 (正向效应收益 - 反向效应损失 + 避险奖励)
+            double step_payoff = (actions.positive_action - actions.negative_action) * actual_delta * 100.0;
             if (actions.immune_lock && actual_delta < -5.0) {
-                pnl += 50.0; // 成功避险奖励
+                step_payoff += 50.0; // 成功避险奖励
             }
-            if (!std::isfinite(pnl)) pnl = 0.0;
+            if (!std::isfinite(step_payoff)) step_payoff = 0.0;
             if (!std::isfinite(org.fitness_score)) org.fitness_score = 0.0;
-            org.fitness_score = std::clamp(org.fitness_score * 0.95 + pnl, -2000.0, 10000.0);
+            org.fitness_score = std::clamp(org.fitness_score * 0.95 + step_payoff, -2000.0, 10000.0);
         }
 
         // 推进代际演化

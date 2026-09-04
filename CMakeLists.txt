@@ -21,6 +21,7 @@ find_package(Threads REQUIRED)
 add_library(kun_cellular INTERFACE)
 target_include_directories(kun_cellular INTERFACE
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(kun_cellular INTERFACE Threads::Threads m)

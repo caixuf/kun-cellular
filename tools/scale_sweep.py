@@ -26,6 +26,7 @@ LATENCY_C = r"""
 #include <stdio.h>
 #include <time.h>
 #include "sdsc_cortex.h"
+#include "tasks/adas/sdsc_adas_adapter.h"
 int main(void) {
     SdscCortex ctx; sdsc_cortex_init_default_adas(&ctx);
     float in[6] = {0.3f,-0.2f,0.1f,0.6f,0.2f,0.0f}, out[2];
@@ -77,7 +78,7 @@ def measure_latency(organ, cost):
         src, exe = os.path.join(td, "l.c"), os.path.join(td, "l")
         with open(src, "w", encoding="utf-8") as f:
             f.write(LATENCY_C)
-        cc = subprocess.run(["cc", "-std=c11", "-O2", "-I", inc, src, "-o", exe, "-lm"],
+        cc = subprocess.run(["cc", "-std=c11", "-O2", "-I", inc, "-I", ROOT, src, "-o", exe, "-lm"],
                             capture_output=True, text=True)
         if cc.returncode != 0:
             return None, f"cc failed: {cc.stderr.strip()[:200]}"

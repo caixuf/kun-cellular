@@ -30,6 +30,7 @@ TOL = 1e-5
 C_MAIN = r"""
 #include <stdio.h>
 #include "sdsc_cortex.h"
+#include "tasks/adas/sdsc_adas_adapter.h"
 
 int main(void) {
     SdscCortex ctx;
@@ -70,7 +71,7 @@ def verify_parity(organ, header_content, test_name):
         with open(src, "w", encoding="utf-8") as f:
             f.write(C_MAIN)
         cc = subprocess.run(
-            ["cc", "-std=c11", "-O2", "-I", td,
+            ["cc", "-std=c11", "-O2", "-I", td, "-I", ROOT,
              src, "-o", exe, "-lm"],
             capture_output=True, text=True)
         if cc.returncode != 0:
@@ -113,7 +114,7 @@ def test_checkpoint_parity():
     organ = AdasCortexOrgan.deserialize(ck["organ"])
     with open(HEADER, "r", encoding="utf-8") as f:
         hdr = f.read()
-    return verify_parity(organ, hdr, "Champion Checkpoint")
+    assert verify_parity(organ, hdr, "Champion Checkpoint")
 
 
 def test_synthetic_all_primitives_parity():
@@ -144,17 +145,16 @@ def test_synthetic_all_primitives_parity():
         "metrics": {}
     }
     hdr_content = build_header(ck)
-    return verify_parity(organ, hdr_content, "All 18 Primitives Synthetic")
+    assert verify_parity(organ, hdr_content, "All 18 Primitives Synthetic")
 
 
 def main():
-    ok1 = test_checkpoint_parity()
-    ok2 = test_synthetic_all_primitives_parity()
-    if ok1 and ok2:
-        print("\n>>> 全部对账测试 100% PASS <<<")
-        return 0
-    return 1
+    test_checkpoint_parity()
+    test_synthetic_all_primitives_parity()
+    print("\n>>> 全部对账测试 100% PASS <<<")
+    return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
