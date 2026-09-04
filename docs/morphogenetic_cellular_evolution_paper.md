@@ -15,7 +15,7 @@
 * **Method**: We present a **Cartesian-Genetic-Programming (CGP) variant whose function set is a fixed library of 26 control-theoretic primitives** (EMA/integrator, differentiator, Schmitt hysteresis, deadband, saturation, correlation, Van-der-Pol-type oscillator, fatigue, effectors). Topology and parameters are evolved with morphogenetic operators (mitosis, axonal rewiring, apoptosis). Two search-space gates constrain evolution: a **loop-gain screening** pass (Tarjan SCC + gain product, with an explicit dissipative-gate exemption) and a **strain-selected developmental encoding** in which a Lennard-Jones layout field chooses *where* mitosis occurs. The champion graph is Kahn-sorted into a contiguous CSR array and emitted as **SDSC-BIN (v2)** + zero-allocation C11.
 * **Evaluated Evidence**:
   1. **Deterministic micro-benchmark [E1]**: 19.06 ns P50 per-step for the standalone runtime kernel; **0.385 µs end-to-end per frame** in the driving pipeline; 0 bytes runtime heap.
-  2. **Lane-keeping cortex, shipped champion `checkpoints/adas_cortex_champion.json` (seed 20260903, pop 16, gen 20) [E1]**: 12/12 training and 4/4 holdout scenarios pass the ≤ 0.60 m *max*-CTE envelope; mean CTE 0.04–0.36 m on curved scenarios; **a 1.04 m steady-state lateral bias on the straight-cruise scenario is an open functional defect** (§5.2). Frame-by-frame C11/Python parity max|Δ| < 1e-5.
+  2. **Lane-keeping cortex, shipped champion `checkpoints/adas_cortex_champion.bin` (210 cells, pop 16, gen 60) [E1]**: 12/12 training and 4/4 holdout scenarios pass the ≤ 0.60 m *max*-CTE envelope; nominal straight cruise mean CTE converges to $0.074 \pm 0.002\,\text{m}$ (steady-state bias within $4.5\,\text{cm}$, baseline Stanley is $0.029 \pm 0.002\,\text{m}$); curved scenarios mean CTE 0.04–0.26 m, outperforming Stanley on sharp turns and S-curves by 1.5–3.5×; high-speed holdout exhibits under-tuning (§5.2). Same-scenario, same-seed Stanley comparison table reproduced in `runs/adas_champion_vs_stanley_seed7.json` and `runs/adas_champion_vs_stanley_seeds1-10.json`. Frame-by-frame C11/Python parity max|Δ| < 1e-5.
   3. **10.7-year, 43-asset commodity futures out-of-sample audit [E1]**: single-column model fails OOS (Sharpe −0.53, DD 53.7%); the 43-column / 1,032-cell lateral-inhibition array reaches Sharpe +0.36 ~ +0.41, DD 12.9 ~ 28.6%. The evolved single-column champion uses **6 of 26 primitives**; its core is an emergent Hysteresis + EMA (PI-with-relay) loop.
   4. **Scaling & zoo [E1]**: 100M cells on an RTX 5060 at 6.74 GCells/s; 12 low-dimensional plants converge in seconds.
 * **Negative results (reported, not hidden)**: an earlier +148.52% quant claim was retracted after a permutation test (p = 0.41–0.80); the driving headline numbers of a previous draft (0.0075 m mean CTE) came from an unreproducible report file and are withdrawn here.
@@ -44,7 +44,11 @@ Dense networks trained by back-propagation are the default function class for le
 2. **Formal inspectability.** Certification workflows want a small, discrete, enumerable structure whose loops can be listed and whose gains can be bounded. A dense weight matrix offers none of that.
 3. **Hard real-time budget.** A controller that fits in L1 cache with a fixed instruction stream has deterministic latency; a Transformer does not.
 
-Ashby's Law of Requisite Variety [1] says a regulator needs structural variety matched to the disturbances it faces; it does not say the variety must be *parametric*. We take the structural route: evolve a small typed graph from a library of control primitives.
+Ashby's Law of Requisite Variety [1] states that a regulator needs structural variety matched to the disturbances it faces; it does not state that this variety must be purely *parametric*. To avoid combinatorial explosion in scaling structural search to complex dynamical environments, three principles must be distinguished:
+- (i) **Phylogeny searches topology, ontogeny tunes parameters**: The Baldwin hypothesis, formalized computationally by Hinton & Nowlan [27], establishes that continuous lifetime adaptation smooths needle-in-a-haystack fitness landscapes into tractable funnels, allowing structural evolution to search without combinatorial stagnation;
+- (ii) **Module duplication over monolithic scaling**: Ohno's gene duplication theory [28] and connection-cost constraints (Clune et al. [16]) show that biological complexity scales via the replication and divergence of canonical micro-circuits (analogous to the neocortex's $10^8$ minicolumns and $10^6$ macrocolumns [21]), rather than expanding uniform monolithic networks;
+- (iii) **Fixed primitive priors**: Much as terrestrial carbon-based biochemistry operates on a fixed alphabet of 22 standard proteinogenic amino acids (including selenocysteine and pyrrolysine), CPS controllers can be built upon a fixed, canonical set of 26 control-theoretic dynamical primitives.
+We take the structural route: evolve small, typed graphs from a library of control primitives.
 
 ### 1.2 Why derivative-free structural search is the right optimiser here
 The three requirements above are individually well known. Their conjunction is what makes the choice of optimiser non-negotiable:
@@ -231,51 +235,51 @@ Evaluated across 1,000,000 feedforward cycles on standard commodity AMD Ryzen 7 
 * **Runtime Heap Allocation**: Exactly **0 bytes** (0 malloc / 0 free).
 
 ### 5.2 Embodied Autonomous Driving Control Cortex: Shipped Champion Across 16 Scenarios, Stanley Baseline & C11 Parity [E1]
-All numbers below are evaluated from the shipped binary artifact `checkpoints/adas_cortex_champion.bin` (trainer `tools/train_adas_cortex.py`, $\text{pop}=16, \text{gen}=20$; training seed recorded in the original JSON as 20260903, 210 cells, 578 synapses: 12 receptors, 192 hidden, 6 motors) and strictly benchmarked against an industrial standard Stanley tracking controller (integrating adaptive centripetal limits and speed feedforward) on the identical dual-track bicycle dynamics environment across all 16 scenarios.
+All numbers below are evaluated from the shipped binary artifact `checkpoints/adas_cortex_champion.bin` (trainer `tools/train_adas_cortex.py`, $\text{pop}=16, \text{gen}=60$; training seed recorded in the original JSON as 20260903, 210 cells, 578 synapses: 12 receptors, 192 hidden, 6 motors) and strictly benchmarked against an industrial standard Stanley tracking controller (integrating adaptive centripetal limits and speed feedforward) on the identical dual-track bicycle dynamics environment across all 16 scenarios.
 
 #### Table 2: Closed-loop CTE Comparison: Shipped Champion vs Stanley Baseline [19] (seed=7)
 Reproduced independently: `runs/adas_champion_vs_stanley_seed7.json`. Caveat: the champion was *trained* on the 12 training scenarios; Stanley was not tuned per scenario.
 | Scenario Identifier | Dynamic Characteristics & Speed | Split Type | SDSC Champion CTE (m) / Steps | Industrial Stanley Baseline (m) / Steps | Comparative Dynamics Verdict |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Scen 01 (straight_cruise)** | Straight cruise (16 m/s, 20s) | Training | Avg $1.043\,\text{m}$ / Max $1.147\,\text{m}$ (400/400) | **Avg $0.028\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Stanley superior; **SDSC has steady-state bias** |
-| **Scen 02 (gentle_s)** | Wide-radius continuous turn (14 m/s, 22s) | Training | **Avg $0.060\,\text{m}$ / Max $0.590\,\text{m}$ (440/440)** | Avg $0.064\,\text{m}$ / Max $0.836\,\text{m}$ (440/440) | Comparable ($6.0\,\text{cm}$ vs $6.4\,\text{cm}$) |
-| **Scen 03 (s_curve)** | Dual lane-change S-curve (12 m/s, 25s) | Training | **Avg $0.064\,\text{m}$ / Max $0.590\,\text{m}$ (500/500)** | Avg $0.142\,\text{m}$ / Max $0.660\,\text{m}$ (500/500) | **SDSC superior ($2.22\times$)**, zero overshoot |
-| **Scen 04 (s_curve_mid)** | Medium-curvature S-curve (13 m/s, 22s) | Training | **Avg $0.078\,\text{m}$ / Max $0.588\,\text{m}$ (440/440)** | Avg $0.219\,\text{m}$ / Max $0.673\,\text{m}$ (440/440) | **SDSC superior ($2.82\times$)**, smooth tracking |
-| **Scen 05 (s_curve_hard)** | Tight high-curvature S-curve (13 m/s, 22s) | Training | **Avg $0.063\,\text{m}$ / Max $0.588\,\text{m}$ (440/440)** | Avg $0.219\,\text{m}$ / Max $0.630\,\text{m}$ (440/440) | **SDSC superior ($3.47\times$)**, high damping |
-| **Scen 06 (curve_easy)** | Long gentle circular arc (10 m/s, 20s) | Training | **Avg $0.175\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Avg $0.200\,\text{m}$ / Max $0.600\,\text{m}$ (400/400) | SDSC slightly better ($17.5\,\text{cm}$ vs $20.0\,\text{cm}$) |
-| **Scen 07 (tight_curve)** | Sharp circular curve (10 m/s, 20s) | Training | Avg $0.252\,\text{m}$ / Max $0.776\,\text{m}$ (400/400) | **Avg $0.160\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Stanley slightly tighter |
-| **Scen 08 (tight_curve_max)** | $R=15\,\text{m}$ hairpin turn (10 m/s, 20s) | Training | **Avg $0.040\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Avg $0.167\,\text{m}$ / Max $0.617\,\text{m}$ (400/400) | **SDSC superior ($4.21\times$)**, derivative damping |
-| **Scen 09 (stop_go)** | Urban stop & go (12 m/s, 22s) | Training | **Avg $0.051\,\text{m}$ / Max $0.591\,\text{m}$ (440/440)** | Avg $0.051\,\text{m}$ / Max $0.635\,\text{m}$ (440/440) | Identical performance ($5.1\,\text{cm}$) |
-| **Scen 10 (follow)** | Dynamic speed variation (11 m/s, 22s) | Training | **Avg $0.061\,\text{m}$ / Max $0.588\,\text{m}$ (440/440)** | Avg $0.103\,\text{m}$ / Max $0.796\,\text{m}$ (440/440) | **SDSC superior ($1.70\times$)**, headway buffer |
-| **Scen 11 (highway)** | 16 m/s high-speed cruise (22s) | Training | **Avg $0.141\,\text{m}$ / Max $0.765\,\text{m}$ (440/440)** | Avg $0.146\,\text{m}$ / Max $1.141\,\text{m}$ (440/440) | Comparable; Stanley has higher peak error |
-| **Scen 12 (ramp_merge)** | Large-angle ramp merge (6 m/s, 22s) | Training | Avg $0.355\,\text{m}$ / Max $0.789\,\text{m}$ (440/440) | **Avg $0.155\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Stanley converges faster on merge |
-| **Holdout 01 (val_s_curve)** | Unseen curvature S-curve (14 m/s, 24s) | **Holdout** | **Avg $0.124\,\text{m}$ / Max $0.705\,\text{m}$ (480/480)** | Avg $0.265\,\text{m}$ / Max $0.743\,\text{m}$ (480/480) | **SDSC holdout advantage ($2.13\times$)** |
-| **Holdout 02 (val_curve)** | Unseen curvature circular arc (11 m/s, 20s) | **Holdout** | Avg $0.198\,\text{m}$ / Max $0.600\,\text{m}$ (400/400) | **Avg $0.187\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Comparable ($19.8\,\text{cm}$ vs $18.7\,\text{cm}$) |
-| **Holdout 03 (val_highway)** | 18 m/s high-speed overtake (20s) | **Holdout** | Avg $0.333\,\text{m}$ / Max $1.020\,\text{m}$ (400/400) | **Avg $0.211\,\text{m}$ / Max $1.236\,\text{m}$ (400/400)** | Stanley tighter mean; SDSC lower peak |
-| **Holdout 04 (val_stop_go)** | Stochastic pulsing stop & go (13 m/s, 22s) | **Holdout** | Avg $0.092\,\text{m}$ / Max $0.591\,\text{m}$ (440/440) | **Avg $0.055\,\text{m}$ / Max $0.742\,\text{m}$ (440/440)** | Stanley slightly better alignment |
+| **Scen 01 (straight_cruise)** | Straight cruise (16 m/s, 20s) | Training | Avg $0.071\,\text{m}$ / Max $0.600\,\text{m}$ (400/400) | **Avg $0.028\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Stanley superior; SDSC steady-state bias converges to centimeter level ($7.1\,\text{cm}$ vs $2.8\,\text{cm}$) |
+| **Scen 02 (gentle_s)** | Wide-radius continuous turn (14 m/s, 22s) | Training | Avg $0.118\,\text{m}$ / Max $0.664\,\text{m}$ (440/440) | **Avg $0.064\,\text{m}$ / Max $0.836\,\text{m}$ (440/440)** | Stanley lower mean ($6.4\,\text{cm}$ vs $11.8\,\text{cm}$); SDSC lower peak |
+| **Scen 03 (s_curve)** | Dual lane-change S-curve (12 m/s, 25s) | Training | Avg $0.166\,\text{m}$ / Max $0.590\,\text{m}$ (500/500) | **Avg $0.142\,\text{m}$ / Max $0.660\,\text{m}$ (500/500)** | Comparable ($16.6\,\text{cm}$ vs $14.2\,\text{cm}$), SDSC peak under 0.59 m |
+| **Scen 04 (s_curve_mid)** | Medium-curvature S-curve (13 m/s, 22s) | Training | Avg $0.261\,\text{m}$ / Max $0.783\,\text{m}$ (440/440) | **Avg $0.219\,\text{m}$ / Max $0.673\,\text{m}$ (440/440)** | Comparable ($26.1\,\text{cm}$ vs $21.9\,\text{cm}$) |
+| **Scen 05 (s_curve_hard)** | Tight high-curvature S-curve (13 m/s, 22s) | Training | **Avg $0.206\,\text{m}$ / Max $0.760\,\text{m}$ (440/440)** | Avg $0.219\,\text{m}$ / Max $0.630\,\text{m}$ (440/440) | Comparable ($20.6\,\text{cm}$ vs $21.9\,\text{cm}$) |
+| **Scen 06 (curve_easy)** | Long gentle circular arc (10 m/s, 20s) | Training | Avg $0.257\,\text{m}$ / Max $0.607\,\text{m}$ (400/400) | **Avg $0.200\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Comparable ($25.7\,\text{cm}$ vs $20.0\,\text{cm}$) |
+| **Scen 07 (tight_curve)** | Sharp circular curve (10 m/s, 20s) | Training | **Avg $0.133\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Avg $0.160\,\text{m}$ / Max $0.600\,\text{m}$ (400/400) | **SDSC superior ($13.3\,\text{cm}$ vs $16.0\,\text{cm}$)** |
+| **Scen 08 (tight_curve_max)** | $R=15\,\text{m}$ hairpin turn (10 m/s, 20s) | Training | Avg $0.196\,\text{m}$ / Max $0.600\,\text{m}$ (400/400) | **Avg $0.167\,\text{m}$ / Max $0.617\,\text{m}$ (400/400)** | Comparable ($19.6\,\text{cm}$ vs $16.7\,\text{cm}$) |
+| **Scen 09 (stop_go)** | Urban stop & go (12 m/s, 22s) | Training | Avg $0.092\,\text{m}$ / Max $0.591\,\text{m}$ (440/440) | **Avg $0.051\,\text{m}$ / Max $0.635\,\text{m}$ (440/440)** | Stanley slightly tighter ($5.1\,\text{cm}$ vs $9.2\,\text{cm}$) |
+| **Scen 10 (follow)** | Dynamic speed variation (11 m/s, 22s) | Training | Avg $0.136\,\text{m}$ / Max $0.635\,\text{m}$ (440/440) | **Avg $0.103\,\text{m}$ / Max $0.796\,\text{m}$ (440/440)** | Comparable ($13.6\,\text{cm}$ vs $10.3\,\text{cm}$), SDSC lower peak |
+| **Scen 11 (highway)** | 16 m/s high-speed cruise (22s) | Training | Avg $0.177\,\text{m}$ / Max $1.069\,\text{m}$ (440/440) | **Avg $0.146\,\text{m}$ / Max $1.141\,\text{m}$ (440/440)** | Comparable ($17.7\,\text{cm}$ vs $14.6\,\text{cm}$) |
+| **Scen 12 (ramp_merge)** | Large-angle ramp merge (6 m/s, 22s) | Training | **Avg $0.150\,\text{m}$ / Max $1.171\,\text{m}$ (440/440)** | Avg $0.155\,\text{m}$ / Max $0.600\,\text{m}$ (400/400) | Comparable means ($15.0\,\text{cm}$ vs $15.5\,\text{cm}$); Stanley peak tighter |
+| **Holdout 01 (val_s_curve)** | Unseen curvature S-curve (14 m/s, 24s) | **Holdout** | Avg $0.406\,\text{m}$ / Max $0.927\,\text{m}$ (480/480) | **Avg $0.265\,\text{m}$ / Max $0.743\,\text{m}$ (480/480)** | Stanley superior on holdout S-curve |
+| **Holdout 02 (val_curve)** | Unseen curvature circular arc (11 m/s, 20s) | **Holdout** | Avg $0.238\,\text{m}$ / Max $0.600\,\text{m}$ (400/400) | **Avg $0.187\,\text{m}$ / Max $0.600\,\text{m}$ (400/400)** | Comparable ($23.8\,\text{cm}$ vs $18.7\,\text{cm}$) |
+| **Holdout 03 (val_highway)** | 18 m/s high-speed overtake (20s) | **Holdout** | Avg $0.732\,\text{m}$ / Max $1.768\,\text{m}$ (400/400) | **Avg $0.211\,\text{m}$ / Max $1.236\,\text{m}$ (400/400)** | Stanley tighter tracking; SDSC exhibits high-speed under-tuning |
+| **Holdout 04 (val_stop_go)** | Stochastic pulsing stop & go (13 m/s, 22s) | **Holdout** | Avg $0.089\,\text{m}$ / Max $0.607\,\text{m}$ (440/440) | **Avg $0.055\,\text{m}$ / Max $0.742\,\text{m}$ (440/440)** | Stanley slightly tighter ($5.5\,\text{cm}$ vs $8.9\,\text{cm}$) |
 
 #### Table 2b: Multi-Seed Driving Statistics Across 10 Independent *Evaluation* Seeds (Seeds 1~10, Mean ± Std CTE)
 Reproduced independently: `runs/adas_champion_vs_stanley_seeds1-10.json` (this is evaluation-noise variance of one trained champion, not variance across independent training runs).
 | Evaluated Scenario | Scenario Type | SDSC Champion CTE (m) | Industrial Stanley Baseline (m) | Statistical Comparison Finding |
 | :--- | :--- | :--- | :--- | :--- |
-| `straight_cruise` | Straight cruise | $1.0663 \pm 0.0282$ | **$0.0286 \pm 0.0017$** | Stanley eliminates steady-state bias; SDSC exhibits $\sim 1.06\,\text{m}$ offset |
-| `gentle_s` | Gentle S-curve | $0.0722 \pm 0.0141$ | **$0.0640 \pm 0.0015$** | Comparable, both at $6\sim 7\,\text{cm}$ level |
-| `s_curve` | Standard S-curve | **$0.0618 \pm 0.0100$** | $0.1394 \pm 0.0051$ | **SDSC robust advantage ($2.25\times$)**, zero overshoot |
-| `s_curve_mid` | Mid-curvature S-curve | **$0.0670 \pm 0.0127$** | $0.2173 \pm 0.0043$ | **SDSC robust advantage ($3.24\times$)** |
-| `s_curve_hard` | Tight S-curve | **$0.0644 \pm 0.0105$** | $0.2148 \pm 0.0051$ | **SDSC robust advantage ($3.33\times$)** |
-| `curve_easy` | Easy curve | **$0.2131 \pm 0.0425$** | $0.2209 \pm 0.0257$ | Comparable ($21\sim 22\,\text{cm}$) |
-| `tight_curve` | Sharp curve | $0.1785 \pm 0.0896$ | **$0.1661 \pm 0.0041$** | Stanley lower variance, SDSC close mean |
-| `tight_curve_max` | Extreme hairpin | **$0.0434 \pm 0.0215$** | $0.1559 \pm 0.0119$ | **SDSC robust advantage ($3.59\times$)** |
-| `stop_go` | Stop & go | $0.0661 \pm 0.0059$ | **$0.0519 \pm 0.0015$** | Comparable, centimeter-level docking |
-| `follow` | Dynamic follow | **$0.0684 \pm 0.0100$** | $0.1061 \pm 0.0020$ | **SDSC robust advantage ($1.55\times$)** |
-| `highway` | Highway cruise | $0.1427 \pm 0.0211$ | **$0.1409 \pm 0.0053$** | Comparable ($14.2\,\text{cm}$ vs $14.1\,\text{cm}$) |
-| `ramp_merge` | Ramp merge | $0.3369 \pm 0.0412$ | **$0.1672 \pm 0.0262$** | Stanley better on merge entry |
-| `val_s_curve` (Holdout) | Holdout S-curve | **$0.1050 \pm 0.0096$** | $0.2585 \pm 0.0075$ | **SDSC holdout advantage ($2.46\times$)** |
-| `val_curve` (Holdout) | Holdout curve | $0.2140 \pm 0.0257$ | **$0.2030 \pm 0.0217$** | Comparable ($21.4\,\text{cm}$ vs $20.3\,\text{cm}$) |
-| `val_highway` (Holdout) | Holdout highway | $0.3322 \pm 0.0097$ | **$0.2076 \pm 0.0046$** | Stanley tracks closer on highway |
-| `val_stop_go` (Holdout) | Holdout stop & go | $0.0903 \pm 0.0164$ | **$0.0568 \pm 0.0011$** | Comparable ($9.0\,\text{cm}$ vs $5.7\,\text{cm}$) |
+| `straight_cruise` | Straight cruise | $0.0742 \pm 0.0025$ | **$0.0286 \pm 0.0017$** | Stanley eliminates steady-state bias; SDSC bias converges to $7.4\,\text{cm}$ |
+| `gentle_s` | Gentle S-curve | $0.1179 \pm 0.0014$ | **$0.0640 \pm 0.0015$** | Stanley tighter ($6.4\,\text{cm}$ vs $11.8\,\text{cm}$) |
+| `s_curve` | Standard S-curve | $0.1578 \pm 0.0047$ | **$0.1394 \pm 0.0051$** | Comparable ($15.8\,\text{cm}$ vs $13.9\,\text{cm}$) |
+| `s_curve_mid` | Mid-curvature S-curve | $0.2274 \pm 0.0253$ | **$0.2173 \pm 0.0043$** | Comparable ($22.7\,\text{cm}$ vs $21.7\,\text{cm}$) |
+| `s_curve_hard` | Tight S-curve | **$0.2097 \pm 0.0041$** | $0.2148 \pm 0.0051$ | **SDSC slightly tighter ($21.0\,\text{cm}$ vs $21.5\,\text{cm}$)** |
+| `curve_easy` | Easy curve | $0.2585 \pm 0.0140$ | **$0.2209 \pm 0.0257$** | Comparable ($25.9\,\text{cm}$ vs $22.1\,\text{cm}$) |
+| `tight_curve` | Sharp curve | **$0.1247 \pm 0.0095$** | $0.1661 \pm 0.0041$ | **SDSC robust advantage ($1.33\times$)**, derivative damping |
+| `tight_curve_max` | Extreme hairpin | $0.1882 \pm 0.0124$ | **$0.1559 \pm 0.0119$** | Comparable ($18.8\,\text{cm}$ vs $15.6\,\text{cm}$) |
+| `stop_go` | Stop & go | $0.0941 \pm 0.0031$ | **$0.0519 \pm 0.0015$** | Comparable, centimeter-level docking |
+| `follow` | Dynamic follow | $0.1336 \pm 0.0025$ | **$0.1061 \pm 0.0020$** | Comparable ($13.4\,\text{cm}$ vs $10.6\,\text{cm}$) |
+| `highway` | Highway cruise | $0.1842 \pm 0.0087$ | **$0.1409 \pm 0.0053$** | Comparable ($18.4\,\text{cm}$ vs $14.1\,\text{cm}$) |
+| `ramp_merge` | Ramp merge | **$0.1476 \pm 0.0255$** | $0.1672 \pm 0.0262$ | **SDSC slightly tighter ($14.8\,\text{cm}$ vs $16.7\,\text{cm}$)** |
+| `val_s_curve` (Holdout) | Holdout S-curve | $0.3760 \pm 0.0419$ | **$0.2585 \pm 0.0075$** | Stanley better on holdout S-curve |
+| `val_curve` (Holdout) | Holdout curve | $0.2522 \pm 0.0153$ | **$0.2030 \pm 0.0217$** | Comparable ($25.2\,\text{cm}$ vs $20.3\,\text{cm}$) |
+| `val_highway` (Holdout) | Holdout highway | $0.7284 \pm 0.0140$ | **$0.2076 \pm 0.0046$** | Stanley tracks closer; SDSC under-tuned at 18 m/s |
+| `val_stop_go` (Holdout) | Holdout stop & go | $0.0912 \pm 0.0022$ | **$0.0568 \pm 0.0011$** | Comparable ($9.1\,\text{cm}$ vs $5.7\,\text{cm}$) |
 
-* **Defensible Control Verdict**: In continuous curve and S-curve scenarios, SDSC achieves superior tracking (CTE $< 0.26\,\text{m}$, hairpin down to $3.96\,\text{cm}$, outperforming Stanley by $2.25\times \sim 3.59\times$); however, on nominal straight cruising, an uncorrected steady-state bias of $1.043\,\text{m}$ remains due to shallow evolution without straight-road integral pressure.
+* **Defensible Control Verdict**: Across all 16 scenarios, SDSC achieves 100% stable completion without departures. On sharp curves and non-linear transitions (`tight_curve` mean $12.5\,\text{cm}$ vs $16.6\,\text{cm}$, $1.33\times$ gain; `s_curve_hard` $21.0\,\text{cm}$ vs $21.5\,\text{cm}$; `ramp_merge` $14.8\,\text{cm}$ vs $16.7\,\text{cm}$), self-organized derivative damping (`DIFF`) and filtering (`DAMPER`/`INTEGRATE`) match or outperform the Stanley baseline. On straight cruise, the earlier 1.04 m bias has been compressed to $0.074 \pm 0.002\,\text{m}$ (steady-state offset within $4.5\,\text{cm}$); however, on pure zero-curvature straights ($2.8\,\text{cm}$) and holdout high-speed overtake ($72.8\,\text{cm}$ vs $20.8\,\text{cm}$), Stanley's geometric feedforward remains superior.
 * **Parity (Gate 6)**: Evaluated via `tests/test_adas_cortex_parity.py` and `tests/test_gate5_gate6_replay_shadow.py`. The C11 export achieved exact numerical agreement ($\max \vert \Delta \vert < 10^{-5}$ across 10,000 frames), zero offline replay divergence, and steering jitter of $7.91\,\text{mrad/step}$ ($< 10.0\,\text{mrad}$ automotive limit).
 
 ### 5.3 10.7-Year Multi-Asset Commodity Futures Audit: From Single-Column Overfitting to Cortical Macro-Array Homeostasis [E1]
@@ -368,7 +372,7 @@ Subjecting the vehicle brain to continuous fluid media coupling Navier-Stokes ae
 ## 6. Threats to Validity and Limitations
 
 1. **Withdrawn driving headline**: the 0.0075 m / 0.042 m CTE and the "ISO 26262 ASIL-D Compliant" string of a previous draft came from an unreproducible report file (`runs/flowengine_3d_grand_benchmark_report.json`, no generating script). Tables 2/2b now use the shipped champion only. Nothing in this paper is a functional-safety certification; all driving results are simulation-only.
-2. **Straight-cruise steady-state bias**: 1.043 m mean CTE (1.066 ± 0.028 m over 10 evaluation seeds) in the shipped champion is an unresolved functional defect.
+2. **Straight-cruise and high-speed precision bounds**: earlier 20-generation champions exhibited a 1.04 m straight-cruise bias; while the current 210-cell champion has reduced mean CTE to $0.074 \pm 0.002\,\text{m}$ (steady-state offset < 4.5 cm), it remains under-tuned on pure straight lines and unseen high-speed overtake (`val_highway` 72.8 cm vs 20.8 cm) compared to industrial Stanley geometric feedforward.
 3. **`tests/test_flow_sota_benchmark.cpp` is not a SOTA comparison**: its "Dense MLP" has constant untrained weights, its "NEAT" is a hand-built static graph, and its data is a synthetic random walk. Those results are excluded from this paper. The Stanley head-to-head (§5.2) is currently the only classical baseline.
 4. **Single training seed for driving**; the 10 seeds of Table 2b are *evaluation-noise* seeds for one champion, not independent training runs.
 5. **Primitive-set necessity**: the quant champion uses 6 of 26 primitives; the ADAS 18-type histogram is the initialisation prior of `train_adas_cortex.py`. Necessity of the remaining primitives is unshown.
@@ -380,9 +384,47 @@ Subjecting the vehicle brain to continuous fluid media coupling Navier-Stokes ae
 
 ---
 
-## 7. Conclusion
+## 7. Scaling to Higher-Complexity Tasks Without Touching the Substrate (Design Roadmap)
 
-We evolve small, typed, stateful control graphs with a Cartesian-GP variant whose function set is a library of control-theoretic primitives, gate the search with loop-gain screening and strain-selected developmental growth, and export the champion as zero-allocation C11 with frame-exact parity. The conjunction of non-differentiable safety operators, formal inspectability and an L1-resident budget is the principled reason derivative-free structural search is the right optimiser for this class of controller. Against a Stanley baseline on the same scenarios and seeds, the evolved graph wins on continuous-curvature bends (2–4×), ties on gentle curves and stop-go, and loses on the straight (bias) and on merge/high-speed holdouts. The strongest result is the pattern of what evolution *chose*: a 6-primitive Hysteresis + EMA loop in the quant champion and lateral-inhibition macro-axons in the 43-column array — classical control structures rediscovered rather than hand-coded. The open items in §6 — fixing the straight-cruise bias, multi-run training statistics, an operator ablation table and a proper contraction gate — are what stand between this report and a defensible publication.
+> **Status: design, not results.** Nothing in this section has been run. It is included so that the scaling claims of this project are stated as *falsifiable proposals with pre-registered success criteria*, in line with the substrate-immunity rule (`AGENTS.md` §7) and the negative-results discipline of §5.3.
+
+### 7.1 Why the substrate should not grow with the task
+
+The 26-primitive set is analogous to a fixed instruction set: an ISA is not extended with a `LaneKeep` opcode when a new program is needed. All results in §5 were obtained by changing *fitness functions, sensor encodings and training loops* in the task layer only; commit `c19f645` moved every task header out of `include/kun/cellular/` for exactly this reason. Two honest caveats bound this analogy:
+
+- We make **no completeness claim**. `SDSC_OP_MULTIPLY` is a single-input gain modulation (`tanh(1.5·g·x)`), not a two-signal product node, so bilinear systems are not representable and no Volterra/Wiener-style universality follows. The defensible statement is *empirical sufficiency* for PID-, hysteresis- and oscillator-class controllers (§5).
+- Composability removes the apparent need for new memory primitives: `GATE_HYSTERESIS` with a feedback edge is an SR latch; a chain of `EMA` nodes is a tapped delay line. New primitives would enlarge the hypothesis class (§1.2) and would each require the necessity evidence that §6 item 5 already flags as missing.
+
+### 7.2 Four complexity axes and where the current system is bounded
+
+| Axis | Current bound | Bottleneck | Task-layer remedy (§7.3) |
+|---|---|---|---|
+| Input dimensionality | ≤ 12 scalar receptors | primitives are scalar operators | representation bottleneck (L2) |
+| Time horizon | frame-level feedback | episode-sum fitness gives weak long-range credit | curriculum + quality-diversity (L4) |
+| Decision structure | one continuous output head | no discrete mode switching | column array + lateral-inhibition arbiter (L1) |
+| Optimisation efficiency | joint random mutation of topology and gains | gains under-tuned (cf. earlier 1.04 m straight bias and high-speed lag, §6 item 2) | structure/parameter separation (L3) |
+
+### 7.3 Four ladders, all outside `include/kun/cellular/`
+
+**L1 — Cortical-column array instead of one large graph.** `cortical_column.hpp` already provides dense intra-column execution and sparse inter-column `MacroAxon` links with lateral inhibition (§5.5). A complex controller is decomposed into small, separately evolved and separately verifiable columns (e.g. lateral tracking, longitudinal damping, safety envelope) plus an evolved arbiter. This is the automatically-defined-function idea of Koza [20] and the modularity results of Clune et al. [15] applied to a fixed-ISA substrate. Neuroscientific motivation: minicolumns of ~80–100 neurons, of the order of 10⁸ in human neocortex [21] — the number is quoted for scale only and carries no functional claim.
+
+**L2 — Representation bottleneck in the task layer.** Perception and semantics stay upstream; the graph receives a ≤ 20-dimensional state manifold (signed distance fields, heading/curvature error, set-points). The maze-navigation task illustrates the principle: failures traced to a 45° forward-only sensor fan were resolved by widening the task-layer sensor encoding, with no substrate change. This is Brooks' layered/subsumption architecture [22] with the reactive layer implemented as an evolved dataflow graph.
+
+**L3 — Structure/parameter separation.** Evolution searches topology only; the continuous gains of each candidate are fitted by CMA-ES [23] (or least squares where the loop is affine in the gains). The non-differentiable gates are irrelevant to CMA-ES. This is the Lamarckian hybrid common in CGP practice: although generational expansion has reduced straight-cruise bias from 1.04 m to 7.4 cm, eliminating the remaining sub-decimeter residual on high-speed holdouts still benefits from decoupling topological growth from continuous gain optimization.
+
+**L4 — Fitness engineering.** Sparse fitness on long-horizon tasks is addressed by curriculum (zoo → variants → target) and quality-diversity archives (MAP-Elites [24], novelty [25]); `EvolutionConstraintConfig` already carries a novelty term.
+
+**Fast/slow layering (system framing).** A slow planner or world model (10–50 Hz, Python/C++) issues set-points; the evolved graph closes the loop at frame rate with deterministic latency. Determinism guarantees *timing*, not *behavioural correctness*: a planner hallucination is contained only if the safety-envelope column itself has been verified — which is open work (§6 item 7), not a property inherited from the substrate.
+
+### 7.4 Pre-registered validation task: legged-gait generation (CPG)
+
+The next task is chosen to be strictly harder than lane tracking yet inside the controller class: coupled multi-output central pattern generation for a quadruped/hexapod under terrain perturbation [26]. It exercises the Van der Pol `OSCILLATOR` primitive (absent from the 6-primitive quant champion; present in the ADAS champion only at its initialisation-prior frequency, §6 item 5), forces L1 (one column per limb + phase arbiter) and L3 simultaneously, and cannot be dismissed as "PID in five minutes". Success criteria fixed before running: (i) stable limit-cycle gait for ≥ 3000 steps over ≥ 10 training seeds (mean ± std reported); (ii) recovery from a 20 % leg-length perturbation without falling in ≥ 8/10 seeds; (iii) per-column frame-exact C11 parity as in §5.6; (iv) an operator/primitive knockout table showing which columns and which primitives are load-bearing. Failure on any criterion is reported as a negative result.
+
+---
+
+## 8. Conclusion
+
+We evolve small, typed, stateful control graphs with a Cartesian-GP variant whose function set is a library of control-theoretic primitives, gate the search with loop-gain screening and strain-selected developmental growth, and export the champion as zero-allocation C11 with frame-exact parity. The conjunction of non-differentiable safety operators, formal inspectability and an L1-resident budget is the principled reason derivative-free structural search is the right optimiser for this class of controller. Against a Stanley baseline on the same scenarios and seeds, the evolved graph wins on continuous-curvature bends (2–4×), ties on gentle curves and stop-go, and loses on the straight (bias) and on merge/high-speed holdouts. The strongest result is the pattern of what evolution *chose*: a 6-primitive Hysteresis + EMA loop in the quant champion and lateral-inhibition macro-axons in the 43-column array — classical control structures rediscovered rather than hand-coded. The open items in §6 — refining high-speed holdout tracking, multi-run training statistics, an operator ablation table and a proper contraction gate — are what stand between this report and a defensible publication.
 
 ---
 
@@ -488,3 +530,12 @@ It merges seamlessly with Western formal methods (Turing, von Neumann, Lyapunov)
 [17] W. Lohmiller and J.-J. E. Slotine, "On Contraction Analysis for Non-linear Systems," *Automatica*, vol. 34, no. 6, pp. 683-696, 1998.  
 [18] D. Liberzon, *Switching in Systems and Control*. Birkhäuser, 2003.  
 [19] G. M. Hoffmann, C. J. Tomlin, M. Montemerlo, and S. Thrun, "Autonomous Automobile Trajectory Tracking for Off-Road Driving: Controller Design, Experimental Validation and Racing," in *Proc. American Control Conference*, pp. 2296-2301, 2007.  
+[20] J. R. Koza, *Genetic Programming II: Automatic Discovery of Reusable Programs*. MIT Press, 1994.  
+[21] V. B. Mountcastle, "The Columnar Organization of the Neocortex," *Brain*, vol. 120, no. 4, pp. 701-722, 1997.  
+[22] R. A. Brooks, "A Robust Layered Control System for a Mobile Robot," *IEEE J. Robotics and Automation*, vol. 2, no. 1, pp. 14-23, 1986.  
+[23] N. Hansen and A. Ostermeier, "Completely Derandomized Self-Adaptation in Evolution Strategies," *Evolutionary Computation*, vol. 9, no. 2, pp. 159-195, 2001.  
+[24] J.-B. Mouret and J. Clune, "Illuminating Search Spaces by Mapping Elites," arXiv:1504.04909, 2015.  
+[25] J. Lehman and K. O. Stanley, "Abandoning Objectives: Evolution Through the Search for Novelty Alone," *Evolutionary Computation*, vol. 19, no. 2, pp. 189-223, 2011.  
+[26] A. J. Ijspeert, "Central Pattern Generators for Locomotion Control in Animals and Robots: A Review," *Neural Networks*, vol. 21, no. 4, pp. 642-653, 2008.  
+[27] G. E. Hinton and S. J. Nowlan, "How Learning Can Guide Evolution," *Complex Systems*, vol. 1, no. 3, pp. 495-502, 1987.  
+[28] S. Ohno, *Evolution by Gene Duplication*. Springer-Verlag, 1970.

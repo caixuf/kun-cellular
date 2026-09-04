@@ -1,8 +1,8 @@
 {
  "straight_cruise": {
   "split": "train",
-  "champ_mean": 1.0662860382348454,
-  "champ_std": 0.028174804289294968,
+  "champ_mean": 0.07416392038945589,
+  "champ_std": 0.002501525580771718,
   "stanley_mean": 0.028582733511783302,
   "stanley_std": 0.0016739389635898703,
   "seeds": [
@@ -20,8 +20,8 @@
  },
  "gentle_s": {
   "split": "train",
-  "champ_mean": 0.07224509030865725,
-  "champ_std": 0.014055835963102788,
+  "champ_mean": 0.11788869903508366,
+  "champ_std": 0.0013771925425028991,
   "stanley_mean": 0.06404161779106513,
   "stanley_std": 0.0014768873624199036,
   "seeds": [
@@ -39,10 +39,10 @@
  },
  "s_curve": {
   "split": "train",
-  "champ_mean": 0.061820146695744156,
-  "champ_std": 0.009985913106564017,
-  "stanley_mean": 0.13944931021861695,
-  "stanley_std": 0.005054480395950921,
+  "champ_mean": 0.15776087678848133,
+  "champ_std": 0.004729496026825673,
+  "stanley_mean": 0.13944931021861692,
+  "stanley_std": 0.00505448039595092,
   "seeds": [
    1,
    2,
@@ -58,9 +58,9 @@
  },
  "s_curve_mid": {
   "split": "train",
-  "champ_mean": 0.06697989441302807,
-  "champ_std": 0.012748744343609432,
-  "stanley_mean": 0.21725107796439166,
+  "champ_mean": 0.2274301301390195,
+  "champ_std": 0.02529898087338739,
+  "stanley_mean": 0.21725107796439164,
   "stanley_std": 0.0043244155280606,
   "seeds": [
    1,
@@ -77,9 +77,9 @@
  },
  "s_curve_hard": {
   "split": "train",
-  "champ_mean": 0.06436336852883813,
-  "champ_std": 0.010529738440337723,
-  "stanley_mean": 0.2148112343636303,
+  "champ_mean": 0.20968871260297078,
+  "champ_std": 0.004129390066676421,
+  "stanley_mean": 0.21481123436363028,
   "stanley_std": 0.005129730798236938,
   "seeds": [
    1,
@@ -96,9 +96,9 @@
  },
  "curve_easy": {
   "split": "train",
-  "champ_mean": 0.21306117333582533,
-  "champ_std": 0.042545178458134034,
-  "stanley_mean": 0.22086118403174415,
+  "champ_mean": 0.25850711628133966,
+  "champ_std": 0.014007408498128728,
+  "stanley_mean": 0.22086118403174418,
   "stanley_std": 0.02568871498920053,
   "seeds": [
    1,
@@ -115,10 +115,10 @@
  },
  "tight_curve": {
   "split": "train",
-  "champ_mean": 0.17851210067156278,
-  "champ_std": 0.0896044810519958,
+  "champ_mean": 0.12465229806929368,
+  "champ_std": 0.00951828033341551,
   "stanley_mean": 0.16609916897369087,
-  "stanley_std": 0.0041088983109700255,
+  "stanley_std": 0.004108898310970026,
   "seeds": [
    1,
    2,
@@ -134,10 +134,10 @@
  },
  "tight_curve_max": {
   "split": "train",
-  "champ_mean": 0.04337180666697444,
-  "champ_std": 0.021515516606556064,
-  "stanley_mean": 0.15590630783808643,
-  "stanley_std": 0.01194575527289223,
+  "champ_mean": 0.18823583095833035,
+  "champ_std": 0.012391126182032244,
+  "stanley_mean": 0.1559063078380864,
+  "stanley_std": 0.011945755272892229,
   "seeds": [
    1,
    2,
@@ -153,8 +153,8 @@
  },
  "stop_go": {
   "split": "train",
-  "champ_mean": 0.06610152123747037,
-  "champ_std": 0.005894982397203493,
+  "champ_mean": 0.0940744008344575,
+  "champ_std": 0.0030775823297198995,
   "stanley_mean": 0.05185882391412289,
   "stanley_std": 0.0015004322702554408,
   "seeds": [
@@ -172,10 +172,10 @@
  },
  "follow": {
   "split": "train",
-  "champ_mean": 0.06836584960744196,
-  "champ_std": 0.009963970572050476,
+  "champ_mean": 0.1336198699751197,
+  "champ_std": 0.002533928187895309,
   "stanley_mean": 0.1060768283411403,
-  "stanley_std": 0.0019530548648023813,
+  "stanley_std": 0.0019530548648023815,
   "seeds": [
    1,
    2,
@@ -191,9 +191,9 @@
  },
  "highway": {
   "split": "train",
-  "champ_mean": 0.14268083546553983,
-  "champ_std": 0.021094620134609436,
-  "stanley_mean": 0.14087340737948872,
+  "champ_mean": 0.18416833797983914,
+  "champ_std": 0.008714050317954207,
+  "stanley_mean": 0.14087340737948875,
   "stanley_std": 0.005292743606805376,
   "seeds": [
    1,
@@ -210,8 +210,8 @@
  },
  "ramp_merge": {
   "split": "train",
-  "champ_mean": 0.3368779160850514,
-  "champ_std": 0.041202429866293314,
+  "champ_mean": 0.14757514857233195,
+  "champ_std": 0.02552722969819913,
   "stanley_mean": 0.16724171379328692,
   "stanley_std": 0.026163069703243835,
   "seeds": [
@@ -228,11 +228,11 @@
   ]
  },
  "val_s_curve": {
-  "split": "holdout",
-  "champ_mean": 0.10501378439337121,
-  "champ_std": 0.009640291900392606,
-  "stanley_mean": 0.258493336184537,
-  "stanley_std": 0.007469652168462849,
+  "split": "val",
+  "champ_mean": 0.37597742624529523,
+  "champ_std": 0.0419244763123169,
+  "stanley_mean": 0.25849333618453707,
+  "stanley_std": 0.007469652168462848,
   "seeds": [
    1,
    2,
@@ -247,9 +247,9 @@
   ]
  },
  "val_curve": {
-  "split": "holdout",
-  "champ_mean": 0.21397163472816733,
-  "champ_std": 0.025724097228183404,
+  "split": "val",
+  "champ_mean": 0.25217347106182086,
+  "champ_std": 0.01528545278958557,
   "stanley_mean": 0.2029553770762583,
   "stanley_std": 0.021671789849538367,
   "seeds": [
@@ -266,11 +266,11 @@
   ]
  },
  "val_highway": {
-  "split": "holdout",
-  "champ_mean": 0.3321892229475523,
-  "champ_std": 0.009712987481143444,
-  "stanley_mean": 0.2075579332899472,
-  "stanley_std": 0.004569104829217851,
+  "split": "val",
+  "champ_mean": 0.7283934643532382,
+  "champ_std": 0.013971339469973454,
+  "stanley_mean": 0.20755793328994718,
+  "stanley_std": 0.00456910482921785,
   "seeds": [
    1,
    2,
@@ -285,10 +285,10 @@
   ]
  },
  "val_stop_go": {
-  "split": "holdout",
-  "champ_mean": 0.09027247910701174,
-  "champ_std": 0.016390370258388846,
-  "stanley_mean": 0.05675090918242814,
+  "split": "val",
+  "champ_mean": 0.09120681305845904,
+  "champ_std": 0.002243904704160705,
+  "stanley_mean": 0.05675090918242813,
   "stanley_std": 0.0010732962173087889,
   "seeds": [
    1,

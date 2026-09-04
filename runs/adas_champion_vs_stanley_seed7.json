@@ -2,8 +2,8 @@
  {
   "split": "train",
   "scenario": "straight_cruise",
-  "champ_avg": 1.041529904243374,
-  "champ_max": 1.2120837073646011,
+  "champ_avg": 0.07124441345946725,
+  "champ_max": 0.6,
   "champ_steps": 400,
   "champ_total": 400,
   "stanley_avg": 0.028238426218879734,
@@ -14,8 +14,8 @@
  {
   "split": "train",
   "scenario": "gentle_s",
-  "champ_avg": 0.06898041377851372,
-  "champ_max": 0.5900958076875277,
+  "champ_avg": 0.1178736480157405,
+  "champ_max": 0.6638257003258791,
   "champ_steps": 440,
   "champ_total": 440,
   "stanley_avg": 0.06439472048566836,
@@ -26,7 +26,7 @@
  {
   "split": "train",
   "scenario": "s_curve",
-  "champ_avg": 0.08130070357676117,
+  "champ_avg": 0.1661654266217559,
   "champ_max": 0.5899494636287448,
   "champ_steps": 500,
   "champ_total": 500,
@@ -38,8 +38,8 @@
  {
   "split": "train",
   "scenario": "s_curve_mid",
-  "champ_avg": 0.061780066973933616,
-  "champ_max": 0.588348405414552,
+  "champ_avg": 0.26116429859812523,
+  "champ_max": 0.7825397955371401,
   "champ_steps": 440,
   "champ_total": 440,
   "stanley_avg": 0.2187230812430092,
@@ -50,8 +50,8 @@
  {
   "split": "train",
   "scenario": "s_curve_hard",
-  "champ_avg": 0.07213756218252282,
-  "champ_max": 0.588348405414552,
+  "champ_avg": 0.20573169246421721,
+  "champ_max": 0.7599694912685049,
   "champ_steps": 440,
   "champ_total": 440,
   "stanley_avg": 0.21919357216747487,
@@ -62,8 +62,8 @@
  {
   "split": "train",
   "scenario": "curve_easy",
-  "champ_avg": 0.18448415155283762,
-  "champ_max": 0.6,
+  "champ_avg": 0.25717356195633245,
+  "champ_max": 0.6065258940059147,
   "champ_steps": 400,
   "champ_total": 400,
   "stanley_avg": 0.20037745074530985,
@@ -74,7 +74,7 @@
  {
   "split": "train",
   "scenario": "tight_curve",
-  "champ_avg": 0.04367266153544943,
+  "champ_avg": 0.13264470848702928,
   "champ_max": 0.6,
   "champ_steps": 400,
   "champ_total": 400,
@@ -86,7 +86,7 @@
  {
   "split": "train",
   "scenario": "tight_curve_max",
-  "champ_avg": 0.05377545368686044,
+  "champ_avg": 0.19629317849297442,
   "champ_max": 0.6,
   "champ_steps": 400,
   "champ_total": 400,
@@ -98,7 +98,7 @@
  {
   "split": "train",
   "scenario": "stop_go",
-  "champ_avg": 0.06025037102318416,
+  "champ_avg": 0.0924502529175023,
   "champ_max": 0.5912691007933508,
   "champ_steps": 440,
   "champ_total": 440,
@@ -110,8 +110,8 @@
  {
   "split": "train",
   "scenario": "follow",
-  "champ_avg": 0.06987318262410298,
-  "champ_max": 0.5884171382364647,
+  "champ_avg": 0.13576888213127983,
+  "champ_max": 0.6348139719604063,
   "champ_steps": 440,
   "champ_total": 440,
   "stanley_avg": 0.1030326818264678,
@@ -122,8 +122,8 @@
  {
   "split": "train",
   "scenario": "highway",
-  "champ_avg": 0.13244871816954662,
-  "champ_max": 0.7644414764202071,
+  "champ_avg": 0.1769465023632652,
+  "champ_max": 1.0690710879883545,
   "champ_steps": 440,
   "champ_total": 440,
   "stanley_avg": 0.1460433829967753,
@@ -134,8 +134,8 @@
  {
   "split": "train",
   "scenario": "ramp_merge",
-  "champ_avg": 0.3494869957429215,
-  "champ_max": 0.7082583968874874,
+  "champ_avg": 0.15020133833655244,
+  "champ_max": 1.1708690194617626,
   "champ_steps": 440,
   "champ_total": 440,
   "stanley_avg": 0.15493622693853812,
@@ -144,10 +144,10 @@
   "stanley_total": 440
  },
  {
-  "split": "holdout",
+  "split": "val",
   "scenario": "val_s_curve",
-  "champ_avg": 0.12398444335298923,
-  "champ_max": 0.7053176440664136,
+  "champ_avg": 0.4058140353070375,
+  "champ_max": 0.927256244295921,
   "champ_steps": 480,
   "champ_total": 480,
   "stanley_avg": 0.2646495120162226,
@@ -156,9 +156,9 @@
   "stanley_total": 480
  },
  {
-  "split": "holdout",
+  "split": "val",
   "scenario": "val_curve",
-  "champ_avg": 0.19757586356242474,
+  "champ_avg": 0.23827687193831715,
   "champ_max": 0.6,
   "champ_steps": 400,
   "champ_total": 400,
@@ -168,10 +168,10 @@
   "stanley_total": 400
  },
  {
-  "split": "holdout",
+  "split": "val",
   "scenario": "val_highway",
-  "champ_avg": 0.3331372082489854,
-  "champ_max": 1.0200196143580238,
+  "champ_avg": 0.7324853806857581,
+  "champ_max": 1.7679238932429417,
   "champ_steps": 400,
   "champ_total": 400,
   "stanley_avg": 0.21106464063431862,
@@ -180,10 +180,10 @@
   "stanley_total": 400
  },
  {
-  "split": "holdout",
+  "split": "val",
   "scenario": "val_stop_go",
-  "champ_avg": 0.09170005386823654,
-  "champ_max": 0.5911885398574672,
+  "champ_avg": 0.0888776773147405,
+  "champ_max": 0.6069412096210057,
   "champ_steps": 440,
   "champ_total": 440,
   "stanley_avg": 0.055300169250158675,
