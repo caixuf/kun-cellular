@@ -101,7 +101,7 @@ int main() {
                 champion.cells.size(), champion.synapses.size(),
                 TaskEvaluator::compute_topology_hash(champion).c_str());
 
-    champion.save_checkpoint_json("checkpoints/cartpole_balance_champion.json");
+    champion.save_checkpoint_bin("checkpoints/cartpole_balance_champion.bin");
     std::ofstream rf("checkpoints/cartpole_balance_report.json");
     rf << report.to_json();
     rf.close();

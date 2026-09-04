@@ -480,8 +480,8 @@ int main() {
     std::cout << "  ↳ [OOS 盲测] " << all_assets.size() << " 品种组合样本外换手调仓: " << test_task.total_trades() << " 次\n";
     std::cout << "  ↳ 初始资金: 1,000,000.00 元 -> 期末实现现金: " << std::setprecision(2) << test_task.final_capital() << " 元\n";
 
-    std::string out_path = "checkpoints/quant_master_champion.json";
-    bool saved = global_champion.save_checkpoint_json(out_path);
+    std::string out_path = "checkpoints/quant_master_champion.bin";
+    bool saved = global_champion.save_checkpoint_bin(out_path);
     {
         std::ofstream report("checkpoints/quant_master_report.json");
         if (report.is_open()) {

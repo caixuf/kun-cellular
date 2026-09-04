@@ -342,8 +342,8 @@ int main() {
               << TaskEvaluator::compute_topology_hash(global_champion) << "\n";
 
     // 存盘规范化检查点
-    std::string out_path = "checkpoints/quant_futures_champion.json";
-    bool saved = global_champion.save_checkpoint_json(out_path);
+    std::string out_path = "checkpoints/quant_futures_champion.bin";
+    bool saved = global_champion.save_checkpoint_bin(out_path);
     if (saved) {
         std::cout << "  [SUCCESS] 真实原生量化生命体已成功存盘: " << out_path << "\n";
     }

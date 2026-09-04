@@ -313,6 +313,125 @@ public:
         return true;
     }
 
+    bool save_checkpoint_bin(const std::string& filepath) const {
+        if (columns_.empty()) return false;
+        std::ofstream ofs(filepath, std::ios::binary);
+        if (!ofs.is_open()) return false;
+
+        uint32_t total_c = total_cells();
+        uint32_t total_s = total_synapses();
+
+        uint64_t header_sz = 72;
+        uint64_t cells_off = header_sz;
+        uint64_t cells_sz = total_c * 4;
+        uint64_t row_ptr_off = cells_off + cells_sz;
+        uint64_t row_ptr_sz = (total_c + 1) * 4;
+        uint64_t col_idx_off = row_ptr_off + row_ptr_sz;
+        uint64_t col_idx_sz = total_s * 4;
+        uint64_t weights_off = col_idx_off + col_idx_sz;
+        uint64_t weights_sz = total_s * 4;
+        uint64_t coords_off = weights_off + weights_sz;
+
+        struct SDSC_BIN_HDR {
+            uint32_t magic{0x53445343};
+            uint32_t version{2};
+            uint32_t n_cells{0};
+            uint32_t n_syns{0};
+            uint32_t in_d{0};
+            uint32_t out_d{0};
+            uint64_t c_off{0};
+            uint64_t rp_off{0};
+            uint64_t ci_off{0};
+            uint64_t w_off{0};
+            uint64_t coords_off{0};
+            uint64_t extra{0};
+        } hdr;
+        hdr.n_cells = total_c;
+        hdr.n_syns = total_s;
+        hdr.in_d = global_in_dim_;
+        hdr.out_d = global_out_dim_;
+        hdr.c_off = cells_off;
+        hdr.rp_off = row_ptr_off;
+        hdr.ci_off = col_idx_off;
+        hdr.w_off = weights_off;
+        hdr.coords_off = coords_off;
+
+        ofs.write(reinterpret_cast<const char*>(&hdr), sizeof(hdr));
+
+        for (const auto& col : columns_) {
+            for (size_t i = 0; i < col.genome.op_types.size(); ++i) {
+                uint8_t op = col.genome.op_types[i];
+                float p1 = (i < col.genome.gains.size()) ? col.genome.gains[i] : 1.0f;
+                uint8_t p1_u8 = static_cast<uint8_t>(std::clamp(p1 * 64.0f, 0.0f, 255.0f));
+                uint8_t p2_u8 = 0;
+                uint8_t flags = 0;
+                if (op <= 3 || op == 26) flags |= 0x01;
+                if (op >= 21 && op <= 23) flags |= 0x02;
+                ofs.write(reinterpret_cast<const char*>(&op), 1);
+                ofs.write(reinterpret_cast<const char*>(&p1_u8), 1);
+                ofs.write(reinterpret_cast<const char*>(&p2_u8), 1);
+                ofs.write(reinterpret_cast<const char*>(&flags), 1);
+            }
+        }
+
+        std::vector<std::vector<std::pair<uint32_t, float>>> adj(total_c);
+        for (size_t c = 0; c < columns_.size(); ++c) {
+            const auto& col = columns_[c];
+            for (size_t i = 0; i < col.genome.op_types.size(); ++i) {
+                uint32_t dst_global = static_cast<uint32_t>(c * cells_per_column_ + i);
+                size_t start = col.genome.inc_off[i];
+                size_t end = col.genome.inc_off[i + 1];
+                for (size_t s = start; s < end; ++s) {
+                    uint32_t src_local = col.genome.inc_from[s];
+                    float w = col.genome.inc_weight[s];
+                    uint32_t src_global = static_cast<uint32_t>(c * cells_per_column_ + src_local);
+                    adj[src_global].push_back({dst_global, w});
+                }
+            }
+        }
+        for (const auto& ax : macro_axons_) {
+            uint32_t src_global = ax.src_column_idx * cells_per_column_ + ax.src_cell_idx;
+            uint32_t dst_global = ax.dst_column_idx * cells_per_column_ + ax.dst_cell_idx;
+            adj[src_global].push_back({dst_global, ax.weight});
+        }
+
+        std::vector<uint32_t> row_ptr(total_c + 1, 0);
+        std::vector<uint32_t> col_idx;
+        std::vector<float> weights;
+        col_idx.reserve(total_s);
+        weights.reserve(total_s);
+
+        uint32_t curr = 0;
+        for (uint32_t i = 0; i < total_c; ++i) {
+            row_ptr[i] = curr;
+            for (const auto& edge : adj[i]) {
+                col_idx.push_back(edge.first);
+                weights.push_back(edge.second);
+                curr++;
+            }
+        }
+        row_ptr[total_c] = curr;
+
+        ofs.write(reinterpret_cast<const char*>(row_ptr.data()), row_ptr.size() * sizeof(uint32_t));
+        if (!col_idx.empty()) {
+            ofs.write(reinterpret_cast<const char*>(col_idx.data()), col_idx.size() * sizeof(uint32_t));
+            ofs.write(reinterpret_cast<const char*>(weights.data()), weights.size() * sizeof(float));
+        }
+
+        std::vector<float> coords(total_c * 3, 0.0f);
+        for (size_t c = 0; c < columns_.size(); ++c) {
+            for (uint32_t i = 0; i < cells_per_column_; ++i) {
+                size_t g_idx = c * cells_per_column_ + i;
+                coords[g_idx * 3 + 0] = static_cast<float>(c * 2.0);
+                coords[g_idx * 3 + 1] = static_cast<float>(i % 6);
+                coords[g_idx * 3 + 2] = static_cast<float>(i / 6);
+            }
+        }
+        ofs.write(reinterpret_cast<const char*>(coords.data()), coords.size() * sizeof(float));
+
+        return true;
+    }
+
     std::vector<CorticalMicroColumn>& columns() { return columns_; }
     const std::vector<CorticalMicroColumn>& columns() const { return columns_; }
     std::vector<MacroAxon>& macro_axons() { return macro_axons_; }

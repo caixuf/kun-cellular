@@ -43,6 +43,57 @@ DEFAULT_TARGETS = [
 ]
 
 
+def load_cortex_from_bin(bin_path):
+    import struct
+    with open(bin_path, "rb") as f:
+        hdr = f.read(72)
+        magic, ver, nc, ns, in_d, out_d, c_off, rp_off, ci_off, w_off, coords_off, extra = struct.unpack("<IIIIIIQQQQQQ", hdr)
+        f.seek(coords_off + nc * 12)
+        meta_str = f.read().decode("utf-8", errors="ignore")
+        meta = json.loads(meta_str) if meta_str else {}
+        
+        if "organ" in meta:
+            return {
+                "organ": meta["organ"],
+                "metrics": meta.get("metrics", {})
+            }
+
+        f.seek(rp_off)
+        row_ptr = struct.unpack(f"<{nc+1}I", f.read((nc+1)*4))
+        f.seek(ci_off)
+        col_idx = struct.unpack(f"<{ns}I", f.read(ns*4))
+        f.seek(w_off)
+        weights = struct.unpack(f"<{ns}f", f.read(ns*4))
+        
+        synapses = []
+        for u in range(nc):
+            start = row_ptr[u]
+            end = row_ptr[u+1]
+            for s in range(start, end):
+                v = col_idx[s]
+                w = weights[s]
+                synapses.append((u, v, w))
+                
+        cells_meta = meta.get("cells_meta", [])
+        cell_types = [c["type"] for c in cells_meta]
+        gains = [c["gain"] for c in cells_meta]
+        
+        n_rec = len(RECEPTOR_TYPES)
+        n_mot = len(MOTOR_TYPES)
+        hidden_types = cell_types[n_rec:nc-n_mot] if len(cell_types) >= n_rec + n_mot else []
+        
+        return {
+            "organ": {
+                "n_hidden": len(hidden_types),
+                "hidden_types": hidden_types,
+                "cell_gains": gains,
+                "synapses": synapses
+            },
+            "metrics": meta.get("metrics", {})
+        }
+
+
+
 def fmt_f(x):
     """生成合法 C 浮点字面量。%g 对整值输出 "-1"，直接加 f 后缀会变成非法的
     整数常量后缀（error: invalid suffix "f" on integer constant），必须补小数点。"""
@@ -348,12 +399,15 @@ def main():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     ap = argparse.ArgumentParser(description="SDSC ADAS Cortex C11 导出器")
     ap.add_argument("--checkpoint",
-                    default=os.path.join(root, "checkpoints", "adas_cortex_champion.json"))
+                    default=os.path.join(root, "checkpoints", "adas_cortex_champion.bin"))
     ap.add_argument("--targets", nargs="*", default=None)
     args = ap.parse_args()
 
-    with open(args.checkpoint, "r", encoding="utf-8") as f:
-        ck = json.load(f)
+    if args.checkpoint.endswith(".bin"):
+        ck = load_cortex_from_bin(args.checkpoint)
+    else:
+        with open(args.checkpoint, "r", encoding="utf-8") as f:
+            ck = json.load(f)
 
     header = build_header(ck)
     targets = args.targets if args.targets is not None else DEFAULT_TARGETS

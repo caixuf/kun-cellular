@@ -592,8 +592,8 @@ int main() {
     std::cout << "  ↳ [OOS 盲测] L2 皮层阵列样本外换手调仓: " << test_task.total_trades() << " 次\n";
     std::cout << "  ↳ 初始资金: 1,000,000.00 元 -> 期末实现现金: " << std::setprecision(2) << test_task.final_capital() << " 元\n";
 
-    std::string out_path = "checkpoints/quant_cortical_array_champion.json";
-    bool saved = global_champion.save_checkpoint_json(out_path);
+    std::string out_path = "checkpoints/quant_cortical_array_champion.bin";
+    bool saved = global_champion.save_checkpoint_bin(out_path);
     if (saved) {
         std::cout << "\n  [SUCCESS] 1,032 细胞 L2 全息皮层微柱阵列已入库: " << out_path << "\n";
     }

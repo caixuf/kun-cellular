@@ -20,10 +20,10 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 from train_adas_cortex import AdasCortexOrgan, SDSC_PRIMITIVES  # noqa: E402
-from export_sdsc_cortex import build_header  # noqa: E402
+from export_sdsc_cortex import build_header, load_cortex_from_bin  # noqa: E402
 
 HEADER = os.path.join(ROOT, "include", "kun", "cellular", "sdsc_cortex.h")
-CHECKPOINT = os.path.join(ROOT, "checkpoints", "adas_cortex_champion.json")
+CHECKPOINT = os.path.join(ROOT, "checkpoints", "adas_cortex_champion.bin")
 N_FRAMES = 400
 TOL = 1e-5
 
@@ -109,8 +109,11 @@ def verify_parity(organ, header_content, test_name):
 
 
 def test_checkpoint_parity():
-    with open(CHECKPOINT, "r", encoding="utf-8") as f:
-        ck = json.load(f)
+    if CHECKPOINT.endswith(".bin"):
+        ck = load_cortex_from_bin(CHECKPOINT)
+    else:
+        with open(CHECKPOINT, "r", encoding="utf-8") as f:
+            ck = json.load(f)
     organ = AdasCortexOrgan.deserialize(ck["organ"])
     with open(HEADER, "r", encoding="utf-8") as f:
         hdr = f.read()

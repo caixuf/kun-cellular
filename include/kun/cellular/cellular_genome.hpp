@@ -2102,6 +2102,155 @@ public:
         return true;
     }
 
+    static uint8_t cell_type_to_sdsc_opcode(CellType t) {
+        switch (t) {
+            case CellType::SENSE_RAW_INPUT_0: return 0;
+            case CellType::SENSE_RAW_INPUT_1: return 1;
+            case CellType::SENSE_RAW_INPUT_2: return 2;
+            case CellType::SENSE_RAW_INPUT_3: return 3;
+            case CellType::SENSE_CHANNEL:     return 0;
+            case CellType::OP_EMA:            return 8;
+            case CellType::OP_DIFF:           return 12;
+            case CellType::OP_INTEGRAL:       return 5;
+            case CellType::OP_SUM:            return 4;
+            case CellType::OP_SUB:            return 13;
+            case CellType::OP_MULTIPLY:       return 11;
+            case CellType::OP_RATIO:          return 14;
+            case CellType::OP_ABS:            return 10;
+            case CellType::OP_DELAY_N:        return 8;
+            case CellType::OP_OSCILLATOR:     return 25;
+            case CellType::OP_QUADRATIC:      return 4;
+            case CellType::GATE_THRESHOLD:    return 15;
+            case CellType::GATE_HYSTERESIS:   return 16;
+            case CellType::GATE_AND:          return 19;
+            case CellType::GATE_INHIBIT:      return 18;
+            case CellType::GATE_DEADZONE:     return 17;
+            case CellType::GATE_MIN_MAX:      return 20;
+            case CellType::ACT_PRIMARY_POSITIVE: return 21;
+            case CellType::ACT_PRIMARY_NEGATIVE: return 22;
+            case CellType::ACT_DEFENSIVE_RESET:  return 23;
+            case CellType::ACT_IMMUNE_BLOCK:     return 23;
+            case CellType::ACT_CHANNEL:          return 21;
+            case CellType::PREDICT_SENSE_0:      return 0;
+            case CellType::PREDICT_SENSE_1:      return 1;
+            case CellType::ASSOCIATION_HUB:      return 24;
+            default: return 4;
+        }
+    }
+
+    bool save_checkpoint_bin(const std::string& filepath) const {
+        if (cells.empty()) return false;
+        std::ofstream ofs(filepath, std::ios::binary);
+        if (!ofs.is_open()) return false;
+
+        uint32_t num_cells = static_cast<uint32_t>(cells.size());
+        std::unordered_map<uint32_t, uint32_t> id_to_idx;
+        for (uint32_t i = 0; i < num_cells; ++i) {
+            id_to_idx[cells[i].id] = i;
+        }
+
+        std::vector<std::vector<std::pair<uint32_t, float>>> adj(num_cells);
+        uint32_t num_synapses = 0;
+        for (const auto& syn : synapses) {
+            if (!syn.is_active) continue;
+            auto it_u = id_to_idx.find(syn.from_cell_id);
+            auto it_v = id_to_idx.find(syn.to_cell_id);
+            if (it_u != id_to_idx.end() && it_v != id_to_idx.end()) {
+                adj[it_u->second].push_back({it_v->second, static_cast<float>(syn.weight)});
+                num_synapses++;
+            }
+        }
+
+        uint32_t in_dim = 0, out_dim = 0;
+        for (const auto& c : cells) {
+            if (c.type <= CellType::SENSE_CHANNEL || c.type == CellType::PREDICT_SENSE_0 || c.type == CellType::PREDICT_SENSE_1) in_dim++;
+            if (c.type >= CellType::ACT_PRIMARY_POSITIVE && c.type <= CellType::ACT_CHANNEL) out_dim++;
+        }
+
+        uint64_t header_sz = 72;
+        uint64_t cells_off = header_sz;
+        uint64_t cells_sz = num_cells * 4;
+        uint64_t row_ptr_off = cells_off + cells_sz;
+        uint64_t row_ptr_sz = (num_cells + 1) * 4;
+        uint64_t col_idx_off = row_ptr_off + row_ptr_sz;
+        uint64_t col_idx_sz = num_synapses * 4;
+        uint64_t weights_off = col_idx_off + col_idx_sz;
+        uint64_t weights_sz = num_synapses * 4;
+        uint64_t coords_off = weights_off + weights_sz;
+
+        struct SDSC_BIN_HDR {
+            uint32_t magic{0x53445343};
+            uint32_t version{2};
+            uint32_t n_cells{0};
+            uint32_t n_syns{0};
+            uint32_t in_d{0};
+            uint32_t out_d{0};
+            uint64_t c_off{0};
+            uint64_t rp_off{0};
+            uint64_t ci_off{0};
+            uint64_t w_off{0};
+            uint64_t coords_off{0};
+            uint64_t extra{0};
+        } hdr;
+        hdr.n_cells = num_cells;
+        hdr.n_syns = num_synapses;
+        hdr.in_d = in_dim;
+        hdr.out_d = out_dim;
+        hdr.c_off = cells_off;
+        hdr.rp_off = row_ptr_off;
+        hdr.ci_off = col_idx_off;
+        hdr.w_off = weights_off;
+        hdr.coords_off = coords_off;
+
+        ofs.write(reinterpret_cast<const char*>(&hdr), sizeof(hdr));
+
+        for (const auto& c : cells) {
+            uint8_t op = cell_type_to_sdsc_opcode(c.type);
+            uint8_t p1_u8 = static_cast<uint8_t>(std::clamp(c.param1 * 64.0, 0.0, 255.0));
+            uint8_t p2_u8 = 0;
+            uint8_t flags = 0;
+            if (c.type <= CellType::SENSE_CHANNEL || c.type == CellType::PREDICT_SENSE_0 || c.type == CellType::PREDICT_SENSE_1) flags |= 0x01;
+            if (c.type >= CellType::ACT_PRIMARY_POSITIVE && c.type <= CellType::ACT_CHANNEL) flags |= 0x02;
+            ofs.write(reinterpret_cast<const char*>(&op), 1);
+            ofs.write(reinterpret_cast<const char*>(&p1_u8), 1);
+            ofs.write(reinterpret_cast<const char*>(&p2_u8), 1);
+            ofs.write(reinterpret_cast<const char*>(&flags), 1);
+        }
+
+        std::vector<uint32_t> row_ptr(num_cells + 1, 0);
+        std::vector<uint32_t> col_idx;
+        std::vector<float> weights;
+        col_idx.reserve(num_synapses);
+        weights.reserve(num_synapses);
+
+        uint32_t curr = 0;
+        for (uint32_t i = 0; i < num_cells; ++i) {
+            row_ptr[i] = curr;
+            for (const auto& edge : adj[i]) {
+                col_idx.push_back(edge.first);
+                weights.push_back(edge.second);
+                curr++;
+            }
+        }
+        row_ptr[num_cells] = curr;
+
+        ofs.write(reinterpret_cast<const char*>(row_ptr.data()), row_ptr.size() * sizeof(uint32_t));
+        if (!col_idx.empty()) {
+            ofs.write(reinterpret_cast<const char*>(col_idx.data()), col_idx.size() * sizeof(uint32_t));
+            ofs.write(reinterpret_cast<const char*>(weights.data()), weights.size() * sizeof(float));
+        }
+
+        std::vector<float> coords(num_cells * 3, 0.0f);
+        for (uint32_t i = 0; i < num_cells; ++i) {
+            coords[i * 3 + 0] = static_cast<float>(cells[i].x);
+            coords[i * 3 + 1] = static_cast<float>(cells[i].y);
+            coords[i * 3 + 2] = static_cast<float>(cells[i].z);
+        }
+        ofs.write(reinterpret_cast<const char*>(coords.data()), coords.size() * sizeof(float));
+
+        return true;
+    }
+
     static CellularOrganism load_checkpoint_json(const std::string& filepath) {
         std::ifstream ifs(filepath);
         if (!ifs.is_open()) return CellularOrganism();

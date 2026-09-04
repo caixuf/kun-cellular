@@ -23,18 +23,17 @@ from tools.train_adas_cortex import (
     VAL_SCENARIOS, 
     run_scenario
 )
+from tools.export_sdsc_cortex import load_cortex_from_bin
 
 def run_gate5_pipeline_offline_replay():
     print("\n=======================================================")
     print("  [门禁 5 认证] 生产级管线离线回放测试 (Pipeline Replay)")
     print("=======================================================")
     
-    ckpt_path = os.path.join(WORKSPACE, "checkpoints", "adas_cortex_champion.json")
+    ckpt_path = os.path.join(WORKSPACE, "checkpoints", "adas_cortex_champion.bin")
     assert os.path.exists(ckpt_path), f"必须存在冠军检查点: {ckpt_path}"
     
-    with open(ckpt_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    
+    data = load_cortex_from_bin(ckpt_path)
     organ_dict = data["organ"]
     cortex1 = AdasCortexOrgan.deserialize(organ_dict)
     cortex2 = AdasCortexOrgan.deserialize(organ_dict)
@@ -79,10 +78,8 @@ def run_gate6_shadow_mode_differential_audit():
     print("  [门禁 6 认证] 影子模式全工况差分对账 (Shadow Audit)")
     print("=======================================================")
     
-    ckpt_path = os.path.join(WORKSPACE, "checkpoints", "adas_cortex_champion.json")
-    with open(ckpt_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        
+    ckpt_path = os.path.join(WORKSPACE, "checkpoints", "adas_cortex_champion.bin")
+    data = load_cortex_from_bin(ckpt_path)
     cortex = AdasCortexOrgan.deserialize(data["organ"])
     
     # 在所有 4 个留出验证集上运行影子模式对账，提取每步转向变化平滑度

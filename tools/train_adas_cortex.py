@@ -673,7 +673,7 @@ def main():
 
     random.seed(args.seed)
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    out_path = args.out or os.path.join(root, "checkpoints", "adas_cortex_champion.json")
+    out_path = args.out or os.path.join(root, "checkpoints", "adas_cortex_champion.bin")
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
 
     print("=" * 72)
@@ -757,11 +757,106 @@ def main():
             k: {kk: round(vv, 6) for kk, vv in v.items() if kk != "trace"}
             for k, v in final_detail.items()
         },
-        "organ": best.serialize(),
+        "checkpoint": out_path,
     }
-    with open(out_path, "w", encoding="utf-8") as f:
+
+    # 存盘为统一标准 SDSC-BIN (v2) 格式
+    import struct
+    import numpy as np
+
+    organ_ser = best.serialize()
+    hidden = organ_ser["hidden_types"]
+    gains = organ_ser["cell_gains"]
+    synapses = organ_ser["synapses"]
+
+    n_rec = len(RECEPTOR_TYPES)
+    n_mot = len(MOTOR_TYPES)
+    n_hid = len(hidden)
+    n_cells = n_rec + n_hid + n_mot
+    n_syn = len(synapses)
+
+    meta_dict = {
+        "organism_id": "adas_cortex_champion",
+        "generation": args.generations,
+        "organ": organ_ser,
+        "metrics": {
+            k: {kk: round(vv, 6) for kk, vv in v.items() if kk != "trace"}
+            for k, v in final_detail.items()
+        }
+    }
+    meta_bytes = json.dumps(meta_dict, ensure_ascii=False).encode("utf-8")
+    meta_size = len(meta_bytes)
+
+    adj = [[] for _ in range(n_cells)]
+    for (f, t, w) in synapses:
+        adj[f].append((t, float(w)))
+
+    row_ptr = [0] * (n_cells + 1)
+    col_idx = []
+    weights = []
+    curr = 0
+    for i in range(n_cells):
+        row_ptr[i] = curr
+        for v, w in adj[i]:
+            col_idx.append(v)
+            weights.append(w)
+            curr += 1
+    row_ptr[n_cells] = curr
+
+    header_size = 72
+    cells_size = n_cells * 4
+    row_ptr_size = (n_cells + 1) * 4
+    col_idx_size = n_syn * 4
+    weights_size = n_syn * 4
+    coords_size = n_cells * 3 * 4
+
+    cells_offset = header_size
+    row_ptr_offset = cells_offset + cells_size
+    col_idx_offset = row_ptr_offset + row_ptr_size
+    weights_offset = col_idx_offset + col_idx_size
+    coords_offset = weights_offset + weights_size
+
+    header_bytes = struct.pack(
+        "<IIIIIIQQQQQQ",
+        0x53445343,  # SDSC
+        2,           # Version 2
+        n_cells,
+        n_syn,
+        6,
+        2,
+        cells_offset,
+        row_ptr_offset,
+        col_idx_offset,
+        weights_offset,
+        coords_offset,
+        (args.generations & 0xFFFFFFFF) | ((meta_size & 0xFFFFFFFF) << 32)
+    )
+
+    with open(out_path, "wb") as f:
+        f.write(header_bytes)
+        cell_bytes = bytearray(cells_size)
+        for i in range(n_cells):
+            idx = i * 4
+            cell_bytes[idx] = 4
+            p1 = gains[i] if i < len(gains) else 1.0
+            cell_bytes[idx + 1] = min(255, max(0, int(p1 * 64.0)))
+            cell_bytes[idx + 2] = 0
+            flags = 0
+            if i < n_rec: flags |= 0x01
+            if i >= n_cells - n_mot: flags |= 0x02
+            cell_bytes[idx + 3] = flags
+        f.write(cell_bytes)
+        f.write(np.array(row_ptr, dtype=np.uint32).tobytes())
+        f.write(np.array(col_idx, dtype=np.uint32).tobytes())
+        f.write(np.array(weights, dtype=np.float32).tobytes())
+        f.write(np.zeros((n_cells, 3), dtype=np.float32).tobytes())
+        f.write(meta_bytes)
+
+    report_path = os.path.join(root, "checkpoints", "adas_cortex_report.json")
+    with open(report_path, "w", encoding="utf-8") as f:
         json.dump(payload, f, indent=2)
-    print(f"[检查点已存盘] -> {out_path}")
+    print(f"[二进制检查点已存盘] -> {out_path}")
+    print(f"[门禁评估报告已存盘] -> {report_path}")
     print(f"  细胞数={len(best.cells)} 突触数={len(best.synapses)}")
 
 

@@ -19,5 +19,6 @@ runs/
 checkpoints/sdsc_mega_1million.bin
 *.tmp
 bin/
+checkpoints/*_champion.json
 checkpoints/vehicle_cortex_champion.json
 scratch/

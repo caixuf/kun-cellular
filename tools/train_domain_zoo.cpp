@@ -83,8 +83,8 @@ ZooResult train_one(const std::function<std::unique_ptr<ZooTask>(double ood)>& m
     r.gate = rep.passes_m1_gate;
     r.sec = sec;
 
-    const std::string path = std::string("checkpoints/") + ckpt_id + ".json";
-    champion.save_checkpoint_json(path);
+    const std::string path = std::string("checkpoints/") + ckpt_id + ".bin";
+    champion.save_checkpoint_bin(path);
     return r;
 }
 

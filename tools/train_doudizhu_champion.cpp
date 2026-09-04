@@ -71,8 +71,8 @@ int main() {
               << global_champion.synapses.size() << " 突触, WL 拓扑哈希: " 
               << TaskEvaluator::compute_topology_hash(global_champion) << "\n";
 
-    std::string out_path = "checkpoints/doudizhu_game_champion.json";
-    bool saved = global_champion.save_checkpoint_json(out_path);
+    std::string out_path = "checkpoints/doudizhu_game_champion.bin";
+    bool saved = global_champion.save_checkpoint_bin(out_path);
     if (saved) {
         std::cout << "  [SUCCESS] 真实斗地主生命体已成功存盘至: " << out_path << "\n";
     } else {

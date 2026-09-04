@@ -199,8 +199,8 @@ int main() {
     std::printf("  [实证] 本机 (12核/27GB) 可训练 %zu 细胞无目标生命体, %.2fs/代\n",
                 phase_b_scale, total_sec / GENS);
 
-    if (champion.save_checkpoint_json("checkpoints/primordial_life_champion.json")) {
-        std::printf("  [SUCCESS] 原始生命体冠军已存盘: checkpoints/primordial_life_champion.json\n");
+    if (champion.save_checkpoint_bin("checkpoints/primordial_life_champion.bin")) {
+        std::printf("  [SUCCESS] 原始生命体冠军已存盘: checkpoints/primordial_life_champion.bin\n");
     } else {
         std::printf("  [ERROR] 存盘失败\n");
         return 1;
