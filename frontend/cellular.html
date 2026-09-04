@@ -1393,13 +1393,21 @@
     <span class="brand-tag">SDSCC // 软件定义硅基细胞计算机</span>
   </div>
 
-  <!-- 中央控制：生命时间流速与史诗演化演示 -->
+  <!-- 中央控制：生命时间流速、光感调控与史诗演化演示 -->
   <div class="header-center-bar">
     <div class="warp-pill">
       <span class="warp-label">WARP:</span>
       <button class="warp-btn active" onclick="setWarp('1x')" id="hw-1x">1x 物理</button>
       <button class="warp-btn" onclick="setWarp('100x')" id="hw-100x">100x 演化</button>
       <button class="warp-btn" onclick="setWarp('unlimited')" id="hw-max">MAX 狂飙</button>
+    </div>
+
+    <!-- 视觉舒适度 / 光感控制药丸 -->
+    <div class="warp-pill" title="调节画面光感与泛光强度，防止光污染">
+      <span class="warp-label">光感:</span>
+      <button class="warp-btn active" onclick="setVisualBloomMode('scientific')" id="bloom-sci" title="舒适科研：适度微泛光，细胞细节与因果网络清晰可辨">舒适科研</button>
+      <button class="warp-btn" onclick="setVisualBloomMode('cinematic')" id="bloom-cine" title="柔和微光：电影级深空生物荧光氛围">柔和微光</button>
+      <button class="warp-btn" onclick="setVisualBloomMode('off')" id="bloom-off" title="纯净关闭：关闭后处理泛光，纯粹几何线框">纯净关闭</button>
     </div>
 
     <!-- 史诗级生命五阶段演化演示 -->
@@ -2164,7 +2172,7 @@ const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference: "hig
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.15;
+renderer.toneMappingExposure = 0.95; // 适度曝光，杜绝过曝泛白
 document.getElementById('stage').appendChild(renderer.domElement);
 
 let composer = null;
@@ -2177,9 +2185,9 @@ if (EffectComposer && RenderPass && UnrealBloomPass) {
 
     bloomPass = new UnrealBloomPass(
       new THREE.Vector2(innerWidth, innerHeight),
-      0.85, // 泛光强度 (strength)
-      0.35, // 泛光半径 (radius)
-      0.55  // 泛光阈值 (threshold)
+      0.22, // 泛光强度 (strength 降至 0.22，温润微光，消除光污染)
+      0.20, // 泛光半径 (radius 降至 0.20，紧凑不溢出)
+      0.88  // 泛光阈值 (threshold 升至 0.88，仅高能动作电位峰值微泛光，细胞质膜与拓扑结构纤毫毕现)
     );
     composer.addPass(bloomPass);
 
@@ -2208,19 +2216,19 @@ const _frustum = new THREE.Frustum();
 const _cellWorldPos = new THREE.Vector3();
 const _cellBoundsSphere = new THREE.Sphere();
 
-/* PBR 生物全息照明系统 (Bio-Fluorescent Dynamic Lighting) */
-const ambientLight = new THREE.AmbientLight(0x0e1726, 1.6);
+/* PBR 生物全息照明系统 (Bio-Fluorescent Dynamic Lighting - 适中温和，结构清晰) */
+const ambientLight = new THREE.AmbientLight(0x0e1726, 0.55); // 适中环境底光
 scene.add(ambientLight);
 
-const dirLight1 = new THREE.DirectionalLight(0x38bdf8, 1.8);
+const dirLight1 = new THREE.DirectionalLight(0x38bdf8, 0.9); // 主侧光柔和塑形
 dirLight1.position.set(350, 500, 400);
 scene.add(dirLight1);
 
-const dirLight2 = new THREE.DirectionalLight(0xf43f5e, 1.2);
+const dirLight2 = new THREE.DirectionalLight(0xa855f7, 0.45); // 辅光勾勒轮廓
 dirLight2.position.set(-350, -400, -300);
 scene.add(dirLight2);
 
-const cellPointLight = new THREE.PointLight(0x00f0ff, 1.6, 1200);
+const cellPointLight = new THREE.PointLight(0x38bdf8, 0.35, 600); // 核心区微弱补光
 scene.add(cellPointLight);
 
 /* 空气介质击穿与离子电弧图层 (Atmospheric Dielectric Breakdown Layer) */
@@ -2229,9 +2237,9 @@ scene.add(lightningGroup);
 
 /* ============================================================
  * 空气介质三维流动微粒场 (Atmospheric Aero-Medium Particle Field)
- * 模拟空气气溶胶、布朗对流运动与介质环境散射
+ * 模拟深空微对流，纯净背景，不抢视线
  * ============================================================ */
-const AIR_PARTICLE_COUNT = 900;
+const AIR_PARTICLE_COUNT = 240; // 降低粒子密度，视界通透纯净
 const airGeo = new THREE.BufferGeometry();
 const airPos = new Float32Array(AIR_PARTICLE_COUNT * 3);
 const airVel = new Float32Array(AIR_PARTICLE_COUNT * 3);
@@ -2242,13 +2250,13 @@ for (let i = 0; i < AIR_PARTICLE_COUNT; i++) {
   airPos[i*3+1] = (Math.random() - 0.5) * 900;
   airPos[i*3+2] = (Math.random() - 0.5) * 1200;
 
-  airVel[i*3]   = (Math.random() - 0.5) * 0.45;
-  airVel[i*3+1] = (Math.random() - 0.5) * 0.35 + 0.2; // 真实热对流轻微上升
-  airVel[i*3+2] = (Math.random() - 0.5) * 0.45;
+  airVel[i*3]   = (Math.random() - 0.5) * 0.35;
+  airVel[i*3+1] = (Math.random() - 0.5) * 0.25 + 0.15;
+  airVel[i*3+2] = (Math.random() - 0.5) * 0.35;
 
-  // 离子化空气分子呈现柔和电青色与银灰色
+  // 离子化微粒呈现极微弱深空荧光
   const isIonized = Math.random() < 0.25;
-  const c = isIonized ? new THREE.Color(0x38bdf8) : new THREE.Color(0x94a3b8);
+  const c = isIonized ? new THREE.Color(0x38bdf8) : new THREE.Color(0x64748b);
   airCol[i*3]   = c.r;
   airCol[i*3+1] = c.g;
   airCol[i*3+2] = c.b;
@@ -2258,11 +2266,11 @@ airGeo.setAttribute('position', new THREE.BufferAttribute(airPos, 3));
 airGeo.setAttribute('color', new THREE.BufferAttribute(airCol, 3));
 
 const airMat = new THREE.PointsMaterial({
-  size: 3.8,
+  size: 1.6, // 微粒精巧
   vertexColors: true,
   transparent: true,
-  opacity: 0.65,
-  blending: THREE.AdditiveBlending,
+  opacity: 0.22, // 极低不透明度，舒适深邃
+  blending: THREE.NormalBlending, // NormalBlending 杜绝光晕叠加热点
   depthWrite: false
 });
 const airParticleCloud = new THREE.Points(airGeo, airMat);
@@ -2542,12 +2550,14 @@ function initCosmicUniverseCage() {
 }
 initCosmicUniverseCage();
 
-/* 发光贴图 (径向渐变 sprite) */
+/* 发光贴图 (自然平方反比平滑渐变，无刺眼白斑) */
 function glowTexture(){
   const cv = document.createElement('canvas'); cv.width = cv.height = 64;
   const g = cv.getContext('2d');
   const grad = g.createRadialGradient(32,32,0,32,32,32);
-  grad.addColorStop(0,'rgba(255,255,255,1)'); grad.addColorStop(.25,'rgba(255,255,255,.55)');
+  grad.addColorStop(0,'rgba(255,255,255,0.70)');
+  grad.addColorStop(0.22,'rgba(255,255,255,0.22)');
+  grad.addColorStop(0.65,'rgba(255,255,255,0.04)');
   grad.addColorStop(1,'rgba(255,255,255,0)');
   g.fillStyle = grad; g.fillRect(0,0,64,64);
   return new THREE.CanvasTexture(cv);
@@ -2739,11 +2749,11 @@ function initLODCloud(count = null) {
   geo.setAttribute("color", new THREE.BufferAttribute(lodColors, 3));
 
   const mat = new THREE.PointsMaterial({
-    size: 4.6 * spreadScale,
+    size: 2.2 * spreadScale, // 纤巧适度尺寸
     vertexColors: true,
     map: GLOW,
     transparent: true,
-    opacity: 0.88,
+    opacity: 0.55, // 降低不透明度，消除过度曝光白晕
     blending: THREE.AdditiveBlending,
     depthWrite: false,
     sizeAttenuation: true
@@ -2808,52 +2818,52 @@ class CellView {
     const fam = FAMILY(cell.type);
     const col = FAMILY_COLOR[fam] || 0x38bdf8;
     
-    // 1. 3D 半透明双脂质细胞质膜 (3D Translucent Lipid Bilayer Shell)
+    // 1. 3D 半透明双脂质细胞质膜 (3D Translucent Lipid Bilayer Shell - 晶莹半透，几何棱角清晰)
     const membraneGeo = new THREE.IcosahedronGeometry(13, 3);
     const membraneMat = new THREE.MeshStandardMaterial({
       color: col,
-      roughness: 0.18,
-      metalness: 0.08,
+      roughness: 0.35,
+      metalness: 0.12,
       transparent: true,
-      opacity: 0.68,
+      opacity: 0.52,
       emissive: col,
-      emissiveIntensity: 0.28,
+      emissiveIntensity: 0.08, // 适度微发光，杜绝泛白
       depthWrite: false
     });
     this.membraneMesh = new THREE.Mesh(membraneGeo, membraneMat);
 
-    // 2. 外层生物发光晕 (Bioluminescent Diffuse Halo)
+    // 2. 外层生物发光晕 (Bioluminescent Diffuse Halo - 紧凑外晕)
     const haloMat = new THREE.SpriteMaterial({
       map: GLOW,
       color: col,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      opacity: 0.45
+      opacity: 0.16 // 极低不透明度，消除厚重光雾
     });
     this.membrane = new THREE.Sprite(haloMat);
-    this.membrane.scale.set(48, 48, 1);
+    this.membrane.scale.set(24, 24, 1);
 
     // 3. 细胞核中枢与致密核仁 (Dense High-Energy Karyon Core & Nucleolus)
-    const coreGeo = new THREE.SphereGeometry(6.5, 20, 20);
+    const coreGeo = new THREE.SphereGeometry(6.0, 20, 20);
     const coreMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       emissive: col,
-      emissiveIntensity: 1.4,
-      roughness: 0.1,
-      metalness: 0.2
+      emissiveIntensity: 0.50, // 柔和宝石质感
+      roughness: 0.2,
+      metalness: 0.1
     });
     this.nucleus = new THREE.Mesh(coreGeo, coreMat);
 
     // 4. 围绕细胞核公转的 3 颗线粒体/能量细胞器 (Orbiting Mitochondria Organelles)
     this.organelles = [];
-    const orgGeo = new THREE.SphereGeometry(2.2, 12, 12);
+    const orgGeo = new THREE.SphereGeometry(1.8, 12, 12);
     for (let k = 0; k < 3; ++k) {
       const orgMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
         emissive: col,
-        emissiveIntensity: 1.8,
-        roughness: 0.1
+        emissiveIntensity: 0.55,
+        roughness: 0.2
       });
       const orgMesh = new THREE.Mesh(orgGeo, orgMat);
       this.organelles.push({
@@ -2865,7 +2875,7 @@ class CellView {
     }
 
     // 5. 动作电位电离冲击波圆环 (Action Potential Ion Shockwave Ring)
-    const ringGeo = new THREE.RingGeometry(9, 14, 32);
+    const ringGeo = new THREE.RingGeometry(9, 13, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: col,
       transparent: true,
@@ -2917,26 +2927,26 @@ class CellView {
     this.label.position.set(0, -18, 0);
 
     // 生物节律自然呼吸波动 (Biological Cellular Breathing Rhythm)
-    const breath = Math.sin(time * 2.2 + this.phase) * 0.12;
-    const actIntensity = Math.min(2.0, Math.abs(c.out || 0) + (c.glow || 0));
+    const breath = Math.sin(time * 2.2 + this.phase) * 0.08;
+    const actIntensity = Math.min(1.5, Math.abs(c.out || 0) + (c.glow || 0));
     
-    // 1. 3D 胶质质膜呼吸形变与发光增强
-    const memScale = (1.0 + breath) * (1.0 + actIntensity * 0.35);
+    // 1. 3D 胶质质膜呼吸形变与发光
+    const memScale = (1.0 + breath) * (1.0 + actIntensity * 0.18);
     this.membraneMesh.scale.set(memScale, memScale, memScale);
-    this.membraneMesh.rotation.y += 0.008;
-    this.membraneMesh.rotation.x += 0.005;
-    this.membraneMesh.material.emissiveIntensity = 0.25 + actIntensity * 1.5;
-    this.membraneMesh.material.opacity = 0.55 + Math.min(0.35, actIntensity * 0.4);
+    this.membraneMesh.rotation.y += 0.006;
+    this.membraneMesh.rotation.x += 0.003;
+    this.membraneMesh.material.emissiveIntensity = 0.06 + actIntensity * 0.30;
+    this.membraneMesh.material.opacity = 0.45 + Math.min(0.20, actIntensity * 0.15);
 
-    // 2. 最外层氛围光晕
-    const haloScale = (44 + breath * 14) * (1.0 + actIntensity * 0.4);
+    // 2. 最外层氛围光晕 (紧凑贴合)
+    const haloScale = (22 + breath * 4) * (1.0 + actIntensity * 0.20);
     this.membrane.scale.set(haloScale, haloScale, 1);
-    this.membrane.material.opacity = 0.25 + actIntensity * 0.55;
+    this.membrane.material.opacity = 0.10 + actIntensity * 0.20;
 
-    // 3. 细胞核高能电位激化
-    const nScale = 1.0 + actIntensity * 0.5;
+    // 3. 细胞核高能电位激化 (温润宝石发光)
+    const nScale = 1.0 + actIntensity * 0.20;
     this.nucleus.scale.set(nScale, nScale, nScale);
-    this.nucleus.material.emissiveIntensity = 1.2 + actIntensity * 2.5;
+    this.nucleus.material.emissiveIntensity = 0.45 + actIntensity * 0.65;
 
     // 4. 线粒体能量颗粒多倾角三维公转
     for (let k = 0; k < this.organelles.length; ++k) {
@@ -2946,16 +2956,16 @@ class CellView {
       const oy = Math.sin(ang) * org.orbitR * Math.cos(org.tilt);
       const oz = Math.sin(ang) * org.orbitR * Math.sin(org.tilt);
       org.mesh.position.set(ox, oy, oz);
-      org.mesh.material.emissiveIntensity = 1.2 + Math.sin(time * 6.0 + k) * 0.8 + actIntensity * 1.5;
+      org.mesh.material.emissiveIntensity = 0.45 + Math.sin(time * 3.0 + k) * 0.20 + actIntensity * 0.35;
     }
 
-    // 5. 动作电位放电冲击波环扩散 (Ion Wave Pulse Burst)
-    if (Math.abs(c.out || 0) > 0.35) {
-      this.shockwaveRadius += 0.08;
-      if (this.shockwaveRadius > 3.2) this.shockwaveRadius = 1.0;
+    // 5. 动作电位放电冲击波环扩散 (Ion Wave Pulse Burst - 柔和微波)
+    if (Math.abs(c.out || 0) > 0.45) {
+      this.shockwaveRadius += 0.06;
+      if (this.shockwaveRadius > 2.6) this.shockwaveRadius = 1.0;
       const ringScale = this.shockwaveRadius;
       this.shockwaveRing.scale.set(ringScale, ringScale, ringScale);
-      this.shockwaveRing.material.opacity = Math.max(0.0, (3.2 - this.shockwaveRadius) * 0.4);
+      this.shockwaveRing.material.opacity = Math.max(0.0, (2.6 - this.shockwaveRadius) * 0.25);
       this.shockwaveRing.visible = true;
     } else {
       this.shockwaveRadius = 1.0;
@@ -3001,8 +3011,8 @@ class SynapseView {
     this.lineMat = new THREE.LineBasicMaterial({
       color: 0x38bdf8,
       transparent: true,
-      opacity: 0.6,
-      blending: THREE.AdditiveBlending
+      opacity: 0.35,
+      blending: THREE.NormalBlending // NormalBlending 避免海量突触重叠过曝
     });
     this.line = new THREE.Line(this.geo, this.lineMat);
 
@@ -3010,12 +3020,12 @@ class SynapseView {
     this.photonMat2 = new THREE.SpriteMaterial({ map: GLOW, color: 0xa855f7, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     this.photon1 = new THREE.Sprite(this.photonMat1);
     this.photon2 = new THREE.Sprite(this.photonMat2);
-    this.photon1.scale.set(16, 16, 1);
-    this.photon2.scale.set(12, 12, 1);
+    this.photon1.scale.set(8, 8, 1);
+    this.photon2.scale.set(6, 6, 1);
 
     this.boutonMat = new THREE.SpriteMaterial({ map: GLOW, color: 0x38bdf8, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     this.bouton = new THREE.Sprite(this.boutonMat);
-    this.bouton.scale.set(20, 20, 1);
+    this.bouton.scale.set(10, 10, 1);
 
     this.group = new THREE.Group();
     this.group.add(this.line);
@@ -3072,13 +3082,13 @@ class SynapseView {
     const w = this.syn.w || 1.0;
     const hot = Math.abs(w) > 0.6;
     this.lineMat.color.setHex(w >= 0 ? (hot ? 0x38bdf8 : 0x0284c7) : (hot ? 0xf43f5e : 0xbe123c));
-    this.lineMat.opacity = 0.4 + Math.min(0.5, Math.abs(w) * 0.4);
+    this.lineMat.opacity = 0.25 + Math.min(0.35, Math.abs(w) * 0.25);
 
     const speed = (0.012 + Math.min(0.04, Math.abs(w) * 0.025)) * warpMultiplier;
     this.flowT1 = (this.flowT1 + speed) % 1.0;
     this.flowT2 = (this.flowT2 + speed * 1.1) % 1.0;
 
-    // 囊泡 1 采样
+    // 囊泡 1 采样 (微粒精炼，纤巧流光)
     {
       const t = this.flowT1, it = 1.0 - t;
       this.photon1.position.set(
@@ -3086,9 +3096,9 @@ class SynapseView {
         it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
         it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
       );
-      const pScale1 = (12 + Math.sin(t * Math.PI) * 10) * (0.8 + Math.abs(w) * 0.5);
+      const pScale1 = (6 + Math.sin(t * Math.PI) * 4) * (0.8 + Math.abs(w) * 0.3);
       this.photon1.scale.set(pScale1, pScale1, 1);
-      this.photon1.material.opacity = 0.3 + Math.sin(t * Math.PI) * 0.7;
+      this.photon1.material.opacity = 0.28 + Math.sin(t * Math.PI) * 0.5;
     }
 
     // 囊泡 2 采样
@@ -3099,17 +3109,17 @@ class SynapseView {
         it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
         it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
       );
-      const pScale2 = (10 + Math.sin(t * Math.PI) * 8) * (0.8 + Math.abs(w) * 0.5);
+      const pScale2 = (5 + Math.sin(t * Math.PI) * 3) * (0.8 + Math.abs(w) * 0.3);
       this.photon2.scale.set(pScale2, pScale2, 1);
-      this.photon2.material.opacity = 0.25 + Math.sin(t * Math.PI) * 0.6;
+      this.photon2.material.opacity = 0.22 + Math.sin(t * Math.PI) * 0.45;
     }
 
-    // 突触终端小体
+    // 突触终端小体 (温和微闪，不夺目)
     this.bouton.position.copy(_tmpP2);
     const boutonFlash = (1.0 - Math.min(1.0, this.flowT1)) * (a.glow || 0.2);
-    const bScale = 14 + boutonFlash * 22;
+    const bScale = 7 + boutonFlash * 7;
     this.bouton.scale.set(bScale, bScale, 1);
-    this.bouton.material.opacity = 0.3 + boutonFlash * 0.7;
+    this.bouton.material.opacity = 0.25 + boutonFlash * 0.45;
     this.bouton.material.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);
   }
 
@@ -3457,6 +3467,40 @@ window.setWarp = async function(speed) {
     fetch('/api/control/warp?speed=' + speed, { method: 'POST' }).catch(() => {});
     fetch('/api/warp?speed=' + speed).catch(() => {});
   } catch(e) {}
+};
+
+window.setVisualBloomMode = function(mode) {
+  ['sci', 'cine', 'off'].forEach(k => {
+    const b = document.getElementById('bloom-' + k);
+    if (b) b.classList.remove('active');
+  });
+  const activeKey = (mode === 'scientific' ? 'sci' : (mode === 'cinematic' ? 'cine' : 'off'));
+  const btn = document.getElementById('bloom-' + activeKey);
+  if (btn) btn.classList.add('active');
+
+  if (mode === 'scientific') {
+    if (bloomPass) {
+      bloomPass.strength = 0.22;
+      bloomPass.threshold = 0.88;
+      bloomPass.radius = 0.20;
+    }
+    renderer.toneMappingExposure = 0.95;
+    log('[视觉调光] 已切换为【舒适科研模式】：适度微泛光，细胞质膜棱角与突触因果纤毫毕现。', true);
+  } else if (mode === 'cinematic') {
+    if (bloomPass) {
+      bloomPass.strength = 0.38;
+      bloomPass.threshold = 0.82;
+      bloomPass.radius = 0.28;
+    }
+    renderer.toneMappingExposure = 1.0;
+    log('[视觉调光] 已切换为【柔和微光模式】：深空生物荧光氛围，温润不刺眼。', true);
+  } else if (mode === 'off') {
+    if (bloomPass) {
+      bloomPass.strength = 0.0;
+    }
+    renderer.toneMappingExposure = 0.95;
+    log('[视觉调光] 已【关闭辉光】：100% 原始三维渲染，杜绝任何泛光。', true);
+  }
 };
 
 
@@ -5177,8 +5221,8 @@ function animate(){
     posAttr.needsUpdate = true;
   }
 
-  // 空气介质高频电离电弧微放电巡检 (Continuous Dielectric Breakdown in Air Medium)
-  const dischargeProb = plasmaStormActive ? 0.28 : 0.07;
+  // 空气介质电离电弧巡检 (仅在风暴或偶尔触发，杜绝常态连续电击闪烁)
+  const dischargeProb = plasmaStormActive ? 0.22 : 0.003;
   if (views && views.cells && views.cells.length > 2 && Math.random() < dischargeProb) {
     const c1 = views.cells[Math.floor(Math.random() * views.cells.length)];
     const c2 = views.cells[Math.floor(Math.random() * views.cells.length)];
@@ -5189,8 +5233,8 @@ function animate(){
       if (dist > 20 && dist < 260) {
         const colors = [0x38bdf8, 0xa855f7, 0x00f0ff, 0xfbbf24];
         const col = colors[Math.floor(Math.random() * colors.length)];
-        spawnDielectricBreakdownArc(v1, v2, col, 1.0);
-        playIonizationSpark(0.35);
+        spawnDielectricBreakdownArc(v1, v2, col, plasmaStormActive ? 0.9 : 0.45);
+        playIonizationSpark(plasmaStormActive ? 0.35 : 0.12);
       }
     }
   }
