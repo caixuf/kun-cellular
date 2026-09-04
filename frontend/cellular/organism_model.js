@@ -328,3 +328,31 @@ export function apoptosis(org) {
   const removed = before - org.cells.length;
   return removed;
 }
+
+export function seedOrganism() {
+  nextCellId = 1;
+  const cells = [
+    makeCell(T.SENSE0, 1.0, 0, -120, -40),   // 0 价格
+    makeCell(T.SENSE1, 1.0, 0, -120,  40),   // 1 量
+    makeCell(T.EMA, 0.05, 0, -40, -30),      // 2 慢线
+    makeCell(T.EMA, 0.20, 0, -40,  30),      // 3 快线
+    makeCell(T.SUB, 0, 0, 30, 0),            // 4 快-慢
+    makeCell(T.HYST, 0.01, -0.01, 80, 0),    // 5 迟滞
+    makeCell(T.ACT_POS, 0, 0, 140, -40),     // 6 买
+    makeCell(T.ACT_NEG, 0, 0, 140,  40),     // 7 卖
+    makeCell(T.ACT_LOCK, 0, 0, 140, 100),    // 8 免疫锁
+  ];
+  cells.forEach((c, i) => { c.id = i; });
+  nextCellId = 9;
+  const syns = [
+    makeSyn(0, 2, 0), makeSyn(0, 3, 0), makeSyn(3, 4, 0), makeSyn(2, 4, 1),
+    makeSyn(4, 5, 0), makeSyn(5, 6, 0), makeSyn(5, 7, 0, -1.0),
+  ];
+  return { generation: 0, cells, syns, order: [], phySteps: 0 };
+}
+
+export const org = makeMatureOrganism();
+compile(org);
+if (typeof window !== 'undefined') {
+  window.org = org;
+}

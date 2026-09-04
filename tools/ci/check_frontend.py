@@ -93,6 +93,50 @@ def check_script_syntax(html_path: Path) -> list[str]:
     return errors
 
 
+def check_es_modules(dir_path: Path) -> list[str]:
+    if not dir_path.exists():
+        return []
+    errors = []
+    js_files = sorted(dir_path.glob("*.js"))
+    exports_map = {}
+
+    for js_file in js_files:
+        content = js_file.read_text(encoding="utf-8")
+        exps = set()
+        for m in re.finditer(r'export\s+(?:function|const|let|var|class|async\s+function)\s+([a-zA-Z0-9_$]+)', content):
+            exps.add(m.group(1))
+        for m in re.finditer(r'export\s*\{([^}]+)\}', content):
+            for part in m.group(1).split(','):
+                part = part.strip()
+                if not part:
+                    continue
+                tokens = re.split(r'\s+as\s+', part)
+                exps.add(tokens[-1].strip())
+        exports_map[js_file.name] = exps
+
+    for js_file in js_files:
+        content = js_file.read_text(encoding="utf-8")
+        for m in re.finditer(r'import\s*\{([^}]+)\}\s*from\s*[\'"](\.[^\'"]+)[\'"]', content):
+            raw_items = m.group(1)
+            raw_target = m.group(2)
+            target_name = Path(raw_target).name
+            if target_name not in exports_map:
+                errors.append(f"{js_file.name}: imports from unknown local module '{raw_target}'")
+                continue
+            target_exports = exports_map[target_name]
+            for item in raw_items.split(','):
+                item = item.strip()
+                if not item:
+                    continue
+                orig_symbol = re.split(r'\s+as\s+', item)[0].strip()
+                if orig_symbol not in target_exports:
+                    errors.append(
+                        f"{js_file.name}: imports '{orig_symbol}' from {target_name}, but {target_name} does not export it!"
+                    )
+
+    return errors
+
+
 def main() -> int:
     print("=" * 60)
     print("  KunCellular Frontend Asset & Syntax Integrity Check")
@@ -115,6 +159,13 @@ def main() -> int:
         status = "OK" if not (asset_errs or syntax_errs) else "FAIL"
         print(f"  [{status}] {html_path.name} (Assets: {len(asset_errs)} errs, Syntax: {len(syntax_errs)} errs)")
 
+    # ES Module Cross-Link Verification for frontend/cellular/
+    cellular_dir = FRONTEND_DIR / "cellular"
+    esm_errs = check_es_modules(cellular_dir)
+    all_errors.extend(esm_errs)
+    status = "OK" if not esm_errs else "FAIL"
+    print(f"  [{status}] cellular/*.js ES Module Graph ({len(list(cellular_dir.glob('*.js')))} modules, {len(esm_errs)} errs)")
+
     print("=" * 60)
     if all_errors:
         print(f"FAILED: {len(all_errors)} issues detected:")
@@ -122,7 +173,7 @@ def main() -> int:
             print(f"  - {err}")
         return 1
 
-    print(f"SUCCESS: All {len(html_files)} frontend HTML files passed asset & syntax check! (Exit 0)")
+    print(f"SUCCESS: All {len(html_files)} HTML files & ES Module graphs passed integrity check! (Exit 0)")
     return 0
 
 
