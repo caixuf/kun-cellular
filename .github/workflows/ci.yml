@@ -21,3 +21,26 @@ jobs:
 
     - name: Run CTest
       run: ctest --test-dir build --output-on-failure
+
+    - name: Run Substrate Purity Guard
+      run: python3 tools/ci/check_substrate_purity.py
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Run Frontend Syntax & Asset Check
+      run: python3 tools/ci/check_frontend.py
+
+    - name: Install Python Dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        pip install numpy torch pytest --index-url https://download.pytorch.org/whl/cpu
+
+    - name: Run Python Parity & System Gate Tests
+      run: |
+        pytest tests/test_adas_cortex_parity.py -v
+        pytest tests/test_adas_cortex_contract.py -v
+        python3 tests/test_gate5_gate6_replay_shadow.py
+
