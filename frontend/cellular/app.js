@@ -17,6 +17,7 @@ import { toggleDialogueDeck, sendQuickPrompt, sendDialogueMsg } from './dialogue
 import { startAutoTour, showTourStep, nextTourStep, prevTourStep, endAutoTour, initTooltipEngine, TOUR_STAGES } from './tour_system.js';
 import { currentSelectedOrgId, currentHighlightedBookId, currentRenderMode, currentLOD, ORGAN_DESCRIPTIONS, onOrganSelectionChange, onRowClick, toggleTreeNode, toggleDock, openLibraryDrawer, toggleHabitatMenu, selectOrganism, highlightBookSubcircuit, loadPreset, switchLOD, setRenderMode, pollLibrary } from './organism_library.js';
 import { currentFluidPhase, setFluidPhase, generateFractalLightningPoints, spawnDielectricBreakdownArc, triggerExtinctionLightningBurst, triggerExtinctionVisualShock } from './plasma_effects.js';
+import { initOrganSystem, updateOrganSystem, toggleOrganVisibility, focusOrgan } from './organ_view.js';
 
 // 1. 初始化后处理通道与镜头控制
 initPostprocessing(renderer, scene, camera);
@@ -77,6 +78,9 @@ function animate() {
   // 3. 动态屏幕像素视锥实化 LOD
   updateDetailLOD(_frustum, scene, camera, org, currentOrganismBounds, currentRenderMode);
 
+  // 3.2 动态更新 3D 生物器官外包膜与共生微柱全息透视
+  updateOrganSystem(scene, org, now * 0.001, !closeLook);
+
   let visibleMicroCount = 0;
   const isDenseCells = views.cells.length > 50;
   for (const v of views.cells) {
@@ -84,9 +88,10 @@ function animate() {
     v.group.visible = true;
     v.update(now * 0.001, clientWarpMultiplier);
 
-    // 宏观远景下隐藏繁琐的大圆环/色带/线粒体，避免遮挡画布；特写近视距时才展示微观内部结构
+    // 宏观远景下隐藏繁琐的大圆环/色带/线粒体/穿膜代谢流，避免遮挡画布；特写近视距时才展示微观内部结构
     if (v.delayRing) v.delayRing.visible = !isDenseCells || closeLook;
     if (v.attrRibbon) v.attrRibbon.visible = !isDenseCells || closeLook;
+    if (v.metabolicPoints) v.metabolicPoints.visible = closeLook;
     for (const o of v.organelles) {
       if (o.mesh) o.mesh.visible = !isDenseCells || closeLook;
     }
@@ -238,6 +243,8 @@ window.onRowClick = onRowClick;
 window.toggleTreeNode = toggleTreeNode;
 window.onOrganSelectionChange = onOrganSelectionChange;
 window.cameraShake = cameraShake;
+window.toggleOrganVisibility = toggleOrganVisibility;
+window.focusOrgan = focusOrgan;
 window.log = log;
 
 // 绑定底座微观操作按钮

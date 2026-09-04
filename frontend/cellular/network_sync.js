@@ -675,6 +675,7 @@ export function updateFromBackendState(data) {
   }
 
   if (data.symbiotic_macro_cells) {
+    org.symbiotic_macro_cells = data.symbiotic_macro_cells;
     const macroCount = data.symbiotic_macro_cells_count || data.symbiotic_macro_cells.length;
     const stMacroCount = document.getElementById("st-macro-count");
     if (stMacroCount) stMacroCount.textContent = `${macroCount} 个微柱`;
@@ -688,10 +689,15 @@ export function updateFromBackendState(data) {
         badge.className = "macro-badge";
         badge.style.borderColor = mc.color || "var(--cyan)";
         badge.style.color = mc.color || "var(--cyan)";
+        badge.style.cursor = "pointer";
         badge.innerHTML = `<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${mc.color || 'var(--cyan)'}"></span>${mc.label} (${mc.cells_count}胞)`;
-        badge.title = `微柱ID: ${mc.id}\n内部元胞: ${mc.cells_count} 个\n感知输入端口: [${mc.sensory_ports?.join(',') || '无'}]\n效应输出端口: [${mc.effector_ports?.join(',') || '无'}]`;
+        badge.title = `微柱ID: ${mc.id}\n内部元胞: ${mc.cells_count} 个\n感知输入端口: [${mc.sensory_ports?.join(',') || '无'}]\n效应输出端口: [${mc.effector_ports?.join(',') || '无'}]\n[点击] 在 3D 空间对焦该器官包络膜与微柱组织`;
         badge.onclick = () => {
-          log(`[MACRO_FOCUS] 对焦超细胞共生微柱【${mc.label}】(${mc.cells_count} 内部元胞)`, true);
+          if (typeof window.focusOrgan === 'function') {
+            window.focusOrgan(mc.id || mc.label);
+          } else {
+            log(`[MACRO_FOCUS] 对焦超细胞共生微柱【${mc.label}】(${mc.cells_count} 内部元胞)`, true);
+          }
         };
         container.appendChild(badge);
       });

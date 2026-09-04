@@ -1,11 +1,70 @@
 /* ============================================================
- * cell_view.js - 生物拟真 3D 实体多层细胞计算结构与相空间显微透视
- * 包含：双脂质质膜、微管蛋白细胞骨架、16阶环形时滞轮盘、相空间极限环吸引子、核仁与线粒体
+ * cell_view.js - 生物拟真 3D 实体多层细胞计算结构与微观代谢通道
+ * 包含：
+ * 1. 磷脂双分子层多层膜结构 (外层亲水质膜 Outer Leaflet + 内层胞质支持膜 Inner Leaflet)
+ * 2. 8向跨膜通道蛋白孔道 (Transmembrane Porins & Gated Channels，营养/离子/病毒进出通道)
+ * 3. 动态穿膜新陈代谢粒子交换流 (Metabolic Nutrient & Ion Particle Flux)
+ * 4. 微管蛋白细胞骨架、16阶环形时滞轮盘、相空间极限环吸引子、核仁与线粒体
  * ============================================================ */
 import * as THREE from 'three';
 import { FAMILY, FAMILY_COLOR } from './config.js';
 import { getGlowTexture, getLabelTexture } from './texture_cache.js';
 import { getCellWorldRadius } from './spatial_bounds.js';
+
+export const PORE_DIRS = [
+  new THREE.Vector3( 1,  1,  1).normalize(),
+  new THREE.Vector3( 1,  1, -1).normalize(),
+  new THREE.Vector3( 1, -1,  1).normalize(),
+  new THREE.Vector3( 1, -1, -1).normalize(),
+  new THREE.Vector3(-1,  1,  1).normalize(),
+  new THREE.Vector3(-1,  1, -1).normalize(),
+  new THREE.Vector3(-1, -1,  1).normalize(),
+  new THREE.Vector3(-1, -1, -1).normalize()
+];
+
+function buildPoresGeometry() {
+  const geos = [];
+  const upVec = new THREE.Vector3(0, 1, 0);
+  const zVec = new THREE.Vector3(0, 0, 1);
+
+  for (const dir of PORE_DIRS) {
+    // 1. 外层受体漏斗环口 (Outer receptor funnel rim at r=13.3)
+    const rimGeo = new THREE.RingGeometry(0.85, 2.1, 10);
+    const qRim = new THREE.Quaternion().setFromUnitVectors(zVec, dir);
+    rimGeo.applyQuaternion(qRim);
+    rimGeo.translate(dir.x * 13.3, dir.y * 13.3, dir.z * 13.3);
+    geos.push(rimGeo.toNonIndexed());
+
+    // 2. 跨膜通道蛋白中空柱 (Transmembrane channel tube from r=10.5 to r=13.3)
+    const tubeGeo = new THREE.CylinderGeometry(1.25, 1.25, 3.2, 10, 1, true);
+    const qTube = new THREE.Quaternion().setFromUnitVectors(upVec, dir);
+    tubeGeo.applyQuaternion(qTube);
+    tubeGeo.translate(dir.x * 11.9, dir.y * 11.9, dir.z * 11.9);
+    geos.push(tubeGeo.toNonIndexed());
+
+    // 3. 内侧胞质门控环口 (Inner cytosolic gate rim at r=10.5)
+    const innerRimGeo = new THREE.RingGeometry(0.7, 1.8, 10);
+    const qInner = new THREE.Quaternion().setFromUnitVectors(zVec, dir.clone().negate());
+    innerRimGeo.applyQuaternion(qInner);
+    innerRimGeo.translate(dir.x * 10.5, dir.y * 10.5, dir.z * 10.5);
+    geos.push(innerRimGeo.toNonIndexed());
+  }
+
+  let totalVerts = 0;
+  for (const g of geos) totalVerts += g.attributes.position.count;
+  const posArr = new Float32Array(totalVerts * 3);
+  const normArr = new Float32Array(totalVerts * 3);
+  let offset = 0;
+  for (const g of geos) {
+    posArr.set(g.attributes.position.array, offset * 3);
+    if (g.attributes.normal) normArr.set(g.attributes.normal.array, offset * 3);
+    offset += g.attributes.position.count;
+  }
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+  merged.setAttribute('normal', new THREE.BufferAttribute(normArr, 3));
+  return merged;
+}
 
 let _sharedGeos = null;
 function getSharedGeos() {
@@ -35,8 +94,11 @@ function getSharedGeos() {
     attrGeo.setAttribute('position', new THREE.BufferAttribute(attrPoints, 3));
 
     _sharedGeos = {
-      membrane: new THREE.IcosahedronGeometry(13, 2),
-      cyto: new THREE.IcosahedronGeometry(12.5, 1),
+      outerMembrane: new THREE.IcosahedronGeometry(13.0, 2),
+      innerMembrane: new THREE.IcosahedronGeometry(11.2, 2),
+      membrane: new THREE.IcosahedronGeometry(13.0, 2),
+      cyto: new THREE.IcosahedronGeometry(10.8, 1),
+      pores: buildPoresGeometry(),
       nucleus: new THREE.SphereGeometry(5.8, 14, 14),
       delay: delayGeo,
       attr: attrGeo,
@@ -66,18 +128,69 @@ export class CellView {
     const glow = getGlowTexture();
     const geos = getSharedGeos();
 
-    // 1. 3D 半透明双脂质细胞质膜 (Lipid Bilayer Shell)
-    const membraneMat = new THREE.MeshStandardMaterial({
+    // 1. 3D 外层磷脂双分子亲水质膜 (Outer Lipid Leaflet Membrane)
+    const outerMat = new THREE.MeshStandardMaterial({
       color: col,
-      roughness: 0.35,
-      metalness: 0.12,
+      roughness: 0.25,
+      metalness: 0.15,
       transparent: true,
-      opacity: 0.48,
+      opacity: 0.38,
       emissive: col,
       emissiveIntensity: 0.08,
+      depthWrite: false,
+      side: THREE.FrontSide
+    });
+    this.outerMembraneMesh = new THREE.Mesh(geos.outerMembrane, outerMat);
+    this.membraneMesh = this.outerMembraneMesh;
+
+    // 1.2 3D 内层胞质支持膜 (Inner Leaflet / Cortex Membrane)
+    // 外膜与内膜之间形成间质腔 (Periplasmic Cavity)，显微镜下呈现真实双层膜厚度
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: col,
+      roughness: 0.40,
+      metalness: 0.08,
+      transparent: true,
+      opacity: 0.22,
+      emissive: col,
+      emissiveIntensity: 0.05,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    this.innerMembraneMesh = new THREE.Mesh(geos.innerMembrane, innerMat);
+
+    // 1.3 8向跨膜蛋白离子通道孔道 (Transmembrane Porins & Gated Ion Channels)
+    // 贯穿内外双层膜，为营养/离子与病毒/抗原提供真实物理出入通道
+    const poreMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.25,
+      metalness: 0.40,
+      emissive: col,
+      emissiveIntensity: 0.35,
+      transparent: true,
+      opacity: 0.88,
+      side: THREE.DoubleSide,
       depthWrite: false
     });
-    this.membraneMesh = new THREE.Mesh(geos.membrane, membraneMat);
+    this.poresMesh = new THREE.Mesh(geos.pores, poreMat);
+
+    // 1.4 穿膜新陈代谢粒子交换流 (Metabolic Nutrient & Ion Particle Flux)
+    // 24颗动态代谢粒子沿着8个穿膜孔道流动 (外部营养吸入，胞内核仁/线粒体代谢排泄)
+    const METABOLIC_COUNT = 24;
+    const metaPos = new Float32Array(METABOLIC_COUNT * 3);
+    const metaGeo = new THREE.BufferGeometry();
+    metaGeo.setAttribute('position', new THREE.BufferAttribute(metaPos, 3));
+    const metaMat = new THREE.PointsMaterial({
+      size: 2.4,
+      map: glow,
+      color: 0x67e8f9,
+      transparent: true,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    this.metabolicGeo = metaGeo;
+    this.metabolicMat = metaMat;
+    this.metabolicPoints = new THREE.Points(metaGeo, metaMat);
 
     // 1.5 细胞微管蛋白骨架晶格 (Cytoskeleton Microtubule Lattice)
     const cytoMat = new THREE.MeshBasicMaterial({
@@ -170,7 +283,10 @@ export class CellView {
     this.label.scale.set(52, 13, 1);
 
     this.group = new THREE.Group();
-    this.group.add(this.membraneMesh);
+    this.group.add(this.outerMembraneMesh);
+    this.group.add(this.innerMembraneMesh);
+    this.group.add(this.poresMesh);
+    this.group.add(this.metabolicPoints);
     this.group.add(this.cytoMesh);
     this.group.add(this.membrane);
     this.group.add(this.nucleus);
@@ -203,10 +319,16 @@ export class CellView {
 
     const fam = FAMILY(cell.type);
     const col = FAMILY_COLOR[fam] || 0x38bdf8;
-    if (this.membraneMesh && this.membraneMesh.material) {
-      this.membraneMesh.material.color.setHex(col);
-      this.membraneMesh.material.emissive.setHex(col);
-      this.membraneMesh.material.opacity = isLargeScale ? 0.35 : 0.48;
+    if (this.outerMembraneMesh && this.outerMembraneMesh.material) {
+      this.outerMembraneMesh.material.color.setHex(col);
+      this.outerMembraneMesh.material.emissive.setHex(col);
+    }
+    if (this.innerMembraneMesh && this.innerMembraneMesh.material) {
+      this.innerMembraneMesh.material.color.setHex(col);
+      this.innerMembraneMesh.material.emissive.setHex(col);
+    }
+    if (this.poresMesh && this.poresMesh.material) {
+      this.poresMesh.material.emissive.setHex(col);
     }
     if (this.cytoMesh && this.cytoMesh.material) {
       this.cytoMesh.material.color.setHex(col);
@@ -227,13 +349,53 @@ export class CellView {
     const breath = Math.sin(time * 2.2 + this.phase) * 0.08;
     const actIntensity = Math.min(1.5, Math.abs(c.out || 0) + (c.glow || 0));
 
-    // 1. 3D 质膜呼吸形变与发光
+    // 1. 3D 外层质膜呼吸形变与发光
     const memScale = (1.0 + breath) * (1.0 + actIntensity * 0.18);
-    this.membraneMesh.scale.set(memScale, memScale, memScale);
-    this.membraneMesh.rotation.y += 0.006;
-    this.membraneMesh.rotation.x += 0.003;
-    this.membraneMesh.material.emissiveIntensity = 0.06 + actIntensity * 0.30;
-    this.membraneMesh.material.opacity = 0.45 + Math.min(0.20, actIntensity * 0.15);
+    this.outerMembraneMesh.scale.set(memScale, memScale, memScale);
+    this.outerMembraneMesh.rotation.y += 0.006;
+    this.outerMembraneMesh.rotation.x += 0.003;
+    this.outerMembraneMesh.material.emissiveIntensity = 0.06 + actIntensity * 0.30;
+    this.outerMembraneMesh.material.opacity = 0.38 + Math.min(0.20, actIntensity * 0.15);
+
+    // 1.2 内层膜同步呼吸 (保持在膜间质腔内侧)
+    const innerScale = memScale * 0.96;
+    this.innerMembraneMesh.scale.set(innerScale, innerScale, innerScale);
+    this.innerMembraneMesh.rotation.y -= 0.004;
+    this.innerMembraneMesh.material.opacity = 0.20 + Math.min(0.15, actIntensity * 0.12);
+
+    // 1.3 跨膜通道孔开合脉动与离子发光
+    if (this.poresMesh && this.poresMesh.material) {
+      this.poresMesh.material.emissiveIntensity = 0.30 + Math.min(1.8, actIntensity * 1.2);
+      const poreBreath = 1.0 + Math.sin(time * 3.2 + this.phase) * 0.04;
+      this.poresMesh.scale.set(poreBreath, poreBreath, poreBreath);
+    }
+
+    // 1.4 动态更新穿膜新陈代谢粒子流 (Metabolic Nutrient & Ion Flux)
+    if (this.metabolicPoints && this.metabolicPoints.visible) {
+      const pos = this.metabolicGeo.attributes.position.array;
+      for (let p = 0; p < 24; p++) {
+        const poreIdx = Math.floor(p / 3);
+        const type = p % 3;
+        const d = PORE_DIRS[poreIdx];
+        let r = 0;
+        if (type === 0) {
+          // 外部环境营养底质/ATP离子穿孔吸入 (18.5 -> 6.0)
+          const prog = ((time * 1.6 + poreIdx * 0.25 + this.phase) % 1.0);
+          r = 18.5 - prog * 12.5;
+        } else if (type === 1) {
+          // 膜通道内部离子门控振荡 (10.0 <-> 14.0)
+          r = 12.0 + Math.sin(time * 4.0 + poreIdx * 1.1 + this.phase) * 2.0;
+        } else {
+          // 代谢废物/动作电位电荷穿孔向外泵出 (6.0 -> 18.5)
+          const prog = ((time * 1.4 + poreIdx * 0.35 + this.phase) % 1.0);
+          r = 6.0 + prog * 12.5;
+        }
+        pos[p * 3]     = d.x * r;
+        pos[p * 3 + 1] = d.y * r;
+        pos[p * 3 + 2] = d.z * r;
+      }
+      this.metabolicGeo.attributes.position.needsUpdate = true;
+    }
 
     // 1.5 细胞微管骨架随动慢旋
     this.cytoMesh.scale.set(memScale, memScale, memScale);
@@ -292,7 +454,11 @@ export class CellView {
   dispose() {
     if (this.scene) this.scene.remove(this.group);
     if (this.labelMat) this.labelMat.dispose();
-    if (this.membraneMesh && this.membraneMesh.material) this.membraneMesh.material.dispose();
+    if (this.outerMembraneMesh && this.outerMembraneMesh.material) this.outerMembraneMesh.material.dispose();
+    if (this.innerMembraneMesh && this.innerMembraneMesh.material) this.innerMembraneMesh.material.dispose();
+    if (this.poresMesh && this.poresMesh.material) this.poresMesh.material.dispose();
+    if (this.metabolicGeo) this.metabolicGeo.dispose();
+    if (this.metabolicMat) this.metabolicMat.dispose();
     if (this.cytoMesh && this.cytoMesh.material) this.cytoMesh.material.dispose();
     if (this.nucleus && this.nucleus.material) this.nucleus.material.dispose();
     if (this.delayRing && this.delayRing.material) this.delayRing.material.dispose();

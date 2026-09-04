@@ -1546,9 +1546,12 @@
 
     <!-- 超细胞共生微柱部分 -->
     <div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(56,189,248,0.2);">
-      <div class="card-title" style="margin-bottom:4px;">
-        <span style="font-size:10px;color:var(--text-main);">超细胞微柱 (Symbiotic Macro-Cells)</span>
-        <span class="card-title-badge" id="st-macro-count" style="color:var(--purple);background:rgba(168,85,247,0.15)">5 个微柱</span>
+      <div class="card-title" style="margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:10px;color:var(--text-main);">超细胞微柱与器官 (3D Organs)</span>
+        <div style="display:flex;gap:4px;align-items:center;">
+          <button class="btn-ctrl" onclick="if(window.toggleOrganVisibility)window.toggleOrganVisibility()" style="font-size:9px;padding:2px 6px;border-color:rgba(56,189,248,0.4);color:var(--cyan);" title="在 3D 视野中切换显示/隐藏器官生物外包膜与全息微柱铭牌">[3D器官包膜]</button>
+          <span class="card-title-badge" id="st-macro-count" style="color:var(--purple);background:rgba(168,85,247,0.15)">3 个微柱</span>
+        </div>
       </div>
       <div id="macro-cells-badges" style="display:flex;flex-wrap:wrap;gap:4px;max-height:85px;overflow-y:auto;padding-right:2px;">
         <!-- 动态徽章注入 -->
