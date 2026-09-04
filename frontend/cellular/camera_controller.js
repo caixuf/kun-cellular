@@ -83,6 +83,15 @@ export function setCameraPreset(preset, bounds = currentOrganismBounds) {
     const btn = document.getElementById('btn-auto-orbit');
     if (btn) btn.classList.remove('active');
   }
+
+  // 同步视角预设按钮的高亮状态
+  try {
+    document.querySelectorAll('.cam-btn[onclick*="setCameraPreset"]').forEach(b => {
+      const oc = b.getAttribute('onclick') || '';
+      if (oc.includes(`'${preset}'`)) b.classList.add('active');
+      else if (!oc.includes("'reset'")) b.classList.remove('active');
+    });
+  } catch(e) {}
 }
 
 export function toggleAutoOrbit() {
