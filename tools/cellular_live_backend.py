@@ -289,7 +289,7 @@ class SdscSiliconLifeOrgan:
         rec[16] = min(1.0, curv * 40.0)
         rec[17] = min(1.0, curv * 80.0)
         rec[24] = min(1.0, vel / 6.0)
-        rec[25] = max(-1.0, min(1.0, d_cte / 4.0))
+        rec[25] = max(-1.0, min(1.0, -d_cte / 4.0))
 
         for i in range(self.n_receptors):
             cells[i].output = float(rec[i])
@@ -325,7 +325,7 @@ class LiveVehicleSimulator:
     def __init__(self):
         self.generation = 1
         self.step_count = 0
-        self.warp_speed = 5
+        self.warp_speed = 1
         self.lock = threading.RLock()
         self.history_cte = []
         self.road_width = 46.0
@@ -561,50 +561,57 @@ class LiveVehicleSimulator:
             L = 18.0
             road_half_w = 23.0
 
-            # 1. 寻找最近赛道点与预瞄点
+            # 1. 寻找最近赛道点与连续线段投影 (彻底消灭离散跳变与微分脉冲)
             best_idx = 0
             best_d = float("inf")
+            n_pts = len(self.track_points)
             for idx, pt in enumerate(self.track_points):
                 d = (self.x - pt["x"])**2 + (self.y - pt["y"])**2
                 if d < best_d:
                     best_d = d
                     best_idx = idx
 
-            curr_pt = self.track_points[best_idx]
+            p_curr = self.track_points[best_idx]
+            p_next = self.track_points[(best_idx + 1) % n_pts]
+            vx = p_next["x"] - p_curr["x"]
+            vy = p_next["y"] - p_curr["y"]
+            v_len2 = max(1e-6, vx * vx + vy * vy)
+            t_proj = max(0.0, min(1.0, ((self.x - p_curr["x"]) * vx + (self.y - p_curr["y"]) * vy) / v_len2))
+
+            cx_b = p_curr["x"] + t_proj * vx
+            cy_b = p_curr["y"] + t_proj * vy
+            th0, th1 = p_curr["theta"], p_next["theta"]
+            dth = (th1 - th0 + math.pi) % math.tau - math.pi
+            theta_b = th0 + t_proj * dth
+            curv_b = p_curr.get("curv", 0.02) * (1.0 - t_proj) + p_next.get("curv", 0.02) * t_proj
+            curr_s = p_curr["s"] + t_proj * math.hypot(vx, vy)
             
-            # 物理恒定弧长前瞻插值 (消灭因离散步长导致的直弯 3.6 倍预瞄失真)
-            lookahead_dist = max(18.0, 24.0 + self.v * 0.4 - curr_pt.get("curv", 0.02) * 100.0)
+            # 物理恒定弧长前瞻插值 (消灭因离散步长导致的直弯预瞄失真)
+            lookahead_dist = max(18.0, 24.0 + self.v * 0.4 - curv_b * 100.0)
             cum_d = 0.0
             look_idx = best_idx
-            n_pts = len(self.track_points)
             while cum_d < lookahead_dist:
                 next_idx = (look_idx + 1) % n_pts
-                p1 = self.track_points[look_idx]
-                p2 = self.track_points[next_idx]
-                cum_d += math.hypot(p2["x"] - p1["x"], p2["y"] - p1["y"])
+                cum_d += math.hypot(self.track_points[next_idx]["x"] - self.track_points[look_idx]["x"],
+                                   self.track_points[next_idx]["y"] - self.track_points[look_idx]["y"])
                 look_idx = next_idx
                 if look_idx == best_idx:
                     break
             look_pt = self.track_points[look_idx]
-
-            cx_b = curr_pt["x"]
-            cy_b = curr_pt["y"]
-            theta_b = curr_pt["theta"]
-            curv_b = curr_pt.get("curv", 0.02)
             theta_far = look_pt["theta"]
 
             dx_b = self.x - cx_b
             dy_b = self.y - cy_b
             signed_cte = math.cos(theta_b) * dy_b - math.sin(theta_b) * dx_b
             self.cte = abs(signed_cte)
-            self.s = curr_pt["s"]
+            self.s = curr_s
             self.total_dist += self.v * dt * 25.0
 
             heading_err = (theta_b - self.theta + math.pi) % math.tau - math.pi
             heading_far_err = (theta_far - self.theta + math.pi) % math.tau - math.pi
 
             # 2. 纯 C 底座 1024 细胞器官前向推演 (150.6 μs 硬实时零延迟闭环)
-            # 真实物理带符号微分：过零点时严格保持单调连续阻尼，彻底消灭直道极限环蛇形摆动
+            # 连续物理微分与阻尼：过零点严格阻尼衰减，消灭画龙极限环
             signed_cte_rate = (signed_cte - getattr(self, "prev_signed_cte", 0.0)) / dt
             self.prev_signed_cte = signed_cte
             cte_n = signed_cte / road_half_w
@@ -624,7 +631,8 @@ class LiveVehicleSimulator:
                 speed_raw = float(-curv_b * 30.0)
 
             steer_target = max(-0.55, min(0.55, steer_raw * 0.55))
-            self.delta += (steer_target - self.delta) * 0.38
+            delta_diff = (steer_target - self.delta) * 0.35
+            self.delta += max(-0.06, min(0.06, delta_diff))
 
             # 弯道平滑自适应控速：直道巡航 4.8~5.2 m/s，急弯减速至 2.8~3.5 m/s 紧贴弯心
             target_v = max(2.8, min(5.2, 4.8 + speed_raw * 1.0 - curv_b * 70.0))
@@ -653,7 +661,7 @@ class LiveVehicleSimulator:
                 for i in range(nc):
                     self.cell_outs[i] = float(organ.cells[i].output)
 
-            # 3. 记录
+            # 3. 记录行驶轨迹与遥测
             if self.step_count % 5 == 0:
                 self.history_cte.append(round(self.cte * 0.05, 3))
                 if len(self.history_cte) > 40:
@@ -662,6 +670,7 @@ class LiveVehicleSimulator:
                 self.trail.append({"x": round(self.x, 1), "y": round(self.y, 1)})
                 if len(self.trail) > 120:
                     self.trail.pop(0)
+                self.champion_trail = list(self.trail)
 
     def get_snapshot(self):
         with self.lock:
@@ -720,9 +729,9 @@ live_veh = LiveVehicleSimulator()
 
 def veh_loop():
     while True:
-        for _ in range(live_veh.warp_speed):
+        for _ in range(max(1, getattr(live_veh, "warp_speed", 1))):
             live_veh.step_physics()
-        time.sleep(0.016)
+        time.sleep(0.04)
 
 threading.Thread(target=veh_loop, daemon=True).start()
 
@@ -2409,7 +2418,7 @@ class SiliconCellularOrganism:
                     "title": "具身公路巡航数字孪生 (Cybernetic Highway Twin)",
                     "car": v_snap.get("car", {}),
                     "track": v_snap.get("track", []),
-                    "trail": v_snap.get("champion_trail", [])[-50:],
+                    "trail": (v_snap.get("champion_trail") or v_snap.get("trail") or [])[-60:],
                     "fitness": v_snap.get("champion_fitness", 0.0),
                     "total_dist_m": v_snap.get("total_dist_m", 0.0)
                 }

@@ -15,9 +15,9 @@ export function createCellCloudMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
       u_time: { value: 0.0 },
-      u_size: { value: 1.8 },
+      u_size: { value: 2.8 },
       u_scale: { value: window.innerHeight / 2.0 },
-      u_opacity: { value: 0.90 }
+      u_opacity: { value: 0.95 }
     },
     transparent: true,
     depthWrite: false,
@@ -39,12 +39,12 @@ export function createCellCloudMaterial() {
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 
         // 微代谢时钟呼吸：微弱的脉冲律动
-        float pulse = 0.90 + 0.20 * sin(u_time * 2.4 + aPrimitive * 0.75 + position.x * 0.02);
-        float actBoost = 1.0 + aActivity * 0.35;
+        float pulse = 0.92 + 0.16 * sin(u_time * 2.4 + aPrimitive * 0.75 + position.x * 0.02);
+        float actBoost = 1.0 + aActivity * 0.40;
 
-        // 严格控制点云像素粒径在 1.2px ~ 4.5px，杜绝任何巨型圆球产生
+        // 高清晰度生物点云：最小 2.0px 杜绝亚像素湮灭，微观放大至 6.5px
         gl_PointSize = u_size * pulse * actBoost * (u_scale / -mvPosition.z);
-        gl_PointSize = clamp(gl_PointSize, 1.2, 4.5);
+        gl_PointSize = clamp(gl_PointSize, 2.0, 6.5);
 
         gl_Position = projectionMatrix * mvPosition;
       }
@@ -59,9 +59,9 @@ export function createCellCloudMaterial() {
         float d = length(coord);
         if (d > 0.5) discard;
 
-        // 高保真生物点云粒子：锐利高斯落差，中心保持 100% 纯正动力学原语全域色彩
-        float falloff = exp(-d * d * 14.0);
-        vec3 col = vColor * (1.05 + vActivity * 0.35);
+        // 高保真生物发光点云：中心纯真高亮，外缘自然通透色晕
+        float falloff = exp(-d * d * 6.5);
+        vec3 col = vColor * (1.28 + vActivity * 0.45);
         float alpha = falloff * u_opacity;
 
         gl_FragColor = vec4(col, alpha);

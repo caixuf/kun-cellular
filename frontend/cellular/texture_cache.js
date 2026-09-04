@@ -13,8 +13,9 @@ export function getGlowTexture() {
   const g = cv.getContext('2d');
   const grad = g.createRadialGradient(32, 32, 1, 32, 32, 30);
   grad.addColorStop(0, 'rgba(255,255,255,1.0)');
-  grad.addColorStop(0.30, 'rgba(255,255,255,0.75)');
-  grad.addColorStop(0.65, 'rgba(255,255,255,0.22)');
+  grad.addColorStop(0.28, 'rgba(255,255,255,0.92)');
+  grad.addColorStop(0.58, 'rgba(255,255,255,0.52)');
+  grad.addColorStop(0.88, 'rgba(255,255,255,0.18)');
   grad.addColorStop(1.0, 'rgba(255,255,255,0.0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, 64, 64);

@@ -91,7 +91,7 @@ class CellularVehicleController:
             self.W1[5, h] = 0.85
             self.W1[0, h] = 0.55
             self.W1[8, h] = -0.55
-            self.W1[25, h] = 0.25
+            self.W1[25, h] = 0.65
             self.W2[h, 0] = 0.048
 
         for h in range(32, 64):
@@ -216,12 +216,13 @@ def evaluate_controller(controller, env, max_steps=1000):
         rec[16] = min(1.0, r_curv * 40.0)
         rec[17] = min(1.0, r_curv * 80.0)
         rec[24] = min(1.0, v / 6.0)
-        rec[25] = max(-1.0, min(1.0, signed_cte_rate / 4.0))
+        rec[25] = max(-1.0, min(1.0, -signed_cte_rate / 4.0))
 
         steer_raw, speed_raw = controller.forward(rec)
 
         steer_target = max(-0.55, min(0.55, steer_raw * 0.55))
-        delta_change = (steer_target - delta) * 0.38
+        delta_diff = (steer_target - delta) * 0.38
+        delta_change = max(-0.06, min(0.06, delta_diff))
         delta += delta_change
         jerk_sum += abs(delta - prev_delta)
         prev_delta = delta

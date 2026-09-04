@@ -155,11 +155,11 @@ export function initLODCloud(s = scene, o = defaultOrg, b = currentOrganismBound
   geo.setAttribute("color", new THREE.BufferAttribute(lodColors, 3));
 
   const mat = new THREE.PointsMaterial({
-    size: 1.4 * spreadScale,
+    size: Math.max(2.4, 3.4 * Math.sqrt(spreadScale)),
     vertexColors: true,
     map: getGlowTexture(),
     transparent: true,
-    opacity: 0.90,
+    opacity: 0.95,
     blending: THREE.NormalBlending,
     depthWrite: false,
     sizeAttenuation: true
@@ -214,11 +214,11 @@ export function buildFullPointCloud(s = scene, o = defaultOrg, b = currentOrgani
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
   const mat = new THREE.PointsMaterial({
-    size: 1.8,
+    size: 2.8,
     vertexColors: true,
     map: getGlowTexture(),
     transparent: true,
-    opacity: 0.90,
+    opacity: 0.95,
     blending: THREE.NormalBlending,
     depthWrite: false,
     sizeAttenuation: true

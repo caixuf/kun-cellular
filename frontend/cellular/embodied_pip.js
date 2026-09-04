@@ -176,14 +176,14 @@ export class EmbodiedPIPTwin {
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
     }
 
-    const cx = w * 0.45;
-    const cy = h * 0.55;
+    const cx = w * 0.50;
+    const cy = h * 0.68;
     const carX = car.x || 0;
     const carY = car.y || 0;
     const carTheta = car.theta || 0;
     const scale = 0.22;
 
-    // 2. 变换到车辆前瞻坐标系
+    // 2. 变换到车辆前瞻坐标系 (车头向上指引)
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(-carTheta - Math.PI * 0.5);
@@ -290,25 +290,25 @@ export class EmbodiedPIPTwin {
       ctx.stroke();
     }
 
-    // 2.3 绘制车辆本体
+    // 2.3 绘制车辆本体 (车头朝前 Y < 0 方向，消除倒退反向错觉)
     ctx.fillStyle = "#38bdf8";
     ctx.shadowColor = "#38bdf8";
     ctx.shadowBlur = 8;
     ctx.beginPath();
-    ctx.moveTo(0, 7);
-    ctx.lineTo(-4, -6);
-    ctx.lineTo(4, -6);
+    ctx.moveTo(0, -9);
+    ctx.lineTo(-5, 6);
+    ctx.lineTo(5, 6);
     ctx.closePath();
     ctx.fill();
     ctx.shadowBlur = 0;
 
-    // 2.4 前视感知预瞄射线
+    // 2.4 前视感知预瞄射线 (正前方射出)
     ctx.strokeStyle = "rgba(251, 191, 36, 0.85)";
     ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.moveTo(0, 7);
-    ctx.lineTo(0, 32);
+    ctx.moveTo(0, -9);
+    ctx.lineTo(0, -38);
     ctx.stroke();
     ctx.setLineDash([]);
 
@@ -347,7 +347,8 @@ export class EmbodiedPIPTwin {
 
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(angleRad);
+    // 左转(delta > 0)逆时针打舵，右转顺时针打舵，严格对齐人类方向盘感知
+    ctx.rotate(-angleRad);
 
     // 外轮圈
     ctx.strokeStyle = "rgba(56, 189, 248, 0.85)";
