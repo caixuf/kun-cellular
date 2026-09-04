@@ -110,12 +110,19 @@ public:
         }
         eval.blindspot_risk_awareness = std::clamp(blindspot_energy / 16.0f, 0.0f, 1.0f);
 
-        // effectors[32..63]: 长程推演时间地平线 (预测衰减特征)
-        float horizon_energy = 0.0f;
+        // effectors[32..63]: 长程推演时间地平线 (32个时序外推通道，每步0.25秒，最长8.0秒)
+        // 彻底废除 5.0s 人工保底外挂：若网络输出全为0，预测地平线严格为 0.0s！
+        // 只有当时序通道预测激活置信度超过有效阈值 (0.15) 时，才连续累加有效预测时间
+        float valid_horizon_steps = 0.0f;
         for (int i = 32; i < 64; ++i) {
-            horizon_energy += std::max(0.0f, effectors[i]);
+            float tap_conf = std::abs(effectors[i]);
+            if (tap_conf > 0.15f) {
+                valid_horizon_steps += std::clamp(tap_conf, 0.0f, 1.0f);
+            } else {
+                break; // 预测置信度衰减断流，地平线即刻终止
+            }
         }
-        eval.prediction_horizon_seconds = 5.0f + std::clamp(horizon_energy * 0.1f, 0.0f, 3.5f); // 5.0s ~ 8.5s
+        eval.prediction_horizon_seconds = valid_horizon_steps * 0.25f; // 纯真实推演跨度 (0.0s ~ 8.0s)
 
         // effectors[64..95]: 反事实多模态熵
         float var_sum = 0.0f;

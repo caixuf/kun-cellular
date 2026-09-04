@@ -1981,74 +1981,159 @@ DOCS_REGISTRY = {
 
 class LiveLocomotionSimulator:
     def __init__(self):
+        self.lock = threading.RLock()
         self.generation = 1
         self.step_count = 0
-        self.max_steps = 300
+        self.max_steps = 260
         self.warp_speed = 5
-        self.lock = threading.RLock()
+        self.x_base = 80.0
+        self.ground_y = 380.0
         self.best_distance = 0
         self.history_dist = [0]
-        self.init_organism()
+        self.pop_size = 8
+        self.population = []
+        self.init_population(self.pop_size)
 
-    def init_organism(self):
-        self.x_base = 80.0
+    def init_population(self, n=8):
+        with self.lock:
+            self.pop_size = n
+            self.population = []
+            base_muscles = [
+                {"n1": 0, "n2": 1, "rest": 40.0},
+                {"n1": 0, "n2": 2, "rest": 50.0},
+                {"n1": 1, "n2": 3, "rest": 50.0},
+                {"n1": 2, "n2": 3, "rest": 40.0},
+                {"n1": 0, "n2": 3, "rest": 64.0}
+            ]
+            for _ in range(self.pop_size):
+                ind = {"muscles": [], "fitness": 0.0}
+                for bm in base_muscles:
+                    m = dict(bm)
+                    m["phase"] = random.uniform(0.0, 2.0 * math.pi)
+                    m["freq"] = random.uniform(2.5, 4.5)
+                    m["amp"] = random.uniform(0.15, 0.35)
+                    ind["muscles"].append(m)
+                self.population.append(ind)
+            self.generation = 1
+            self.step_count = 0
+            self.best_distance = 0
+            self.history_dist = [0]
+            self.reset_organism_state()
+
+    def reset_organism_state(self):
         self.nodes = [
             {"x": self.x_base, "y": 320.0, "vx": 0.0, "vy": 0.0},
             {"x": self.x_base + 40.0, "y": 320.0, "vx": 0.0, "vy": 0.0},
             {"x": self.x_base, "y": 370.0, "vx": 0.0, "vy": 0.0},
             {"x": self.x_base + 40.0, "y": 370.0, "vx": 0.0, "vy": 0.0}
         ]
-        self.muscles = [
-            {"n1": 0, "n2": 1, "rest": 40.0, "phase": 0.0},
-            {"n1": 0, "n2": 2, "rest": 50.0, "phase": 0.5},
-            {"n1": 1, "n2": 3, "rest": 50.0, "phase": 1.5},
-            {"n1": 2, "n2": 3, "rest": 40.0, "phase": 2.0},
-            {"n1": 0, "n2": 3, "rest": 64.0, "phase": 2.5}
-        ]
+        if self.population:
+            self.muscles = [dict(m) for m in self.population[0]["muscles"]]
+        else:
+            self.muscles = []
 
-    def init_population(self, n=20):
-        with self.lock:
-            self.init_organism()
+    def eval_candidate_pure_physics(self, muscles, steps=260):
+        nodes = [
+            {"x": self.x_base, "y": 320.0, "vx": 0.0, "vy": 0.0},
+            {"x": self.x_base + 40.0, "y": 320.0, "vx": 0.0, "vy": 0.0},
+            {"x": self.x_base, "y": 370.0, "vx": 0.0, "vy": 0.0},
+            {"x": self.x_base + 40.0, "y": 370.0, "vx": 0.0, "vy": 0.0}
+        ]
+        for s in range(steps):
+            t = s * 0.05
+            for m in muscles:
+                act = math.sin(t * m.get("freq", 4.0) + m["phase"])
+                target_len = m["rest"] * (1.0 + act * m.get("amp", 0.25))
+                n1, n2 = nodes[m["n1"]], nodes[m["n2"]]
+                dx, dy = n2["x"] - n1["x"], n2["y"] - n1["y"]
+                d = math.sqrt(dx*dx + dy*dy) + 1e-5
+                f = (d - target_len) * 0.18
+                fx, fy = (dx/d)*f, (dy/d)*f
+                n1["vx"] += fx; n1["vy"] += fy
+                n2["vx"] -= fx; n2["vy"] -= fy
+
+            for n in nodes:
+                n["vy"] += 0.40
+                n["x"] += n["vx"]
+                n["y"] += n["vy"]
+                n["vx"] *= 0.95
+                n["vy"] *= 0.95
+                if n["y"] >= self.ground_y - 6:
+                    n["y"] = self.ground_y - 6
+                    n["vy"] = 0.0
+                    n["vx"] *= 0.20
+        return max(0.0, nodes[0]["x"] - self.x_base)
+
+    def advance_generation(self, current_dist):
+        if self.population:
+            self.population[0]["fitness"] = float(current_dist)
+        for i in range(1, len(self.population)):
+            self.population[i]["fitness"] = self.eval_candidate_pure_physics(self.population[i]["muscles"])
+        self.population.sort(key=lambda x: x["fitness"], reverse=True)
+        top_dist = self.population[0]["fitness"]
+        if top_dist > self.best_distance:
+            self.best_distance = int(top_dist)
+        self.generation += 1
+        self.history_dist.append(self.best_distance)
+        if len(self.history_dist) > 35:
+            self.history_dist.pop(0)
+
+        elites = [self.population[0], self.population[1] if len(self.population) > 1 else self.population[0]]
+        new_pop = [
+            {"muscles": [dict(m) for m in elites[0]["muscles"]], "fitness": 0.0},
+            {"muscles": [dict(m) for m in elites[1]["muscles"]], "fitness": 0.0}
+        ]
+        while len(new_pop) < self.pop_size:
+            parent = random.choice(elites)
+            child_muscles = []
+            for m in parent["muscles"]:
+                cm = dict(m)
+                if random.random() < 0.65:
+                    cm["phase"] = (cm["phase"] + random.gauss(0, 0.35)) % (2 * math.pi)
+                if random.random() < 0.40:
+                    cm["freq"] = max(1.8, min(6.0, cm["freq"] + random.gauss(0, 0.3)))
+                if random.random() < 0.40:
+                    cm["amp"] = max(0.10, min(0.40, cm["amp"] + random.gauss(0, 0.05)))
+                child_muscles.append(cm)
+            new_pop.append({"muscles": child_muscles, "fitness": 0.0})
+
+        self.population = new_pop
+        self.reset_organism_state()
 
     def step_physics(self):
         with self.lock:
             self.step_count += 1
             t = self.step_count * 0.05
-            
             for m in self.muscles:
-                act = math.sin(t * 4.0 + m["phase"])
-                target_len = m["rest"] * (1.0 + act * 0.25)
+                act = math.sin(t * m.get("freq", 4.0) + m["phase"])
+                target_len = m["rest"] * (1.0 + act * m.get("amp", 0.25))
                 n1, n2 = self.nodes[m["n1"]], self.nodes[m["n2"]]
                 dx, dy = n2["x"] - n1["x"], n2["y"] - n1["y"]
                 d = math.sqrt(dx*dx + dy*dy) + 1e-5
-                f = (d - target_len) * 0.15
+                f = (d - target_len) * 0.18
                 fx, fy = (dx/d)*f, (dy/d)*f
                 n1["vx"] += fx; n1["vy"] += fy
                 n2["vx"] -= fx; n2["vy"] -= fy
 
-            ground_y = 380.0
             for n in self.nodes:
-                n["vy"] += 0.45
+                n["vy"] += 0.40
                 n["x"] += n["vx"]
                 n["y"] += n["vy"]
-                n["vx"] *= 0.92
-                n["vy"] *= 0.92
-                if n["y"] >= ground_y - 6:
-                    n["y"] = ground_y - 6
+                n["vx"] *= 0.95
+                n["vy"] *= 0.95
+                if n["y"] >= self.ground_y - 6:
+                    n["y"] = self.ground_y - 6
                     n["vy"] = 0.0
-                    n["vx"] += 0.85
+                    # 纯净牛顿物理与地面库仑摩擦（完全剔除任何人工向前加速外挂）
+                    n["vx"] *= 0.20
 
             dist = int(max(0, self.nodes[0]["x"] - self.x_base))
             if dist > self.best_distance:
                 self.best_distance = dist
 
             if self.step_count >= self.max_steps or self.nodes[0]["x"] > 1200:
-                self.generation += 1
-                self.history_dist.append(self.best_distance)
-                if len(self.history_dist) > 30:
-                    self.history_dist.pop(0)
                 self.step_count = 0
-                self.init_organism()
+                self.advance_generation(dist)
 
     def get_snapshot(self):
         with self.lock:
