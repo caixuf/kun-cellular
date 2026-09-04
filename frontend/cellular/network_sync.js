@@ -592,7 +592,9 @@ export function updateFromBackendState(data) {
   if (realCellsEl) {
     const solidCount = (views && views.cells) ? views.cells.length : 0;
     const ptCount = (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.position) ? lodPointsMesh.geometry.attributes.position.count : realCells;
-    if (solidCount > 0 && solidCount < ptCount) {
+    if (realCells <= 1536) {
+      realCellsEl.textContent = `${solidCount}/${realCells} 实体全量 (100% 显微实化)`;
+    } else if (solidCount > 0 && solidCount < ptCount) {
       realCellsEl.textContent = `${solidCount} 实体 (显微实化) / ${ptCount.toLocaleString()} 点云流形`;
     } else if (solidCount === 0) {
       realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观亚像素，真实未放大)`;

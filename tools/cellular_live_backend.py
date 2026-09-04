@@ -2935,7 +2935,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         # 跨物种器官冷冻库列表接口
-        if self.path.startswith("/api/organ/bank") or self.path == "/api/organs":
+        if self.path.startswith("/api/organ/bank") or self.path.startswith("/api/organ/list") or self.path == "/api/organs" or self.path.startswith("/api/organs"):
             data = OrganFrozenBank.instance().list_organs()
             body = json.dumps({"status": "ok", "bank": data}, ensure_ascii=False).encode("utf-8")
             self.send_response(200)

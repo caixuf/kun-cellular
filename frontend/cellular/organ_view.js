@@ -32,7 +32,11 @@ function getOrganBadgeTexture(label, count, colorHex) {
   ctx.strokeStyle = colorHex || '#38bdf8';
   ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.roundRect(6, 6, 372, 84, 12);
+  if (ctx.roundRect) {
+    ctx.roundRect(6, 6, 372, 84, 12);
+  } else {
+    ctx.rect(6, 6, 372, 84);
+  }
   ctx.fill();
   ctx.stroke();
 
