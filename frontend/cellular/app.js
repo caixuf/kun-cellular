@@ -67,7 +67,9 @@ function animate() {
   _frustum.setFromProjectionMatrix(_projScreenMatrix);
 
   const closeLook = camState.camR < Math.max(160, (currentOrganismBounds.microDist || 220) * 0.85);
-  const showPointCloud = currentRenderMode !== "puremesh";
+  const totalCellCount = org && org.cells ? org.cells.length : 0;
+  const isDiscrete = totalCellCount <= 1536;
+  const showPointCloud = (currentRenderMode !== "puremesh") && !isDiscrete;
 
   if (lodPointsMesh && lodPointsMesh.material) {
     lodPointsMesh.visible = showPointCloud;
@@ -127,11 +129,12 @@ function animate() {
     }
   }
 
-  const totalCellCount = org && org.cells ? org.cells.length : 0;
   const ptCount = (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.position) ? lodPointsMesh.geometry.attributes.position.count : totalCellCount;
   const realCellsEl = document.getElementById("st-real-cells");
   if (realCellsEl) {
-    if (visibleMicroCount > 0 && visibleMicroCount < ptCount) {
+    if (isDiscrete) {
+      realCellsEl.textContent = `${visibleMicroCount}/${totalCellCount} 实体全量 (100% 显微实化)`;
+    } else if (visibleMicroCount > 0 && visibleMicroCount < ptCount) {
       realCellsEl.textContent = `${visibleMicroCount} 实体 (显微实化) / ${ptCount.toLocaleString()} 点云流形`;
     } else if (visibleMicroCount === 0) {
       realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观亚像素，真实未放大)`;
@@ -140,7 +143,7 @@ function animate() {
     }
   }
   const elScale = document.getElementById("st-pipe");
-  if (elScale) elScale.textContent = `实体 ${visibleMicroCount} / 点云 ${ptCount.toLocaleString()} · 像素LOD实化`;
+  if (elScale) elScale.textContent = isDiscrete ? `实体 ${visibleMicroCount}/${totalCellCount} (100% 全量实化)` : `实体 ${visibleMicroCount} / 点云 ${ptCount.toLocaleString()} · 像素LOD实化`;
 
   const vitalScaleEl = document.getElementById("vital-scale");
   const vitalScaleSubEl = document.getElementById("vital-scale-sub");

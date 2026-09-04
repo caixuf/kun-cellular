@@ -310,9 +310,13 @@ export class CellView {
   updateCell(cell, org = null) {
     this.cell = cell;
     if (org) this.org = org;
-    this.targetX = cell.x;
-    this.targetY = cell.y;
+    this.targetX = cell.x || 0;
+    this.targetY = cell.y || 0;
     this.targetZ = cell.z || 0;
+    this.curX = this.targetX;
+    this.curY = this.targetY;
+    this.curZ = this.targetZ;
+    this.group.position.set(this.curX, this.curY, this.curZ);
     const rBase = getCellWorldRadius(this.org);
     const sf = rBase / 13.0;
     this.group.scale.set(sf, sf, sf);

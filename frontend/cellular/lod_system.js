@@ -308,27 +308,30 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5));
   const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
 
-  // 1. 严格物理光学显微分辨门禁 (Physical Optical Microscope Gate)
-  // 当相机推进到显微视距级别、细胞屏幕投影尺寸 >= MIN_CELL_PIXELS 时，
-  // 达到该放大级别的【每一个】细胞 100% 全部全量实化生物真实细节！严禁任何 cherry-picking 配额筛选！
+  // 1. 离散硅基生命体 (n <= 1536，如 9、13、210、1024 细胞)
+  // 离散生命体 100% 全部细胞全量实化，绝不因视距裁剪丢弃任何一个细胞！
+  // 只有超大规模体素流体场 (n > 1536) 才在远景进入点云降级。
   _lodCandidates.length = 0;
-  const isPureMesh = (renderMode === 'puremesh');
+  const isDiscrete = n <= 1536;
+  const isPureMesh = (renderMode === 'puremesh') || isDiscrete;
 
   for (const c of orgObj.cells) {
     _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
     const d = _lodCamPos.distanceTo(_lodCellPos);
 
-    // 未放大到该物理显微级别时，保持为真实亚像素点云；一旦放大到该级别，每一个都实化！
+    // 超大规模体素流体场才进行远景光学门禁过滤
     if (!isPureMesh && d > solidMaxDist) continue;
 
-    _lodSphere.center.copy(_lodCellPos);
-    _lodSphere.radius = Math.max(12.0, cellRadius * 2.0);
-    if (frustum && !frustum.intersectsSphere(_lodSphere)) continue;
+    if (!isDiscrete) {
+      _lodSphere.center.copy(_lodCellPos);
+      _lodSphere.radius = Math.max(12.0, cellRadius * 2.0);
+      if (frustum && !frustum.intersectsSphere(_lodSphere)) continue;
+    }
 
     _lodCandidates.push({ id: c.id, d });
   }
 
-  // 达到该放大级别的每一个细胞全量实化，绝不人为设限截断！
+  // 每一个细胞全量实化，绝不人为设限截断！
   const wantIds = new Set();
   for (const cd of _lodCandidates) wantIds.add(cd.id);
 
