@@ -2282,8 +2282,8 @@ scene.add(airParticleCloud);
 /* ============================================================
  * 2. 增强型 3D 动力学相机控制器 (Momentum Lerp, Zoom-to-Cursor, Double-Click Focus)
  * ============================================================ */
-let camTheta = 0, camPhi = Math.PI / 2, camR = 560;
-let targetTheta = 0, targetPhi = Math.PI / 2, targetCamR = 560;
+let camTheta = 0, camPhi = Math.PI / 2, camR = 540;
+let targetTheta = 0, targetPhi = Math.PI / 2, targetCamR = 540;
 window.setCameraDistance = (r) => { targetCamR = clampCamDistance(r); camR = targetCamR; isCamTransitioning = false; };
 window.setCameraTarget = (v) => { targetLookAt.copy(v); currentLookAt.copy(v); };
 window.focusOnCell = function(cellId, distance = 25) {
@@ -2311,8 +2311,8 @@ const _zoomHit = new THREE.Vector3();
 let panDragging = false;
 
 function clampCamDistance(r) {
-  const macro = (currentOrganismBounds && currentOrganismBounds.macroDist) || 560;
-  return Math.max(10, Math.min(Math.max(3200, macro * 4), r));
+  const macro = (currentOrganismBounds && currentOrganismBounds.macroDist) || 540;
+  return Math.max(15, Math.min(Math.max(3200, macro * 4), r));
 }
 
 renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
@@ -2579,10 +2579,11 @@ let currentOrganismBounds = {
   radius: 180,
   min: new THREE.Vector3(-180, -180, -180),
   max: new THREE.Vector3(180, 180, 180),
-  macroDist: 460,
-  microDist: 260,
+  macroDist: 540,
+  microDist: 180,
   cellScale: 12,
-  volumeRatio: 0.000001
+  volumeRatio: 0.000001,
+  trueRadius: 14.0
 };
 window.currentOrganismBounds = currentOrganismBounds;
 
@@ -2593,8 +2594,8 @@ function updateOrganismBounds(data = null) {
   const V_ratio = cellScale / HARDWARE_COSMIC_SPECS.maxCellCapacity;
   // 计算在 1000m 宇宙中的相对物理占据半径 (R ∝ cbrt(V_ratio))
   const R_raw = (HARDWARE_COSMIC_SPECS.universeEdge * 0.5) * Math.cbrt(V_ratio);
-  const R_min = 14.0; // 最小可视半径基线 (确保 12 细胞反射弧细节清晰可辨)
-  const R_max = 440.0; // 一亿级大尺度上限 (占据 88% 宇宙跨度)
+  const R_min = 14.0; // 最小物理可视半径基线
+  const R_max = 440.0; // 一亿级大尺度物理上限
   const R_true = Math.max(R_min, Math.min(R_max, R_raw));
 
   // 1. 记录并保留细胞原始拓扑相对坐标 (_rawX, _rawY, _rawZ)
@@ -2619,10 +2620,14 @@ function updateOrganismBounds(data = null) {
   const dx = Math.max(1.0, maxX - minX);
   const dy = Math.max(1.0, maxY - minY);
   const dz = Math.max(1.0, maxZ - minZ);
-  const rawRad = Math.max(1.0, Math.sqrt(dx * dx + dy * dy + dz * dz) * 0.5);
-  const scale = R_true / rawRad;
+  const rawRad = Math.max(10.0, Math.sqrt(dx * dx + dy * dy + dz * dz) * 0.5);
 
-  // 2. 根据宇宙相对物理尺度映射细胞实际三维位置
+  // 保持生命体三维拓扑原始宏观形态与特征比例 (Preserve Authentic 3D Morphology)
+  // 视效占据半径统一控制在 180m ~ 240m 宏伟全景视界，完整展现生命体奇特多样的三维构造，绝不压缩成微观球团
+  const targetVisRadius = Math.max(160.0, Math.min(240.0, rawRad));
+  const scale = targetVisRadius / rawRad;
+
+  // 2. 映射细胞实际三维拓扑坐标，保持其真实奇特形态
   for (const c of org.cells) {
     c.x = (c._rawX - cx) * scale;
     c.y = (c._rawY - cy) * scale;
@@ -2636,13 +2641,14 @@ function updateOrganismBounds(data = null) {
   }
 
   currentOrganismBounds.center.set(0, 0, 0);
-  currentOrganismBounds.radius = R_true;
-  currentOrganismBounds.min.set(-R_true, -R_true, -R_true);
-  currentOrganismBounds.max.set(R_true, R_true, R_true);
-  currentOrganismBounds.macroDist = Math.max(35, R_true * 2.2);
-  currentOrganismBounds.microDist = Math.max(18, R_true * 1.15);
+  currentOrganismBounds.radius = targetVisRadius;
+  currentOrganismBounds.min.set(-targetVisRadius, -targetVisRadius, -targetVisRadius);
+  currentOrganismBounds.max.set(targetVisRadius, targetVisRadius, targetVisRadius);
+  currentOrganismBounds.macroDist = Math.max(480, targetVisRadius * 2.6);
+  currentOrganismBounds.microDist = Math.max(140, targetVisRadius * 0.7);
   currentOrganismBounds.cellScale = cellScale;
   currentOrganismBounds.volumeRatio = V_ratio;
+  currentOrganismBounds.trueRadius = R_true;
 
   // 3. 遥测面板实时更新宇宙相对空间指标
   const radEl = document.getElementById("st-universe-rad");
@@ -2658,9 +2664,9 @@ function getCellWorldRadius() {
   const R = (currentOrganismBounds && currentOrganismBounds.radius) || 180;
   const n = (org && org.cells && org.cells.length) ? org.cells.length : 12;
   const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || n;
-  if (cellScale >= 10000000) return 1.6;
-  if (cellScale >= 1000000) return 2.0;
-  return Math.max(1.5, Math.min(6.0, (R / Math.cbrt(n)) * 0.42));
+  if (cellScale >= 10000000) return 2.0;
+  if (cellScale >= 1000000) return 2.6;
+  return Math.max(2.8, Math.min(6.5, (R / Math.cbrt(n)) * 0.42));
 }
 
 // 动态计算点云粒子自适应密度 (Adaptive Point Cloud Density)
@@ -3150,7 +3156,7 @@ window.views = views;
 window.cellViewsMap = cellViewsMap;
 
 // ===== 真实渲染 LOD：点云打底 + 按屏幕像素尺寸实化放大区域的实体细胞 =====
-const MIN_CELL_PIXELS   = 22.0;    // 严格几何：单细胞在屏幕上投影直径 < 22 像素 -> 必须作为点云中的一个点！绝不能画实体多边形网格！
+const MIN_CELL_PIXELS   = 26.0;    // 严格几何：单细胞在屏幕上投影直径 < 26 像素 -> 必须作为点云中的一个点！绝不能画实体多边形网格！
 const MAX_SOLID_CELLS   = 300;     // 同屏最多实体细胞数（性能护栏，防放大近距爆量）
 const POINT_CLOUD_CAP   = 2000000; // 点云 GPU 硬上限
 const cellViewPool = [];           // 空闲 CellView 复用池（避免反复 dispose/重建）
@@ -3159,6 +3165,37 @@ let cellSpatialHash = new Map();   // "bx,by,bz" -> [cellId,...]  空间哈希�
 let cellSynAdj = new Map();        // cellId -> [synKey,...]       突触反查邻接
 let synKeyMap = new Map();         // synKey -> syn                突触 O(1) 查表
 let lodPointsMesh = null;          // 真实全量点云（每细胞一个点）
+
+// 获取活跃大型突触集合 (Active Major Synapses for Connectome / Point Cloud LOD)
+// 无论相机在宏观还是微观，生命体核心突触回路始终清晰可辨，确保点云模式下宏观突触回路持续奔涌闪耀
+const MAX_MACRO_SYNS = 120; // 宏观点云下最大活跃突触连接线数 (兼顾震撼视觉与纳秒级性能)
+let cachedMajorSynKeys = null;
+let lastMajorSynOrgId = null;
+let lastMajorSynCount = 0;
+
+function getMajorSynapseKeys() {
+  if (!org || !org.syns || org.syns.length === 0) return [];
+  const curId = org.lastOrganismId || (currentOrganismBounds && currentOrganismBounds.organismId) || '';
+  if (cachedMajorSynKeys && lastMajorSynOrgId === curId && lastMajorSynCount === org.syns.length) {
+    return cachedMajorSynKeys;
+  }
+
+  // 筛选活跃突触，按权重绝对值降序排序 (优先展示主干突触拓扑)
+  const activeSyns = org.syns.filter(s => s.active !== false);
+  const candidates = activeSyns.length > 0 ? activeSyns : org.syns;
+  
+  const sorted = candidates.slice().sort((a, b) => {
+    const wa = Math.abs(a.w !== undefined ? a.w : (a.weight !== undefined ? a.weight : 1.0));
+    const wb = Math.abs(b.w !== undefined ? b.w : (b.weight !== undefined ? b.weight : 1.0));
+    return wb - wa;
+  });
+
+  const top = sorted.slice(0, MAX_MACRO_SYNS);
+  cachedMajorSynKeys = top.map(s => `${s.from}->${s.to}:${s.port || 0}`);
+  lastMajorSynOrgId = curId;
+  lastMajorSynCount = org.syns.length;
+  return cachedMajorSynKeys;
+}
 
 function rebuildViews(){
   updateOrganismBounds();
@@ -3174,6 +3211,8 @@ function rebuildViews(){
 
   // 3. 空间哈希 + 突触反查邻接（每帧 LOD 邻域查询用）
   buildCellSpatialHash();
+
+  cachedMajorSynKeys = null;
 
   org.cellMap = new Map(org.cells.map(c => [c.id, c]));
   views.cells = [];
@@ -3259,44 +3298,30 @@ function updateDetailLOD(frustum){
   _lodCamPos.copy(camera.position);
 
   // 严格几何换算：细胞在屏幕上的像素直径 D_px = (2.0 * cellRadius * projScale) / d
-  // 当 D_px < MIN_CELL_PIXELS (22px) 时，d > solidMaxDist，必须退化为点云中的一个点！
+  // 当 D_px < MIN_CELL_PIXELS (26px) 时，d > solidMaxDist，必须退化为点云中的一个点！
   const cellRadius = getCellWorldRadius();
   const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
   const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
   const orgR = currentOrganismBounds.radius || 180;
-
-  // 早退：相机离组织太远 -> 细胞在屏幕上太小 (< MIN_CELL_PIXELS) -> 全部退化为点云！
   const camToCtr = _lodCamPos.distanceTo(currentOrganismBounds.center);
-  if (camToCtr > solidMaxDist + orgR) {
-    if (cellViewsMap.size) {
-      for (const v of cellViewsMap.values()) { v.group.visible = false; cellViewPool.push(v); }
-      cellViewsMap.clear();
-    }
-    if (synViewsMap.size) {
-      for (const v of synViewsMap.values()) { v.group.visible = false; synViewPool.push(v); }
-      synViewsMap.clear();
-    }
-    views.cells = []; views.syns = [];
-    window.views = views;
-    return;
-  }
 
-  // 只遍历「含细胞的桶」，对每个细胞测距离 + 视锥（百万细胞也只扫实有桶）
+  // 1. 实体细胞筛选：仅当相机距离合适且在视锥内时实化对应细胞
   _lodCandidates.length = 0;
-  for (const arr of cellSpatialHash.values()) {
-    for (const c of arr) {
-      _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
-      const d = _lodCamPos.distanceTo(_lodCellPos);
-      if (d > solidMaxDist) continue;
-      _lodSphere.center.copy(_lodCellPos); _lodSphere.radius = 52.0;
-      if (!frustum.intersectsSphere(_lodSphere)) continue;
-      _lodCandidates.push({ id: c.id, d });
+  if (camToCtr <= solidMaxDist + orgR) {
+    for (const arr of cellSpatialHash.values()) {
+      for (const c of arr) {
+        _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
+        const d = _lodCamPos.distanceTo(_lodCellPos);
+        if (d > solidMaxDist) continue;
+        _lodSphere.center.copy(_lodCellPos); _lodSphere.radius = 52.0;
+        if (!frustum.intersectsSphere(_lodSphere)) continue;
+        _lodCandidates.push({ id: c.id, d });
+      }
     }
+    _lodCandidates.sort((a, b) => a.d - b.d);
+    if (_lodCandidates.length > MAX_SOLID_CELLS) _lodCandidates.length = MAX_SOLID_CELLS;
   }
 
-  // 距相机最近者优先，截断到护栏
-  _lodCandidates.sort((a, b) => a.d - b.d);
-  if (_lodCandidates.length > MAX_SOLID_CELLS) _lodCandidates.length = MAX_SOLID_CELLS;
   const wantIds = new Set();
   for (const cd of _lodCandidates) wantIds.add(cd.id);
 
@@ -3316,12 +3341,31 @@ function updateDetailLOD(frustum){
   }
   views.cells = Array.from(cellViewsMap.values());
 
-  // 突触 LOD：仅当至少一端是实体细胞时才显示
+  // 2. 突触 LOD：实化细胞关联突触 + 点云模式下全脑活跃大型突触 (Active Major Synapses)
   const wantSyn = new Set();
-  for (const id of wantIds) {
-    const adj = cellSynAdj.get(id);
-    if (adj) for (const key of adj) wantSyn.add(key);
+
+  // 若存在近距离实化细胞，优先包含其直连突触
+  if (wantIds.size > 0) {
+    for (const id of wantIds) {
+      const adj = cellSynAdj.get(id);
+      if (adj) {
+        for (const key of adj) {
+          wantSyn.add(key);
+          if (wantSyn.size >= 120) break;
+        }
+      }
+      if (wantSyn.size >= 120) break;
+    }
   }
+
+  // 无论微观还是宏观点云模式，始终保留活跃大型突触回路 (Active Major Synapses)，
+  // 确保点云星团中奔涌的光流纤维与因果通道始终清晰可辨、震撼可见！
+  const majorKeys = getMajorSynapseKeys();
+  for (const key of majorKeys) {
+    wantSyn.add(key);
+    if (wantSyn.size >= 140) break;
+  }
+
   for (const [key, v] of synViewsMap) {
     if (!wantSyn.has(key)) { v.group.visible = false; synViewPool.push(v); synViewsMap.delete(key); }
   }
@@ -3332,8 +3376,9 @@ function updateDetailLOD(frustum){
       let v = synViewPool.length ? (synViewPool.pop()) : new SynapseView(syn, org);
       v.updateSyn(syn, org);
       synViewsMap.set(key, v);
-      v.group.visible = true;
     }
+    const v = synViewsMap.get(key);
+    if (v) v.group.visible = true;
   }
   views.syns = Array.from(synViewsMap.values());
   window.views = views;
@@ -4909,7 +4954,7 @@ function updateFromBackendState(data) {
         from: s.from,
         to: s.to,
         port: s.port || 0,
-        w: s.w !== undefined ? s.w : 1.0,
+        w: s.w !== undefined ? s.w : (s.weight !== undefined ? s.weight : 1.0),
         active: s.active !== undefined ? s.active : true,
         photon: -1
       }));
