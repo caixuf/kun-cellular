@@ -1816,7 +1816,8 @@ class SiliconCellularOrganism:
                 "macro_cells": self.macro_cells,
                 "macro_synapses": self.macro_synapses,
                 "cells_count": len(self.cells),
-                "synapses_count": len(self.synapses)
+                "synapses_count": len(self.synapses),
+                "cells_scale": getattr(self, "nominal_scale", len(self.cells))
             }
 
     def load_mega_1m_preset(self):
