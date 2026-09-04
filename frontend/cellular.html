@@ -603,13 +603,19 @@
   const dispatcher = new CosmicDispatcher(model);
 
   // 初始化视口与 Worker 异步管线
-  window.addEventListener("DOMContentLoaded", async () => {
+  async function startApp() {
+    console.log("[Observatory] Initializing Cosmic MVD App...");
     await dispatcher.init(document.getElementById("stage"));
 
-    // 默认加载 1 亿细胞旗舰生命体并进入 4D 全息世界模型视界
+    // 默认加载 1 亿细胞旗舰生命体并进入算力宇宙全息视界
     await selectOrganism("adas_world_model_100m");
-    switchScenario("world_model");
-  });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startApp);
+  } else {
+    startApp();
+  }
 
   // 全局交互暴露
   window.selectOrganism = async function(orgId) {
@@ -630,14 +636,8 @@
           domain: resData.result.domain || "具身控制"
         }, rawTopo);
 
-        // 智能场景联动：若选 100M 则自动进入 4D 体素世界模型，若选 1M 则进入爆胎稳控，其余进入算力宇宙
-        if (orgId === "adas_world_model_100m") {
-          switchScenario("world_model");
-        } else if (orgId === "adas_transient_1m") {
-          switchScenario("transient_blowout");
-        } else {
-          switchScenario("cosmic");
-        }
+        // 默认进入算力宇宙空间呈现真实生命体
+        switchScenario("cosmic");
       }
     } catch (e) {
       console.warn("加载生命体异常，使用离线兜底:", e);
@@ -646,6 +646,7 @@
         if (ckptRes.ok) {
           const rawCkpt = await ckptRes.json();
           dispatcher.loadOrganism({ id: orgId, name: orgId }, rawCkpt);
+          switchScenario("cosmic");
         }
       } catch (err) {}
     }
