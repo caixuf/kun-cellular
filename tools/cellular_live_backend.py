@@ -844,7 +844,7 @@ def compute_lyapunov_stability(cells, synapses):
                     is_stable = False
                     if cycle_nodes not in unstable_cycles and len(unstable_cycles) < 10:
                         unstable_cycles.append(cycle_nodes)
-            elif visited.get(v, 0) == 0:
+            elif visited.get(v, 0) == 0 and len(path) < 64:
                 dfs(v)
             weights_path.pop()
             
@@ -1714,6 +1714,18 @@ class SiliconCellularOrganism:
                         SymbioticMacroCell(2, "AdaptiveDampingCortex", core_ids, color="#34d399"),
                         SymbioticMacroCell(3, "AntiSlipEffectorCore", act_ids, color="#f43f5e")
                     ]
+                elif oid in ("quant_master_champion", "quant_futures_champion", "real_trained_champion"):
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "MomentumSensoryCore", sense_ids or [0, 1], color="#22d3ee"),
+                        SymbioticMacroCell(2, "HysteresisDecisionManifold", core_ids or list(range(2, 6)), color="#34d399"),
+                        SymbioticMacroCell(3, "ExecutionRiskLock", act_ids or [6, 7, 8], color="#f43f5e")
+                    ]
+                elif oid.startswith("quant_"):
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "QuantSensoryLattice", sense_ids or list(range(min(32, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "QuantArbitrageManifold", core_ids or list(range(min(32, len(self.cells)), max(min(32, len(self.cells)), len(self.cells) - 16))), color="#34d399"),
+                        SymbioticMacroCell(3, "QuantExecutionRing", act_ids or list(range(max(0, len(self.cells) - 16), len(self.cells))), color="#f43f5e")
+                    ]
                 else:
                     self.symbiotic_macro_cells = [
                         SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
@@ -2190,11 +2202,24 @@ class SiliconCellularOrganism:
                 sense_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L1_SENSORY" or str(c.type).startswith("Sense")]
                 act_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L3_MOTOR" or str(c.type).startswith("Act")]
                 core_ids = [c.id for c in self.cells if c.id not in sense_ids and c.id not in act_ids]
-                self.symbiotic_macro_cells = [
-                    SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
-                    SymbioticMacroCell(2, "AssociationCore", core_ids or list(range(min(4, len(self.cells)), len(self.cells))), color="#34d399"),
-                    SymbioticMacroCell(3, "EffectorRing", act_ids or [self.cells[-1].id], color="#f43f5e")
-                ]
+                if oid.startswith("adas_"):
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "AdasSensoryLattice", sense_ids or list(range(min(16, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "AdasDampingCore", core_ids or list(range(min(16, len(self.cells)), max(min(16, len(self.cells)), len(self.cells) - 8))), color="#34d399"),
+                        SymbioticMacroCell(3, "AdasActuatorRing", act_ids or list(range(max(0, len(self.cells) - 8), len(self.cells))), color="#f43f5e")
+                    ]
+                elif oid.startswith("quant_") or oid == "real_trained_champion":
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "QuantSensoryLattice", sense_ids or list(range(min(16, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "QuantArbitrageManifold", core_ids or list(range(min(16, len(self.cells)), max(min(16, len(self.cells)), len(self.cells) - 8))), color="#34d399"),
+                        SymbioticMacroCell(3, "QuantExecutionRing", act_ids or list(range(max(0, len(self.cells) - 8), len(self.cells))), color="#f43f5e")
+                    ]
+                else:
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "AssociationCore", core_ids or list(range(min(4, len(self.cells)), len(self.cells))), color="#34d399"),
+                        SymbioticMacroCell(3, "EffectorRing", act_ids or [self.cells[-1].id], color="#f43f5e")
+                    ]
 
             # 统一对齐宏观与微观双尺度定义：宏观标称规模与实际驱动几何
             self.nominal_scale = int(biz.get("cells_scale", len(self.cells)))
@@ -4070,7 +4095,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             elif ptype == "maze": organism.load_organism_by_id("maze_navigation_champion")
             elif ptype == "doudizhu": organism.load_organism_by_id("doudizhu_game_champion")
             elif ptype == "fluid": organism.load_organism_by_id("fluid_damper_champion")
-            elif ptype == "quant": organism.load_organism_by_id("quant_futures_champion")
+            elif ptype == "quant": organism.load_organism_by_id("quant_master_champion")
             elif ptype == "primordial": organism.load_organism_by_id("primordial_life_champion")
             else: organism.load_organism_by_id("adas_cortex_champion")
 

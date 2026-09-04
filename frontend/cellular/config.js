@@ -51,15 +51,12 @@ export const LIFEFORM_SCALES = {
   adas_world_model_100m: 100000000,
   adas_occupancy_10m: 10000000,
   adas_transient_1m: 1000000,
-  sdsc_mega_1million: 1000000,
-  quant_million_reservoir: 1000000,
   adas_cortex_champion: 210,
-  fluid_damper_champion: 40,
-  primordial_life_champion: 16,
-  maze_navigation_champion: 13,
-  cartpole_balance_champion: 12,
-  quant_futures_champion: 12,
-  doudizhu_game_champion: 9
+  quant_world_model_100m: 100000000,
+  quant_cross_asset_10m: 10000000,
+  quant_market_making_1m: 1000000,
+  quant_master_champion: 14,
+  real_trained_champion: 12
 };
 
 export const TOOLTIP_DICT = {

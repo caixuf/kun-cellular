@@ -97,6 +97,8 @@ export function openLibraryDrawer() {
 export function toggleHabitatMenu() {
   const m = document.getElementById('habitat-menu');
   if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'flex' : 'none';
+}
+
 export function renderActiveOrganismProfile(meta) {
   if (!meta) return;
   const orgId = meta.organism_id || meta.id || currentSelectedOrgId;
