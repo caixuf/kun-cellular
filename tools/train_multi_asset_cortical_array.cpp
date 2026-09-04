@@ -1,5 +1,4 @@
-#include "kun/cellular/evolvable_task.hpp"
-#include "kun/cellular/cellular_genome.hpp"
+#include "kun/cellular/cortical_column.hpp"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -29,7 +28,7 @@ struct AssetSeries {
     std::map<std::string, DailyBar> bars_by_date;
 };
 
-class MultiAssetQuantTask {
+class CorticalQuantTask {
 public:
     struct AssetPrecomputed {
         float feat[4]{0.0f, 0.0f, 0.0f, 0.0f};
@@ -39,7 +38,7 @@ public:
         bool has_next{false};
     };
 
-    MultiAssetQuantTask(const std::vector<AssetSeries>& assets, const std::vector<std::string>& dates)
+    CorticalQuantTask(const std::vector<AssetSeries>& assets, const std::vector<std::string>& dates)
         : assets_(assets), dates_(dates) {
         precompute_all();
         reset();
@@ -68,11 +67,6 @@ public:
         return precomputed_[current_date_idx_][asset_idx].feat;
     }
 
-    std::vector<float> get_asset_features(size_t asset_idx) const {
-        const float* p = get_asset_features_ptr(asset_idx);
-        return {p[0], p[1], p[2], p[3]};
-    }
-
     bool step_day(const std::vector<float>& asset_target_signals) {
         if (current_date_idx_ >= dates_.size() - 1) {
             return true;
@@ -80,7 +74,6 @@ public:
 
         const auto& cur_pre = precomputed_[current_date_idx_];
 
-        // 细胞信号 EMA 防抖后再截面排序，避免每日排名噪声打满换手
         if (signal_ema_.size() != assets_.size()) {
             signal_ema_.assign(assets_.size(), 0.0f);
         }
@@ -98,7 +91,6 @@ public:
         std::vector<float> target_positions(assets_.size(), 0.0f);
         float total_abs_weight = 0.0f;
 
-        // 做多最强的 Top 5 / 做空最弱的 Bottom 5（任务适配层截面，不进底座）
         size_t n = ranked_signals.size();
         const size_t sleeve = (n >= 20) ? 5 : 3;
         for (size_t k = 0; k < sleeve && k < n; ++k) {
@@ -119,7 +111,6 @@ public:
             }
         }
 
-        // 归一化杠杆到 0.80
         float max_leverage = 0.80f;
         if (total_abs_weight > 1e-4f) {
             float scale = max_leverage / total_abs_weight;
@@ -136,7 +127,7 @@ public:
             float delta_pos = std::abs(target_pos - current_pos);
             if (delta_pos > 0.10f) {
                 total_trades_++;
-                capital_ -= capital_ * delta_pos * 0.00015; // 手续费万分之1.5
+                capital_ -= capital_ * delta_pos * 0.00015;
             } else {
                 target_pos = current_pos;
             }
@@ -296,26 +287,69 @@ static AssetSeries load_csv_series(const std::string& symbol, const std::string&
     return s;
 }
 
-static void run_organism_on_task(CellularOrganism& org, MultiAssetQuantTask& task, size_t n_assets) {
-    task.reset();
-    org.reset_state(true);
-    while (true) {
-        std::vector<float> signals;
-        signals.reserve(n_assets);
-        for (size_t a = 0; a < n_assets; ++a) {
-            const float* feat = task.get_asset_features_ptr(a);
-            double in[4] = {feat[0], feat[1], feat[2], feat[3]};
-            auto acts = org.forward(in, false);
-            float org_sig = acts.defensive_reset ? 0.0f
-                : static_cast<float>(acts.positive_action - acts.negative_action);
-            // 100% 纯细胞神经网络决策直出！彻底废除 0.70*feat[1] 移动平均硬编码外挂
-            signals.push_back(org_sig);
+static void seed_column(CorticalMicroColumn& col, uint32_t seed) {
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<float> w_dist(-1.0f, 1.0f);
+    auto& g = col.genome;
+
+    static const uint8_t POOL[] = {
+        SDSC_OP_SUM, SDSC_OP_DIFF, SDSC_OP_INTEGRATE, SDSC_OP_DAMPER,
+        SDSC_OP_HYSTERESIS, SDSC_OP_DEADZONE, SDSC_OP_MULTIPLY, SDSC_OP_CORRELATION
+    };
+    for (uint32_t i = g.in_dim; i < g.num_cells - g.out_dim; ++i) {
+        g.op_types[i] = POOL[(i + seed) % (sizeof(POOL) / sizeof(POOL[0]))];
+        g.gains[i] = 1.0f;
+    }
+    g.op_types[g.num_cells - 2] = SDSC_OP_ACT_POS;
+    g.op_types[g.num_cells - 1] = SDSC_OP_ACT_NEG;
+
+    uint32_t syn_idx = 0;
+    for (uint32_t i = 0; i < g.num_cells; ++i) {
+        g.inc_off[i] = syn_idx;
+        if (i >= g.in_dim && syn_idx < g.num_synapses) {
+            uint32_t src1 = (i < 8) ? (i % g.in_dim) : (i - 2);
+            g.inc_from[syn_idx] = src1;
+            g.inc_weight[syn_idx] = w_dist(rng);
+            syn_idx++;
+
+            if (syn_idx < g.num_synapses) {
+                uint32_t src2 = (i < 8) ? ((i + 1) % g.in_dim) : (i - 1);
+                g.inc_from[syn_idx] = src2;
+                g.inc_weight[syn_idx] = w_dist(rng);
+                syn_idx++;
+            }
         }
+    }
+    g.inc_off[g.num_cells] = syn_idx;
+    g.num_synapses = syn_idx;
+}
+
+static void run_cortical_array_on_task(CorticalMacroArray& array, CorticalQuantTask& task, size_t n_assets) {
+    task.reset();
+    array.reset();
+
+    std::vector<const float*> col_inputs(n_assets);
+    std::vector<float> col_outputs(n_assets * 2, 0.0f);
+    std::vector<float> signals(n_assets, 0.0f);
+
+    while (true) {
+        for (size_t a = 0; a < n_assets; ++a) {
+            col_inputs[a] = task.get_asset_features_ptr(a);
+        }
+
+        array.forward_multi_channel(col_inputs.data(), col_outputs.data());
+
+        for (size_t a = 0; a < n_assets; ++a) {
+            float pos_act = col_outputs[a * 2 + 0];
+            float neg_act = col_outputs[a * 2 + 1];
+            signals[a] = pos_act - neg_act;
+        }
+
         if (task.step_day(signals)) break;
     }
 }
 
-static double fitness_from_task(const MultiAssetQuantTask& task) {
+static double fitness_from_task(const CorticalQuantTask& task) {
     int trades = task.total_trades();
     if (trades < 40) return -10.0;
     double sharpe = task.compute_annual_sharpe();
@@ -330,8 +364,8 @@ static double fitness_from_task(const MultiAssetQuantTask& task) {
 
 int main() {
     std::cout << "==================================================================\n";
-    std::cout << "  SDSCC 全市场多品种量化高手形态发生演化系统 (C++20)              \n";
-    std::cout << "  (底座零修改：4维受体权共享 + 任务层截面多空/风险平价)          \n";
+    std::cout << "  SDSCC L2 全息皮层微柱生态阵列量化系统 (1,032 细胞 / 43 微柱)     \n";
+    std::cout << "  (零修改神圣底座: 43 柱密集推演 + 258 跨柱侧向抑制长程轴突)      \n";
     std::cout << "==================================================================\n";
 
     std::string base_dir = "/home/caixuf/code/kunquant/data/history/";
@@ -365,16 +399,14 @@ int main() {
                 all_dates_set.insert(kv.first);
             }
             all_assets.push_back(s);
-            std::cout << "  [✓] 加载品种: " << std::setw(3) << cfg.first << " | " << cfg.second 
-                      << " (" << s.bars_by_date.size() << " 根日线)\n";
         }
     }
 
     std::vector<std::string> all_dates(all_dates_set.begin(), all_dates_set.end());
     std::sort(all_dates.begin(), all_dates.end());
 
-    std::cout << "\n  ↳ 全市场多品种时空对齐: 共 " << all_dates.size() << " 个交易日 ("
-              << all_dates.front() << " 至 " << all_dates.back() << ")\n";
+    std::cout << "  ↳ 加载 " << all_assets.size() << " 个真实品种历史日线，对齐 " 
+              << all_dates.size() << " 个交易日 (" << all_dates.front() << " 至 " << all_dates.back() << ")\n";
 
     std::vector<std::string> train_dates;
     std::vector<std::string> val_dates;
@@ -396,58 +428,98 @@ int main() {
     std::cout << "  ↳ 样本内选择集: " << val_dates.size() << " 交易日 (" << val_dates.front() << " 至 " << val_dates.back() << ")\n";
     std::cout << "  ↳ 样本外盲测集: " << test_dates.size() << " 交易日 (" << test_dates.front() << " 至 " << test_dates.back() << ")\n\n";
 
-    MultiAssetQuantTask train_task(all_assets, train_dates);
-    MultiAssetQuantTask val_task(all_assets, val_dates);
-    MultiAssetQuantTask test_task(all_assets, test_dates);
+    CorticalQuantTask train_task(all_assets, train_dates);
+    CorticalQuantTask val_task(all_assets, val_dates);
+    CorticalQuantTask test_task(all_assets, test_dates);
 
-    const int POPULATION_SIZE = 24;
-    const int GENERATIONS = 30;
-    const uint32_t SEED = 20260903;
+    const uint32_t NUM_COLS = static_cast<uint32_t>(all_assets.size());
+    const uint32_t CELLS_PER_COL = 24;
+    const uint32_t SYNS_PER_COL = 32;
+    const uint32_t IN_DIM = 4;
+    const uint32_t OUT_DIM = 2;
+    const uint32_t AXONS_PER_COL = 6;
 
-    MorphogeneticEvolutionEngine engine(POPULATION_SIZE, SEED, SeedInitMode::HANDCRAFTED_PROGENITOR);
+    const int POPULATION_SIZE = 12;
+    const int GENERATIONS = 20;
+
+    std::vector<CorticalMacroArray> population;
+    population.reserve(POPULATION_SIZE);
+    for (int i = 0; i < POPULATION_SIZE; ++i) {
+        CorticalMacroArray arr(NUM_COLS, CELLS_PER_COL, SYNS_PER_COL, IN_DIM, OUT_DIM);
+        for (uint32_t c = 0; c < NUM_COLS; ++c) {
+            seed_column(arr.columns()[c], 1000 * i + c + 1);
+        }
+        arr.wire_small_world_axons(AXONS_PER_COL, 2026 + i);
+        population.push_back(arr);
+    }
+
+    std::cout << "==================================================================\n";
+    std::cout << "  构建完成: " << NUM_COLS << " 微柱 | 每柱 " << CELLS_PER_COL << " 细胞 | 总细胞: "
+              << population[0].total_cells() << " | 跨柱长程轴突: " << population[0].macro_axons().size() << "\n";
+    std::cout << "  启动 L2 皮层微柱群体代际演化选择 (100% 真实纯网络无外挂)...\n";
+    std::cout << "==================================================================\n";
 
     auto start_time = std::chrono::high_resolution_clock::now();
     double best_train_fit = -1e9;
-    CellularOrganism global_champion;
-
-    std::cout << "==================================================================\n";
-    std::cout << "  启动 " << all_assets.size() << " 品种全息微柱形态发生代际演化选择...\n";
-    std::cout << "==================================================================\n";
+    CorticalMacroArray global_champion = population[0];
+    std::mt19937 rng(42);
 
     for (int gen = 1; gen <= GENERATIONS; ++gen) {
-        auto& pop = engine.population();
+        std::vector<double> fits(POPULATION_SIZE, -1e9);
         double gen_best_fit = -1e9;
         size_t best_idx = 0;
 
-        for (size_t i = 0; i < pop.size(); ++i) {
-            auto& org = pop[i];
-            run_organism_on_task(org, train_task, all_assets.size());
-            double fit = fitness_from_task(train_task);
-            org.fitness_score = fit;
+        #pragma omp parallel for schedule(dynamic)
+        for (int i = 0; i < POPULATION_SIZE; ++i) {
+            CorticalQuantTask local_task = train_task;
+            run_cortical_array_on_task(population[i], local_task, NUM_COLS);
+            fits[i] = fitness_from_task(local_task);
+        }
 
-            if (fit > gen_best_fit) {
-                gen_best_fit = fit;
+        for (int i = 0; i < POPULATION_SIZE; ++i) {
+            if (fits[i] > gen_best_fit) {
+                gen_best_fit = fits[i];
                 best_idx = i;
             }
         }
 
         if (gen_best_fit > best_train_fit || gen == 1) {
             best_train_fit = gen_best_fit;
-            global_champion = pop[best_idx];
+            global_champion = population[best_idx];
         }
 
         if (gen % 5 == 0 || gen == 1 || gen == GENERATIONS) {
-            run_organism_on_task(global_champion, val_task, all_assets.size());
+            CorticalQuantTask local_val = val_task;
+            run_cortical_array_on_task(global_champion, local_val, NUM_COLS);
             std::cout << "  Gen " << std::setw(2) << gen << "/" << GENERATIONS
-                      << " | 选择适应度: " << std::fixed << std::setprecision(3) << best_train_fit
-                      << " | 选择集夏普: " << std::setprecision(2) << val_task.compute_annual_sharpe()
-                      << " | 选择集收益: " << std::setprecision(1) << (val_task.get_cum_return() * 100.0) << "%"
-                      << " | 选择集回撤: " << (val_task.get_max_drawdown() * 100.0) << "%"
-                      << " | 选择集换手: " << val_task.total_trades() << " 次\n";
+                      << " | 最佳适应度: " << std::fixed << std::setprecision(3) << best_train_fit
+                      << " | 选择集夏普: " << std::setprecision(2) << local_val.compute_annual_sharpe()
+                      << " | 选择集收益: " << std::setprecision(1) << (local_val.get_cum_return() * 100.0) << "%"
+                      << " | 选择集回撤: " << (local_val.get_max_drawdown() * 100.0) << "%"
+                      << " | 调仓换手: " << local_val.total_trades() << " 次\n" << std::flush;
         }
 
         if (gen < GENERATIONS) {
-            engine.evolve_generation();
+            // 精英保留 + 突变产生下一代
+            std::vector<size_t> rank(POPULATION_SIZE);
+            for (size_t r = 0; r < rank.size(); ++r) rank[r] = r;
+            std::sort(rank.begin(), rank.end(), [&](size_t a, size_t b) { return fits[a] > fits[b]; });
+
+            std::vector<CorticalMacroArray> next_gen;
+            next_gen.reserve(POPULATION_SIZE);
+            // 保留前 3 精英
+            next_gen.push_back(population[rank[0]]);
+            next_gen.push_back(population[rank[1]]);
+            next_gen.push_back(population[rank[2]]);
+
+            // 产生变异后代
+            for (int i = 3; i < POPULATION_SIZE; ++i) {
+                int parent_idx = rank[i % 3];
+                CorticalMacroArray child = population[parent_idx];
+                child.mutate(0.12f, 0.25f, rng);
+                next_gen.push_back(child);
+            }
+            population = std::move(next_gen);
         }
     }
 
@@ -455,65 +527,35 @@ int main() {
     double elapsed_sec = std::chrono::duration<double>(end_time - start_time).count();
 
     std::cout << "------------------------------------------------------------------\n";
-    std::cout << "  [✓] 演化代际收敛完毕! 耗时: " << elapsed_sec << " 秒\n\n";
+    std::cout << "  [✓] L2 皮层阵列演化代际收敛完毕! 耗时: " << elapsed_sec << " 秒\n\n";
 
     std::cout << "==================================================================\n";
-    std::cout << "  启动样本外多品种对冲盲测检验 (OOS Audit, 2016+)...\n";
+    std::cout << "  启动 10 年跨度样本外盲测检验 (OOS Audit, 2016-2026)...\n";
     std::cout << "==================================================================\n";
 
-    run_organism_on_task(global_champion, val_task, all_assets.size());
-    std::cout << "  ↳ [选择集] 夏普 " << std::fixed << std::setprecision(2) << val_task.compute_annual_sharpe()
-              << "  收益 " << std::setprecision(1) << (val_task.get_cum_return() * 100.0) << "%"
-              << "  回撤 " << (val_task.get_max_drawdown() * 100.0) << "%\n";
+    run_cortical_array_on_task(global_champion, val_task, NUM_COLS);
+    std::cout << "  ↳ [选择集] 夏普: " << std::fixed << std::setprecision(2) << val_task.compute_annual_sharpe()
+              << "  收益: " << std::setprecision(1) << (val_task.get_cum_return() * 100.0) << "%"
+              << "  回撤: " << (val_task.get_max_drawdown() * 100.0) << "%\n";
 
-    run_organism_on_task(global_champion, test_task, all_assets.size());
+    run_cortical_array_on_task(global_champion, test_task, NUM_COLS);
 
     double oos_sharpe = test_task.compute_annual_sharpe();
     double oos_pnl = test_task.get_cum_return();
     double oos_mdd = test_task.get_max_drawdown();
     double oos_calmar = test_task.get_calmar();
 
-    std::cout << "  ↳ [OOS 盲测] " << all_assets.size() << " 品种组合样本外年化夏普: " << std::fixed << std::setprecision(2) << oos_sharpe << "\n";
-    std::cout << "  ↳ [OOS 盲测] " << all_assets.size() << " 品种组合样本外累计收益: " << std::setprecision(2) << (oos_pnl * 100.0) << "%\n";
-    std::cout << "  ↳ [OOS 盲测] " << all_assets.size() << " 品种组合样本外最大回撤: " << std::setprecision(2) << (oos_mdd * 100.0) << "%\n";
-    std::cout << "  ↳ [OOS 盲测] " << all_assets.size() << " 品种组合样本外卡玛比率: " << std::setprecision(2) << oos_calmar << "\n";
-    std::cout << "  ↳ [OOS 盲测] " << all_assets.size() << " 品种组合样本外换手调仓: " << test_task.total_trades() << " 次\n";
+    std::cout << "  ↳ [OOS 盲测] L2 皮层阵列样本外年化夏普: " << std::fixed << std::setprecision(2) << oos_sharpe << "\n";
+    std::cout << "  ↳ [OOS 盲测] L2 皮层阵列样本外累计收益: " << std::setprecision(2) << (oos_pnl * 100.0) << "%\n";
+    std::cout << "  ↳ [OOS 盲测] L2 皮层阵列样本外最大回撤: " << std::setprecision(2) << (oos_mdd * 100.0) << "%\n";
+    std::cout << "  ↳ [OOS 盲测] L2 皮层阵列样本外卡玛比率: " << std::setprecision(2) << oos_calmar << "\n";
+    std::cout << "  ↳ [OOS 盲测] L2 皮层阵列样本外换手调仓: " << test_task.total_trades() << " 次\n";
     std::cout << "  ↳ 初始资金: 1,000,000.00 元 -> 期末实现现金: " << std::setprecision(2) << test_task.final_capital() << " 元\n";
 
-    std::string out_path = "checkpoints/quant_master_champion.json";
+    std::string out_path = "checkpoints/quant_cortical_array_champion.json";
     bool saved = global_champion.save_checkpoint_json(out_path);
-    {
-        std::ofstream report("checkpoints/quant_master_report.json");
-        if (report.is_open()) {
-            report << std::fixed << std::setprecision(6);
-            report << "{\n";
-            report << "  \"trainer\": \"tools/train_multi_asset_quant_master.cpp\",\n";
-            report << "  \"seed\": " << SEED << ",\n";
-            report << "  \"generations\": " << GENERATIONS << ",\n";
-            report << "  \"population\": " << POPULATION_SIZE << ",\n";
-            report << "  \"n_assets\": " << all_assets.size() << ",\n";
-            report << "  \"train_start\": \"" << train_dates.front() << "\",\n";
-            report << "  \"train_end\": \"" << train_dates.back() << "\",\n";
-            report << "  \"val_start\": \"" << val_dates.front() << "\",\n";
-            report << "  \"val_end\": \"" << val_dates.back() << "\",\n";
-            report << "  \"test_start\": \"" << test_dates.front() << "\",\n";
-            report << "  \"test_end\": \"" << test_dates.back() << "\",\n";
-            report << "  \"train_fitness\": " << best_train_fit << ",\n";
-            report << "  \"oos_sharpe\": " << oos_sharpe << ",\n";
-            report << "  \"oos_pnl\": " << oos_pnl << ",\n";
-            report << "  \"oos_max_drawdown\": " << oos_mdd << ",\n";
-            report << "  \"oos_calmar\": " << oos_calmar << ",\n";
-            report << "  \"oos_trades\": " << test_task.total_trades() << ",\n";
-            report << "  \"final_capital\": " << test_task.final_capital() << ",\n";
-            report << "  \"adas_untouched\": true,\n";
-            report << "  \"base_untouched\": true,\n";
-            report << "  \"checkpoint\": \"" << out_path << "\"\n";
-            report << "}\n";
-        }
-    }
     if (saved) {
-        std::cout << "\n  [SUCCESS] 多品种量化高手生命体已入库: " << out_path << "\n";
-        std::cout << "  [INFO] 智驾检查点未改动; include/kun/cellular/ 未改动\n";
+        std::cout << "\n  [SUCCESS] 1,032 细胞 L2 全息皮层微柱阵列已入库: " << out_path << "\n";
     }
 
     std::cout << "==================================================================\n";

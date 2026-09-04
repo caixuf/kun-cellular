@@ -79,6 +79,8 @@ export function setCameraPreset(preset, bounds = currentOrganismBounds) {
     camState.targetTheta = 0;
     camState.targetPhi = Math.PI / 2;
     camState.targetLookAt.copy(b.center);
+    camState.targetCamR = (b && b.macroDist) || 540;
+    camState.isCamTransitioning = true;
     camState.autoOrbitEnabled = false;
     const btn = document.getElementById('btn-auto-orbit');
     if (btn) btn.classList.remove('active');

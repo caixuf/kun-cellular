@@ -68,13 +68,28 @@ function animate() {
 
   const closeLook = camState.camR < Math.max(160, (currentOrganismBounds.microDist || 220) * 0.85);
   const totalCellCount = org && org.cells ? org.cells.length : 0;
-  const isDiscrete = totalCellCount <= 1536;
-  const showPointCloud = (currentRenderMode !== "puremesh") && !isDiscrete;
+  const macroScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || totalCellCount;
+  const isLargeScale = (macroScale >= 1000) || (totalCellCount > 256);
+  const isDiscrete = !isLargeScale;
+
+  let showPointCloud = true;
+  if (currentRenderMode === "puremesh") {
+    showPointCloud = false;
+  } else if (currentRenderMode === "lod") {
+    showPointCloud = isLargeScale || !closeLook;
+  } else { // "symbiosis"
+    showPointCloud = true;
+  }
 
   if (lodPointsMesh && lodPointsMesh.material) {
     lodPointsMesh.visible = showPointCloud;
-    lodPointsMesh.material.opacity = closeLook ? 0.18 : (currentRenderMode === "lod" ? 0.7 : 0.5);
-    lodPointsMesh.material.size = (currentRenderMode === "lod") ? 3.6 : 3.2;
+    if (isLargeScale) {
+      lodPointsMesh.material.opacity = closeLook ? 0.35 : 0.85;
+      lodPointsMesh.material.size = closeLook ? 3.0 : 4.2;
+    } else {
+      lodPointsMesh.material.opacity = closeLook ? 0.18 : (currentRenderMode === "lod" ? 0.70 : 0.45);
+      lodPointsMesh.material.size = (currentRenderMode === "lod") ? 3.6 : 2.6;
+    }
   }
 
   // 3. 动态屏幕像素视锥实化 LOD
@@ -134,12 +149,10 @@ function animate() {
   if (realCellsEl) {
     if (isDiscrete) {
       realCellsEl.textContent = `${visibleMicroCount}/${totalCellCount} 实体全量 (100% 显微实化)`;
-    } else if (visibleMicroCount > 0 && visibleMicroCount < ptCount) {
-      realCellsEl.textContent = `${visibleMicroCount} 实体 (显微实化) / ${ptCount.toLocaleString()} 点云流形`;
-    } else if (visibleMicroCount === 0) {
-      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观亚像素，真实未放大)`;
+    } else if (visibleMicroCount > 0) {
+      realCellsEl.textContent = `${visibleMicroCount} 实体视锥局部实化 / ${ptCount.toLocaleString()} 点云流形`;
     } else {
-      realCellsEl.textContent = `${visibleMicroCount} 实体全量`;
+      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观亚像素，真实未放大)`;
     }
   }
   const elScale = document.getElementById("st-pipe");
@@ -148,12 +161,13 @@ function animate() {
   const vitalScaleEl = document.getElementById("vital-scale");
   const vitalScaleSubEl = document.getElementById("vital-scale-sub");
   if (vitalScaleEl) {
-    const macroScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || totalCellCount;
     vitalScaleEl.textContent = macroScale.toLocaleString() + ' 细胞';
   }
   if (vitalScaleSubEl) {
-    if (visibleMicroCount > 0) {
-      vitalScaleSubEl.textContent = `${visibleMicroCount} 实体近距晶化 / ${ptCount.toLocaleString()} 点云`;
+    if (isDiscrete) {
+      vitalScaleSubEl.textContent = `${visibleMicroCount}/${totalCellCount} 实体全量晶化 · 30,000 星云`;
+    } else if (visibleMicroCount > 0) {
+      vitalScaleSubEl.textContent = `${visibleMicroCount} 实体视锥实化 / ${ptCount.toLocaleString()} 点云`;
     } else {
       vitalScaleSubEl.textContent = `全视界 ${ptCount.toLocaleString()} 动力学流形点云 (LOD)`;
     }
@@ -248,6 +262,8 @@ window.onOrganSelectionChange = onOrganSelectionChange;
 window.cameraShake = cameraShake;
 window.toggleOrganVisibility = toggleOrganVisibility;
 window.focusOrgan = focusOrgan;
+window.focusOnCell = (id, dist = 25) => focusOnCell(id, org, dist);
+window.camState = camState;
 window.log = log;
 
 // 绑定底座微观操作按钮

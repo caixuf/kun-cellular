@@ -166,6 +166,99 @@ public:
         }
     }
 
+    /**
+     * @brief 多通道阵列并行前向推演: 每个微柱直接接收专属张量输入并产生专属效应
+     * @param column_inputs 指针数组 [num_columns_]，指向各柱长度为 global_in_dim_ 的输入张量
+     * @param column_outputs 连续数组 [num_columns_ * global_out_dim_]，接收各柱输出
+     */
+    void forward_multi_channel(const float* const* column_inputs, float* column_outputs) {
+        if (!column_inputs || !column_outputs || num_columns_ == 0) return;
+
+        // 1. 各微柱注入自身输入
+        for (uint32_t c = 0; c < num_columns_; ++c) {
+            if (column_inputs[c]) {
+                for (uint32_t i = 0; i < global_in_dim_; ++i) {
+                    columns_[c].local_inputs[i] = column_inputs[c][i];
+                }
+            }
+        }
+
+        // 2. 轴突脉冲信号交换 (跨柱双缓冲突触)
+        for (const auto& axon : macro_axons_) {
+            auto& dst_col = columns_[axon.dst_column_idx];
+            if (axon.dst_cell_idx < dst_col.local_inputs.size()) {
+                dst_col.local_inputs[axon.dst_cell_idx] += axon.delay_signal * axon.weight;
+            }
+        }
+
+        // 3. 微柱独立前向推演 (大规模微柱 >64 启用 OpenMP，中小规模纯紧凑循环避免线程抖动)
+        if (num_columns_ > 64) {
+            #pragma omp parallel for schedule(static)
+            for (int c = 0; c < static_cast<int>(num_columns_); ++c) {
+                columns_[c].step();
+            }
+        } else {
+            for (uint32_t c = 0; c < num_columns_; ++c) {
+                columns_[c].step();
+            }
+        }
+
+        // 4. 准备下一拍的轴突传导信号 (双缓冲延迟)
+        for (auto& axon : macro_axons_) {
+            const auto& src_col = columns_[axon.src_column_idx];
+            uint32_t out_idx = axon.src_cell_idx >= (cells_per_column_ - global_out_dim_) ?
+                               (axon.src_cell_idx - (cells_per_column_ - global_out_dim_)) : 0;
+            if (out_idx < src_col.local_outputs.size()) {
+                axon.delay_signal = src_col.local_outputs[out_idx];
+            }
+        }
+
+        // 5. 各微柱输出写出
+        for (uint32_t c = 0; c < num_columns_; ++c) {
+            for (uint32_t o = 0; o < global_out_dim_; ++o) {
+                column_outputs[c * global_out_dim_ + o] = columns_[c].local_outputs[o];
+            }
+        }
+    }
+
+    void mutate(float rate, float sigma, std::mt19937& rng) {
+        std::uniform_real_distribution<float> u(0.0f, 1.0f);
+        std::normal_distribution<float> n(0.0f, sigma);
+        for (auto& col : columns_) {
+            col.genome.mutate_parameters(rate, sigma, rng);
+            col.genome.mutate_primitive_types(rate * 0.5f, rng);
+        }
+        for (auto& axon : macro_axons_) {
+            if (u(rng) < rate) {
+                axon.weight = std::clamp(axon.weight + n(rng), -2.0f, 2.0f);
+            }
+        }
+    }
+
+    bool save_checkpoint_json(const std::string& filepath) const {
+        std::ofstream ofs(filepath);
+        if (!ofs.is_open()) return false;
+        ofs << "{\n";
+        ofs << "  \"architecture\": \"CorticalMacroArray\",\n";
+        ofs << "  \"num_columns\": " << num_columns_ << ",\n";
+        ofs << "  \"cells_per_column\": " << cells_per_column_ << ",\n";
+        ofs << "  \"total_cells\": " << total_cells() << ",\n";
+        ofs << "  \"total_synapses\": " << total_synapses() << ",\n";
+        ofs << "  \"global_in_dim\": " << global_in_dim_ << ",\n";
+        ofs << "  \"global_out_dim\": " << global_out_dim_ << ",\n";
+        ofs << "  \"macro_axons_count\": " << macro_axons_.size() << ",\n";
+        ofs << "  \"columns\": [\n";
+        for (size_t c = 0; c < columns_.size(); ++c) {
+            const auto& col = columns_[c];
+            ofs << "    {\"id\": " << col.column_id << ", \"cells\": " << col.genome.num_cells
+                << ", \"synapses\": " << col.genome.num_synapses << "}"
+                << (c + 1 < columns_.size() ? "," : "") << "\n";
+        }
+        ofs << "  ]\n";
+        ofs << "}\n";
+        return true;
+    }
+
     std::vector<CorticalMicroColumn>& columns() { return columns_; }
     const std::vector<CorticalMicroColumn>& columns() const { return columns_; }
     std::vector<MacroAxon>& macro_axons() { return macro_axons_; }

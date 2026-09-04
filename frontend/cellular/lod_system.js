@@ -308,30 +308,42 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5));
   const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
 
-  // 1. 离散硅基生命体 (n <= 1536，如 9、13、210、1024 细胞)
-  // 离散生命体 100% 全部细胞全量实化，绝不因视距裁剪丢弃任何一个细胞！
-  // 只有超大规模体素流体场 (n > 1536) 才在远景进入点云降级。
+  // 尺度判定：宏观规模 >= 1000 细胞或节点数 > 256 属于超大规模生命体 (1M, 10M, 100M+ 世界模型与体素流场)
+  const cellScale = (bnds && bnds.cellScale) || n;
+  const isLargeScale = (cellScale >= 1000) || (n > 256);
+  const isDiscrete = !isLargeScale;
+
   _lodCandidates.length = 0;
-  const isDiscrete = n <= 1536;
-  const isPureMesh = (renderMode === 'puremesh') || isDiscrete;
 
-  for (const c of orgObj.cells) {
-    _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
-    const d = _lodCamPos.distanceTo(_lodCellPos);
+  if (isDiscrete) {
+    // 1. 离散硅基微观皮层柱 (如 210 细胞 ASIL-D 皮层、13 细胞迷宫、9 细胞斗地主)
+    // 100% 全部细胞全量物理实化，绝不因视距裁剪只渲染十几个细胞！
+    for (const c of orgObj.cells) {
+      _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
+      const d = _lodCamPos.distanceTo(_lodCellPos);
+      _lodCandidates.push({ id: c.id, d });
+    }
+  } else {
+    // 2. 超大规模生命体 (1M, 10M, 100M+ 细胞全息世界模型与体素流场)
+    // 宏观远景下，以 GPU 高性能密集点云流形 (Point Cloud) 主导呈现！
+    // 只有相机推进到微观视距内 (d <= solidMaxDist) 且位于视锥内的局部细胞才实化为细节网格
+    for (const c of orgObj.cells) {
+      _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
+      const d = _lodCamPos.distanceTo(_lodCellPos);
 
-    // 超大规模体素流体场才进行远景光学门禁过滤
-    if (!isPureMesh && d > solidMaxDist) continue;
+      // 宏观远景下不实化为巨大实体球，保留纯粹点云流形
+      if (d > solidMaxDist) continue;
 
-    if (!isDiscrete) {
       _lodSphere.center.copy(_lodCellPos);
       _lodSphere.radius = Math.max(12.0, cellRadius * 2.0);
       if (frustum && !frustum.intersectsSphere(_lodSphere)) continue;
-    }
 
-    _lodCandidates.push({ id: c.id, d });
+      _lodCandidates.push({ id: c.id, d });
+      if (_lodCandidates.length >= 128) break;
+    }
   }
 
-  // 每一个细胞全量实化，绝不人为设限截断！
+  // 视锥实化集合
   const wantIds = new Set();
   for (const cd of _lodCandidates) wantIds.add(cd.id);
 

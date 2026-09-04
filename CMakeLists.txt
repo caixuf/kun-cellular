@@ -103,6 +103,9 @@ target_link_libraries(train_quant_futures PRIVATE kun_cellular Threads::Threads 
 add_executable(train_multi_asset_quant_master "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_multi_asset_quant_master.cpp")
 target_link_libraries(train_multi_asset_quant_master PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_multi_asset_cortical_array "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_multi_asset_cortical_array.cpp")
+target_link_libraries(train_multi_asset_cortical_array PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_flagship_voxel "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_flagship_voxel.cpp")
 target_link_libraries(train_flagship_voxel PRIVATE kun_cellular Threads::Threads m)
 

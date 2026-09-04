@@ -1737,9 +1737,9 @@ class SiliconCellularOrganism:
                 ]
 
             # 统一对齐宏观与微观双尺度定义：宏观标称规模与实际驱动几何
-            self.macro_cells = len(self.cells)
-            self.macro_synapses = len(self.synapses)
             self.nominal_scale = int(biz.get("cells_scale", len(self.cells)))
+            self.macro_cells = self.nominal_scale
+            self.macro_synapses = int(biz.get("synapses_scale", len(self.synapses)))
 
             # 重新初始化 GPU 张量引擎与稳态拓扑
             self.gpu_engine = CUDACellularDynamicsEngine(len(self.cells))

@@ -15,7 +15,7 @@ export let clientWarpMultiplier = 1.0;
 export let lastPrice = 3620;
 export let realPrice = null;
 export let totalActs = 0;
-export let currentSelectedOrgId = 'adas_cortex_champion';
+export let currentSelectedOrgId = null;
 
 export function setCurrentSelectedOrgId(id) {
   currentSelectedOrgId = id;
@@ -531,6 +531,9 @@ export async function syncBackendState() {
 
 export function updateFromBackendState(data) {
   if (!data || !data.cells) return;
+  if (!currentSelectedOrgId && data.organism_id) {
+    currentSelectedOrgId = data.organism_id;
+  }
   if (currentSelectedOrgId && data.organism_id && data.organism_id !== currentSelectedOrgId) {
     return;
   }
@@ -592,14 +595,15 @@ export function updateFromBackendState(data) {
   if (realCellsEl) {
     const solidCount = (views && views.cells) ? views.cells.length : 0;
     const ptCount = (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.position) ? lodPointsMesh.geometry.attributes.position.count : realCells;
-    if (realCells <= 1536) {
+    const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || macroCells || realCells;
+    const isLargeScale = (cellScale >= 1000) || (realCells > 256);
+
+    if (!isLargeScale) {
       realCellsEl.textContent = `${solidCount}/${realCells} 实体全量 (100% 显微实化)`;
-    } else if (solidCount > 0 && solidCount < ptCount) {
-      realCellsEl.textContent = `${solidCount} 实体 (显微实化) / ${ptCount.toLocaleString()} 点云流形`;
-    } else if (solidCount === 0) {
-      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观亚像素，真实未放大)`;
+    } else if (solidCount > 0) {
+      realCellsEl.textContent = `${solidCount} 实体视锥局部实化 / ${ptCount.toLocaleString()} 点云流形`;
     } else {
-      realCellsEl.textContent = `${solidCount} 实体全量`;
+      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观视距)`;
     }
     const isSurrogate = macroCells > realCells * 5;
     realCellsEl.title = isSurrogate

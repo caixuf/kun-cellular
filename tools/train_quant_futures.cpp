@@ -36,6 +36,7 @@ public:
         capital_ = 1000000.0;
         peak_capital_ = capital_;
         max_drawdown_ = 0.0;
+        total_trades_ = 0;
         returns_.clear();
     }
 
@@ -121,6 +122,7 @@ public:
         // 手续费磨损 (1.5 bp)
         if (std::abs(target_pos - position_) > 0.1f) {
             capital_ -= capital_ * 0.00015;
+            total_trades_++;
         }
 
         capital_ += step_pnl;
@@ -139,8 +141,18 @@ public:
         return res;
     }
 
+    int total_trades() const { return total_trades_; }
+
     double current_fitness() const override {
-        return compute_annual_sharpe() * (1.0 - max_drawdown_) + get_cum_return() * 0.3;
+        if (total_trades_ < 15) return -10.0;
+        double sharpe = compute_annual_sharpe();
+        double pnl = get_cum_return();
+        double mdd = max_drawdown_;
+        if (sharpe > 0.0) {
+            return sharpe * (1.0 - mdd) + pnl * 0.2 - mdd * 1.5;
+        } else {
+            return sharpe * 2.0 - mdd * 3.0 + (pnl < 0.0 ? pnl * 0.5 : 0.0);
+        }
     }
 
     double compute_annual_sharpe() const {
@@ -173,6 +185,7 @@ private:
     double capital_{1000000.0};
     double peak_capital_{1000000.0};
     double max_drawdown_{0.0};
+    int total_trades_{0};
     std::vector<double> returns_;
 };
 
@@ -249,22 +262,17 @@ int main() {
         for (size_t i = 0; i < pop.size(); ++i) {
             auto& org = pop[i];
             train_task.reset(0);
-            org.reset_state();
+            org.reset_state(true);
 
             while (true) {
                 auto obs = train_task.current_observation();
                 double in[4] = {obs[0], obs[1], obs[2], obs[3]};
-                auto acts = org.forward(in);
+                auto acts = org.forward(in, false);
                 auto res = train_task.step_continuous(acts);
                 if (res.done) break;
             }
 
-            double sharpe = train_task.compute_annual_sharpe();
-            double pnl = train_task.get_cum_return();
-            double mdd = train_task.get_max_drawdown();
-
-            // 适应度函数: 夏普比率 * (1 - 最大回撤) + 累计收益率
-            double fit = sharpe * (1.0 - mdd) + pnl * 0.3;
+            double fit = train_task.current_fitness();
             org.fitness_score = fit;
 
             if (fit > gen_best_fit) {
@@ -281,11 +289,11 @@ int main() {
         if (gen % 5 == 0 || gen == 1 || gen == GENERATIONS) {
             // 在最佳个体上获取训练集统计
             train_task.reset(0);
-            global_champion.reset_state();
+            global_champion.reset_state(true);
             while (true) {
                 auto obs = train_task.current_observation();
                 double in[4] = {obs[0], obs[1], obs[2], obs[3]};
-                auto acts = global_champion.forward(in);
+                auto acts = global_champion.forward(in, false);
                 auto res = train_task.step_continuous(acts);
                 if (res.done) break;
             }
@@ -293,7 +301,8 @@ int main() {
                       << " | 训练最佳适应度: " << std::fixed << std::setprecision(3) << best_train_fit
                       << " | 年化夏普: " << std::setprecision(2) << train_task.compute_annual_sharpe()
                       << " | 累计收益: " << std::setprecision(1) << (train_task.get_cum_return() * 100.0) << "%"
-                      << " | 最大回撤: " << (train_task.get_max_drawdown() * 100.0) << "%\n";
+                      << " | 最大回撤: " << (train_task.get_max_drawdown() * 100.0) << "%"
+                      << " | 交易次数: " << train_task.total_trades() << "\n";
         }
 
         if (gen < GENERATIONS) {
@@ -312,11 +321,11 @@ int main() {
     std::cout << "  启动 1,271 根日线严格样本外盲测检验 (Out-of-Sample Audit)...\n";
     std::cout << "==================================================================\n";
     test_task.reset(0);
-    global_champion.reset_state();
+    global_champion.reset_state(true);
     while (true) {
         auto obs = test_task.current_observation();
         double in[4] = {obs[0], obs[1], obs[2], obs[3]};
-        auto acts = global_champion.forward(in);
+        auto acts = global_champion.forward(in, false);
         auto res = test_task.step_continuous(acts);
         if (res.done) break;
     }

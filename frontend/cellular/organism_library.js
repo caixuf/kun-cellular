@@ -10,7 +10,7 @@ import { FAMILY, FAMILY_COLOR } from './config.js';
 import { log, syncBackendState, setCurrentSelectedOrgId } from './network_sync.js';
 import { cellPointLight } from './scene_setup.js';
 
-export let currentSelectedOrgId = 'adas_cortex_champion';
+export let currentSelectedOrgId = null;
 export let currentHighlightedBookId = null;
 let libraryInitialRenderDone = false;
 
