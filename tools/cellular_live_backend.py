@@ -1451,6 +1451,17 @@ class SiliconCellularOrganism:
                 meta = bin_data.get("meta", {})
                 cells_meta = meta.get("cells_meta", [])
 
+                # 若 coords 为全 0，自动进行 3D 拓扑投影展开，防止三维全息视口点重叠坍缩
+                if np.max(np.abs(coords)) < 1e-4:
+                    golden_ratio = (1 + math.sqrt(5)) / 2
+                    for i in range(nc):
+                        phi = math.acos(1 - 2 * (i + 0.5) / max(1, nc))
+                        theta = 2 * math.pi * i / golden_ratio
+                        r = 80.0 + (i % 7) * 8.0
+                        coords[i, 0] = r * math.sin(phi) * math.cos(theta)
+                        coords[i, 1] = r * math.sin(phi) * math.sin(theta)
+                        coords[i, 2] = r * math.cos(phi)
+
                 for i in range(nc):
                     cid = i
                     ctype = "Op_EMA"
