@@ -259,10 +259,17 @@ export async function selectOrganism(organismId, organismName) {
   }
   if (views && views.cells) {
     for (const v of views.cells) {
-      if (v && v.cell && v.membrane && v.membrane.material && v.membrane.material.color) {
+      if (v && v.cell) {
         const fam = FAMILY(v.cell.type);
-        v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
-        v.membrane.material.opacity = 0.65;
+        const col = FAMILY_COLOR[fam] || 0x38bdf8;
+        if (v.membrane && v.membrane.material) {
+          v.membrane.material.color.setHex(col);
+          v.membrane.material.opacity = 0.65;
+        }
+        if (v.outerMembraneMesh && v.outerMembraneMesh.material) {
+          v.outerMembraneMesh.material.color.setHex(col);
+          v.outerMembraneMesh.material.emissive.setHex(col);
+        }
       }
     }
   }

@@ -15,13 +15,13 @@ export const T = {
 };
 
 export function FAMILY(c) {
-  if (c.startsWith('SENSE') || c.includes('INPUT') || c.startsWith('REC_') || c.startsWith('Sense_')) return 'receptor';
-  if (c.startsWith('Op_') || ['EMA','DIFF','INTEGRAL','SUM','SUB','MUL','RATIO','ABS','DELAY_N','OSCILLATOR','QUADRATIC',
-      'DAMPER','AMPLIFY','INVERT','CLIP','MULTIPLY'].includes(c)) return 'metabolic';
-  if (c.startsWith('Gate_') || ['THRESH','HYST','AND','INHIB','DEADZONE','MIN_MAX',
-      'THRESHOLD','HYSTERESIS','INHIBIT'].includes(c)) return 'gating';
-  if (c.startsWith('Pred_') || c.startsWith('Assoc_') || ['CORRELATION','FATIGUE'].includes(c)) return 'cognitive';
-  return 'effector';
+  if (!c) return 'metabolic';
+  const s = String(c).toUpperCase();
+  if (s.startsWith('SENSE') || s.includes('INPUT') || s.startsWith('REC_') || s.includes('SENSOR') || s.startsWith('L1') || s.includes('RECEPTOR')) return 'receptor';
+  if (s.startsWith('ACT') || s.startsWith('MOTOR') || s.startsWith('EFFECTOR') || s.includes('STEER') || s.includes('BRAKE') || s.includes('ACCEL') || s.startsWith('L3')) return 'effector';
+  if (s.startsWith('GATE') || ['THRESH','HYST','AND','INHIB','DEADZONE','MIN_MAX','THRESHOLD','HYSTERESIS','INHIBIT'].some(k => s.includes(k))) return 'gating';
+  if (s.startsWith('PRED') || s.startsWith('ASSOC') || s.includes('CORRELATION') || s.includes('FATIGUE') || s.includes('MEMORY') || s.includes('ORACLE')) return 'cognitive';
+  return 'metabolic';
 }
 
 export const FAMILY_COLOR = {

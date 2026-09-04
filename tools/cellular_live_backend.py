@@ -1740,17 +1740,46 @@ class SiliconCellularOrganism:
                             coords[i, 1] = r * math.sin(phi) * math.sin(theta)
                             coords[i, 2] = r * math.cos(phi)
 
+                OPCODE_MAP = {
+                    0: "SENSE0", 1: "SENSE1", 2: "SENSE2", 3: "SENSE3",
+                    4: "SUM", 5: "INTEGRATE", 6: "AMPLIFY", 7: "INVERT",
+                    8: "DAMPER", 9: "CLIP", 10: "ABS", 11: "MULTIPLY",
+                    12: "DIFF", 13: "SUB", 14: "RATIO",
+                    15: "THRESHOLD", 16: "HYSTERESIS", 17: "DEADZONE",
+                    18: "INHIBIT", 19: "AND", 20: "MIN_MAX",
+                    21: "ACT_POS", 22: "ACT_NEG", 23: "ACT_RESET",
+                    24: "CORRELATION", 25: "FATIGUE"
+                }
+                cb = bin_data.get("cells_bytes", b"")
+                has_cb = len(cb) >= nc * 4
+
                 for i in range(nc):
                     cid = i
                     ctype = "Op_EMA"
                     layer = "L2_ASSOCIATION"
                     gain = 1.0
+
+                    if has_cb:
+                        op = cb[i * 4]
+                        p1 = cb[i * 4 + 1]
+                        l_byte = cb[i * 4 + 3]
+                        if l_byte == 1 or op < 4:
+                            layer = "L1_SENSORY"
+                            ctype = f"SENSE_{op}" if op < 4 else f"Sense_{op}"
+                        elif l_byte == 2 or op in (21, 22, 23):
+                            layer = "L3_MOTOR"
+                            ctype = "Act_POS" if op == 21 else ("Act_NEG" if op == 22 else "Act_RESET")
+                        else:
+                            layer = "L2_ASSOCIATION"
+                            ctype = OPCODE_MAP.get(op, "Op_EMA")
+                        gain = max(0.1, round(float(p1) / 64.0, 2)) if p1 > 0 else 1.0
+
                     if i < len(cells_meta):
                         cm = cells_meta[i]
-                        cid = cm.get("id", i)
-                        ctype = cm.get("type", "Op_EMA")
-                        layer = cm.get("layer", "L2_ASSOCIATION")
-                        gain = float(cm.get("gain", 1.0))
+                        if "id" in cm: cid = cm["id"]
+                        if "type" in cm: ctype = cm["type"]
+                        if "layer" in cm: layer = cm["layer"]
+                        if "gain" in cm: gain = float(cm["gain"])
                     
                     x, y, z = float(coords[i, 0]), float(coords[i, 1]), float(coords[i, 2])
                     cell = PhysicalCell3D(cid, ctype, x, y, z, layer=layer)
@@ -1768,8 +1797,8 @@ class SiliconCellularOrganism:
                         w = float(weights[syn_idx])
                         self.synapses.append({"from": u, "to": v, "weight": round(w, 4), "active": True})
 
-                sense_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L1_SENSORY" or str(c.type).startswith(("Sense", "REC_"))]
-                act_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L3_MOTOR" or str(c.type).startswith(("Act", "MOTOR_", "EFFECTOR_"))]
+                sense_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L1_SENSORY" or str(c.type).upper().startswith(("SENSE", "REC_"))]
+                act_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L3_MOTOR" or str(c.type).upper().startswith(("ACT", "MOTOR", "EFFECTOR"))]
                 core_ids = [c.id for c in self.cells if c.id not in sense_ids and c.id not in act_ids]
 
                 if oid == "adas_track_champion":
@@ -2298,7 +2327,7 @@ class SiliconCellularOrganism:
                     "x": round(c.x, 1),
                     "y": round(c.y, 1),
                     "z": round(c.z, 1),
-                    "organ": getattr(c, "organ", (0 if "Sense" in c.type or "REC_" in c.type else (2 if "Act_" in c.type else 1))),
+                    "organ": getattr(c, "organ", (0 if "SENSE" in str(c.type).upper() or "REC_" in str(c.type).upper() or getattr(c, "layer", "") == "L1_SENSORY" else (2 if "ACT" in str(c.type).upper() or "MOTOR" in str(c.type).upper() or getattr(c, "layer", "") == "L3_MOTOR" else 1))),
                     "vm": round(getattr(c, "vm", -70.0 + (c.out * 35.0 if c.out > 0 else c.out * 15.0)), 1),
                     "morph": round(getattr(c, "morph", 0.5), 2)
                 }

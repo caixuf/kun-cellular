@@ -337,6 +337,23 @@ export class CellView {
     if (this.cytoMesh && this.cytoMesh.material) {
       this.cytoMesh.material.color.setHex(col);
     }
+    if (this.nucleus && this.nucleus.material) {
+      this.nucleus.material.emissive.setHex(col);
+    }
+    if (this.membrane && this.membrane.material) {
+      this.membrane.material.color.setHex(col);
+    }
+    if (this.delayRing && this.delayRing.material) {
+      this.delayRing.material.color.setHex(col);
+    }
+    if (this.attrRibbon && this.attrRibbon.material) {
+      this.attrRibbon.material.color.setHex(col);
+    }
+    if (this.organelles) {
+      for (const o of this.organelles) {
+        if (o.mesh && o.mesh.material) o.mesh.material.emissive.setHex(col);
+      }
+    }
     if (this.labelMat) {
       this.labelMat.map = getLabelTexture(cell.type);
     }
