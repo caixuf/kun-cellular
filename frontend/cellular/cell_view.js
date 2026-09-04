@@ -186,6 +186,19 @@ export class CellView {
     const rBase = getCellWorldRadius(this.org);
     const sf = Math.max(0.12, Math.min(1.0, rBase / 13.0));
     this.group.scale.set(sf, sf, sf);
+
+    const fam = FAMILY(cell.type);
+    const col = FAMILY_COLOR[fam] || 0x38bdf8;
+    if (this.membraneMesh && this.membraneMesh.material) {
+      this.membraneMesh.material.color.setHex(col);
+      this.membraneMesh.material.emissive.setHex(col);
+    }
+    if (this.cytoMesh && this.cytoMesh.material) {
+      this.cytoMesh.material.color.setHex(col);
+    }
+    if (this.labelMat) {
+      this.labelMat.map = getLabelTexture(cell.type);
+    }
   }
 
   update(time, warpMultiplier = 1) {

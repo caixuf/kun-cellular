@@ -12,7 +12,7 @@ import { CellView } from './cell_view.js';
 import { SynapseView } from './synapse_view.js';
 
 export const MIN_CELL_PIXELS = 26.0;
-export const MAX_SOLID_CELLS = 300;
+export const MAX_SOLID_CELLS = 500;
 
 export const cellViewPool = [];
 export const synViewPool = [];
@@ -275,9 +275,10 @@ const _lodCellPos = new THREE.Vector3();
 const _lodSphere = new THREE.Sphere();
 const _lodCandidates = [];
 
-export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5) {
+export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   let frustum = arg1;
   let scn = scene, cam = camera, orgObj = defaultOrg, bnds = currentOrganismBounds;
+  let renderMode = arg6 || (typeof window !== 'undefined' && window.currentRenderMode) || 'symbiosis';
 
   if (arg1 && arg1.isScene) {
     scn = arg1;
@@ -285,12 +286,14 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5) {
     frustum = arg3;
     orgObj = arg4 || defaultOrg;
     bnds = arg5 || currentOrganismBounds;
+    if (arg6) renderMode = arg6;
   } else {
     frustum = arg1;
     if (arg2 && arg2.isScene) scn = arg2;
     if (arg3 && arg3.isCamera) cam = arg3;
     if (arg4 && arg4.cells) orgObj = arg4;
     if (arg5) bnds = arg5;
+    if (arg6) renderMode = arg6;
   }
 
   if (!orgObj || !orgObj.cells) return;
@@ -300,28 +303,46 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5) {
 
   _lodCamPos.copy(cam.position);
 
+  const isCompact = n <= MAX_SOLID_CELLS; // <= 500 个细胞全部全量实化渲染
+  const isLODMode = (renderMode === 'lod');
+
   const cellRadius = getCellWorldRadius(orgObj);
   const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5));
   const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
-  const orgR = (bnds && bnds.radius) || 180;
-  const camToCtr = _lodCamPos.distanceTo(bnds.center);
 
   // 1. 实体细胞筛选
   _lodCandidates.length = 0;
-  if (camToCtr <= solidMaxDist + orgR) {
-    for (const arr of cellSpatialHash.values()) {
-      for (const c of arr) {
-        _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
-        const d = _lodCamPos.distanceTo(_lodCellPos);
-        if (d > solidMaxDist) continue;
-        _lodSphere.center.copy(_lodCellPos);
-        _lodSphere.radius = 52.0;
-        if (!frustum.intersectsSphere(_lodSphere)) continue;
-        _lodCandidates.push({ id: c.id, d });
-      }
+
+  if (isCompact) {
+    // 紧凑生命体 (<= 500 细胞，如 210 细胞 ADAS Cortex)：全量实化展示全部拓扑细胞，视锥剔除保底
+    for (const c of orgObj.cells) {
+      _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
+      const d = _lodCamPos.distanceTo(_lodCellPos);
+      _lodSphere.center.copy(_lodCellPos);
+      _lodSphere.radius = 70.0;
+      if (frustum && !frustum.intersectsSphere(_lodSphere)) continue;
+      _lodCandidates.push({ id: c.id, d });
     }
     _lodCandidates.sort((a, b) => a.d - b.d);
-    if (_lodCandidates.length > MAX_SOLID_CELLS) _lodCandidates.length = MAX_SOLID_CELLS;
+  } else {
+    // 超大规模生命体 (如百万微柱点云)：根据距离与视锥筛选最近的代表性微柱实化
+    const orgR = (bnds && bnds.radius) || 180;
+    const camToCtr = _lodCamPos.distanceTo(bnds.center);
+    if (camToCtr <= solidMaxDist + orgR || !isLODMode) {
+      for (const arr of cellSpatialHash.values()) {
+        for (const c of arr) {
+          _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
+          const d = _lodCamPos.distanceTo(_lodCellPos);
+          if (isLODMode && d > solidMaxDist) continue;
+          _lodSphere.center.copy(_lodCellPos);
+          _lodSphere.radius = 52.0;
+          if (!frustum.intersectsSphere(_lodSphere)) continue;
+          _lodCandidates.push({ id: c.id, d });
+        }
+      }
+      _lodCandidates.sort((a, b) => a.d - b.d);
+      if (_lodCandidates.length > MAX_SOLID_CELLS) _lodCandidates.length = MAX_SOLID_CELLS;
+    }
   }
 
   const wantIds = new Set();
@@ -343,26 +364,35 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5) {
   }
   views.cells = Array.from(cellViewsMap.values());
 
-  // 2. 突触 LOD：关联突触 + 点云模式下全脑活跃大型突触
+  // 2. 突触实化：对于紧凑生命体，全量实化所有突触连接与电位光子
   const wantSyn = new Set();
+  const maxSyns = isCompact ? Math.min(orgObj.syns ? orgObj.syns.length : 0, 800) : 160;
 
-  if (wantIds.size > 0) {
-    for (const id of wantIds) {
-      const adj = cellSynAdj.get(id);
-      if (adj) {
-        for (const key of adj) {
-          wantSyn.add(key);
-          if (wantSyn.size >= 120) break;
-        }
-      }
-      if (wantSyn.size >= 120) break;
+  if (isCompact && orgObj.syns) {
+    for (const s of orgObj.syns) {
+      const key = `${s.from}->${s.to}:${s.port || 0}`;
+      wantSyn.add(key);
+      if (wantSyn.size >= maxSyns) break;
     }
-  }
+  } else {
+    if (wantIds.size > 0) {
+      for (const id of wantIds) {
+        const adj = cellSynAdj.get(id);
+        if (adj) {
+          for (const key of adj) {
+            wantSyn.add(key);
+            if (wantSyn.size >= 140) break;
+          }
+        }
+        if (wantSyn.size >= 140) break;
+      }
+    }
 
-  const majorKeys = getMajorSynapseKeys(orgObj, bnds);
-  for (const key of majorKeys) {
-    wantSyn.add(key);
-    if (wantSyn.size >= 140) break;
+    const majorKeys = getMajorSynapseKeys(orgObj, bnds);
+    for (const key of majorKeys) {
+      wantSyn.add(key);
+      if (wantSyn.size >= 160) break;
+    }
   }
 
   for (const [key, v] of synViewsMap) {

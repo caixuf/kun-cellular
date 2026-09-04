@@ -65,7 +65,7 @@ export class SynapseView {
     if (!this.org.cellMap) this.org.cellMap = new Map(this.org.cells.map(c => [c.id, c]));
     const a = this.org.cellMap.get(this.syn.from);
     const b = this.org.cellMap.get(this.syn.to);
-    if (!a || !b || !this.syn.active) {
+    if (!a || !b || this.syn.active === false) {
       this.group.visible = false;
       return;
     }

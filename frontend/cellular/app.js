@@ -75,7 +75,7 @@ function animate() {
   }
 
   // 3. 动态屏幕像素视锥实化 LOD
-  updateDetailLOD(_frustum, scene, camera, org, currentOrganismBounds);
+  updateDetailLOD(_frustum, scene, camera, org, currentOrganismBounds, currentRenderMode);
 
   let visibleMicroCount = 0;
   for (const v of views.cells) {
