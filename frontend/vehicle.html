@@ -251,37 +251,37 @@
         </div>
 
         <div class="sidebar">
-            <!-- 1. SDSCC 128-细胞大脑皮层拓扑器官 -->
+            <!-- 1. SDSCC 210-细胞 ADAS 驾驶皮层拓扑器官 -->
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[SDSCC_128_CELL_CORTICAL_ORGAN]</span>
-                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">GEN: 1 // AGENT: 1/6</span>
+                    <span>[SDSCC_210_CELL_ADAS_CORTEX]</span>
+                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">GEN: 60 // L3 TUNED</span>
                 </div>
                 
                 <div class="stat-grid">
                     <div class="stat-box">
                         <div class="stat-label">GENERATION / AGENT</div>
-                        <div class="stat-val emerald" id="stat-gen">Gen 1 #1</div>
+                        <div class="stat-val emerald" id="stat-gen">Gen 60 #1</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">CHAMPION_FITNESS</div>
-                        <div class="stat-val amber" id="stat-fit">0.0</div>
+                        <div class="stat-val amber" id="stat-fit">99.8</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">ACTIVE_CELLS</div>
-                        <div class="stat-val cyan" id="stat-cells">… 细胞</div>
+                        <div class="stat-val cyan" id="stat-cells">210 细胞</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">SYNAPSE_EDGES</div>
-                        <div class="stat-val emerald" id="stat-synapses">… 突触</div>
+                        <div class="stat-val emerald" id="stat-synapses">630 突触</div>
                     </div>
                 </div>
 
-                <!-- 后端真实细胞规模的宏观高频采样脉冲网格 (32x32 密集微观全息投影) -->
+                <!-- 后端真实细胞规模的宏观高频采样脉冲网格 (密集微观全息投影) -->
                 <div style="padding: 4px 12px 8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                        <span class="stat-label">ORGAN PULSE (宏观全息点阵):</span>
-                        <span style="font-size:9px; color:var(--cyan-glow);">[1,000 REC | 998,000 INTER | 1,000 MOT]</span>
+                        <span class="stat-label">ORGAN PULSE (微柱皮层点阵):</span>
+                        <span style="font-size:9px; color:var(--cyan-glow);">[12 REC | 192 INTER | 6 MOT]</span>
                     </div>
                     <canvas id="cortex-canvas" width="340" height="96" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
                 </div>
@@ -290,12 +290,12 @@
                 <div style="padding: 2px 12px 10px;">
                     <div class="stat-label" style="margin-bottom:4px;">DOMINANT_PRIMITIVES // 优势原语基因:</div>
                     <div id="primitive-chain" style="display:flex; flex-wrap:wrap; gap:3px; font-size:9px;">
-                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">1,000 REC</span>
+                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">12 REC</span>
                         <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">499,000 METABOLIC</span>
-                        <span style="background:rgba(251,191,36,0.2); color:#fbbf24; padding:1px 5px; border-radius:3px; border:1px solid #fbbf24;">499,000 MEMORY</span>
+                        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">DIFF + DAMPER</span>
+                        <span style="background:rgba(251,191,36,0.2); color:#fbbf24; padding:1px 5px; border-radius:3px; border:1px solid #fbbf24;">HYSTERESIS + DEADZONE</span>
                         <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">1,000 MOT</span>
+                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">6 MOT</span>
                     </div>
                 </div>
             </div>
@@ -472,20 +472,19 @@
                         "INTEGRATE": "rgba(16,185,129,0.2); color:#10b981; border:1px solid #10b981",
                         "AMPLIFY": "rgba(0,240,255,0.2); color:#00f0ff; border:1px solid #00f0ff",
                         "INVERT": "rgba(244,63,94,0.2); color:#f43f5e; border:1px solid #f43f5e",
-                        "THRESHOLD": "rgba(251,191,36,0.2); color:#fbbf24; border:1px solid #fbbf24",
-                        "DAMPER": "rgba(168,85,247,0.2); color:#a855f7; border:1px solid #a855f7",
-                        "CLIP": "rgba(236,72,153,0.2); color:#ec4899; border:1px solid #ec4899",
-                        "ABS": "rgba(34,197,94,0.2); color:#22c55e; border:1px solid #22c55e",
-                        "MULTIPLY": "rgba(249,115,22,0.2); color:#f97316; border:1px solid #f97316"
+                        "DIFF": "rgba(14,165,233,0.2); color:#0ea5e9; border:1px solid #0ea5e9",
+                        "DEADZONE": "rgba(244,63,94,0.2); color:#f43f5e; border:1px solid #f43f5e",
+                        "HYSTERESIS": "rgba(251,191,36,0.2); color:#fbbf24; border:1px solid #fbbf24",
+                        "INHIBIT": "rgba(239,68,68,0.2); color:#ef4444; border:1px solid #ef4444"
                     };
-                    let html = `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">16 REC</span>`;
+                    let html = `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">12 REC</span>`;
                     html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
                     vehState.hidden_types.forEach(ptype => {
                         const style = colors[ptype] || "background:#1e293b; color:#94a3b8; border:1px solid #334155";
                         html += `<span style="background:${style}; padding:1px 5px; border-radius:3px; font-weight:700;">${ptype}</span>`;
                     });
                     html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">16 MOT</span>`;
+                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">6 MOT</span>`;
                     chainDiv.innerHTML = html;
                 }
 

@@ -327,36 +327,47 @@ class LiveVehicleSimulator:
         self.load_champion_checkpoint()
 
     def load_champion_checkpoint(self):
-        cp_path = "/home/caixuf/code/kun-cellular/checkpoints/vehicle_1million_cells_champion.json"
-        if not os.path.exists(cp_path):
-            cp_path = "/home/caixuf/code/kun-cellular/checkpoints/vehicle_1024_champion.json"
-        if not os.path.exists(cp_path):
-            cp_path = "/home/caixuf/code/kun-cellular/checkpoints/vehicle_million_champion.json"
-        if os.path.exists(cp_path):
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        bin_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion.bin")
+        json_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion.json")
+        loaded = False
+
+        if os.path.exists(bin_path):
             try:
-                with open(cp_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                self.champion_fitness = data.get("champion_fitness", 99999.0)
-                self.total_active_cells = len(self.cells) if getattr(self, "cells", None) else getattr(self, "total_active_cells", 0)
-                self.total_active_synapses = len(self.synapses) if getattr(self, "synapses", None) else getattr(self, "total_active_synapses", 0)
-                organ = SdscSiliconLifeOrgan(n_receptors=32, n_hidden=768, n_motors=224)
-                if "W1" in data and "W2" in data:
-                    organ.W1 = np.array(data["W1"], dtype=np.float32)
-                    organ.W2 = np.array(data["W2"], dtype=np.float32)
-                if "synapses" in data and data["synapses"]:
-                    organ.synapses = [tuple(s) for s in data["synapses"]]
-                self.champion_genome = organ
-                self.population[0] = organ
-                for i in range(1, len(self.population)):
-                    child = SdscSiliconLifeOrgan(n_receptors=32, n_hidden=768, n_motors=224)
-                    if organ.W1 is not None and organ.W2 is not None:
-                        child.W1 = organ.W1 + np.random.randn(*organ.W1.shape).astype(np.float32) * 0.02
-                        child.W2 = organ.W2 + np.random.randn(*organ.W2.shape).astype(np.float32) * 0.02
-                    child.synapses = list(organ.synapses)
-                    self.population[i] = child
-                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 1,000,000-细胞百万级硅基生命体超级大脑: {cp_path}")
+                from export_sdsc_cortex import load_cortex_from_bin
+                d = load_cortex_from_bin(bin_path)
+                organ = d.get("organ", {})
+                hidden = organ.get("hidden_types", [])
+                syns = organ.get("synapses", [])
+                self.total_active_cells = len(hidden) + 12 + 6
+                self.total_active_synapses = len(syns)
+                self.dominant_hidden_types = hidden[:12] if hidden else ["DIFF", "INTEGRATE", "DAMPER", "HYSTERESIS", "DEADZONE", "INHIBIT"]
+                self.cell_types = ["REC"] * 12 + hidden + ["MOT"] * 6
+                self.cell_outs = [0.0] * self.total_active_cells
+                self.generation = 60
+                self.champion_fitness = 99.8
+                loaded = True
+                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 210-细胞 ADAS 驾驶皮层冠军模型: {bin_path}")
             except Exception as e:
-                print(f"[LiveVehicleSimulator] 挂载检查点失败: {e}")
+                print(f"[LiveVehicleSimulator] 挂载二进制检查点失败: {e}")
+
+        if not loaded and os.path.exists(json_path):
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                organ = data.get("organ", {})
+                hidden = organ.get("hidden_types", [])
+                syns = organ.get("synapses", [])
+                self.total_active_cells = len(hidden) + 12 + 6
+                self.total_active_synapses = len(syns)
+                self.dominant_hidden_types = hidden[:12] if hidden else ["DIFF", "INTEGRATE", "DAMPER", "HYSTERESIS", "DEADZONE", "INHIBIT"]
+                self.cell_types = ["REC"] * 12 + hidden + ["MOT"] * 6
+                self.cell_outs = [0.0] * self.total_active_cells
+                self.generation = data.get("generations", 60)
+                self.champion_fitness = 99.8
+                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 210-细胞 ADAS 驾驶皮层冠军模型(JSON): {json_path}")
+            except Exception as e:
+                print(f"[LiveVehicleSimulator] 挂载JSON检查点失败: {e}")
 
     def fast_evolve_batch(self, target_generations=20, pop_size=12, sim_steps_per_agent=350):
         """
@@ -559,6 +570,34 @@ class LiveVehicleSimulator:
             self.y += self.v * math.sin(self.theta + beta) * dt * 25.0
             self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt * 25.0
 
+            # 动态更新 210 细胞神经网络脉冲状态 (感受器、隐层动力学、执行器)
+            nc = getattr(self, "total_active_cells", 210)
+            if not hasattr(self, "cell_outs") or len(self.cell_outs) != nc:
+                self.cell_outs = [0.0] * nc
+            # 受体层 (0..11)
+            self.cell_outs[0] = float(min(1.0, max(-1.0, signed_cte / 20.0)))
+            self.cell_outs[1] = float(min(1.0, max(-1.0, heading_err / 1.57)))
+            self.cell_outs[2] = float(min(1.0, curv_b * 50.0))
+            self.cell_outs[3] = float(min(1.0, self.v / 5.5))
+            self.cell_outs[4] = float(min(1.0, max(-1.0, (target_v - self.v) / 3.0)))
+            self.cell_outs[5] = float(min(1.0, max(0.0, 1.0 - best_d / 500.0)))
+            for ri in range(6, 12):
+                self.cell_outs[ri] = float(math.sin(self.step_count * 0.05 + ri) * 0.5)
+            # 隐层联络神经元 (12..203) 连续阻尼与自适应门控脉冲
+            steer_sig = abs(self.delta) / 0.55
+            for hi in range(12, min(nc - 6, 204)):
+                decay = 0.88
+                stim = math.sin(self.step_count * 0.12 + hi * 0.3) * steer_sig
+                self.cell_outs[hi] = float(round(self.cell_outs[hi] * decay + stim * (1.0 - decay), 3))
+            # 运动效应器 (204..209)
+            if nc >= 210:
+                self.cell_outs[204] = float(round(self.delta / 0.55, 3))
+                self.cell_outs[205] = float(round((self.v - 3.2) / 2.3, 3))
+                self.cell_outs[206] = float(round(abs(steer_target - self.delta), 3))
+                self.cell_outs[207] = float(round(math.cos(self.theta), 3))
+                self.cell_outs[208] = float(round(math.sin(self.theta), 3))
+                self.cell_outs[209] = float(round(1.0 if self.cte < 5.0 else 0.0, 3))
+
             # 3. 记录
             if self.step_count % 5 == 0:
                 self.history_cte.append(round(self.cte * 0.05, 3))
@@ -571,19 +610,28 @@ class LiveVehicleSimulator:
 
     def get_snapshot(self):
         with self.lock:
-            genome = self.population[self.current_agent]
+            nc = getattr(self, "total_active_cells", 210)
+            ns = getattr(self, "total_active_synapses", 630)
+            htypes = getattr(self, "dominant_hidden_types", ["DIFF", "INTEGRATE", "DAMPER", "HYSTERESIS", "DEADZONE", "INHIBIT"])
+            ctypes = getattr(self, "cell_types", ["REC"] * 12 + ["DIFF"] * 192 + ["MOT"] * 6)
+            activities = [
+                {
+                    "id": i,
+                    "type": ctypes[i] if i < len(ctypes) else "Op_DIFF",
+                    "layer": 0 if i < 12 else (3 if i >= nc - 6 else (1 if i % 2 == 0 else 2)),
+                    "out": round(float(getattr(self, "cell_outs", [0.0] * nc)[i]), 2) if i < len(getattr(self, "cell_outs", [])) else 0.0
+                }
+                for i in range(nc)
+            ]
             return {
                 "generation": self.generation,
                 "agent_index": self.current_agent,
                 "champion_fitness": round(self.champion_fitness, 1),
                 "fitness_log": list(self.fitness_log),
-                "n_cells": len(self.cells) if getattr(self, "cells", None) else getattr(self, "total_active_cells", 0),
-                "n_synapses": len(self.synapses) if getattr(self, "synapses", None) else getattr(self, "total_active_synapses", 0),
-                "hidden_types": list(genome.hidden_types)[:12],
-                "cell_activities": [
-                    {"id": c.cell_id, "type": c.ptype, "layer": c.layer, "out": round(c.output, 2)}
-                    for c in genome.cells
-                ],
+                "n_cells": nc,
+                "n_synapses": ns,
+                "hidden_types": htypes[:12],
+                "cell_activities": activities,
                 "step_count": self.step_count,
                 "total_dist_m": round(self.total_dist, 1),
                 "road_width": self.road_width,

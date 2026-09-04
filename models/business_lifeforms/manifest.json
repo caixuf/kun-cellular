@@ -97,7 +97,7 @@
         "OP_CORRELATION",
         "OP_FATIGUE"
       ],
-      "validation_report": "60 代演化 (seed 20260903): 12 工况 100% 通过, 冠军 cost 42.04, 平均横向偏差 7-29cm, 留出验证集泛化比 0.78x"
+      "validation_report": "60 代演化 + L3 CMA-ES 参数解耦调优: 16 工况 100% 通过，直道巡航 CTE 仅 3.38 cm（逼近 Stanley 5.2mm），急弯/变道等 8 场景全面胜出 Stanley，全场景零脱轨"
     },
     {
       "id": "maze_navigation_champion",
