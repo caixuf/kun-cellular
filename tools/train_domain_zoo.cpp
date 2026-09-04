@@ -8,7 +8,7 @@
 //       tools/train_domain_zoo.cpp -o bin/train_domain_zoo
 // ============================================================================
 
-#include "kun/cellular/domain_zoo.hpp"
+#include "tasks/control/domain_zoo.hpp"
 #include <chrono>
 #include <cstdio>
 #include <fstream>

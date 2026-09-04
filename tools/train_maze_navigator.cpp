@@ -1,4 +1,4 @@
-#include "kun/cellular/maze_navigator.hpp"
+#include "tasks/robotics/maze_navigator.hpp"
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/evolvable_task.hpp"
 #include <iostream>

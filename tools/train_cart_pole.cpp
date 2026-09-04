@@ -8,7 +8,7 @@
 //       tools/train_cart_pole.cpp -o bin/train_cart_pole
 // ============================================================================
 
-#include "kun/cellular/cart_pole_task.hpp"
+#include "tasks/control/cart_pole_task.hpp"
 #include <chrono>
 #include <cstdio>
 #include <fstream>

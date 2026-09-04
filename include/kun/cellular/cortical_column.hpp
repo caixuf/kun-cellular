@@ -167,27 +167,36 @@ public:
     }
 
     /**
-     * @brief 多通道阵列并行前向推演: 每个微柱直接接收专属张量输入并产生专属效应
-     * @param column_inputs 指针数组 [num_columns_]，指向各柱长度为 global_in_dim_ 的输入张量
+     * @brief 多通道阵列并行前向推演: 每个微柱直接接收专属张量输入并产生专属效应 (严格内存安全保护)
+     * @param column_inputs 指针数组 [num_channels]，指向各柱长度为 global_in_dim_ 的输入张量
+     * @param num_channels 输入通道数量 (防止越界访存)
      * @param column_outputs 连续数组 [num_columns_ * global_out_dim_]，接收各柱输出
      */
-    void forward_multi_channel(const float* const* column_inputs, float* column_outputs) {
-        if (!column_inputs || !column_outputs || num_columns_ == 0) return;
+    void forward_multi_channel(const float* const* column_inputs, size_t num_channels, float* column_outputs) {
+        if (!column_inputs || !column_outputs || num_columns_ == 0 || num_channels == 0) return;
 
-        // 1. 各微柱注入自身输入
-        for (uint32_t c = 0; c < num_columns_; ++c) {
+        // 1. 各微柱注入自身输入 (严格通道边界保护，多余微柱自动置零)
+        uint32_t active_cols = std::min(num_columns_, static_cast<uint32_t>(num_channels));
+        for (uint32_t c = 0; c < active_cols; ++c) {
             if (column_inputs[c]) {
                 for (uint32_t i = 0; i < global_in_dim_; ++i) {
                     columns_[c].local_inputs[i] = column_inputs[c][i];
                 }
+            } else {
+                std::fill(columns_[c].local_inputs.begin(), columns_[c].local_inputs.end(), 0.0f);
             }
+        }
+        for (uint32_t c = active_cols; c < num_columns_; ++c) {
+            std::fill(columns_[c].local_inputs.begin(), columns_[c].local_inputs.end(), 0.0f);
         }
 
         // 2. 轴突脉冲信号交换 (跨柱双缓冲突触)
         for (const auto& axon : macro_axons_) {
-            auto& dst_col = columns_[axon.dst_column_idx];
-            if (axon.dst_cell_idx < dst_col.local_inputs.size()) {
-                dst_col.local_inputs[axon.dst_cell_idx] += axon.delay_signal * axon.weight;
+            if (axon.dst_column_idx < num_columns_) {
+                auto& dst_col = columns_[axon.dst_column_idx];
+                if (axon.dst_cell_idx < dst_col.local_inputs.size()) {
+                    dst_col.local_inputs[axon.dst_cell_idx] += axon.delay_signal * axon.weight;
+                }
             }
         }
 
@@ -205,11 +214,13 @@ public:
 
         // 4. 准备下一拍的轴突传导信号 (双缓冲延迟)
         for (auto& axon : macro_axons_) {
-            const auto& src_col = columns_[axon.src_column_idx];
-            uint32_t out_idx = axon.src_cell_idx >= (cells_per_column_ - global_out_dim_) ?
-                               (axon.src_cell_idx - (cells_per_column_ - global_out_dim_)) : 0;
-            if (out_idx < src_col.local_outputs.size()) {
-                axon.delay_signal = src_col.local_outputs[out_idx];
+            if (axon.src_column_idx < num_columns_) {
+                const auto& src_col = columns_[axon.src_column_idx];
+                uint32_t out_idx = axon.src_cell_idx >= (cells_per_column_ - global_out_dim_) ?
+                                   (axon.src_cell_idx - (cells_per_column_ - global_out_dim_)) : 0;
+                if (out_idx < src_col.local_outputs.size()) {
+                    axon.delay_signal = src_col.local_outputs[out_idx];
+                }
             }
         }
 
@@ -219,6 +230,10 @@ public:
                 column_outputs[c * global_out_dim_ + o] = columns_[c].local_outputs[o];
             }
         }
+    }
+
+    void forward_multi_channel(const float* const* column_inputs, float* column_outputs) {
+        forward_multi_channel(column_inputs, num_columns_, column_outputs);
     }
 
     void mutate(float rate, float sigma, std::mt19937& rng) {
@@ -235,6 +250,9 @@ public:
         }
     }
 
+    /**
+     * @brief 真实无损完整存盘 (100% 序列化全部微柱原语、权重拓扑与宏轴突)
+     */
     bool save_checkpoint_json(const std::string& filepath) const {
         std::ofstream ofs(filepath);
         if (!ofs.is_open()) return false;
@@ -250,9 +268,45 @@ public:
         ofs << "  \"columns\": [\n";
         for (size_t c = 0; c < columns_.size(); ++c) {
             const auto& col = columns_[c];
-            ofs << "    {\"id\": " << col.column_id << ", \"cells\": " << col.genome.num_cells
-                << ", \"synapses\": " << col.genome.num_synapses << "}"
-                << (c + 1 < columns_.size() ? "," : "") << "\n";
+            ofs << "    {\n";
+            ofs << "      \"id\": " << col.column_id << ",\n";
+            ofs << "      \"cells\": " << col.genome.num_cells << ",\n";
+            ofs << "      \"synapses\": " << col.genome.num_synapses << ",\n";
+            ofs << "      \"op_types\": [";
+            for (size_t i = 0; i < col.genome.op_types.size(); ++i) {
+                ofs << (int)col.genome.op_types[i] << (i + 1 < col.genome.op_types.size() ? "," : "");
+            }
+            ofs << "],\n";
+            ofs << "      \"gains\": [";
+            for (size_t i = 0; i < col.genome.gains.size(); ++i) {
+                ofs << col.genome.gains[i] << (i + 1 < col.genome.gains.size() ? "," : "");
+            }
+            ofs << "],\n";
+            ofs << "      \"inc_off\": [";
+            for (size_t i = 0; i < col.genome.inc_off.size(); ++i) {
+                ofs << col.genome.inc_off[i] << (i + 1 < col.genome.inc_off.size() ? "," : "");
+            }
+            ofs << "],\n";
+            ofs << "      \"inc_from\": [";
+            for (size_t i = 0; i < col.genome.inc_from.size(); ++i) {
+                ofs << col.genome.inc_from[i] << (i + 1 < col.genome.inc_from.size() ? "," : "");
+            }
+            ofs << "],\n";
+            ofs << "      \"inc_weight\": [";
+            for (size_t i = 0; i < col.genome.inc_weight.size(); ++i) {
+                ofs << col.genome.inc_weight[i] << (i + 1 < col.genome.inc_weight.size() ? "," : "");
+            }
+            ofs << "]\n";
+            ofs << "    }" << (c + 1 < columns_.size() ? "," : "") << "\n";
+        }
+        ofs << "  ],\n";
+        ofs << "  \"macro_axons\": [\n";
+        for (size_t a = 0; a < macro_axons_.size(); ++a) {
+            const auto& ax = macro_axons_[a];
+            ofs << "    {\"src_col\": " << ax.src_column_idx << ", \"src_cell\": " << ax.src_cell_idx
+                << ", \"dst_col\": " << ax.dst_column_idx << ", \"dst_cell\": " << ax.dst_cell_idx
+                << ", \"weight\": " << ax.weight << "}"
+                << (a + 1 < macro_axons_.size() ? "," : "") << "\n";
         }
         ofs << "  ]\n";
         ofs << "}\n";

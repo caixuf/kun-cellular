@@ -52,6 +52,72 @@ def load_business_lifeform_manifest():
         return []
 
 
+def read_sdsc_binary(bin_path):
+    """
+    流式读取 SDSC-BIN (v2) 二进制检查点文件，还原真实细胞与突触拓扑。
+    """
+    if not os.path.exists(bin_path):
+        return None
+    try:
+        with open(bin_path, "rb") as f:
+            hdr_bytes = f.read(72)
+            if len(hdr_bytes) < 72:
+                return None
+            magic, version, num_cells, num_synapses, in_dim, out_dim, cells_off, row_ptr_off, col_idx_off, weights_off, coords_off, extra = struct.unpack("<IIIIIIQQQQQQ", hdr_bytes)
+            if magic != 0x53445343:
+                return None
+            
+            # 读取细胞属性 (4 bytes each: op_type, param1_u8, param2_u8, flags)
+            f.seek(cells_off)
+            cells_bytes = f.read(num_cells * 4)
+            
+            # 读取 CSR 突触
+            f.seek(row_ptr_off)
+            row_ptr = np.frombuffer(f.read((num_cells + 1) * 4), dtype=np.uint32)
+            f.seek(col_idx_off)
+            col_idx = np.frombuffer(f.read(num_synapses * 4), dtype=np.uint32)
+            f.seek(weights_off)
+            weights = np.frombuffer(f.read(num_synapses * 4), dtype=np.float32)
+            
+            # 读取 3D 坐标
+            coords = np.zeros((num_cells, 3), dtype=np.float32)
+            if coords_off > 0 and coords_off < os.path.getsize(bin_path):
+                f.seek(coords_off)
+                coord_bytes = f.read(num_cells * 12)
+                if len(coord_bytes) == num_cells * 12:
+                    coords = np.frombuffer(coord_bytes, dtype=np.float32).reshape((num_cells, 3))
+            
+            # 读取附加元数据 (JSON)
+            meta = {}
+            meta_size = (extra >> 32) & 0xFFFFFFFF
+            generation = extra & 0xFFFFFFFF
+            if meta_size > 0:
+                meta_off = coords_off + num_cells * 12
+                f.seek(meta_off)
+                meta_raw = f.read(meta_size).decode("utf-8", errors="ignore")
+                try:
+                    meta = json.loads(meta_raw)
+                except Exception:
+                    meta = {}
+            
+            return {
+                "num_cells": num_cells,
+                "num_synapses": num_synapses,
+                "input_dim": in_dim,
+                "output_dim": out_dim,
+                "generation": generation,
+                "cells_bytes": cells_bytes,
+                "row_ptr": row_ptr,
+                "col_idx": col_idx,
+                "weights": weights,
+                "coords": coords,
+                "meta": meta
+            }
+    except Exception as e:
+        print(f"[read_sdsc_binary] Error reading {bin_path}: {e}")
+        return None
+
+
 # ============================================================================
 # 0.13 硅基细胞计算机车辆控制器 (SDSCC Vehicle Controller - True 24-Primitive DAG Evolution)
 # 基因组编码 DAG 拓扑结构（哪些原语、如何连接），而非浮点参数向量
@@ -1298,18 +1364,104 @@ class SiliconCellularOrganism:
 
             ckpt_rel = biz.get("checkpoint", "")
             ckpt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ckpt_rel)
-            if not os.path.exists(ckpt_path):
-                return {"status": "error", "message": f"Checkpoint not found: {ckpt_path}"}
 
+            # 自动寻址与格式适配：优先使用当前指定路径，若不存在则检查 .bin / .json 伴侣文件
+            if not os.path.exists(ckpt_path):
+                if ckpt_path.endswith(".bin") and os.path.exists(ckpt_path[:-4] + ".json"):
+                    ckpt_path = ckpt_path[:-4] + ".json"
+                elif ckpt_path.endswith(".json") and os.path.exists(ckpt_path[:-5] + ".bin"):
+                    ckpt_path = ckpt_path[:-5] + ".bin"
+                else:
+                    return {"status": "error", "message": f"Checkpoint not found: {ckpt_path}"}
+
+            # 优先读取配套的 JSON 元数据（如有）用于特化物种逻辑
+            json_fallback_path = ckpt_path[:-4] + ".json" if ckpt_path.endswith(".bin") else ckpt_path
             ckpt = {}
-            if ckpt_path.endswith(".json"):
-                with open(ckpt_path, "r", encoding="utf-8") as f:
-                    ckpt = json.load(f)
+            if os.path.exists(json_fallback_path):
+                try:
+                    with open(json_fallback_path, "r", encoding="utf-8") as f:
+                        ckpt = json.load(f)
+                except Exception:
+                    ckpt = {}
+
+            # 读取标准二进制 SDSC-BIN
+            bin_data = None
+            if ckpt_path.endswith(".bin"):
+                bin_data = read_sdsc_binary(ckpt_path)
+            elif os.path.exists(ckpt_path[:-5] + ".bin"):
+                bin_data = read_sdsc_binary(ckpt_path[:-5] + ".bin")
 
             oid = biz.get("id")
 
-            # 1. 具身智能驾驶 210 细胞微柱皮层 (ASIL-D Cortex)
-            if oid == "adas_cortex_champion":
+            # 优先从标准 SDSC-BIN 二进制文件加载完整拓扑与 3D 坐标
+            if bin_data is not None and bin_data["num_cells"] > 0:
+                nc = bin_data["num_cells"]
+                ns = bin_data["num_synapses"]
+                if bin_data.get("generation"):
+                    self.generation = bin_data["generation"]
+                coords = bin_data["coords"]
+                meta = bin_data.get("meta", {})
+                cells_meta = meta.get("cells_meta", [])
+
+                for i in range(nc):
+                    cid = i
+                    ctype = "Op_EMA"
+                    layer = "L2_ASSOCIATION"
+                    gain = 1.0
+                    if i < len(cells_meta):
+                        cm = cells_meta[i]
+                        cid = cm.get("id", i)
+                        ctype = cm.get("type", "Op_EMA")
+                        layer = cm.get("layer", "L2_ASSOCIATION")
+                        gain = float(cm.get("gain", 1.0))
+                    
+                    x, y, z = float(coords[i, 0]), float(coords[i, 1]), float(coords[i, 2])
+                    cell = PhysicalCell3D(cid, ctype, x, y, z, layer=layer)
+                    cell.gain = gain
+                    self.cells.append(cell)
+
+                row_ptr = bin_data["row_ptr"]
+                col_idx = bin_data["col_idx"]
+                weights = bin_data["weights"]
+                for u in range(nc):
+                    start = row_ptr[u]
+                    end = row_ptr[u + 1]
+                    for syn_idx in range(start, end):
+                        v = int(col_idx[syn_idx])
+                        w = float(weights[syn_idx])
+                        self.synapses.append({"from": u, "to": v, "weight": round(w, 4), "active": True})
+
+                sense_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L1_SENSORY" or str(c.type).startswith(("Sense", "REC_"))]
+                act_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L3_MOTOR" or str(c.type).startswith(("Act", "MOTOR_", "EFFECTOR_"))]
+                core_ids = [c.id for c in self.cells if c.id not in sense_ids and c.id not in act_ids]
+
+                if oid == "adas_cortex_champion":
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(0, 12)), color="#22d3ee"),
+                        SymbioticMacroCell(2, "AssociationCortex", core_ids or list(range(12, 204)), color="#34d399"),
+                        SymbioticMacroCell(3, "MotorEffectorCore", act_ids or list(range(204, 210)), color="#f43f5e")
+                    ]
+                elif oid == "maze_navigation_champion":
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "LidarSensoryRay", sense_ids, color="#22d3ee"),
+                        SymbioticMacroCell(2, "SpatialEscapeMemory", core_ids, color="#34d399"),
+                        SymbioticMacroCell(3, "SteerThrustEffector", act_ids, color="#f43f5e")
+                    ]
+                elif oid == "fluid_damper_champion":
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "FluidDisturbanceSensory", sense_ids, color="#22d3ee"),
+                        SymbioticMacroCell(2, "AdaptiveDampingCortex", core_ids, color="#34d399"),
+                        SymbioticMacroCell(3, "AntiSlipEffectorCore", act_ids, color="#f43f5e")
+                    ]
+                else:
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "AssociationCore", core_ids or list(range(min(4, len(self.cells)), len(self.cells))), color="#34d399"),
+                        SymbioticMacroCell(3, "EffectorRing", act_ids or [self.cells[-1].id], color="#f43f5e")
+                    ]
+
+            # 兼容回退：若无标准二进制则回退至旧版 JSON 解析分支
+            elif oid == "adas_cortex_champion":
                 organ = ckpt.get("organ", {})
                 hidden_types = organ.get("hidden_types", [])
                 raw_syns = organ.get("synapses", [])
@@ -1734,6 +1886,53 @@ class SiliconCellularOrganism:
                     SymbioticMacroCell(1, "AdasSensoryLattice", sense_ids, color="#22d3ee"),
                     SymbioticMacroCell(2, "AdasDampingCore", core_ids, color="#34d399"),
                     SymbioticMacroCell(3, "AdasActuatorRing", act_ids, color="#f43f5e")
+                ]
+
+            # 若上述物种特化未生成细胞，但存在有效的二进制 SDSC-BIN 数据，则直接通过二进制反序列化装载
+            if len(self.cells) == 0 and bin_data is not None and bin_data["num_cells"] > 0:
+                nc = bin_data["num_cells"]
+                ns = bin_data["num_synapses"]
+                if bin_data.get("generation"):
+                    self.generation = bin_data["generation"]
+                coords = bin_data["coords"]
+                meta = bin_data.get("meta", {})
+                cells_meta = meta.get("cells_meta", [])
+
+                for i in range(nc):
+                    cid = i
+                    ctype = "Op_EMA"
+                    layer = "L2_ASSOCIATION"
+                    gain = 1.0
+                    if i < len(cells_meta):
+                        cm = cells_meta[i]
+                        cid = cm.get("id", i)
+                        ctype = cm.get("type", "Op_EMA")
+                        layer = cm.get("layer", "L2_ASSOCIATION")
+                        gain = float(cm.get("gain", 1.0))
+                    
+                    x, y, z = float(coords[i, 0]), float(coords[i, 1]), float(coords[i, 2])
+                    cell = PhysicalCell3D(cid, ctype, x, y, z, layer=layer)
+                    cell.gain = gain
+                    self.cells.append(cell)
+
+                row_ptr = bin_data["row_ptr"]
+                col_idx = bin_data["col_idx"]
+                weights = bin_data["weights"]
+                for u in range(nc):
+                    start = row_ptr[u]
+                    end = row_ptr[u + 1]
+                    for syn_idx in range(start, end):
+                        v = int(col_idx[syn_idx])
+                        w = float(weights[syn_idx])
+                        self.synapses.append({"from": u, "to": v, "weight": round(w, 4), "active": True})
+
+                sense_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L1_SENSORY" or str(c.type).startswith("Sense")]
+                act_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L3_MOTOR" or str(c.type).startswith("Act")]
+                core_ids = [c.id for c in self.cells if c.id not in sense_ids and c.id not in act_ids]
+                self.symbiotic_macro_cells = [
+                    SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
+                    SymbioticMacroCell(2, "AssociationCore", core_ids or list(range(min(4, len(self.cells)), len(self.cells))), color="#34d399"),
+                    SymbioticMacroCell(3, "EffectorRing", act_ids or [self.cells[-1].id], color="#f43f5e")
                 ]
 
             # 统一对齐宏观与微观双尺度定义：宏观标称规模与实际驱动几何

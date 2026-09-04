@@ -9,7 +9,7 @@
 #include <string>
 
 #include "kun/cellular/cellular_genome.hpp"
-#include "kun/cellular/maze_navigator.hpp"
+#include "tasks/robotics/maze_navigator.hpp"
 
 using namespace kun;
 

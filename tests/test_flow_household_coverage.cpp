@@ -1,4 +1,4 @@
-#include "kun/cellular/household_coverage.hpp"
+#include "tasks/robotics/household_coverage.hpp"
 
 #ifdef NDEBUG
 #undef NDEBUG

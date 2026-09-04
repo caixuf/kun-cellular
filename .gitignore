@@ -15,6 +15,8 @@ Testing/
 runs/
 *.pt
 *.bin
+!checkpoints/*.bin
+checkpoints/sdsc_mega_1million.bin
 *.tmp
 bin/
 checkpoints/vehicle_cortex_champion.json
