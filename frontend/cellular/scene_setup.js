@@ -15,9 +15,15 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 0.95;
 
-const stage = document.getElementById('stage');
-if (stage) {
-  stage.appendChild(renderer.domElement);
+export function attachStage() {
+  const stage = document.getElementById('stage') || document.body;
+  if (stage && !stage.contains(renderer.domElement)) {
+    stage.appendChild(renderer.domElement);
+  }
+}
+attachStage();
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', attachStage);
 }
 
 // PBR 生物全息照明系统
@@ -39,11 +45,11 @@ export const lightningGroup = new THREE.Group();
 scene.add(lightningGroup);
 
 // 空气介质三维流动微粒场
-const AIR_PARTICLE_COUNT = 240;
-const airGeo = new THREE.BufferGeometry();
-const airPos = new Float32Array(AIR_PARTICLE_COUNT * 3);
-const airVel = new Float32Array(AIR_PARTICLE_COUNT * 3);
-const airCol = new Float32Array(AIR_PARTICLE_COUNT * 3);
+export const AIR_PARTICLE_COUNT = 240;
+export const airGeo = new THREE.BufferGeometry();
+export const airPos = new Float32Array(AIR_PARTICLE_COUNT * 3);
+export const airVel = new Float32Array(AIR_PARTICLE_COUNT * 3);
+export const airCol = new Float32Array(AIR_PARTICLE_COUNT * 3);
 
 for (let i = 0; i < AIR_PARTICLE_COUNT; i++) {
   airPos[i * 3]     = (Math.random() - 0.5) * 1200;
@@ -64,7 +70,7 @@ for (let i = 0; i < AIR_PARTICLE_COUNT; i++) {
 airGeo.setAttribute('position', new THREE.BufferAttribute(airPos, 3));
 airGeo.setAttribute('color', new THREE.BufferAttribute(airCol, 3));
 
-const airMat = new THREE.PointsMaterial({
+export const airMat = new THREE.PointsMaterial({
   size: 1.6,
   vertexColors: true,
   transparent: true,

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { T, FAMILY, FAMILY_COLOR, MUT_CANDIDATES } from './config.js';
 import { org, compile, forward, stepPhysics, mitosis, rewire, apoptosis, seedOrganism } from './organism_model.js';
 import { currentOrganismBounds, updateOrganismBounds } from './spatial_bounds.js';
-import { scene, camera, renderer, cellPointLight, airParticleCloud } from './scene_setup.js';
+import { scene, camera, renderer, cellPointLight, airParticleCloud, updateAirParticles } from './scene_setup.js';
 import { initPostprocessing, setVisualBloomMode, renderScene, resizePostprocessing } from './postprocessing.js';
 import { camState, updateCamera, setCameraDistance, setCameraTarget, focusOnCell, setCameraPreset, toggleAutoOrbit, initCameraController, cameraShake } from './camera_controller.js';
 import { views, lodPointsMesh, rebuildViews, updateDetailLOD } from './lod_system.js';
@@ -18,14 +18,14 @@ import { startAutoTour, showTourStep, nextTourStep, prevTourStep, endAutoTour, i
 import { currentSelectedOrgId, currentHighlightedBookId, currentRenderMode, currentLOD, ORGAN_DESCRIPTIONS, onOrganSelectionChange, onRowClick, toggleTreeNode, toggleDock, openLibraryDrawer, toggleHabitatMenu, selectOrganism, highlightBookSubcircuit, loadPreset, switchLOD, setRenderMode, pollLibrary } from './organism_library.js';
 import { currentFluidPhase, setFluidPhase, generateFractalLightningPoints, spawnDielectricBreakdownArc, triggerExtinctionLightningBurst, triggerExtinctionVisualShock } from './plasma_effects.js';
 
-// 初始化后处理通道
-await initPostprocessing();
+// 1. 初始化后处理通道与镜头控制
+initPostprocessing(renderer, scene, camera);
+initCameraController(renderer, camera, () => org, () => views, () => currentOrganismBounds, log);
 
-// 初始化相机交互控制
-initCameraController();
-
-// 初始构建场景中默认生命体渲染结构
-rebuildViews();
+// 2. 初始构建全景流形与微观视图
+compile(org);
+updateOrganismBounds(null, org);
+rebuildViews(scene, org, currentOrganismBounds);
 
 let paused = false;
 let tickTimer = 0;
@@ -59,7 +59,7 @@ function animate() {
   }
 
   // 1. 相机动力学更新与阻尼插值
-  updateCamera(dt, currentOrganismBounds);
+  updateCamera(dt, camera);
 
   // 2. 视锥裁剪准备
   _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -75,7 +75,7 @@ function animate() {
   }
 
   // 3. 动态屏幕像素视锥实化 LOD
-  updateDetailLOD(_frustum);
+  updateDetailLOD(_frustum, scene, camera, org, currentOrganismBounds);
 
   let visibleMicroCount = 0;
   for (const v of views.cells) {
@@ -153,17 +153,7 @@ function animate() {
 
   // 流体微粒模拟
   if (airParticleCloud && airParticleCloud.geometry && airParticleCloud.visible) {
-    const posAttr = airParticleCloud.geometry.attributes.position;
-    const arr = posAttr.array;
-    const isHydro = (currentFluidPhase === 'hydro');
-    const speedMult = isHydro ? 0.35 : 1.0;
-    const buoyancy = isHydro ? 0.42 : 0.15;
-
-    for (let i = 0; i < arr.length / 3; i++) {
-      arr[i * 3 + 1] += (0.2 * speedMult + buoyancy) + Math.sin(now * 0.001 + i) * 0.06;
-      if (arr[i * 3 + 1] > 450) arr[i * 3 + 1] = -450;
-    }
-    posAttr.needsUpdate = true;
+    updateAirParticles(dt);
   }
 
   // 离子电弧放电
@@ -185,12 +175,12 @@ function animate() {
   }
 
   // 最终渲染
-  renderScene(dt);
+  renderScene(dt, renderer, scene, camera);
 }
 
 // 绑定所有全局 HTML 事件处理器
 window.setWarp = setWarp;
-window.setVisualBloomMode = setVisualBloomMode;
+window.setVisualBloomMode = (mode) => setVisualBloomMode(mode, renderer, log);
 window.setStress = setStress;
 window.playLifeEpicStory = () => playLifeEpicStory(views, currentOrganismBounds, log, (w, s) => sendBackendCommand('extinction', { wipeout_ratio: w, shock_scale: s }), () => sendBackendCommand('splice'));
 window.triggerGlobalLifeEvent = (type) => triggerGlobalLifeEvent(type, views, currentOrganismBounds, log, (w, s) => sendBackendCommand('extinction', { wipeout_ratio: w, shock_scale: s }), () => sendBackendCommand('splice'));
@@ -230,9 +220,9 @@ window.log = log;
 
 // 绑定底座微观操作按钮
 const _bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
-_bind('b-mito', () => { mitosis(org); rebuildViews(); });
-_bind('b-rewire', () => { rewire(org); rebuildViews(); });
-_bind('b-apop', () => { apoptosis(org); rebuildViews(); });
+_bind('b-mito', () => { mitosis(org); rebuildViews(scene, org, currentOrganismBounds); });
+_bind('b-rewire', () => { rewire(org); rebuildViews(scene, org, currentOrganismBounds); });
+_bind('b-apop', () => { apoptosis(org); rebuildViews(scene, org, currentOrganismBounds); });
 _bind('b-bio', e => {
   const vis = toggleBioLayer();
   e.target.textContent = vis ? ' 生态圈' : ' 生态圈(关)';
@@ -250,7 +240,7 @@ _bind('b-reset', () => {
   org.cells = seeded.cells;
   org.syns = seeded.syns;
   compile(org);
-  rebuildViews();
+  rebuildViews(scene, org, currentOrganismBounds);
   log('[RESET] 重置为种子形态生物 Genesis-0', true);
 });
 
@@ -266,8 +256,8 @@ setInterval(pollLibrary, 5000);
 setInterval(syncBackendState, 33);
 connectWebSocket();
 
-setInterval(() => { if (!paused && !serverOnline) { mitosis(org); rebuildViews(); } }, 14000);
-setInterval(() => { if (!paused && !serverOnline && org.cells.length > 16) { apoptosis(org); rebuildViews(); } }, 42000);
+setInterval(() => { if (!paused && !serverOnline) { mitosis(org); rebuildViews(scene, org, currentOrganismBounds); } }, 14000);
+setInterval(() => { if (!paused && !serverOnline && org.cells.length > 16) { apoptosis(org); rebuildViews(scene, org, currentOrganismBounds); } }, 42000);
 
 // 事件监听器
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDocReader(); });

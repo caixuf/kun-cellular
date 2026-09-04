@@ -40,7 +40,6 @@ jobs:
 
     - name: Run Python Parity & System Gate Tests
       run: |
-        pytest tests/test_adas_cortex_parity.py -v
-        pytest tests/test_adas_cortex_contract.py -v
+        pytest tests/ -v
         python3 tests/test_gate5_gate6_replay_shadow.py
 

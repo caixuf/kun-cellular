@@ -2,6 +2,9 @@
  * lod_system.js - 空间哈希、自适应点云流形与像素级 LOD 裁剪调度
  * ============================================================ */
 import * as THREE from 'three';
+import { scene, camera } from './scene_setup.js';
+import { org as defaultOrg } from './organism_model.js';
+import { currentOrganismBounds } from './spatial_bounds.js';
 import { FAMILY, FAMILY_COLOR } from './config.js';
 import { getGlowTexture } from './texture_cache.js';
 import { getCellWorldRadius } from './spatial_bounds.js';
@@ -30,15 +33,17 @@ let cachedMajorSynKeys = null;
 let lastMajorSynOrgId = null;
 let lastMajorSynCount = 0;
 
-export function getMajorSynapseKeys(org, bounds) {
-  if (!org || !org.syns || org.syns.length === 0) return [];
-  const curId = org.lastOrganismId || (bounds && bounds.organismId) || '';
-  if (cachedMajorSynKeys && lastMajorSynOrgId === curId && lastMajorSynCount === org.syns.length) {
+export function getMajorSynapseKeys(org = defaultOrg, bounds = currentOrganismBounds) {
+  const o = org || defaultOrg;
+  const b = bounds || currentOrganismBounds;
+  if (!o || !o.syns || o.syns.length === 0) return [];
+  const curId = o.lastOrganismId || (b && b.organismId) || '';
+  if (cachedMajorSynKeys && lastMajorSynOrgId === curId && lastMajorSynCount === o.syns.length) {
     return cachedMajorSynKeys;
   }
 
-  const activeSyns = org.syns.filter(s => s.active !== false);
-  const candidates = activeSyns.length > 0 ? activeSyns : org.syns;
+  const activeSyns = o.syns.filter(s => s.active !== false);
+  const candidates = activeSyns.length > 0 ? activeSyns : o.syns;
 
   const sorted = candidates.slice().sort((a, b) => {
     const wa = Math.abs(a.w !== undefined ? a.w : (a.weight !== undefined ? a.weight : 1.0));
@@ -49,27 +54,33 @@ export function getMajorSynapseKeys(org, bounds) {
   const top = sorted.slice(0, MAX_MACRO_SYNS);
   cachedMajorSynKeys = top.map(s => `${s.from}->${s.to}:${s.port || 0}`);
   lastMajorSynOrgId = curId;
-  lastMajorSynCount = org.syns.length;
+  lastMajorSynCount = o.syns.length;
   return cachedMajorSynKeys;
 }
 
-export function computeAdaptiveLodCount(bounds, org) {
-  const cellScale = (bounds && bounds.cellScale) || ((org && org.cells) ? org.cells.length : 1);
+export function computeAdaptiveLodCount(bounds = currentOrganismBounds, org = defaultOrg) {
+  const b = bounds || currentOrganismBounds;
+  const o = org || defaultOrg;
+  const cellScale = (b && b.cellScale) || ((o && o.cells) ? o.cells.length : 1);
   if (cellScale >= 100000000) return 90000;
   if (cellScale >= 10000000) return 60000;
   if (cellScale >= 1000000) return 40000;
   if (cellScale >= 1000) return 15000;
-  const nCells = (org && org.cells) ? org.cells.length : 1;
-  const nSyns = (org && org.syns) ? org.syns.length : 0;
+  const nCells = (o && o.cells) ? o.cells.length : 1;
+  const nSyns = (o && o.syns) ? o.syns.length : 0;
   return Math.min(30000, Math.max(1500, Math.round(nCells * 110 + nSyns * 45)));
 }
 
-export function initLODCloud(scene, org, bounds, count = null) {
+export function initLODCloud(s = scene, o = defaultOrg, b = currentOrganismBounds, count = null) {
+  const scn = s || scene;
+  const orgObj = o || defaultOrg;
+  const bnds = b || currentOrganismBounds;
+
   if (count === null || count === undefined) {
-    count = computeAdaptiveLodCount(bounds, org);
+    count = computeAdaptiveLodCount(bnds, orgObj);
   }
   if (lodPointsMesh) {
-    scene.remove(lodPointsMesh);
+    scn.remove(lodPointsMesh);
     if (lodPointsMesh.geometry) lodPointsMesh.geometry.dispose();
     if (lodPointsMesh.material) lodPointsMesh.material.dispose();
   }
@@ -77,14 +88,14 @@ export function initLODCloud(scene, org, bounds, count = null) {
   lodPositions = new Float32Array(count * 3);
   lodColors = new Float32Array(count * 3);
 
-  const nCells = (org && org.cells && org.cells.length) ? org.cells.length : 1;
-  const synList = (org && org.syns && org.syns.length) ? org.syns : [];
+  const nCells = (orgObj && orgObj.cells && orgObj.cells.length) ? orgObj.cells.length : 1;
+  const synList = (orgObj && orgObj.syns && orgObj.syns.length) ? orgObj.syns : [];
   const cellsMap = new Map();
-  if (org && org.cells) {
-    for (const c of org.cells) cellsMap.set(c.id, c);
+  if (orgObj && orgObj.cells) {
+    for (const c of orgObj.cells) cellsMap.set(c.id, c);
   }
 
-  const spreadScale = Math.min(2.5, Math.max(0.12, (bounds ? bounds.radius : 180.0) / 180.0));
+  const spreadScale = Math.min(2.5, Math.max(0.12, (bnds ? bnds.radius : 180.0) / 180.0));
 
   for (let i = 0; i < count; ++i) {
     let px = 0, py = 0, pz = 0;
@@ -94,33 +105,38 @@ export function initLODCloud(scene, org, bounds, count = null) {
 
     if (isAxon) {
       const syn = synList[Math.floor(Math.random() * synList.length)];
-      const cFrom = cellsMap.get(syn.from) || org.cells[0];
-      const cTo = cellsMap.get(syn.to) || org.cells[Math.min(1, nCells - 1)];
+      const cFrom = cellsMap.get(syn.from) || orgObj.cells[0];
+      const cTo = cellsMap.get(syn.to) || orgObj.cells[Math.min(1, nCells - 1)];
 
       const t = Math.random();
-      const midX = (cFrom.x + cTo.x) * 0.5 + (Math.sin(syn.from * 3.1 + syn.to * 1.7)) * 12.0 * spreadScale;
-      const midY = (cFrom.y + cTo.y) * 0.5 + (Math.cos(syn.from * 2.3 + syn.to * 4.1)) * 12.0 * spreadScale;
-      const midZ = ((cFrom.z || 0) + (cTo.z || 0)) * 0.5 + (Math.sin(syn.from * 1.9 + syn.to * 2.8)) * 12.0 * spreadScale;
+      const fx = cFrom ? (cFrom.x || 0) : 0;
+      const fy = cFrom ? (cFrom.y || 0) : 0;
+      const fz = cFrom ? (cFrom.z || 0) : 0;
+      const tx = cTo ? (cTo.x || 0) : 0;
+      const ty = cTo ? (cTo.y || 0) : 0;
+      const tz = cTo ? (cTo.z || 0) : 0;
 
-      const oneMinusT = 1.0 - t;
-      px = oneMinusT * oneMinusT * cFrom.x + 2.0 * oneMinusT * t * midX + t * t * cTo.x + (Math.random() - 0.5) * 5.0 * spreadScale;
-      py = oneMinusT * oneMinusT * cFrom.y + 2.0 * oneMinusT * t * midY + t * t * cTo.y + (Math.random() - 0.5) * 5.0 * spreadScale;
-      pz = oneMinusT * oneMinusT * (cFrom.z || 0) + 2.0 * oneMinusT * t * midZ + t * t * (cTo.z || 0) + (Math.random() - 0.5) * 5.0 * spreadScale;
+      const sag = Math.sin(t * Math.PI) * (12.0 * spreadScale);
+      px = fx + (tx - fx) * t + (Math.random() - 0.5) * (6.0 * spreadScale);
+      py = fy + (ty - fy) * t + sag + (Math.random() - 0.5) * (6.0 * spreadScale);
+      pz = fz + (tz - fz) * t + (Math.random() - 0.5) * (6.0 * spreadScale);
 
-      const fam = FAMILY(cTo.type);
-      colHex = FAMILY_COLOR[fam] || 0x38bdf8;
+      const w = (syn && syn.w !== undefined) ? syn.w : 1.0;
+      colHex = w >= 0 ? 0x38bdf8 : 0xf43f5e;
     } else {
-      const c = org.cells[Math.floor(Math.random() * nCells)];
-      const u = Math.random();
-      const phi = Math.acos(1 - 2 * Math.random());
+      const c = (orgObj && orgObj.cells && orgObj.cells.length) ? orgObj.cells[Math.floor(Math.random() * orgObj.cells.length)] : null;
+      const cx = c ? (c.x || 0) : 0;
+      const cy = c ? (c.y || 0) : 0;
+      const cz = c ? (c.z || 0) : 0;
+
+      const r = (Math.random() * 18.0 + 2.0) * spreadScale;
       const theta = Math.random() * Math.PI * 2;
-      const r = (1.5 + Math.pow(u, 0.4) * (18.0 + (c.glow || 0) * 8.0)) * spreadScale;
+      const phi = Math.acos(Math.random() * 2 - 1);
+      px = cx + r * Math.sin(phi) * Math.cos(theta);
+      py = cy + r * Math.sin(phi) * Math.sin(theta);
+      pz = cz + r * Math.cos(phi);
 
-      px = c.x + r * Math.sin(phi) * Math.cos(theta);
-      py = c.y + r * Math.sin(phi) * Math.sin(theta);
-      pz = (c.z || 0) + r * Math.cos(phi);
-
-      const fam = FAMILY(c.type);
+      const fam = c ? FAMILY(c.type) : 'metabolic';
       colHex = FAMILY_COLOR[fam] || 0x38bdf8;
     }
 
@@ -149,21 +165,26 @@ export function initLODCloud(scene, org, bounds, count = null) {
   });
 
   lodPointsMesh = new THREE.Points(geo, mat);
-  scene.add(lodPointsMesh);
+  scn.add(lodPointsMesh);
 }
 
-export function buildFullPointCloud(scene, org, bounds) {
-  const n = org.cells.length;
+export function buildFullPointCloud(s = scene, o = defaultOrg, b = currentOrganismBounds) {
+  const scn = s || scene;
+  const orgObj = o || defaultOrg;
+  const bnds = b || currentOrganismBounds;
+
+  if (!orgObj || !orgObj.cells) return;
+  const n = orgObj.cells.length;
   if (n === 0) return;
-  const cellScale = (bounds && bounds.cellScale) || n;
+  const cellScale = (bnds && bnds.cellScale) || n;
 
   if (cellScale >= 200 || n >= 80) {
-    initLODCloud(scene, org, bounds, computeAdaptiveLodCount(bounds, org));
+    initLODCloud(scn, orgObj, bnds, computeAdaptiveLodCount(bnds, orgObj));
     return;
   }
 
   if (lodPointsMesh) {
-    scene.remove(lodPointsMesh);
+    scn.remove(lodPointsMesh);
     if (lodPointsMesh.geometry) lodPointsMesh.geometry.dispose();
     if (lodPointsMesh.material) lodPointsMesh.material.dispose();
     lodPointsMesh = null;
@@ -171,7 +192,7 @@ export function buildFullPointCloud(scene, org, bounds) {
   const pos = new Float32Array(n * 3);
   const col = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
-    const c = org.cells[i];
+    const c = orgObj.cells[i];
     pos[i * 3]     = c.x || 0;
     pos[i * 3 + 1] = c.y || 0;
     pos[i * 3 + 2] = c.z || 0;
@@ -195,44 +216,56 @@ export function buildFullPointCloud(scene, org, bounds) {
   });
   lodPointsMesh = new THREE.Points(geo, mat);
   lodPointsMesh.frustumCulled = false;
-  scene.add(lodPointsMesh);
+  scn.add(lodPointsMesh);
 }
 
-export function buildCellSpatialHash(org, bounds) {
+export function buildCellSpatialHash(o = defaultOrg, b = currentOrganismBounds) {
+  const orgObj = o || defaultOrg;
+  const bnds = b || currentOrganismBounds;
+  if (!orgObj || !orgObj.cells) return;
+
   cellSpatialHash = new Map();
   cellSynAdj = new Map();
   synKeyMap = new Map();
-  const B = Math.max(20, ((bounds && bounds.radius) || 180) / 12);
-  for (const c of org.cells) {
+  const B = Math.max(20, ((bnds && bnds.radius) || 180) / 12);
+  for (const c of orgObj.cells) {
     const bx = Math.floor((c.x || 0) / B), by = Math.floor((c.y || 0) / B), bz = Math.floor((c.z || 0) / B);
     const key = bx + ',' + by + ',' + bz;
     let arr = cellSpatialHash.get(key);
     if (!arr) { arr = []; cellSpatialHash.set(key, arr); }
     arr.push(c);
   }
-  for (const s of org.syns) {
-    const key = `${s.from}->${s.to}:${s.port || 0}`;
-    synKeyMap.set(key, s);
-    let outList = cellSynAdj.get(s.from);
-    if (!outList) { outList = []; cellSynAdj.set(s.from, outList); }
-    outList.push(key);
-    let inList = cellSynAdj.get(s.to);
-    if (!inList) { inList = []; cellSynAdj.set(s.to, inList); }
-    inList.push(key);
+  if (orgObj.syns) {
+    for (const s of orgObj.syns) {
+      const key = `${s.from}->${s.to}:${s.port || 0}`;
+      synKeyMap.set(key, s);
+      let outList = cellSynAdj.get(s.from);
+      if (!outList) { outList = []; cellSynAdj.set(s.from, outList); }
+      outList.push(key);
+      let inList = cellSynAdj.get(s.to);
+      if (!inList) { inList = []; cellSynAdj.set(s.to, inList); }
+      inList.push(key);
+    }
   }
 }
 
-export function rebuildViews(scene, org, bounds) {
+export function rebuildViews(s = scene, o = defaultOrg, b = currentOrganismBounds) {
+  const scn = s || scene;
+  const orgObj = o || defaultOrg;
+  const bnds = b || currentOrganismBounds;
+
   for (const v of cellViewsMap.values()) { v.group.visible = false; cellViewPool.push(v); }
   cellViewsMap.clear();
   for (const v of synViewsMap.values()) { v.group.visible = false; synViewPool.push(v); }
   synViewsMap.clear();
 
-  buildFullPointCloud(scene, org, bounds);
-  buildCellSpatialHash(org, bounds);
+  buildFullPointCloud(scn, orgObj, bnds);
+  buildCellSpatialHash(orgObj, bnds);
 
   cachedMajorSynKeys = null;
-  org.cellMap = new Map(org.cells.map(c => [c.id, c]));
+  if (orgObj && orgObj.cells) {
+    orgObj.cellMap = new Map(orgObj.cells.map(c => [c.id, c]));
+  }
   views.cells = [];
   views.syns = [];
 }
@@ -242,16 +275,36 @@ const _lodCellPos = new THREE.Vector3();
 const _lodSphere = new THREE.Sphere();
 const _lodCandidates = [];
 
-export function updateDetailLOD(scene, camera, frustum, org, bounds) {
-  const n = org.cells.length;
-  if (n === 0) return;
-  _lodCamPos.copy(camera.position);
+export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5) {
+  let frustum = arg1;
+  let scn = scene, cam = camera, orgObj = defaultOrg, bnds = currentOrganismBounds;
 
-  const cellRadius = getCellWorldRadius(org);
-  const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
+  if (arg1 && arg1.isScene) {
+    scn = arg1;
+    cam = arg2;
+    frustum = arg3;
+    orgObj = arg4 || defaultOrg;
+    bnds = arg5 || currentOrganismBounds;
+  } else {
+    frustum = arg1;
+    if (arg2 && arg2.isScene) scn = arg2;
+    if (arg3 && arg3.isCamera) cam = arg3;
+    if (arg4 && arg4.cells) orgObj = arg4;
+    if (arg5) bnds = arg5;
+  }
+
+  if (!orgObj || !orgObj.cells) return;
+  const n = orgObj.cells.length;
+  if (n === 0) return;
+  if (!cam || !frustum) return;
+
+  _lodCamPos.copy(cam.position);
+
+  const cellRadius = getCellWorldRadius(orgObj);
+  const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5));
   const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
-  const orgR = (bounds && bounds.radius) || 180;
-  const camToCtr = _lodCamPos.distanceTo(bounds.center);
+  const orgR = (bnds && bnds.radius) || 180;
+  const camToCtr = _lodCamPos.distanceTo(bnds.center);
 
   // 1. 实体细胞筛选
   _lodCandidates.length = 0;
@@ -280,9 +333,10 @@ export function updateDetailLOD(scene, camera, frustum, org, bounds) {
   for (const cd of _lodCandidates) {
     let v = cellViewsMap.get(cd.id);
     if (!v) {
-      const c = org.cellMap.get(cd.id);
-      v = cellViewPool.length ? cellViewPool.pop() : new CellView(c, scene, org);
-      v.updateCell(c, org);
+      const c = (orgObj.cellMap && orgObj.cellMap.get(cd.id)) || orgObj.cells.find(x => x.id === cd.id);
+      if (!c) continue;
+      v = cellViewPool.length ? cellViewPool.pop() : new CellView(c, scn, orgObj);
+      v.updateCell(c, orgObj);
       cellViewsMap.set(cd.id, v);
     }
     v.group.visible = true;
@@ -305,7 +359,7 @@ export function updateDetailLOD(scene, camera, frustum, org, bounds) {
     }
   }
 
-  const majorKeys = getMajorSynapseKeys(org, bounds);
+  const majorKeys = getMajorSynapseKeys(orgObj, bnds);
   for (const key of majorKeys) {
     wantSyn.add(key);
     if (wantSyn.size >= 140) break;
@@ -318,8 +372,8 @@ export function updateDetailLOD(scene, camera, frustum, org, bounds) {
     if (!synViewsMap.has(key)) {
       const syn = synKeyMap.get(key);
       if (!syn) continue;
-      let v = synViewPool.length ? synViewPool.pop() : new SynapseView(syn, org, scene);
-      v.updateSyn(syn, org);
+      let v = synViewPool.length ? synViewPool.pop() : new SynapseView(syn, orgObj, scn);
+      v.updateSyn(syn, orgObj);
       synViewsMap.set(key, v);
     }
     const v = synViewsMap.get(key);

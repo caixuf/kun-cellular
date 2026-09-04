@@ -2,6 +2,11 @@
  * camera_controller.js - 动力学相机控制器 (动量Lerp, 光标推进, 双击显微, 全景复位)
  * ============================================================ */
 import * as THREE from 'three';
+import { scene, camera, renderer } from './scene_setup.js';
+import { org as defaultOrg } from './organism_model.js';
+import { currentOrganismBounds } from './spatial_bounds.js';
+import { views as defaultViews } from './lod_system.js';
+import { log as defaultLog } from './network_sync.js';
 
 export const camState = {
   camTheta: 0,
@@ -17,7 +22,7 @@ export const camState = {
   shakeImpulse: 0
 };
 
-export function clampCamDistance(r, bounds) {
+export function clampCamDistance(r, bounds = currentOrganismBounds) {
   const macro = (bounds && bounds.macroDist) || 540;
   return Math.max(15, Math.min(Math.max(3200, macro * 4), r));
 }
@@ -26,7 +31,7 @@ export function cameraShake(strength = 4.0) {
   camState.shakeImpulse = Math.max(camState.shakeImpulse, strength);
 }
 
-export function setCameraDistance(r, bounds) {
+export function setCameraDistance(r, bounds = currentOrganismBounds) {
   camState.targetCamR = clampCamDistance(r, bounds);
   camState.camR = camState.targetCamR;
   camState.isCamTransitioning = false;
@@ -37,8 +42,9 @@ export function setCameraTarget(v) {
   camState.currentLookAt.copy(v);
 }
 
-export function focusOnCell(cellId, org, distance = 25) {
-  const c = (org.cellMap && org.cellMap.get(cellId)) || (org.cells && org.cells[0]);
+export function focusOnCell(cellId, org = defaultOrg, distance = 25) {
+  const o = org || defaultOrg;
+  const c = (o.cellMap && o.cellMap.get(cellId)) || (o.cells && o.cells[0]);
   if (!c) return;
   camState.targetLookAt.set(c.x || 0, c.y || 0, c.z || 0);
   camState.currentLookAt.copy(camState.targetLookAt);
@@ -51,8 +57,9 @@ export function focusOnCell(cellId, org, distance = 25) {
   camState.isCamTransitioning = false;
 }
 
-export function setCameraPreset(preset, bounds) {
-  const dist = (bounds && bounds.macroDist) || 540;
+export function setCameraPreset(preset, bounds = currentOrganismBounds) {
+  const b = bounds || currentOrganismBounds;
+  const dist = (b && b.macroDist) || 540;
   camState.targetCamR = dist;
   camState.isCamTransitioning = true;
 
@@ -68,11 +75,13 @@ export function setCameraPreset(preset, bounds) {
   } else if (preset === 'dramatic') {
     camState.targetTheta = 0.785;
     camState.targetPhi = 1.1;
-    camState.targetCamR = Math.max(140, dist * 0.65);
   } else if (preset === 'reset') {
-    camState.targetLookAt.set(0, 0, 0);
     camState.targetTheta = 0;
     camState.targetPhi = Math.PI / 2;
+    camState.targetLookAt.copy(b.center);
+    camState.autoOrbitEnabled = false;
+    const btn = document.getElementById('btn-auto-orbit');
+    if (btn) btn.classList.remove('active');
   }
 }
 
@@ -82,7 +91,15 @@ export function toggleAutoOrbit() {
   if (btn) btn.classList.toggle('active', camState.autoOrbitEnabled);
 }
 
-export function initCameraController(renderer, camera, getOrgFn, getViewsFn, getBoundsFn, logFn) {
+export function initCameraController(
+  r = renderer,
+  cam = camera,
+  getOrgFn = () => defaultOrg,
+  getViewsFn = () => defaultViews,
+  getBoundsFn = () => currentOrganismBounds,
+  logFn = defaultLog
+) {
+  if (!r || !r.domElement) return;
   const raycaster = new THREE.Raycaster();
   const mouseNDC = new THREE.Vector2();
   const focalPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -97,14 +114,14 @@ export function initCameraController(renderer, camera, getOrgFn, getViewsFn, get
     const panScale = Math.max(0.05, camState.targetCamR / 480);
     const right = new THREE.Vector3();
     const up = new THREE.Vector3();
-    camera.matrix.extractBasis(right, up, new THREE.Vector3());
+    cam.matrix.extractBasis(right, up, new THREE.Vector3());
     camState.targetLookAt.addScaledVector(right, -dx * panScale);
     camState.targetLookAt.addScaledVector(up, dy * panScale);
   }
 
-  renderer.domElement.addEventListener('contextmenu', e => e.preventDefault());
+  r.domElement.addEventListener('contextmenu', e => e.preventDefault());
 
-  renderer.domElement.addEventListener('pointerdown', e => {
+  r.domElement.addEventListener('pointerdown', e => {
     lx = e.clientX; ly = e.clientY;
     const wantPan = e.button === 2 || e.button === 1 || e.altKey || e.ctrlKey;
     if (wantPan) {
@@ -112,7 +129,7 @@ export function initCameraController(renderer, camera, getOrgFn, getViewsFn, get
     } else if (e.button === 0) {
       dragging = true;
     }
-    renderer.domElement.setPointerCapture?.(e.pointerId);
+    r.domElement.setPointerCapture?.(e.pointerId);
   });
 
   window.addEventListener('pointerup', () => { dragging = false; panDragging = false; });
@@ -143,7 +160,7 @@ export function initCameraController(renderer, camera, getOrgFn, getViewsFn, get
     if (e.key === 'e' || e.key === 'E') camState.targetLookAt.y -= step * 0.6;
   });
 
-  renderer.domElement.addEventListener('wheel', e => {
+  r.domElement.addEventListener('wheel', e => {
     e.preventDefault();
     mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
     mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
@@ -152,39 +169,42 @@ export function initCameraController(renderer, camera, getOrgFn, getViewsFn, get
     const bounds = getBoundsFn();
     camState.targetCamR = clampCamDistance(oldCamR * zoomFactor, bounds);
 
-    camera.getWorldDirection(_camForward);
+    cam.getWorldDirection(_camForward);
     focalPlane.normal.copy(_camForward).negate();
     focalPlane.constant = -camState.currentLookAt.dot(focalPlane.normal);
-    raycaster.setFromCamera(mouseNDC, camera);
+    raycaster.setFromCamera(mouseNDC, cam);
     if (raycaster.ray.intersectPlane(focalPlane, _zoomHit)) {
       camState.targetLookAt.lerp(_zoomHit, 1.0 - camState.targetCamR / oldCamR);
     }
   }, { passive: false });
 
-  renderer.domElement.addEventListener('dblclick', e => {
+  r.domElement.addEventListener('dblclick', e => {
     mouseNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
     mouseNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
-    raycaster.setFromCamera(mouseNDC, camera);
+    raycaster.setFromCamera(mouseNDC, cam);
 
     const views = getViewsFn();
     const bounds = getBoundsFn();
-    const clickableObjects = [];
-    for (const v of views.cells) {
-      if (v.membraneMesh) { v.membraneMesh.userData.cellView = v; clickableObjects.push(v.membraneMesh); }
-      if (v.nucleus) { v.nucleus.userData.cellView = v; clickableObjects.push(v.nucleus); }
-      if (v.membrane) { v.membrane.userData.cellView = v; clickableObjects.push(v.membrane); }
-    }
-    const hits = raycaster.intersectObjects(clickableObjects, false);
+    let clickedCell = null;
+    let minD = Infinity;
 
-    if (hits.length > 0) {
-      const v = hits[0].object.userData.cellView;
-      if (v && v.cell) {
-        camState.targetLookAt.set(v.cell.x, v.cell.y, v.cell.z || 0);
-        const neighborR = Math.max(90, Math.min(220, (bounds.radius || 180) * 0.55));
-        camState.targetCamR = neighborR;
-        camState.isCamTransitioning = true;
-        if (logFn) logFn(`[街区对焦] 推进至元胞 #${v.cell.id} (${v.cell.type})，邻域组织保持原尺度同屏可见`, true);
+    if (views && views.cells) {
+      for (const v of views.cells) {
+        if (!v.group || !v.group.visible) continue;
+        const wp = new THREE.Vector3(v.curX, v.curY, v.curZ);
+        const rayD = raycaster.ray.distanceToPoint(wp);
+        if (rayD < 18 && rayD < minD) {
+          minD = rayD;
+          clickedCell = v.cell;
+        }
       }
+    }
+
+    if (clickedCell) {
+      camState.targetLookAt.set(clickedCell.x || 0, clickedCell.y || 0, clickedCell.z || 0);
+      camState.targetCamR = 25.0;
+      camState.isCamTransitioning = true;
+      if (logFn) logFn(`[微观特写] 对焦至细胞 #${clickedCell.id} [${clickedCell.type}]`, true);
     } else {
       camState.targetLookAt.copy(bounds.center);
       camState.targetCamR = bounds.macroDist || 540;
@@ -196,7 +216,17 @@ export function initCameraController(renderer, camera, getOrgFn, getViewsFn, get
   });
 }
 
-export function updateCamera(camera, dt) {
+export function updateCamera(arg1, arg2) {
+  let dt = 0.016;
+  let cam = camera;
+  if (typeof arg1 === 'number') {
+    dt = arg1;
+    if (arg2 && arg2.isCamera) cam = arg2;
+  } else if (arg1 && arg1.isCamera) {
+    cam = arg1;
+    if (typeof arg2 === 'number') dt = arg2;
+  }
+
   if (camState.autoOrbitEnabled) {
     camState.targetTheta += 0.0035;
   }
@@ -222,8 +252,10 @@ export function updateCamera(camera, dt) {
   }
 
   const r = camState.camR;
-  camera.position.x = camState.currentLookAt.x + r * Math.sin(camState.camPhi) * Math.sin(camState.camTheta) + shakeX;
-  camera.position.y = camState.currentLookAt.y + r * Math.cos(camState.camPhi) + shakeY;
-  camera.position.z = camState.currentLookAt.z + r * Math.sin(camState.camPhi) * Math.cos(camState.camTheta) + shakeZ;
-  camera.lookAt(camState.currentLookAt);
+  if (cam) {
+    cam.position.x = camState.currentLookAt.x + r * Math.sin(camState.camPhi) * Math.sin(camState.camTheta) + shakeX;
+    cam.position.y = camState.currentLookAt.y + r * Math.cos(camState.camPhi) + shakeY;
+    cam.position.z = camState.currentLookAt.z + r * Math.sin(camState.camPhi) * Math.cos(camState.camTheta) + shakeZ;
+    cam.lookAt(camState.currentLookAt);
+  }
 }

@@ -115,4 +115,21 @@ if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
     target_link_libraries(bench_adas_scales PRIVATE kun_cellular ${CUDA_DRIVER_LIB} ${NVRTC_LIB})
 endif()
 
+# 4. 构建纯 C11 硬件级通用运行时动态共享库 (C-ABI Shared Library for ctypes / Python Binding)
+add_library(kun_cellular_runtime SHARED
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/sdsc_c_runtime.c"
+)
+target_include_directories(kun_cellular_runtime PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(kun_cellular_runtime PRIVATE m)
+set_target_properties(kun_cellular_runtime PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+)
+
+
 
