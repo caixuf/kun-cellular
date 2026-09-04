@@ -515,43 +515,29 @@ export async function pollLibrary() {
         libraryInitialRenderDone = true;
         window.__libCount = j.organisms.length;
 
-        const foundationsHtml = `
+        const docsList = j.documents || [];
+        const foundationsHtml = docsList.length === 0 ? '' : `
           <div class="tree-node open" style="margin-bottom:8px;border-bottom:1px dashed rgba(56,189,248,0.3);padding-bottom:6px;">
             <div class="tree-row" style="background:rgba(56,189,248,0.06);">
               <div class="tree-label">
                 <div style="display:flex;align-items:center;gap:6px;">
-                  <span style="color:#38bdf8;font-weight:700;font-size:11px;">[理论文献] 核心学术论著与工程宪章</span>
-                  <span class="org-tag" style="background:rgba(56,189,248,0.2);color:#38bdf8;">权威文献</span>
+                  <span style="color:#38bdf8;font-weight:700;font-size:11px;">[理论文献与工程宪章] (${docsList.length} 篇权威典籍)</span>
+                  <span class="org-tag" style="background:rgba(56,189,248,0.2);color:#38bdf8;">权威知识库</span>
                 </div>
-                <div style="color:#64748b;font-size:9px;margin-top:2px;">点击 [全文研读] 在线阅读项目真实理论与数学公理</div>
+                <div style="color:#64748b;font-size:9px;margin-top:2px;">点击 [全文研读] 在线阅读项目真实理论论著、架构宪章与自组织演化设计</div>
               </div>
             </div>
             <div class="tree-children-wrapper" style="display:block;">
               <div class="tree-children-inner" style="padding:4px 0 0 0;display:flex;flex-direction:column;gap:4px;">
-                <div class="tree-leaf" style="cursor:pointer;" onclick="event.stopPropagation(); openDocReader('docs/ARCHITECTURE_DISCIPLINE.md', 'SDSCC 最高架构与工程纪律宪章')">
+                ${docsList.map(doc => `
+                <div class="tree-leaf" style="cursor:pointer;" onclick="event.stopPropagation(); openDocReader('${doc.file}', '${doc.title}')">
                   <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
-                    <span>《最高架构与工程纪律宪章》</span>
-                    <span style="color:#fbbf24;font-size:9px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[全文研读]</span>
+                    <span>${doc.title}</span>
+                    <span style="color:#fbbf24;font-size:9px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">${doc.category || '[全文研读]'}</span>
                   </div>
-                  <div style="color:#94a3b8;font-size:10px;margin-top:3px;line-height:1.4;">非冯算存一体、六道实证门禁、26类原子原语定义与C绝对权威。</div>
-                  <div style="color:#64748b;font-size:9px;margin-top:4px;font-family:var(--font-mono);">docs/ARCHITECTURE_DISCIPLINE.md</div>
-                </div>
-                <div class="tree-leaf" style="cursor:pointer;" onclick="event.stopPropagation(); openDocReader('docs/morphogenetic_cellular_evolution_paper.zh.md', '形态发生非冯硅基细胞计算学术论文 (中文精译版)')">
-                  <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
-                    <span>《形态发生非冯硅基细胞计算论文》</span>
-                    <span style="color:#fbbf24;font-size:9px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[全文研读]</span>
-                  </div>
-                  <div style="color:#94a3b8;font-size:10px;margin-top:3px;line-height:1.4;">图灵形态发生动力学、代际自催化演化、100M细胞空间压测理论。</div>
-                  <div style="color:#64748b;font-size:9px;margin-top:4px;font-family:var(--font-mono);">docs/morphogenetic_cellular_evolution_paper.zh.md</div>
-                </div>
-                <div class="tree-leaf" style="cursor:pointer;" onclick="event.stopPropagation(); openDocReader('docs/2026-09-01-quantitative-cellular-evolution-roadmap.md', '三十年大宗商品量化演化数学路线图')">
-                  <div style="display:flex;justify-content:space-between;align-items:center;color:#38bdf8;font-weight:700;font-size:11px;">
-                    <span>《三十年商品量化演化路线图》</span>
-                    <span style="color:#fbbf24;font-size:9px;background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:3px;border:1px solid rgba(251,191,36,0.3);">[全文研读]</span>
-                  </div>
-                  <div style="color:#94a3b8;font-size:10px;margin-top:3px;line-height:1.4;">近30年4,234根真实日线演化、施密特迟滞滤波与风控防线数学公理。</div>
-                  <div style="color:#64748b;font-size:9px;margin-top:4px;font-family:var(--font-mono);">docs/2026-09-01-quantitative-cellular-evolution-roadmap.md</div>
-                </div>
+                  <div style="color:#94a3b8;font-size:10px;margin-top:3px;line-height:1.4;">${doc.description || ''}</div>
+                  <div style="color:#64748b;font-size:9px;margin-top:4px;font-family:var(--font-mono);">${doc.file}</div>
+                </div>`).join('')}
               </div>
             </div>
           </div>

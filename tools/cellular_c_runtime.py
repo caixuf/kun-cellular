@@ -138,15 +138,18 @@ class NativeCellularDynamicsEngine:
 
     def _alloc_buffers(self, n_cells: int):
         self.n_cells = n_cells
-        self.op_types = np.zeros(n_cells, dtype=np.uint8)
-        self.gains = np.ones(n_cells, dtype=np.float32)
-        self.states = np.zeros(n_cells, dtype=np.float32)
-        self.aux_states = np.zeros(n_cells, dtype=np.float32)
-        self.outputs = np.zeros(n_cells, dtype=np.float32)
-        self.preds = np.zeros(n_cells, dtype=np.float32)
-        self.errors = np.zeros(n_cells, dtype=np.float32)
-        self.W = np.zeros((n_cells, n_cells), dtype=np.float32)
-        self.mask = np.zeros((n_cells, n_cells), dtype=np.float32)
+        # 防止超大尺度全景流形 (如 100万~1亿细胞) 在稠密矩阵模式下发生 TB 级内存溢出
+        # 微观 C 底座单次稠密微柱推演上限安全钳位在 4096
+        self.sim_n = min(n_cells, 4096)
+        self.op_types = np.zeros(self.sim_n, dtype=np.uint8)
+        self.gains = np.ones(self.sim_n, dtype=np.float32)
+        self.states = np.zeros(self.sim_n, dtype=np.float32)
+        self.aux_states = np.zeros(self.sim_n, dtype=np.float32)
+        self.outputs = np.zeros(self.sim_n, dtype=np.float32)
+        self.preds = np.zeros(self.sim_n, dtype=np.float32)
+        self.errors = np.zeros(self.sim_n, dtype=np.float32)
+        self.W = np.zeros((self.sim_n, self.sim_n), dtype=np.float32)
+        self.mask = np.zeros((self.sim_n, self.sim_n), dtype=np.float32)
 
     def load_topology(self, cells, synapses):
         n = len(cells)
@@ -161,8 +164,8 @@ class NativeCellularDynamicsEngine:
             self.W.fill(0.0)
             self.mask.fill(0.0)
 
-        id_to_idx = {c.id: idx for idx, c in enumerate(cells)}
-        for idx, c in enumerate(cells):
+        id_to_idx = {c.id: idx for idx, c in enumerate(cells[:self.sim_n])}
+        for idx, c in enumerate(cells[:self.sim_n]):
             op = SDSC_PRIMITIVE_NAME_TO_OP.get(c.type, 4)  # 默认 SUM
             self.op_types[idx] = op
             self.gains[idx] = getattr(c, "gain", 1.0)
@@ -171,7 +174,7 @@ class NativeCellularDynamicsEngine:
             u = id_to_idx.get(s.get("from"))
             v = id_to_idx.get(s.get("to"))
             w = float(s.get("weight", 1.0))
-            if u is not None and v is not None and u < self.n_cells and v < self.n_cells:
+            if u is not None and v is not None and u < self.sim_n and v < self.sim_n:
                 self.W[u, v] = w
                 self.mask[u, v] = 1.0
 
@@ -183,14 +186,14 @@ class NativeCellularDynamicsEngine:
         alpha: float = 0.012
     ) -> Tuple[float, float, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """调用纯 C11 底座单步执行动力学演化"""
-        if self.n_cells == 0:
+        if self.sim_n == 0:
             return 0.0, 0.0, self.outputs, self.states, self.preds, self.errors
 
         free_energy = c_float(0.0)
         plasticity_flux = c_float(0.0)
 
         _clib.sdsc_c_cellular_dynamics_step(
-            c_uint32(self.n_cells),
+            c_uint32(self.sim_n),
             c_float(t),
             c_float(red_queen_pressure),
             c_float(eta),

@@ -33,6 +33,14 @@ export const FAMILY_COLOR = {
 };
 
 export const PRIMITIVE_COLORS_26 = {
+  SENSE_0: 0x22d3ee,
+  SENSE_1: 0x0ea5e9,
+  SENSE_2: 0x14b8a6,
+  SENSE_3: 0x10b981,
+  ACT_POS: 0xef4444,
+  ACT_NEG: 0xbe123c,
+  ACT_RESET: 0x94a3b8,
+  PASSTHRU: 0xe2e8f0,
   SUM: 0x38bdf8,
   DIFF: 0x0ea5e9,
   INTEGRAL: 0x10b981,
