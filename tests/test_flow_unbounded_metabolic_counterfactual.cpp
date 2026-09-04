@@ -24,7 +24,7 @@ void test_unbounded_dynamic_metabolism() {
 
     EvolutionConstraintConfig cfg;
     cfg.enable_dynamic_metabolism = true;
-    cfg.max_cells_limit = 1000000; // 彻底解除 32 限制，允许无上限演化
+    cfg.max_cells_limit = 0; // 无上限 (0 = 解除细胞数量限制，规模由动态代谢调节)
     cfg.basal_metabolic_cost = 0.005;
     cfg.synaptic_metabolic_cost = 0.001;
 

@@ -70,15 +70,15 @@ SDSC_HOT static inline void sdsc_tensor_graph_forward(
     uint32_t out_dim,
     const uint8_t*  SDSC_RESTRICT op_types,
     const float*    SDSC_RESTRICT gains,
-    const uint16_t* SDSC_RESTRICT inc_off,
-    const uint16_t* SDSC_RESTRICT inc_from,
+    const uint32_t* SDSC_RESTRICT inc_off,
+    const uint32_t* SDSC_RESTRICT inc_from,
     const float*    SDSC_RESTRICT inc_weight,
     const float*    SDSC_RESTRICT in_tensor,
     float*          SDSC_RESTRICT states,
     float*          SDSC_RESTRICT aux_states,
     float*          SDSC_RESTRICT cell_outputs,
     float*          SDSC_RESTRICT out_tensor,
-    const uint16_t* SDSC_RESTRICT out_cell_ids
+    const uint32_t* SDSC_RESTRICT out_cell_ids
 ) {
     if (SDSC_UNLIKELY(!in_tensor || !out_tensor || !states || !cell_outputs)) return;
     (void)synapse_count;
@@ -90,12 +90,12 @@ SDSC_HOT static inline void sdsc_tensor_graph_forward(
 
     /* 2. Kahn 拓扑线性化连续单遍推演 (0 堆分配, 确定性亚微秒执行) */
     for (uint32_t i = in_dim; i < cell_count; ++i) {
-        const uint16_t b = inc_off[i];
-        const uint16_t e = inc_off[i + 1];
+        const uint32_t b = inc_off[i];
+        const uint32_t e = inc_off[i + 1];
 
         float sum_input = 0.0f;
-        for (uint16_t k = b; k < e; ++k) {
-            const uint16_t src = inc_from[k];
+        for (uint32_t k = b; k < e; ++k) {
+            const uint32_t src = inc_from[k];
             sum_input += cell_outputs[src] * inc_weight[k];
         }
 
@@ -110,7 +110,7 @@ SDSC_HOT static inline void sdsc_tensor_graph_forward(
 
     /* 3. 输出效应动作收集 */
     for (uint32_t j = 0; j < out_dim; ++j) {
-        const uint16_t tgt = out_cell_ids[j];
+        const uint32_t tgt = out_cell_ids[j];
         out_tensor[j] = (tgt < cell_count) ? cell_outputs[tgt] : 0.0f;
     }
 }

@@ -1,0 +1,30 @@
+{
+  "task_name": "CartPoleBalance",
+  "organism_id": 27,
+  "lineage": "Apex-Gen35",
+  "topology_hash": "WL-15715d98b5009b19-C12S21",
+  "num_cells": 12,
+  "num_synapses": 21,
+  "m1_gate_passed": true,
+  "verdict": "M1 OOS Report: Train[SR=100.0%] -> ID-Holdout[SR=100.0%, Ratio=1.00] -> OOD-Holdout[SR=100.0%]. Gate=PASSED (>= 70%)",
+  "train": {
+    "success_rate": 1,
+    "mean_fitness": 0.99663,
+    "mean_steps": 300,
+    "episodes": 10
+  },
+  "holdout_id": {
+    "success_rate": 1,
+    "generalization_ratio": 1,
+    "mean_fitness": 0.996073,
+    "mean_steps": 300,
+    "episodes": 10
+  },
+  "holdout_ood": {
+    "success_rate": 1,
+    "generalization_ratio": 1,
+    "mean_fitness": 1.79725,
+    "mean_steps": 600,
+    "episodes": 10
+  }
+}

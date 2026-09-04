@@ -1,0 +1,31 @@
+{
+  "organism_id": 17,
+  "generation": 35,
+  "lineage": "Apex-Gen35",
+  "fitness": 0.997284,
+  "thought_energy": 42.1601,
+  "cells": [
+    {"id": 0, "type": "Sense_Input0", "param1": 1.16274, "param2": -0.0302447, "output": -0.00235817, "activations": 281988, "x": -120, "y": -40, "z": 0, "glow": 1},
+    {"id": 2, "type": "Op_EMA", "param1": 0.139193, "param2": 0.0539426, "output": -0.00354928, "activations": 281913, "x": -40, "y": -30, "z": 0, "glow": 1},
+    {"id": 3, "type": "Op_EMA", "param1": 0.201294, "param2": -0.00174537, "output": -0.002531, "activations": 281944, "x": -40, "y": 30, "z": 0, "glow": 1},
+    {"id": 4, "type": "Op_Sub", "param1": 0.0665711, "param2": -0.0726772, "output": 0.00315761, "activations": 281932, "x": 30, "y": 0, "z": 0, "glow": 1},
+    {"id": 5, "type": "Gate_Hysteresis", "param1": 0.01, "param2": -0.01, "output": 1, "activations": 282000, "x": 80, "y": 0, "z": 0, "glow": 1},
+    {"id": 6, "type": "Act_PosAction", "param1": -0.037633, "param2": -0.161694, "output": 1.11012, "activations": 282000, "x": 140, "y": -40, "z": 0, "glow": 1},
+    {"id": 7, "type": "Act_NegAction", "param1": -0.0216999, "param2": -0.0327983, "output": -6.31884, "activations": 282000, "x": 140, "y": 40, "z": 0, "glow": 1},
+    {"id": 8, "type": "Act_ImmuneLock", "param1": -0.214929, "param2": 0.0209891, "output": 0, "activations": 0, "x": 140, "y": 100, "z": 0, "glow": 0}
+  ],
+  "synapses": [
+    {"from": 0, "to": 2, "port": 0, "initial_weight": 1.07071, "weight": 1.07071, "active": true, "recurrent": false, "hebb_rate": 0.00503613, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 0, "to": 3, "port": 0, "initial_weight": 0.715744, "weight": 0.715744, "active": true, "recurrent": false, "hebb_rate": 0.00438675, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 3, "to": 4, "port": 0, "initial_weight": 1.15135, "weight": 1.15135, "active": true, "recurrent": false, "hebb_rate": 0.0093692, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 2, "to": 4, "port": 1, "initial_weight": 0.494379, "weight": 0.494379, "active": true, "recurrent": false, "hebb_rate": 0.00260072, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 4, "to": 5, "port": 0, "initial_weight": 1.19323, "weight": 1.19323, "active": true, "recurrent": false, "hebb_rate": 0.00524582, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 5, "to": 6, "port": 0, "initial_weight": 1.11012, "weight": 1.11012, "active": true, "recurrent": false, "hebb_rate": 0, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 5, "to": 7, "port": 0, "initial_weight": 0.30089, "weight": 0.30089, "active": true, "recurrent": false, "hebb_rate": 0.0108991, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 0, "to": 5, "port": 0, "initial_weight": -1.72776, "weight": -1.72776, "active": true, "recurrent": false, "hebb_rate": 0.00674254, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 6, "to": 7, "port": 0, "initial_weight": -1.44193, "weight": -1.44193, "active": true, "recurrent": false, "hebb_rate": 0.0050225, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 3, "to": 8, "port": 1, "initial_weight": 0.265654, "weight": 0.265654, "active": true, "recurrent": false, "hebb_rate": 0.00493573, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 6, "to": 3, "port": 1, "initial_weight": -0.180771, "weight": -0.180771, "active": true, "recurrent": false, "hebb_rate": 0.00560341, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 0, "to": 4, "port": 1, "initial_weight": 1.95587, "weight": 1.95587, "active": true, "recurrent": false, "hebb_rate": 0.005, "hebb_decay": 0.02, "photon_pos": -1}
+  ]
+}

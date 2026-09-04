@@ -24,6 +24,8 @@
 #include <iostream>
 #include <functional>
 #include <queue>
+#include <atomic>
+#include <thread>
 
 namespace kun {
 
@@ -288,8 +290,10 @@ enum class FitnessDriverMode : uint8_t {
     HYBRID_CURIOSITY = 2   // 混合驱动：任务适应度 + 好奇心新颖性奖励
 };
 
+class CellularOrganism;
+
 struct EvolutionConstraintConfig {
-    SkeletonLockMode skeleton_lock{SkeletonLockMode::LOCKED};
+    SkeletonLockMode skeleton_lock{SkeletonLockMode::UNLOCKED}; // 默认自由形态发生 (允许探索新感官与新附肢)
     TypeWhitelistMode type_whitelist{TypeWhitelistMode::FULL_24};
     SeedInitMode seed_mode{SeedInitMode::HANDCRAFTED_PROGENITOR};
     FitnessDriverMode fitness_driver{FitnessDriverMode::TASK_FITNESS_ONLY};
@@ -297,16 +301,19 @@ struct EvolutionConstraintConfig {
     bool enable_mechanotransduction{true}; // 是否启入力敏转导与皮层沟回自发折叠
 
     // ── 资源上限守卫与动态代谢平衡 (Resource Bounds & Metabolic Equilibrium) ──
-    size_t max_cells_limit{4096};          // 细胞规模预算硬上限 (杜绝无序膨胀，支持任务级配置)
-    size_t max_synapses_limit{16384};      // 突触规模预算硬上限
+    size_t max_cells_limit{0};             // 细胞规模预算硬上限 (0 = 无上限，完全开放)
+    size_t max_synapses_limit{0};          // 突触规模预算硬上限 (0 = 无上限，完全开放)
     bool enable_dynamic_metabolism{true};  // 启用动态代谢能耗调节
-    double basal_metabolic_cost{0.002};    // 细胞单位维持能耗
-    double synaptic_metabolic_cost{0.0005};// 突触单位通信能耗
-    double immigrant_rate{0.15};           // 客卿移民比例
+    double basal_metabolic_cost{0.00002};  // 细胞单位维持能耗 (热力学软阻尼标定)
+    double synaptic_metabolic_cost{0.000005};// 突触单位通信能耗
+    double immigrant_rate{0.05};           // 客卿移民比例
 
     // ── 事务性变异与依赖保护 (Transactional Mutation & Dependency Guard) ──
     bool enable_transaction_rollback{true};// 变异事务原子回滚：编译/预算/契约校验失败时自动回滚
-    bool enable_dependency_guard{false};   // ADAS 模式下按功能路径原子拒绝破坏性突变
+    bool enable_dependency_guard{false};   // 严禁默认开启业务依赖守卫
+    std::function<bool(const CellularOrganism&)> topology_contract_guard{nullptr}; // 通用外围拓扑契约校验钩子 (底座完全解耦)
+    std::function<bool(const CellularOrganism&)> viability_filter{nullptr};        // 通用外围生存力/准入过滤钩子 (例如亏损时不分裂)
+    std::function<std::vector<double>(const CellularOrganism&)> behavior_extractor{nullptr}; // 通用外围行为特征提取钩子 (多样性/新颖性搜索)
     double fast_mutation_rate{0.80};       // 参数与局部权重漂移
     double medium_mutation_rate{0.45};     // 局部突触重连
     double slow_mutation_rate{0.35};       // 细胞增殖/力敏重塑
@@ -404,6 +411,7 @@ public:
     double total_pnl{0.0};
     double max_drawdown{0.0};
     uint32_t trade_count{0};
+    std::unordered_map<std::string, double> custom_metrics; // 外围 Task 自定义业务度量挂载容器 (杜绝向基座增添业务字段)
     
     // 预编译扁平执行序列 (真·零 GC，无哈希表，无堆分配)
     struct CompiledSynapse {
@@ -423,6 +431,9 @@ public:
     std::vector<CompiledSynapse> compiled_synapses_;
     std::vector<CompiledActionCell> compiled_actions_;
     std::vector<size_t> execution_order_;
+    // 出边 CSR 索引: forward_nd 内层传递由 O(细胞×突触) 降为 O(出度) — 百万级前向的生命线
+    std::vector<size_t> out_start_;   // [cell_idx] 起始偏移, 长 N+1
+    std::vector<size_t> out_edges_;   // compiled_synapses_ 的出边索引 (按 from_idx 分桶)
     mutable std::vector<double> flat_port_inputs_; // [cell_idx * 2 + port]
     mutable SpatialHashGrid3D spatial_grid_;       // 3D 空间哈希网格 (O(N) 多体力场)
     bool is_compiled_{false};
@@ -638,6 +649,8 @@ public:
             compiled_synapses_.clear();
             compiled_actions_.clear();
             execution_order_.clear();
+            out_start_.clear();
+            out_edges_.clear();
             is_compiled_ = true;
             return true;
         }
@@ -765,6 +778,22 @@ public:
         // 预分配扁平输入端口缓冲 (每个细胞 2 个端口)
         flat_port_inputs_.assign(cells.size() * 2, 0.0);
 
+        // 构建出边 CSR 索引 (按 from_idx 分桶, 编译期一次, 前向 O(出度))
+        out_start_.assign(cells.size() + 1, 0);
+        for (const auto& s : compiled_synapses_) {
+            out_start_[s.from_idx + 1]++;
+        }
+        for (size_t i = 0; i < cells.size(); ++i) {
+            out_start_[i + 1] += out_start_[i];
+        }
+        out_edges_.resize(compiled_synapses_.size());
+        {
+            std::vector<size_t> cursor(out_start_.begin(), out_start_.end() - 1);
+            for (size_t e = 0; e < compiled_synapses_.size(); ++e) {
+                out_edges_[cursor[compiled_synapses_[e].from_idx]++] = e;
+            }
+        }
+
         is_compiled_ = true;
         return true;
     }
@@ -840,6 +869,88 @@ public:
             }
         }
 
+        is_compiled_ = false;
+    }
+
+    // ========================================================================
+    // 4.5 宽契约供给 (N-Channel Wide Contract)
+    //
+    // 1) ensure_receptors: 保证 SENSE_CHANNEL 感受器覆盖 [0, n_channels) 通道,
+    //    新增感受器以小权重随机接入既有核心网络 (为演化提供接线素材)。
+    // 2) wire_global_bridge: 全细胞范围随机铺设长程突触, 让发育生长的新基质
+    //    真正参与 感受→代谢→效应 通路 —— 否则百万细胞只是挂在核心旁边的死重
+    //    (develop_to_scale 的局部前驱链接构性上无法被远处任务信号触达)。
+    // ========================================================================
+    void ensure_receptors(size_t n_channels, uint32_t seed = 7, size_t fan_out = 8) {
+        std::vector<char> have(n_channels, 0);
+        for (const auto& c : cells) {
+            if (c.type == CellType::SENSE_CHANNEL ||
+                c.type == CellType::SENSE_RAW_INPUT_0 || c.type == CellType::SENSE_RAW_INPUT_1 ||
+                c.type == CellType::SENSE_RAW_INPUT_2 || c.type == CellType::SENSE_RAW_INPUT_3) {
+                const size_t ch = receptor_channel_index(c.type, c.param2);
+                if (ch < n_channels) have[ch] = 1;
+            }
+        }
+
+        std::vector<uint32_t> internals;
+        for (size_t i = 0; i < cells.size(); ++i) {
+            const CellType t = cells[i].type;
+            const bool is_sense = (t == CellType::SENSE_CHANNEL || t == CellType::SENSE_RAW_INPUT_0 ||
+                                   t == CellType::SENSE_RAW_INPUT_1 || t == CellType::SENSE_RAW_INPUT_2 ||
+                                   t == CellType::SENSE_RAW_INPUT_3);
+            if (!is_sense) internals.push_back(static_cast<uint32_t>(i));
+        }
+        if (internals.empty()) return;
+
+        std::mt19937 rng(seed);
+        std::uniform_int_distribution<size_t> pick(0, internals.size() - 1);
+        std::uniform_real_distribution<double> w(-0.4, 0.4);
+        uint32_t next_id = 0;
+        for (const auto& c : cells) next_id = std::max(next_id, c.id);
+        ++next_id;
+
+        for (size_t ch = 0; ch < n_channels; ++ch) {
+            if (have[ch]) continue;
+            Cell nc;
+            nc.id = next_id++;
+            nc.type = CellType::SENSE_CHANNEL;
+            nc.param1 = 1.0;
+            nc.param2 = static_cast<double>(ch);
+            nc.x = -180.0f;
+            nc.y = static_cast<float>(ch) * 8.0f - 120.0f;
+            cells.push_back(nc);
+            for (size_t k = 0; k < fan_out; ++k) {
+                Synapse syn;
+                syn.from_cell_id = nc.id;
+                syn.to_cell_id = internals[pick(rng)];
+                syn.to_port = 0;
+                syn.weight = w(rng);
+                syn.initial_weight = syn.weight;
+                syn.is_active = true;
+                synapses.push_back(syn);
+            }
+        }
+        is_compiled_ = false;
+    }
+
+    void wire_global_bridge(size_t n_edges, uint32_t seed = 11) {
+        if (cells.size() < 2 || n_edges == 0) return;
+        std::mt19937 rng(seed);
+        std::uniform_int_distribution<uint32_t> pick(0, static_cast<uint32_t>(cells.size() - 1));
+        std::uniform_real_distribution<double> w(-0.05, 0.05);  // 小权重: 桥接不淹没已训练通路
+        synapses.reserve(synapses.size() + n_edges);
+        for (size_t e = 0; e < n_edges; ++e) {
+            const uint32_t a = pick(rng), b = pick(rng);
+            if (a == b) continue;
+            Synapse syn;
+            syn.from_cell_id = a;
+            syn.to_cell_id = b;
+            syn.to_port = (e % 8 == 0) ? 1 : 0;
+            syn.weight = w(rng);
+            syn.initial_weight = syn.weight;
+            syn.is_active = true;
+            synapses.push_back(syn);
+        }
         is_compiled_ = false;
     }
 
@@ -1537,10 +1648,10 @@ public:
                 c.glow_charge = std::min(1.0f, c.glow_charge + 0.3f);
             }
 
-            // 前向突触即时传递至后续位阶节点
-            for (size_t s = 0; s < num_synapses; ++s) {
-                const auto& syn = syn_ptr[s];
-                if (!syn.is_recurrent && syn.from_idx == idx) {
+            // 前向突触即时传递至后续位阶节点 (CSR 出边索引: O(出度))
+            for (size_t k = out_start_[idx]; k < out_start_[idx + 1]; ++k) {
+                const auto& syn = syn_ptr[out_edges_[k]];
+                if (!syn.is_recurrent) {
                     port_ptr[syn.to_idx * 2 + syn.to_port] += c.output_val * syn.weight;
                 }
             }
@@ -2345,6 +2456,36 @@ public:
         init_population();
     }
 
+    // 种群并行评估 (尴尬并行: 个体间相互独立; 每线程克隆任务环境, 无数据竞争)
+    // 演化主循环的标准入口 —— 1M 规模下评估吞吐随核数线性扩展。
+    template <typename TaskT>
+    std::vector<double> evaluate_population_parallel(
+            TaskT& proto_env, const std::vector<uint32_t>& seeds,
+            int max_steps, bool allow_plasticity, size_t n_threads = 0) {
+        if (n_threads == 0) {
+            n_threads = std::max<size_t>(1, std::thread::hardware_concurrency());
+        }
+        auto& pop = population_;
+        std::vector<double> fits(pop.size(), 0.0);
+        std::atomic<size_t> next{0};
+        const size_t workers_n = std::min(n_threads, pop.size());
+        std::vector<std::thread> workers;
+        workers.reserve(workers_n);
+        for (size_t t = 0; t < workers_n; ++t) {
+            workers.emplace_back([&, t] {
+                TaskT env = proto_env;   // 线程私有克隆 (每 episode reset 重播种, 确定性不丢)
+                for (;;) {
+                    const size_t i = next.fetch_add(1);
+                    if (i >= pop.size()) break;
+                    auto m = env.evaluate_organism(pop[i], seeds, max_steps, allow_plasticity);
+                    fits[i] = m.mean_fitness;
+                }
+            });
+        }
+        for (auto& w : workers) w.join();
+        return fits;
+    }
+
     void set_constraint_config(const EvolutionConstraintConfig& cfg) {
         constraint_cfg_ = cfg;
         init_population();
@@ -2409,18 +2550,11 @@ public:
         return report;
     }
 
-    // ── 生物变异操作 1: 细胞分裂增殖 (Mitosis / Add Cell — 受资源预算与代谢平衡约束) ──
+    // ── 生物变异操作 1: 细胞分裂增殖 (Mitosis / Add Cell — 开放式自组织演化) ──
     bool mutate_add_cell(CellularOrganism& org) {
-        if (org.cells.size() >= constraint_cfg_.max_cells_limit ||
-            org.synapses.size() + 2 > constraint_cfg_.max_synapses_limit) {
+        if ((constraint_cfg_.max_cells_limit != 0 && org.cells.size() >= constraint_cfg_.max_cells_limit) ||
+            (constraint_cfg_.max_synapses_limit != 0 && org.synapses.size() + 2 > constraint_cfg_.max_synapses_limit)) {
             return mutate_add_synapse(org);
-        }
-        // 动态代谢能量约束：亏损/平庸个体受代谢赤字调节，优先重塑现有突触。
-        if (constraint_cfg_.enable_dynamic_metabolism && org.total_pnl < 0.0 && org.cells.size() > 128) {
-            std::uniform_real_distribution<double> dist_met(0.0, 1.0);
-            if (dist_met(rng_) < 0.85) {
-                return mutate_add_synapse(org);
-            }
         }
         if (org.synapses.empty()) return mutate_add_synapse(org);
         std::uniform_int_distribution<size_t> dist_syn(0, org.synapses.size() - 1);
@@ -2462,7 +2596,8 @@ public:
                     CellType::SENSE_RAW_INPUT_0, CellType::SENSE_RAW_INPUT_1,
                     CellType::SENSE_RAW_INPUT_2, CellType::SENSE_RAW_INPUT_3,
                     CellType::ACT_PRIMARY_POSITIVE, CellType::ACT_PRIMARY_NEGATIVE,
-                    CellType::ACT_DEFENSIVE_RESET, CellType::ACT_IMMUNE_BLOCK
+                    CellType::ACT_DEFENSIVE_RESET, CellType::ACT_IMMUNE_BLOCK,
+                    CellType::SENSE_CHANNEL, CellType::ACT_CHANNEL
                 };
                 std::uniform_int_distribution<size_t> dist_sk(0, sizeof(skel_candidates) / sizeof(skel_candidates[0]) - 1);
                 new_type = skel_candidates[dist_sk(rng_)];
@@ -2473,28 +2608,46 @@ public:
         for (const auto& c : org.cells) new_id = std::max(new_id, c.id);
         new_id += 1;
 
-        std::uniform_real_distribution<double> dist_param(0.01, 1.0);
-        std::uniform_real_distribution<float> dist_pos(-30.0f, 30.0f);
+        Cell new_cell;
+        new_cell.id = new_id;
+        new_cell.type = new_type;
 
-        Cell new_cell{new_id, new_type, dist_param(rng_), -dist_param(rng_), 0.0, 0.0, false, 0.0, 0, 0,
-                      dist_pos(rng_), dist_pos(rng_), 0.0f};
+        // 空间场发育引导: 新细胞诞生于原突触母体空间连线中点，并注入随机微扰
+        size_t from_idx = 0, to_idx = 0;
+        for (size_t i = 0; i < org.cells.size(); ++i) {
+            if (org.cells[i].id == old_syn.from_cell_id) from_idx = i;
+            if (org.cells[i].id == old_syn.to_cell_id) to_idx = i;
+        }
+
+        std::normal_distribution<float> dist_pos(0.0f, 15.0f);
+        new_cell.x = (org.cells[from_idx].x + org.cells[to_idx].x) * 0.5f + dist_pos(rng_);
+        new_cell.y = (org.cells[from_idx].y + org.cells[to_idx].y) * 0.5f + dist_pos(rng_);
+        new_cell.z = (org.cells[from_idx].z + org.cells[to_idx].z) * 0.5f + dist_pos(rng_);
+
+        std::uniform_real_distribution<double> dist_param(-1.0, 1.0);
+        new_cell.param1 = dist_param(rng_);
+        new_cell.param2 = dist_param(rng_);
+
         org.cells.push_back(new_cell);
 
-        uint32_t from_id = old_syn.from_cell_id;
-        uint32_t to_id = old_syn.to_cell_id;
-        uint8_t to_port = old_syn.to_port;
-        double orig_weight = old_syn.weight;
+        // 原突触断裂与重接：A -> NewCell -> B (保持原有权重的因果连续性)
         old_syn.is_active = false;
 
-        Synapse syn1{from_id, new_id, 0, 1.0, true, 60.0f, -1.0f};
-        syn1.initial_weight = 1.0;
-        syn1.hebbian_rate = 0.005;
-        syn1.hebbian_decay = 0.02;
+        Synapse syn1;
+        syn1.from_cell_id = old_syn.from_cell_id;
+        syn1.to_cell_id = new_id;
+        syn1.to_port = 0;
+        syn1.weight = old_syn.weight;
+        syn1.initial_weight = syn1.weight;
+        syn1.is_active = true;
 
-        Synapse syn2{new_id, to_id, to_port, orig_weight, true, 60.0f, -1.0f};
-        syn2.initial_weight = orig_weight;
-        syn2.hebbian_rate = 0.005;
-        syn2.hebbian_decay = 0.02;
+        Synapse syn2;
+        syn2.from_cell_id = new_id;
+        syn2.to_cell_id = old_syn.to_cell_id;
+        syn2.to_port = old_syn.to_port;
+        syn2.weight = 1.0;
+        syn2.initial_weight = syn2.weight;
+        syn2.is_active = true;
 
         org.synapses.push_back(syn1);
         org.synapses.push_back(syn2);
@@ -2505,7 +2658,7 @@ public:
 
     // ── 生物变异操作 2: 突触跨界重连 (Synaptic Rewiring & Morphogenetic Spatial Wiring) ──
     bool mutate_add_synapse(CellularOrganism& org) {
-        if (org.synapses.size() >= constraint_cfg_.max_synapses_limit) {
+        if (constraint_cfg_.max_synapses_limit != 0 && org.synapses.size() >= constraint_cfg_.max_synapses_limit) {
             return mutate_parameters(org);
         }
         if (org.cells.size() < 2) return false;
@@ -2566,8 +2719,7 @@ public:
             // 突触学习率微调漂移 (慢时标系统发育演化)
             std::normal_distribution<double> dist_h(0.0, 0.002);
             syn.hebbian_rate = std::clamp(syn.hebbian_rate + dist_h(rng_), 0.0, 0.05);
-
-            org.compile();
+            // 参数就地更新无需重复全图 compile，极大加速变异热路径
         }
         return true;
     }
@@ -2576,10 +2728,9 @@ public:
     void prune_apoptosis(CellularOrganism& org) {
         std::unordered_set<uint32_t> useful_cells;
         for (const auto& c : org.cells) {
-            if (c.type == CellType::ACT_PRIMARY_POSITIVE ||
-                c.type == CellType::ACT_PRIMARY_NEGATIVE ||
-                c.type == CellType::ACT_DEFENSIVE_RESET ||
-                c.type == CellType::ACT_IMMUNE_BLOCK) {
+            if (is_effector_cell(c.type) ||
+                c.type == CellType::PREDICT_SENSE_0 ||
+                c.type == CellType::PREDICT_SENSE_1) {
                 useful_cells.insert(c.id);
             }
         }
@@ -2632,8 +2783,8 @@ public:
 
     // ── 生物变异操作 4: 力敏转导定向有丝分裂与皮层沟回拱起 (Mechanosensitive Mitosis) ──
     bool mutate_mechanosensitive_mitosis(CellularOrganism& org) {
-        if (org.cells.size() >= constraint_cfg_.max_cells_limit ||
-            org.synapses.size() + 2 > constraint_cfg_.max_synapses_limit ||
+        if ((constraint_cfg_.max_cells_limit != 0 && org.cells.size() >= constraint_cfg_.max_cells_limit) ||
+            (constraint_cfg_.max_synapses_limit != 0 && org.synapses.size() + 2 > constraint_cfg_.max_synapses_limit) ||
             org.cells.size() < 5) return false;
 
         // 寻找综合力敏应变最高的候选母细胞
@@ -2725,6 +2876,14 @@ public:
 
     // 综合变异入口 (具备事务性原子回滚保障)
     bool mutate(CellularOrganism& org) {
+        if (constraint_cfg_.viability_filter && !constraint_cfg_.viability_filter(org)) {
+            return false; // 外围 Task 生存力准入拦截 (业务层决定何时不许繁殖)
+        }
+        // 预算预检: 若配置了非零硬上限且已超预算，跳过无效变异
+        if ((constraint_cfg_.max_cells_limit != 0 && org.cells.size() > constraint_cfg_.max_cells_limit) ||
+            (constraint_cfg_.max_synapses_limit != 0 && org.synapses.size() > constraint_cfg_.max_synapses_limit)) {
+            return false;
+        }
         CellularOrganism snapshot = org; // 变异前事务快照
         std::uniform_real_distribution<double> dist(0.0, 1.0);
         bool any_mutated = false;
@@ -2767,9 +2926,16 @@ public:
 
         // 变异后事务校验：编译完整性、资源上限约束、功能依赖契约
         bool compile_ok = org.compile();
-        bool budget_ok = (org.cells.size() <= constraint_cfg_.max_cells_limit &&
-                          org.synapses.size() <= constraint_cfg_.max_synapses_limit);
-        bool contract_ok = (!constraint_cfg_.enable_dependency_guard || org.evaluate_adas_contract().valid());
+        bool budget_ok = ((constraint_cfg_.max_cells_limit == 0 ||
+                           org.cells.size() <= constraint_cfg_.max_cells_limit) &&
+                          (constraint_cfg_.max_synapses_limit == 0 ||
+                           org.synapses.size() <= constraint_cfg_.max_synapses_limit));
+        bool contract_ok = true;
+        if (constraint_cfg_.enable_dependency_guard) {
+            contract_ok = constraint_cfg_.topology_contract_guard ?
+                          constraint_cfg_.topology_contract_guard(org) :
+                          org.evaluate_adas_contract().valid();
+        }
 
         if (constraint_cfg_.enable_transaction_rollback) {
             if (!compile_ok || !budget_ok || !contract_ok) {
@@ -2787,14 +2953,14 @@ public:
     // ── 种群世代演化 (Evolve Next Generation — 无上限开放式自发演化) ──
     void evolve_generation() {
         // 1. 动态代谢能量平衡 (Dynamic Metabolic Energy Equilibrium):
-        // 彻底破除人工硬上限。代谢维持成本随细胞与突触规模自然产生：
-        // 盈利/高适应度个体获得充足能量供给，可自发支撑成千上万细胞的宏伟大脑；
-        // 亏损/低能个体面临代谢赤字，自然抑制盲目增殖，实现真正的开放式自组织演化。
-        if (constraint_cfg_.enable_dynamic_metabolism) {
+        // 采用热力学乘性软阻尼，严禁直接相减负分导致复杂大脑被小个体逆淘汰
+        if (constraint_cfg_.enable_dynamic_metabolism && constraint_cfg_.basal_metabolic_cost > 0.0) {
             for (auto& org : population_) {
-                double metabolic_cost = static_cast<double>(org.cells.size()) * constraint_cfg_.basal_metabolic_cost +
-                                        static_cast<double>(org.synapses.size()) * constraint_cfg_.synaptic_metabolic_cost;
-                org.fitness_score -= metabolic_cost;
+                double raw_cost = static_cast<double>(org.cells.size()) * constraint_cfg_.basal_metabolic_cost +
+                                  static_cast<double>(org.synapses.size()) * constraint_cfg_.synaptic_metabolic_cost;
+                // 软阻尼因子: 能耗惩罚平滑受限在 [0, 0.20]，绝对不破坏正向适应度
+                double metabolic_penalty = 0.20 * std::tanh(raw_cost * 1e-4);
+                org.fitness_score = org.fitness_score * (1.0 - metabolic_penalty);
             }
         }
 
@@ -2802,17 +2968,25 @@ public:
         if (constraint_cfg_.fitness_driver == FitnessDriverMode::NOVELTY_SEARCH ||
             constraint_cfg_.fitness_driver == FitnessDriverMode::HYBRID_CURIOSITY) {
             for (auto& org : population_) {
-                if (constraint_cfg_.enable_dependency_guard &&
-                    !org.evaluate_adas_contract().valid()) {
-                    org.fitness_score = -1e12;
-                    continue;
+                if (constraint_cfg_.enable_dependency_guard) {
+                    bool valid = constraint_cfg_.topology_contract_guard ?
+                                 constraint_cfg_.topology_contract_guard(org) :
+                                 org.evaluate_adas_contract().valid();
+                    if (!valid) {
+                        org.fitness_score = -1e12;
+                        continue;
+                    }
                 }
-                std::vector<double> b_vec = {
-                    static_cast<double>(org.cells.size()),
-                    static_cast<double>(org.synapses.size()),
-                    org.total_pnl,
-                    org.fitness_score
-                };
+                std::vector<double> b_vec;
+                if (constraint_cfg_.behavior_extractor) {
+                    b_vec = constraint_cfg_.behavior_extractor(org);
+                } else {
+                    b_vec = {
+                        static_cast<double>(org.cells.size()),
+                        static_cast<double>(org.synapses.size()),
+                        org.fitness_score
+                    };
+                }
                 double nov = novelty_archive_.compute_novelty(b_vec);
                 novelty_archive_.add_behavior(b_vec);
 
@@ -2828,7 +3002,10 @@ public:
         // Apply the dependency guard after every score transform, including novelty.
         if (constraint_cfg_.enable_dependency_guard) {
             for (auto& org : population_) {
-                if (!org.evaluate_adas_contract().valid()) {
+                bool valid = constraint_cfg_.topology_contract_guard ?
+                             constraint_cfg_.topology_contract_guard(org) :
+                             org.evaluate_adas_contract().valid();
+                if (!valid) {
                     org.fitness_score = -1e12;
                 }
             }
@@ -2869,9 +3046,12 @@ public:
             next_gen.push_back(population_[i]);
         }
 
-        // 3.2 注入客卿移民 (Immigrants - 彻底杜绝近亲繁殖与全盘抄袭)
-        size_t immigrant_count = static_cast<size_t>(population_size_ * constraint_cfg_.immigrant_rate);
-        immigrant_count = std::max<size_t>(1, std::min<size_t>(immigrant_count, population_size_ / 4));
+        // 3.2 注入客卿移民 (Immigrants - 保持种群多样性)
+        size_t immigrant_count = static_cast<size_t>(std::round(population_size_ * constraint_cfg_.immigrant_rate));
+        if (constraint_cfg_.immigrant_rate > 1e-6 && immigrant_count == 0 && population_size_ >= 8) {
+            immigrant_count = 1;
+        }
+        immigrant_count = std::min<size_t>(immigrant_count, population_size_ / 4);
         for (size_t k = 0; k < immigrant_count && next_gen.size() < population_size_; ++k) {
             auto immigrant = CellularOrganism::create_by_mode(
                 constraint_cfg_.seed_mode, 

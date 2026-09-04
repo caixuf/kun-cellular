@@ -1,0 +1,18 @@
+{
+  "gate": true,
+  "passed": 12, "total": 12,
+  "domains": [
+    {"id": "zoo_cartpole", "cells": 16, "synapses": 29, "train_sr": 1, "id_sr": 1, "id_ratio": 1, "ood_sr": 0.8, "gate": true, "train_sec": 2.30912},
+    {"id": "zoo_ballbeam", "cells": 12, "synapses": 16, "train_sr": 0.9, "id_sr": 1, "id_ratio": 1.11111, "ood_sr": 0.9, "gate": true, "train_sec": 4.61499},
+    {"id": "zoo_maglev", "cells": 18, "synapses": 47, "train_sr": 1, "id_sr": 1, "id_ratio": 1, "ood_sr": 0, "gate": true, "train_sec": 2.05198},
+    {"id": "zoo_rocket_hover", "cells": 11, "synapses": 15, "train_sr": 1, "id_sr": 0.7, "id_ratio": 0.7, "ood_sr": 0.6, "gate": true, "train_sec": 1.59898},
+    {"id": "zoo_cruise", "cells": 8, "synapses": 12, "train_sr": 1, "id_sr": 1, "id_ratio": 1, "ood_sr": 1, "gate": true, "train_sec": 1.68208},
+    {"id": "zoo_thermal", "cells": 9, "synapses": 19, "train_sr": 0.9, "id_sr": 1, "id_ratio": 1.11111, "ood_sr": 0.9, "gate": true, "train_sec": 1.3222},
+    {"id": "zoo_water_tank", "cells": 9, "synapses": 9, "train_sr": 1, "id_sr": 1, "id_ratio": 1, "ood_sr": 1, "gate": true, "train_sec": 1.50602},
+    {"id": "zoo_dc_motor", "cells": 11, "synapses": 15, "train_sr": 1, "id_sr": 1, "id_ratio": 1, "ood_sr": 1, "gate": true, "train_sec": 1.3844},
+    {"id": "zoo_vibration", "cells": 11, "synapses": 17, "train_sr": 1, "id_sr": 1, "id_ratio": 1, "ood_sr": 1, "gate": true, "train_sec": 1.81367},
+    {"id": "zoo_servo", "cells": 11, "synapses": 29, "train_sr": 1, "id_sr": 1, "id_ratio": 1, "ood_sr": 1, "gate": true, "train_sec": 1.78822},
+    {"id": "zoo_boiler", "cells": 11, "synapses": 20, "train_sr": 1, "id_sr": 1, "id_ratio": 1, "ood_sr": 1, "gate": true, "train_sec": 2.23916},
+    {"id": "zoo_bicycle", "cells": 11, "synapses": 17, "train_sr": 1, "id_sr": 1, "id_ratio": 1, "ood_sr": 0.7, "gate": true, "train_sec": 1.45011}
+  ]
+}

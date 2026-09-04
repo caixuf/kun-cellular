@@ -1,0 +1,37 @@
+{
+  "organism_id": 24,
+  "generation": 21,
+  "lineage": "Apex-Gen21",
+  "fitness": 0.996874,
+  "thought_energy": 163,
+  "cells": [
+    {"id": 0, "type": "Sense_Input0", "param1": 1.40487, "param2": -0.00046409, "output": 0.00426585, "activations": 221986, "x": -120, "y": -40, "z": 0, "glow": 1},
+    {"id": 2, "type": "Op_EMA", "param1": 0.179145, "param2": -0.0886979, "output": -0.000986459, "activations": 221947, "x": -40, "y": -30, "z": 0, "glow": 1},
+    {"id": 3, "type": "Op_EMA", "param1": 0.259241, "param2": -0.00159433, "output": -0.00109947, "activations": 221968, "x": -40, "y": 30, "z": 0, "glow": 1},
+    {"id": 4, "type": "Op_Sub", "param1": 0, "param2": 0, "output": -0.00610234, "activations": 221992, "x": 30, "y": 0, "z": 0, "glow": 1},
+    {"id": 5, "type": "Gate_Hysteresis", "param1": 0.0139846, "param2": 0.106759, "output": -1, "activations": 222000, "x": 80, "y": 0, "z": 0, "glow": 1},
+    {"id": 6, "type": "Act_PosAction", "param1": -0.0093696, "param2": -0.0148701, "output": -12, "activations": 222000, "x": 140, "y": -40, "z": 0, "glow": 1},
+    {"id": 7, "type": "Act_NegAction", "param1": 0.0959356, "param2": 0.00357314, "output": -3, "activations": 222000, "x": 140, "y": 40, "z": 0, "glow": 1},
+    {"id": 8, "type": "Act_ImmuneLock", "param1": 0.0620805, "param2": 0.0032991, "output": 0, "activations": 0, "x": 140, "y": 100, "z": 0, "glow": 0},
+    {"id": 9, "type": "Op_EMA", "param1": 0.802084, "param2": -0.0295445, "output": -0.00308754, "activations": 221996, "x": 37.3171, "y": -4.58176, "z": 24.9666, "glow": 1},
+    {"id": 10, "type": "Op_Sum", "param1": 0, "param2": 0, "output": -0.00867758, "activations": 17998, "x": 75.2612, "y": -1.02858, "z": 29.9282, "glow": 1},
+    {"id": 11, "type": "Op_Sum", "param1": 0, "param2": 0, "output": -3, "activations": 15000, "x": 139.743, "y": -35.206, "z": 20.4913, "glow": 1}
+  ],
+  "synapses": [
+    {"from": 0, "to": 2, "port": 0, "initial_weight": 1.01019, "weight": 1.01019, "active": true, "recurrent": false, "hebb_rate": 0.00665249, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 0, "to": 3, "port": 0, "initial_weight": 0.861553, "weight": 0.861553, "active": true, "recurrent": false, "hebb_rate": 0.00389062, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 2, "to": 4, "port": 1, "initial_weight": 1.58722, "weight": 1.58722, "active": true, "recurrent": false, "hebb_rate": 0.00483872, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 4, "to": 5, "port": 0, "initial_weight": 1.30661, "weight": 1.30661, "active": false, "recurrent": false, "hebb_rate": 0.00445469, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 5, "to": 6, "port": 0, "initial_weight": 1.02412, "weight": 1.02412, "active": true, "recurrent": false, "hebb_rate": 0.0129822, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 5, "to": 7, "port": 0, "initial_weight": 0.238298, "weight": 0.238298, "active": true, "recurrent": false, "hebb_rate": 0.00682019, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 3, "to": 9, "port": 0, "initial_weight": 1.08908, "weight": 1.08908, "active": true, "recurrent": false, "hebb_rate": 0.0037644, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 9, "to": 4, "port": 0, "initial_weight": 1.0383, "weight": 1.0383, "active": true, "recurrent": false, "hebb_rate": 0.00541335, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 0, "to": 9, "port": 0, "initial_weight": -1.27658, "weight": -1.27658, "active": true, "recurrent": false, "hebb_rate": 0.00330033, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 5, "to": 6, "port": 0, "initial_weight": 1.45568, "weight": 1.45568, "active": false, "recurrent": false, "hebb_rate": 0.005, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 4, "to": 10, "port": 0, "initial_weight": 1, "weight": 1, "active": true, "recurrent": false, "hebb_rate": 0.005, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 10, "to": 5, "port": 0, "initial_weight": 1.30661, "weight": 1.30661, "active": true, "recurrent": false, "hebb_rate": 0.005, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 9, "to": 4, "port": 1, "initial_weight": -1.41969, "weight": -1.41969, "active": true, "recurrent": false, "hebb_rate": 0.005, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 5, "to": 11, "port": 0, "initial_weight": 1, "weight": 1, "active": true, "recurrent": false, "hebb_rate": 0.005, "hebb_decay": 0.02, "photon_pos": -1},
+    {"from": 11, "to": 6, "port": 0, "initial_weight": 1.45568, "weight": 1.45568, "active": true, "recurrent": false, "hebb_rate": 0.005, "hebb_decay": 0.02, "photon_pos": -1}
+  ]
+}

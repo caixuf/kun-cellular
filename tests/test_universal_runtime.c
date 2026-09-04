@@ -38,7 +38,7 @@ int main(void) {
 
     /* CSR 入边表: 8 条内部有向突触 */
     const uint32_t N_SYNS = 8;
-    static const uint16_t INC_OFF[13] = {
+    static const uint32_t INC_OFF[13] = {
         0, 0, 0, 0, 0,  /* 0~3 无入边 (输入感受器) */
         1,              /* 4: 1 条入边 (来自 0) */
         2,              /* 5: 1 条入边 (来自 1) */
@@ -50,9 +50,9 @@ int main(void) {
         8               /* 11: 1 条入边 (来自 9) */
     };
 
-    static const uint16_t INC_FROM[8]   = { 0,     1,     2,     3,     4,     5,     8,     9     };
+    static const uint32_t INC_FROM[8]   = { 0,     1,     2,     3,     4,     5,     8,     9     };
     static const float    INC_WEIGHT[8] = { 0.8f,  1.2f,  0.5f,  0.9f,  0.7f, -0.6f,  1.0f,  1.0f  };
-    static const uint16_t OUT_CELLS[2]  = { 10, 11 };
+    static const uint32_t OUT_CELLS[2]  = { 10, 11 };
 
     /* 运行时状态寄存器 (栈内存或静态区, 严格 0 堆动态分配) */
     float states[12]       SDSC_ALIGN64 = {0};

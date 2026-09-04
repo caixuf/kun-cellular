@@ -187,7 +187,7 @@ public:
         size_t successes = 0;
 
         for (uint32_t seed : seeds) {
-            org.reset_state(); // 清除跨地图 EMA 与突触记忆污染
+            org.reset_state(true); // 塑性隔离: 每 episode 从基因组权重出发, 杜绝跨种子 hebbian 漂移污染
             reset(seed);
 
             std::vector<float> obs = current_observation();

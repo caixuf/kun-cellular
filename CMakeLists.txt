@@ -25,15 +25,52 @@ target_include_directories(kun_cellular INTERFACE
 )
 target_link_libraries(kun_cellular INTERFACE Threads::Threads m)
 
+find_package(OpenMP)
+if(OpenMP_CXX_FOUND)
+    target_link_libraries(kun_cellular INTERFACE OpenMP::OpenMP_CXX)
+endif()
+
 enable_testing()
 
+# 自动探测 CUDA Driver 与 NVRTC 支持
+find_path(CUDA_HEADER_PATH cuda.h
+    PATHS
+    /usr/local/cuda/include
+    /usr/include
+    $ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/include
+)
+find_library(CUDA_DRIVER_LIB cuda
+    PATHS
+    /usr/lib/wsl/lib
+    /usr/lib/x86_64-linux-gnu
+    /usr/local/cuda/lib64
+)
+find_library(NVRTC_LIB nvrtc
+    PATHS
+    $ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib
+    /usr/local/cuda/lib64
+    /usr/lib/x86_64-linux-gnu
+)
+
 # 1. 编译运行 C++ 宏观生态与形态发生单元测试
-file(GLOB TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_flow_*.cpp")
+file(GLOB TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp")
 foreach(TEST_SRC ${TEST_SOURCES})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
-    add_executable(${TEST_NAME} ${TEST_SRC})
-    target_link_libraries(${TEST_NAME} PRIVATE kun_cellular)
-    add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    if(TEST_NAME MATCHES "cuda_scale" OR TEST_NAME MATCHES "adas_scales")
+        if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
+            add_executable(${TEST_NAME} ${TEST_SRC})
+            target_include_directories(${TEST_NAME} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_HEADER_PATH})
+            target_link_libraries(${TEST_NAME} PRIVATE kun_cellular ${CUDA_DRIVER_LIB} ${NVRTC_LIB})
+            add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+            if(EXISTS "$ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib")
+                set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT "LD_LIBRARY_PATH=$ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib:$ENV{LD_LIBRARY_PATH}")
+            endif()
+        endif()
+    else()
+        add_executable(${TEST_NAME} ${TEST_SRC})
+        target_link_libraries(${TEST_NAME} PRIVATE kun_cellular)
+        add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    endif()
 endforeach()
 
 # 2. 编译运行纯 C11 硬件级核心原语、通用运行时与连续流体介质测试 (Single Source of Truth)
@@ -64,5 +101,17 @@ target_link_libraries(train_quant_futures PRIVATE kun_cellular Threads::Threads 
 
 add_executable(train_multi_asset_quant_master "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_multi_asset_quant_master.cpp")
 target_link_libraries(train_multi_asset_quant_master PRIVATE kun_cellular Threads::Threads m)
+
+add_executable(train_flagship_voxel "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_flagship_voxel.cpp")
+target_link_libraries(train_flagship_voxel PRIVATE kun_cellular Threads::Threads m)
+
+add_executable(train_field_3d_turbulence "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_field_3d_turbulence.cpp")
+target_link_libraries(train_field_3d_turbulence PRIVATE kun_cellular Threads::Threads m)
+
+if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
+    add_executable(bench_adas_scales "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_adas_scales.cpp")
+    target_include_directories(bench_adas_scales PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_HEADER_PATH})
+    target_link_libraries(bench_adas_scales PRIVATE kun_cellular ${CUDA_DRIVER_LIB} ${NVRTC_LIB})
+endif()
 
 

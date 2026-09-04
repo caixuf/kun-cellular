@@ -16,4 +16,5 @@ runs/
 *.pt
 *.bin
 *.tmp
+bin/
 checkpoints/vehicle_cortex_champion.json

@@ -1709,6 +1709,66 @@ class SiliconCellularOrganism:
                     SymbioticMacroCell(3, "ViabilityActuatorRing", act_ids, color="#f43f5e")
                 ]
 
+            # 8.5 倒立摆平衡生命体冠军 (12 细胞, 管线横向复刻首证)
+            elif oid == "cartpole_balance_champion":
+                raw_cells = ckpt.get("cells", [])
+                raw_syns = ckpt.get("synapses", [])
+                self.generation = ckpt.get("generation", 150)
+
+                for c in raw_cells:
+                    cid = int(c.get("id"))
+                    ctype = c.get("type", "Op_EMA")
+                    layer = "L1_SENSORY" if ctype.startswith("Sense") else ("L3_MOTOR" if ctype.startswith("Act") else "L2_ASSOCIATION")
+                    cell = PhysicalCell3D(cid, ctype, float(c.get("x", 0.0)), float(c.get("y", 0.0)), float(c.get("z", 0.0)), layer=layer)
+                    cell.gain = float(c.get("param1", 1.0) or 1.0)
+                    self.cells.append(cell)
+
+                for syn in raw_syns:
+                    u = int(syn.get("from"))
+                    v = int(syn.get("to"))
+                    w = float(syn.get("weight", syn.get("initial_weight", 1.0)))
+                    act = bool(syn.get("active", True))
+                    self.synapses.append({"from": u, "to": v, "weight": round(w, 4), "active": act})
+
+                sense_ids = [int(c.get("id")) for c in raw_cells if str(c.get("type", "")).startswith("Sense")]
+                act_ids = [int(c.get("id")) for c in raw_cells if str(c.get("type", "")).startswith("Act")]
+                core_ids = [int(c.get("id")) for c in raw_cells if not str(c.get("type", "")).startswith(("Sense", "Act"))]
+                self.symbiotic_macro_cells = [
+                    SymbioticMacroCell(1, "PoleStateSensory", sense_ids, color="#22d3ee"),
+                    SymbioticMacroCell(2, "BalanceDampingCore", core_ids, color="#34d399"),
+                    SymbioticMacroCell(3, "CartForceActuator", act_ids, color="#f43f5e")
+                ]
+
+            # 8.9 DomainZoo 批量冠军 (zoo_* 通配, 标准存盘格式统一解析)
+            elif oid.startswith("zoo_"):
+                raw_cells = ckpt.get("cells", [])
+                raw_syns = ckpt.get("synapses", [])
+                self.generation = ckpt.get("generation", 120)
+
+                for c in raw_cells:
+                    cid = int(c.get("id"))
+                    ctype = c.get("type", "Op_EMA")
+                    layer = "L1_SENSORY" if ctype.startswith("Sense") else ("L3_MOTOR" if ctype.startswith("Act") else "L2_ASSOCIATION")
+                    cell = PhysicalCell3D(cid, ctype, float(c.get("x", 0.0)), float(c.get("y", 0.0)), float(c.get("z", 0.0)), layer=layer)
+                    cell.gain = float(c.get("param1", 1.0) or 1.0)
+                    self.cells.append(cell)
+
+                for syn in raw_syns:
+                    u = int(syn.get("from"))
+                    v = int(syn.get("to"))
+                    w = float(syn.get("weight", syn.get("initial_weight", 1.0)))
+                    act = bool(syn.get("active", True))
+                    self.synapses.append({"from": u, "to": v, "weight": round(w, 4), "active": act})
+
+                sense_ids = [int(c.get("id")) for c in raw_cells if str(c.get("type", "")).startswith("Sense")]
+                act_ids = [int(c.get("id")) for c in raw_cells if str(c.get("type", "")).startswith("Act")]
+                core_ids = [int(c.get("id")) for c in raw_cells if not str(c.get("type", "")).startswith(("Sense", "Act"))]
+                self.symbiotic_macro_cells = [
+                    SymbioticMacroCell(1, "ZooSensoryColumn", sense_ids, color="#22d3ee"),
+                    SymbioticMacroCell(2, "ZooAssociationCore", core_ids, color="#34d399"),
+                    SymbioticMacroCell(3, "ZooEffectorRing", act_ids, color="#f43f5e")
+                ]
+
             # 统一对齐宏观与微观双尺度定义：宏观标称规模必须等同真实驱动的细胞数，
             # 严禁用 manifest 的 cells_scale 标称值（如 1,000,000）冒充真实几何（见尺度真理宪章）
             self.macro_cells = len(self.cells)

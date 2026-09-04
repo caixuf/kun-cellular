@@ -22,10 +22,10 @@ struct SdscLiveGraph {
 
     std::vector<uint8_t> op_types;
     std::vector<float> gains;
-    std::vector<uint16_t> inc_off;
-    std::vector<uint16_t> inc_from;
+    std::vector<uint32_t> inc_off;
+    std::vector<uint32_t> inc_from;
     std::vector<float> inc_weight;
-    std::vector<uint16_t> out_cell_ids;
+    std::vector<uint32_t> out_cell_ids;
 
     std::vector<float> states;
     std::vector<float> aux_states;
@@ -66,17 +66,17 @@ inline SdscLiveGraph make_dense_mixer_graph(uint32_t in_dim, uint32_t out_dim) {
     for (uint32_t o = 0; o < out_dim; ++o) {
         const uint32_t cell = in_dim + o;
         g.op_types[cell] = SDSC_OP_SUM;
-        g.out_cell_ids[o] = static_cast<uint16_t>(cell);
-        g.inc_off[cell] = static_cast<uint16_t>(syn);
+        g.out_cell_ids[o] = cell;
+        g.inc_off[cell] = syn;
         for (uint32_t i = 0; i < in_dim; ++i) {
-            g.inc_from[syn] = static_cast<uint16_t>(i);
+            g.inc_from[syn] = i;
             g.inc_weight[syn] = (o == 0)
                 ? (0.05f + 0.01f * static_cast<float>(i))
                 : 0.02f;
             ++syn;
         }
     }
-    g.inc_off[g.cell_count] = static_cast<uint16_t>(syn);
+    g.inc_off[g.cell_count] = syn;
 
     g.states.assign(g.cell_count, 0.0f);
     g.aux_states.assign(g.cell_count, 0.0f);

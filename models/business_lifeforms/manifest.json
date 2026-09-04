@@ -114,6 +114,279 @@
         "ACT_NEG",
         "ACT_LOCK"
       ]
+    },
+    {
+      "id": "cartpole_balance_champion",
+      "name": "倒立摆平衡生命体 (12细胞·管线横向复刻首证)",
+      "domain": "低维硬实时控制 (两轮平衡类)",
+      "cells_scale": 12,
+      "synapses_scale": 21,
+      "checkpoint": "checkpoints/cartpole_balance_champion.json",
+      "c_header": "include/kun/cellular/cart_pole_task.hpp",
+      "test_suite": "tests/test_adas_cortex_contract.py",
+      "validation_report": "M1门禁: 随机基线0%→100%满生存, ID留出比1.00, 跨物理OOD(摆锤2x重/摆杆1.4x长/推力噪声)100%, 训练2.6s",
+      "input_signals": [
+        "POLE_THETA",
+        "POLE_THETA_DOT",
+        "CART_X",
+        "CART_X_DOT"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_cartpole",
+      "name": "倒立摆平衡生命体 (16细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 16,
+      "synapses_scale": 29,
+      "checkpoint": "checkpoints/zoo_cartpole.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 1.00, 跨物理OOD 80%, 训练2.2s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_ballbeam",
+      "name": "滚球天平生命体 (12细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 12,
+      "synapses_scale": 16,
+      "checkpoint": "checkpoints/zoo_ballbeam.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 90%, ID留出比 1.11, 跨物理OOD 90%, 训练1.6s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_rocket_hover",
+      "name": "火箭悬停生命体 (11细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 11,
+      "synapses_scale": 15,
+      "checkpoint": "checkpoints/zoo_rocket_hover.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 0.70, 跨物理OOD 60%, 训练1.6s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_cruise",
+      "name": "巡航定速生命体 (8细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 8,
+      "synapses_scale": 12,
+      "checkpoint": "checkpoints/zoo_cruise.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 1.00, 跨物理OOD 100%, 训练1.6s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_thermal",
+      "name": "温度调节生命体 (9细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 9,
+      "synapses_scale": 19,
+      "checkpoint": "checkpoints/zoo_thermal.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 90%, ID留出比 1.11, 跨物理OOD 90%, 训练1.3s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_water_tank",
+      "name": "水箱液位生命体 (9细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 9,
+      "synapses_scale": 9,
+      "checkpoint": "checkpoints/zoo_water_tank.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 1.00, 跨物理OOD 100%, 训练1.5s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_dc_motor",
+      "name": "电机调速生命体 (11细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 11,
+      "synapses_scale": 15,
+      "checkpoint": "checkpoints/zoo_dc_motor.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 1.00, 跨物理OOD 100%, 训练1.4s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_vibration",
+      "name": "振动隔离生命体 (11细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 11,
+      "synapses_scale": 17,
+      "checkpoint": "checkpoints/zoo_vibration.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 1.00, 跨物理OOD 100%, 训练1.8s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_servo",
+      "name": "伺服定位生命体 (11细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 11,
+      "synapses_scale": 29,
+      "checkpoint": "checkpoints/zoo_servo.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 1.00, 跨物理OOD 100%, 训练1.7s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_boiler",
+      "name": "锅炉压力生命体 (11细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 11,
+      "synapses_scale": 20,
+      "checkpoint": "checkpoints/zoo_boiler.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 1.00, 跨物理OOD 100%, 训练2.2s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_bicycle",
+      "name": "自行车平衡生命体 (11细胞·DomainZoo)",
+      "domain": "低维硬实时控制 (DomainZoo 管线复刻)",
+      "cells_scale": 11,
+      "synapses_scale": 17,
+      "checkpoint": "checkpoints/zoo_bicycle.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 1.00, 跨物理OOD 70%, 训练1.4s",
+      "input_signals": [
+        "CH0",
+        "CH1",
+        "CH2",
+        "CH3"
+      ],
+      "action_outputs": [
+        "ACT_POS",
+        "ACT_NEG"
+      ]
+    },
+    {
+      "id": "zoo_maglev",
+      "name": "磁悬浮生命体 (18细胞·开环不稳定非线性)",
+      "domain": "低维硬实时控制 (非线性边界首证)",
+      "cells_scale": 18,
+      "synapses_scale": 47,
+      "checkpoint": "checkpoints/zoo_maglev.json",
+      "c_header": "include/kun/cellular/domain_zoo.hpp",
+      "test_suite": "checkpoints/domain_zoo_report.json",
+      "validation_report": "M1门禁: 训练SR 100%, ID留出比 1.00; 诚实缺陷: 双倍质量OOD 0% (悬浮带偏移未泛化)",
+      "input_signals": [
+        "GAP_ERR",
+        "GAP_VEL",
+        "COIL_I",
+        "-"
+      ],
+      "action_outputs": [
+        "COIL_UP",
+        "COIL_DOWN"
+      ]
     }
   ]
 }
