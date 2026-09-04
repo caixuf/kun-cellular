@@ -72,7 +72,7 @@
       "name": "具身智能驾驶 ASIL-D 210细胞微柱皮层 (ADAS Cortex)",
       "domain": "具身物理控制与运动学自组织",
       "cells_scale": 210,
-      "synapses_scale": 610,
+      "synapses_scale": 630,
       "checkpoint": "checkpoints/adas_cortex_champion.bin",
       "c_header": "include/kun/cellular/sdsc_cortex.h",
       "test_suite": "tests/test_gate5_gate6_replay_shadow.py",
@@ -97,7 +97,7 @@
         "OP_CORRELATION",
         "OP_FATIGUE"
       ],
-      "validation_report": "16 个高难度工况 100% 满分，平均横向偏差 7.9cm，留出验证集泛化比 0.59x，气/水/真空 3,000 步流体物理大考全部通过。"
+      "validation_report": "60 代演化 (seed 20260903): 12 工况 100% 通过, 冠军 cost 42.04, 平均横向偏差 7-29cm, 留出验证集泛化比 0.78x"
     },
     {
       "id": "maze_navigation_champion",

@@ -198,6 +198,10 @@ def build_header(ck):
 #define SDSC_ALIGN64
 #endif
 
+#ifdef __cplusplus
+extern "C" {{
+#endif
+
 #define SDSC_CELL_COUNT      {n_cells}
 #define SDSC_SYNAPSE_COUNT   {n_syn}
 #define SDSC_RECEPTOR_COUNT  {n_rec}
