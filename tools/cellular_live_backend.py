@@ -3542,6 +3542,26 @@ def answer_cellular_dialogue(prompt: str) -> dict:
 
 MANIFOLD_CACHE = {}
 
+def get_organism_manifest_scale(oid: str) -> int:
+    try:
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        mpath = os.path.join(base_dir, "models", "business_lifeforms", "manifest.json")
+        if os.path.exists(mpath):
+            with open(mpath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                for item in data.get("lifeforms", []):
+                    if item.get("id") == oid:
+                        return int(item.get("cells_scale", 1024))
+    except Exception:
+        pass
+    if "100m" in oid:
+        return 100000000
+    if "10m" in oid:
+        return 10000000
+    if "1m" in oid or "mega" in oid:
+        return 1000000
+    return 1024
+
 def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
     """构建零堆、硬件对齐的纯二进制细胞点云流形负载 (Header 32B + Positions N*12B + Colors N*3B + Attrs N*4B)"""
     cache_key = f"cell_{oid}_{target_count}"
@@ -3555,6 +3575,8 @@ def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
         bin_path = os.path.join(base_dir, "checkpoints", f"{cur_oid}.bin")
 
     bin_data = read_sdsc_binary(bin_path) if os.path.exists(bin_path) else None
+    manifest_scale = get_organism_manifest_scale(oid)
+    is_macro_scale = (manifest_scale >= 100000) or ("100m" in oid) or ("10m" in oid) or ("1m" in oid)
     
     if bin_data and bin_data["num_cells"] > 0:
         num_cells = bin_data["num_cells"]
@@ -3566,11 +3588,40 @@ def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
         has_real_coords = False
         cells_bytes = b""
 
-    sample_n = min(target_count, max(num_cells, 1024))
-    if num_cells >= 100000:
-        sample_n = min(target_count, 60000)
+    if is_macro_scale:
+        sample_n = max(60000, min(target_count, 80000))
+    else:
+        sample_n = min(target_count, max(num_cells, 1024))
 
-    if has_real_coords and num_cells <= sample_n:
+    if has_real_coords and is_macro_scale and num_cells <= sample_n:
+        # 100M/10M/1M 宇宙星系连续场流形：基于原型微柱坐标插值衍生为高密度全息点云
+        k = max(2, sample_n // num_cells)
+        pts_list = []
+        opcodes_list = []
+        proto_opcodes = np.zeros(num_cells, dtype=np.uint8)
+        stride = 16 if len(cells_bytes) >= num_cells * 16 else 4
+        op_offset = 4 if stride == 16 else 0
+        for i in range(min(num_cells, len(cells_bytes) // stride)):
+            proto_opcodes[i] = cells_bytes[i * stride + op_offset]
+
+        np.random.seed(42)
+        for i in range(num_cells):
+            cx, cy, cz = float(coords[i, 0]), float(coords[i, 1]), float(coords[i, 2])
+            op = proto_opcodes[i]
+            dz = np.linspace(-22.0, 22.0, k, dtype=np.float32)
+            r_jit = np.random.normal(0, 4.2, k).astype(np.float32)
+            th_jit = np.random.uniform(0, 2 * np.pi, k).astype(np.float32)
+            sub_x = cx + r_jit * np.cos(th_jit)
+            sub_y = cy + r_jit * np.sin(th_jit)
+            sub_z = cz + dz
+            col_pts = np.stack([sub_x, sub_y, sub_z], axis=1)
+            pts_list.append(col_pts)
+            opcodes_list.append(np.full(k, op, dtype=np.uint8))
+
+        pts = np.vstack(pts_list)
+        opcodes = np.concatenate(opcodes_list)
+        sample_n = len(pts)
+    elif has_real_coords and num_cells <= sample_n:
         pts = coords.astype(np.float32)
         sample_n = len(pts)
         opcodes = np.zeros(sample_n, dtype=np.uint8)
@@ -3657,7 +3708,7 @@ def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
     attrs[:, 3] = 0
 
     colors = PALETTE_26_RGB[attrs[:, 0]]
-    hdr = struct.pack("<IIIIffff", 0x4D414E46, 2, sample_n, num_cells, 180.0, 0.0, 0.0, 0.0)
+    hdr = struct.pack("<IIIIffff", 0x4D414E46, 2, sample_n, manifest_scale, 180.0, 0.0, 0.0, 0.0)
     payload = hdr + pts.tobytes() + colors.tobytes() + attrs.tobytes()
     MANIFOLD_CACHE[cache_key] = payload
     return payload

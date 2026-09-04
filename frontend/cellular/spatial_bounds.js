@@ -101,8 +101,16 @@ export function updateOrganismBounds(arg1 = null, arg2 = null, cellViewsMap = nu
   currentOrganismBounds.radius = targetVisRadius;
   currentOrganismBounds.min.set(-targetVisRadius, -targetVisRadius, -targetVisRadius);
   currentOrganismBounds.max.set(targetVisRadius, targetVisRadius, targetVisRadius);
-  currentOrganismBounds.macroDist = Math.max(480, targetVisRadius * 2.6);
-  currentOrganismBounds.microDist = Math.max(140, targetVisRadius * 0.7);
+  if (cellScale >= 100000000) {
+    currentOrganismBounds.macroDist = Math.max(720, targetVisRadius * 3.2);
+    currentOrganismBounds.microDist = Math.max(120, targetVisRadius * 0.5);
+  } else if (cellScale >= 1000000) {
+    currentOrganismBounds.macroDist = Math.max(540, targetVisRadius * 2.7);
+    currentOrganismBounds.microDist = Math.max(130, targetVisRadius * 0.6);
+  } else {
+    currentOrganismBounds.macroDist = Math.max(480, targetVisRadius * 2.5);
+    currentOrganismBounds.microDist = Math.max(140, targetVisRadius * 0.7);
+  }
   currentOrganismBounds.cellScale = cellScale;
   currentOrganismBounds.volumeRatio = V_ratio;
   currentOrganismBounds.trueRadius = R_true;

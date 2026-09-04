@@ -246,6 +246,15 @@ export function updateOrganSystem(scene, org, t, isMacroView) {
     if (_organRootGroup) _organRootGroup.visible = false;
     return;
   }
+
+  const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || (org && org.cellScale) || 1024;
+  const isLarge = (cellScale >= 100000) || (org.cells && org.cells.length > 3000);
+
+  // 核心哲学：在 1亿/1000万/100万 超大规模宏观全景下，严禁任何宏观外包圆球或铭牌遮挡星系点云流形！
+  if (isMacroView && isLarge) {
+    if (_organRootGroup) _organRootGroup.visible = false;
+    return;
+  }
   _organRootGroup.visible = true;
 
   const organList = extractOrganList(org);

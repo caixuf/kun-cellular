@@ -188,40 +188,104 @@ export class EmbodiedPIPTwin {
     ctx.translate(cx, cy);
     ctx.rotate(-carTheta - Math.PI * 0.5);
 
-    // 2.1 绘制赛道中心线与双边界
+    // 2.1 沿车辆运动方向连续提取赛道切片并绘制道路
     if (track.length > 0) {
-      ctx.strokeStyle = "rgba(56, 189, 248, 0.75)";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      let started = false;
-      for (const pt of track) {
-        const px = (pt.x - carX) * scale;
-        const py = (pt.y - carY) * scale;
-        if (Math.abs(px) < 180 && Math.abs(py) < 180) {
-          if (!started) { ctx.moveTo(px, py); started = true; }
-          else ctx.lineTo(px, py);
+      // 找到最近的赛道参考点索引
+      let closestIdx = 0;
+      let minD2 = Infinity;
+      for (let i = 0; i < track.length; i++) {
+        const dx = track[i].x - carX;
+        const dy = track[i].y - carY;
+        const d2 = dx * dx + dy * dy;
+        if (d2 < minD2) {
+          minD2 = d2;
+          closestIdx = i;
         }
       }
-      ctx.stroke();
 
-      // 赛道护栏边缘
-      ctx.strokeStyle = "rgba(148, 163, 184, 0.25)";
-      ctx.lineWidth = 1;
-      const rw = (et.road_width || 120.0) * scale * 0.5;
+      // 取车后 15 点到车前 85 点的连续道路序列 (按道路弧长顺序遍历，彻底消灭穿心飞线与圆环)
+      const roadHalfW = 23.0 * scale;
+      const nPts = track.length;
+      const startIdx = closestIdx - 15;
+      const endIdx = closestIdx + 85;
+
+      const leftPts = [];
+      const rightPts = [];
+      const centerPts = [];
+
+      for (let k = startIdx; k <= endIdx; k++) {
+        const idx = ((k % nPts) + nPts) % nPts;
+        const pt = track[idx];
+        const px = (pt.x - carX) * scale;
+        const py = (pt.y - carY) * scale;
+
+        // 切向与法向计算双边车道线
+        const th = pt.theta !== undefined ? pt.theta : 0;
+        const nx = -Math.sin(th) * roadHalfW;
+        const ny = Math.cos(th) * roadHalfW;
+
+        centerPts.push({ x: px, y: py });
+        leftPts.push({ x: px + nx, y: py + ny });
+        rightPts.push({ x: px - nx, y: py - ny });
+      }
+
+      // 绘制道路沥青底色带
+      if (leftPts.length > 1) {
+        ctx.fillStyle = "rgba(15, 23, 42, 0.45)";
+        ctx.beginPath();
+        ctx.moveTo(leftPts[0].x, leftPts[0].y);
+        for (let i = 1; i < leftPts.length; i++) ctx.lineTo(leftPts[i].x, leftPts[i].y);
+        for (let i = rightPts.length - 1; i >= 0; i--) ctx.lineTo(rightPts[i].x, rightPts[i].y);
+        ctx.closePath();
+        ctx.fill();
+
+        // 左右道路护栏/车道边缘线
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.35)";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let i = 0; i < leftPts.length; i++) {
+          if (i === 0) ctx.moveTo(leftPts[i].x, leftPts[i].y);
+          else ctx.lineTo(leftPts[i].x, leftPts[i].y);
+        }
+        ctx.stroke();
+
+        ctx.beginPath();
+        for (let i = 0; i < rightPts.length; i++) {
+          if (i === 0) ctx.moveTo(rightPts[i].x, rightPts[i].y);
+          else ctx.lineTo(rightPts[i].x, rightPts[i].y);
+        }
+        ctx.stroke();
+      }
+
+      // 道路中心虚线 (航向引导线)
+      ctx.strokeStyle = "rgba(56, 189, 248, 0.85)";
+      ctx.lineWidth = 2.0;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      for (let i = 0; i < centerPts.length; i++) {
+        if (i === 0) ctx.moveTo(centerPts[i].x, centerPts[i].y);
+        else ctx.lineTo(centerPts[i].x, centerPts[i].y);
+      }
       ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     // 2.2 绘制历史行驶轨迹 (尾迹流)
     if (trail.length > 1) {
-      ctx.strokeStyle = "rgba(52, 211, 153, 0.45)";
-      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = "rgba(52, 211, 153, 0.6)";
+      ctx.lineWidth = 2.0;
       ctx.beginPath();
+      let trailStarted = false;
       for (let i = 0; i < trail.length; i++) {
         const pt = trail[i];
         const px = (pt.x - carX) * scale;
         const py = (pt.y - carY) * scale;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+        if (Math.hypot(px, py) < 140) {
+          if (!trailStarted) { ctx.moveTo(px, py); trailStarted = true; }
+          else ctx.lineTo(px, py);
+        } else {
+          trailStarted = false;
+        }
       }
       ctx.stroke();
     }
