@@ -439,9 +439,9 @@ export class CellView {
     }
 
     // 2. 最外层氛围光晕
-    const haloScale = (22 + breath * 4) * (1.0 + actIntensity * 0.20);
+    const haloScale = (14.5 + breath * 1.5) * (1.0 + actIntensity * 0.15);
     this.membrane.scale.set(haloScale, haloScale, 1);
-    this.membrane.material.opacity = 0.10 + actIntensity * 0.20;
+    this.membrane.material.opacity = 0.08 + actIntensity * 0.16;
 
     // 3. 细胞核高能电位激化
     const nScale = 1.0 + actIntensity * 0.20;

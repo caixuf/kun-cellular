@@ -13,7 +13,7 @@ import { SynapseView } from './synapse_view.js';
 import { tractography } from './tractography.js';
 import { loadBinaryManifold, clearBinaryManifold } from './manifold_system.js';
 
-export const MIN_CELL_PIXELS = 20.0;
+export const MIN_CELL_PIXELS = 42.0;
 export const MAX_SOLID_CELLS = 3000;
 
 export const cellViewPool = [];
@@ -155,12 +155,12 @@ export function initLODCloud(s = scene, o = defaultOrg, b = currentOrganismBound
   geo.setAttribute("color", new THREE.BufferAttribute(lodColors, 3));
 
   const mat = new THREE.PointsMaterial({
-    size: 2.2 * spreadScale,
+    size: 1.4 * spreadScale,
     vertexColors: true,
     map: getGlowTexture(),
     transparent: true,
-    opacity: 0.55,
-    blending: THREE.AdditiveBlending,
+    opacity: 0.90,
+    blending: THREE.NormalBlending,
     depthWrite: false,
     sizeAttenuation: true
   });
@@ -214,12 +214,12 @@ export function buildFullPointCloud(s = scene, o = defaultOrg, b = currentOrgani
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
   const mat = new THREE.PointsMaterial({
-    size: 4.2,
+    size: 1.8,
     vertexColors: true,
     map: getGlowTexture(),
     transparent: true,
-    opacity: 0.75,
-    blending: THREE.AdditiveBlending,
+    opacity: 0.90,
+    blending: THREE.NormalBlending,
     depthWrite: false,
     sizeAttenuation: true
   });

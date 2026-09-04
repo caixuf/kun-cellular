@@ -15,13 +15,13 @@ export function createCellCloudMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
       u_time: { value: 0.0 },
-      u_size: { value: 4.8 },
+      u_size: { value: 1.8 },
       u_scale: { value: window.innerHeight / 2.0 },
-      u_opacity: { value: 0.85 }
+      u_opacity: { value: 0.90 }
     },
     transparent: true,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
     vertexShader: `
       uniform float u_time;
       uniform float u_size;
@@ -38,13 +38,13 @@ export function createCellCloudMaterial() {
         vActivity = aActivity;
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 
-        // 代谢微呼吸：不同原语和网络层具有不同呼吸频率与相位
-        float pulse = 0.82 + 0.28 * sin(u_time * 2.8 + aPrimitive * 0.75 + position.x * 0.02);
-        float actBoost = 1.0 + aActivity * 0.45;
+        // 微代谢时钟呼吸：微弱的脉冲律动
+        float pulse = 0.90 + 0.20 * sin(u_time * 2.4 + aPrimitive * 0.75 + position.x * 0.02);
+        float actBoost = 1.0 + aActivity * 0.35;
 
-        // 基于相机的透视投影衰减
+        // 严格控制点云像素粒径在 1.2px ~ 4.5px，杜绝任何巨型圆球产生
         gl_PointSize = u_size * pulse * actBoost * (u_scale / -mvPosition.z);
-        gl_PointSize = clamp(gl_PointSize, 1.5, 48.0);
+        gl_PointSize = clamp(gl_PointSize, 1.2, 4.5);
 
         gl_Position = projectionMatrix * mvPosition;
       }
@@ -59,15 +59,12 @@ export function createCellCloudMaterial() {
         float d = length(coord);
         if (d > 0.5) discard;
 
-        // 双层仿生同心结构：中心高亮核仁 + 外层透亮质膜能量光晕
-        float nucleus = smoothstep(0.18, 0.02, d);
-        float membraneGlow = exp(-d * 4.2);
-        float halo = smoothstep(0.5, 0.2, d) * 0.4;
+        // 高保真生物点云粒子：锐利高斯落差，中心保持 100% 纯正动力学原语全域色彩
+        float falloff = exp(-d * d * 14.0);
+        vec3 col = vColor * (1.05 + vActivity * 0.35);
+        float alpha = falloff * u_opacity;
 
-        vec3 coreColor = mix(vColor * 1.35, vec3(1.0), nucleus * 0.75);
-        float alpha = (nucleus * 0.95 + membraneGlow * 0.65 + halo) * u_opacity;
-
-        gl_FragColor = vec4(coreColor, alpha);
+        gl_FragColor = vec4(col, alpha);
       }
     `
   });

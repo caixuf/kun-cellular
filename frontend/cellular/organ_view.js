@@ -11,7 +11,7 @@ import { getCellWorldRadius } from './spatial_bounds.js';
 
 let _organRootGroup = null;
 const _organViewsMap = new Map();
-let _isOrganVisible = true;
+let _isOrganVisible = false;
 
 const _sharedEnvelopeGeo = new THREE.SphereGeometry(1.0, 24, 16);
 const _sharedRingGeo = new THREE.TorusGeometry(1.0, 0.022, 8, 48);
