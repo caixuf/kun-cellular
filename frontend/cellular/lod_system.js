@@ -28,7 +28,7 @@ export let lodPointsMesh = null;
 let lodPositions = null;
 let lodColors = null;
 
-const MAX_MACRO_SYNS = 120;
+const MAX_MACRO_SYNS = 180;
 let cachedMajorSynKeys = null;
 let lastMajorSynOrgId = null;
 let lastMajorSynCount = 0;
@@ -308,15 +308,16 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5));
   const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
 
-  // 尺度判定：宏观规模 >= 1000 细胞或节点数 > 256 属于超大规模生命体 (1M, 10M, 100M+ 世界模型与体素流场)
+  // 尺度判定：真实细胞节点数 <= MAX_SOLID_CELLS (3000) 均为离散微柱生命体 (1024-ADAS、1024-量化、1032-皮层阵列等)
+  // 必须 100% 全量实体物理实化，绝不截断或丢弃任何细胞！
   const cellScale = (bnds && bnds.cellScale) || n;
-  const isLargeScale = (cellScale >= 1000) || (n > 256);
-  const isDiscrete = !isLargeScale;
+  const isDiscrete = (n <= MAX_SOLID_CELLS);
+  const isLargeScale = !isDiscrete;
 
   _lodCandidates.length = 0;
 
   if (isDiscrete) {
-    // 1. 离散硅基微观皮层柱 (如 210 细胞 ASIL-D 皮层、13 细胞迷宫、9 细胞斗地主)
+    // 1. 离散硅基微观皮层柱 (1024 细胞微柱皮层、1032 细胞阵列、210 细胞 ASIL-D 皮层等)
     // 100% 全部细胞全量物理实化，绝不因视距裁剪只渲染十几个细胞！
     for (const c of orgObj.cells) {
       _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
@@ -339,7 +340,7 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
       if (frustum && !frustum.intersectsSphere(_lodSphere)) continue;
 
       _lodCandidates.push({ id: c.id, d });
-      if (_lodCandidates.length >= 128) break;
+      if (_lodCandidates.length >= 512) break;
     }
   }
 
@@ -364,18 +365,18 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   views.cells = Array.from(cellViewsMap.values());
 
   // 2. 突触全量实化：
-  // 凡是实化细胞之间的全部突触通道，100% 全量物理实化，绝不截断丢弃！
+  // 凡是实化细胞之间的全部突触通道，轮转均匀采样覆盖全脑各微区，100% 避免局部垄断！
   const wantSyn = new Set();
   if (wantIds.size > 0) {
-    for (const id of wantIds) {
-      const adj = cellSynAdj.get(id);
-      if (adj) {
-        for (const key of adj) {
-          wantSyn.add(key);
+    const idList = Array.from(wantIds);
+    for (let round = 0; round < 4 && wantSyn.size < MAX_MACRO_SYNS; ++round) {
+      for (const id of idList) {
+        const adj = cellSynAdj.get(id);
+        if (adj && adj.length > round) {
+          wantSyn.add(adj[round]);
           if (wantSyn.size >= MAX_MACRO_SYNS) break;
         }
       }
-      if (wantSyn.size >= MAX_MACRO_SYNS) break;
     }
   }
 

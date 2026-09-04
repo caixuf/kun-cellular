@@ -100,22 +100,30 @@ function animate() {
 
   let visibleMicroCount = 0;
   const isDenseCells = views.cells.length > 50;
+  const showMicroOrganelles = !isDenseCells || closeLook;
+
   for (const v of views.cells) {
     visibleMicroCount++;
     v.group.visible = true;
-    v.update(now * 0.001, clientWarpMultiplier);
 
-    // 宏观远景下隐藏繁琐的大圆环/色带/线粒体/穿膜代谢流，避免遮挡画布；特写近视距时才展示微观内部结构
-    if (v.delayRing) v.delayRing.visible = !isDenseCells || closeLook;
-    if (v.attrRibbon) v.attrRibbon.visible = !isDenseCells || closeLook;
+    // 宏观远景下隐藏繁琐的大圆环/色带/线粒体/穿膜代谢流/内膜孔道，避免几何与CPU过载；特写近视距时才展示微观超精细内部结构
+    if (v.delayRing) v.delayRing.visible = showMicroOrganelles;
+    if (v.attrRibbon) v.attrRibbon.visible = showMicroOrganelles;
     if (v.metabolicPoints) v.metabolicPoints.visible = closeLook;
-    for (const o of v.organelles) {
-      if (o.mesh) o.mesh.visible = !isDenseCells || closeLook;
+    if (v.innerMembraneMesh) v.innerMembraneMesh.visible = showMicroOrganelles;
+    if (v.poresMesh) v.poresMesh.visible = showMicroOrganelles;
+    if (v.cytoMesh) v.cytoMesh.visible = showMicroOrganelles;
+    if (v.organelles) {
+      for (const o of v.organelles) {
+        if (o.mesh) o.mesh.visible = showMicroOrganelles;
+      }
     }
+
+    v.update(now * 0.001, clientWarpMultiplier);
 
     // 标签显示：避免几十个巨大文字漂浮遮挡画面。只在近距特写或少量细胞下针对前排受体显示
     if (v.label) {
-      const showLabel = closeLook ? (visibleMicroCount <= 12) : (!isDenseCells && visibleMicroCount <= 8);
+      const showLabel = closeLook ? (visibleMicroCount <= 16) : (!isDenseCells && visibleMicroCount <= 8);
       v.label.visible = showLabel;
       if (v.label.material) v.label.material.opacity = showLabel ? 0.90 : 0;
     }

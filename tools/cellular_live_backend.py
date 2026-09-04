@@ -1665,16 +1665,80 @@ class SiliconCellularOrganism:
                 meta = bin_data.get("meta", {})
                 cells_meta = meta.get("cells_meta", [])
 
-                # 若 coords 为全 0，自动进行 3D 拓扑投影展开，防止三维全息视口点重叠坍缩
-                if np.max(np.abs(coords)) < 1e-4:
-                    golden_ratio = (1 + math.sqrt(5)) / 2
-                    for i in range(nc):
-                        phi = math.acos(1 - 2 * (i + 0.5) / max(1, nc))
-                        theta = 2 * math.pi * i / golden_ratio
-                        r = 80.0 + (i % 7) * 8.0
-                        coords[i, 0] = r * math.sin(phi) * math.cos(theta)
-                        coords[i, 1] = r * math.sin(phi) * math.sin(theta)
-                        coords[i, 2] = r * math.cos(phi)
+                # 若 coords 为全 0 或在任意轴严重扁平坍缩，自动进行真实 3D 拓扑形态防坍缩展开
+                ptp = np.ptp(coords, axis=0) if nc > 0 else np.zeros(3)
+                is_degenerate = (np.max(np.abs(coords)) < 1e-4) or (np.min(ptp) < 8.0) or (np.max(ptp) < 90.0 and nc > 64)
+                if is_degenerate:
+                    if oid == "quant_master_champion" or "cortical_array" in ckpt_path or nc == 1032:
+                        # 43 微柱皮层阵列 (43 品种 x 24 细胞) 真实罗马柱廊状宏观架构
+                        num_cols = 43
+                        col_len = 24
+                        for k in range(num_cols):
+                            theta = -math.pi * 0.82 + (k / max(1.0, num_cols - 1.0)) * (2.0 * math.pi * 0.82)
+                            rx, rz = 145.0, 95.0
+                            cx = rx * math.cos(theta)
+                            cz = rz * math.sin(theta)
+                            cy = math.sin(k * 0.35) * 12.0
+                            for j in range(col_len):
+                                idx = k * col_len + j
+                                if idx >= nc: break
+                                if j < 4:
+                                    dy = 34.0 + j * 5.0
+                                    dx = math.cos(j * math.pi * 0.5) * 6.5
+                                    dz = math.sin(j * math.pi * 0.5) * 6.5
+                                elif j < 20:
+                                    sub = j - 4
+                                    dy = 24.0 - sub * 3.2
+                                    ang = sub * 1.35
+                                    r = 4.5 + (sub % 3) * 2.2
+                                    dx = math.cos(ang) * r
+                                    dz = math.sin(ang) * r
+                                else:
+                                    sub = j - 20
+                                    dy = -34.0 - sub * 5.0
+                                    dx = math.cos(sub * math.pi * 0.5) * 6.0
+                                    dz = math.sin(sub * math.pi * 0.5) * 6.0
+                                coords[idx, 0] = cx + dx
+                                coords[idx, 1] = cy + dy
+                                coords[idx, 2] = cz + dz
+                    elif oid == "adas_track_champion" or nc == 1024:
+                        # 具身阿克曼 1024 细胞皮层：前庭感觉弧 + 双侧大脑半球脑回 + 尾极运动角
+                        for i in range(min(32, nc)):
+                            phi = -math.pi * 0.42 + (i / 31.0) * (math.pi * 0.84)
+                            r_horiz = 145.0 + (i % 4) * 4.0
+                            coords[i, 0] = -r_horiz * math.cos(phi * 0.5) - 10.0
+                            coords[i, 1] = r_horiz * math.sin(phi)
+                            coords[i, 2] = ((i % 8) - 3.5) * 10.0
+                        cortex_cells = min(768, max(0, nc - 32 - 224))
+                        for k in range(cortex_cells):
+                            i = 32 + k
+                            sign = 1.0 if (k % 2 == 0) else -1.0
+                            h = k // 2
+                            v = (h + 0.5) / max(1.0, cortex_cells / 2.0)
+                            u = v * 2.0 - 1.0
+                            theta = h * 2.399963229728653
+                            r_xy = math.sqrt(max(0.01, 1.0 - u * u))
+                            coords[i, 0] = u * 100.0
+                            coords[i, 1] = sign * (28.0 + r_xy * abs(math.sin(theta)) * 85.0)
+                            coords[i, 2] = math.cos(theta) * r_xy * 70.0 + math.sin(coords[i, 0] * 0.05) * 15.0
+                        motor_start = 32 + cortex_cells
+                        for m in range(max(0, nc - motor_start)):
+                            i = motor_start + m
+                            prog = m / max(1.0, float(nc - motor_start - 1))
+                            coords[i, 0] = 110.0 + prog * 45.0
+                            cone_r = 45.0 * (1.0 - prog * 0.65) + (m % 5) * 3.0
+                            ang = m * 2.399963229728653
+                            coords[i, 1] = cone_r * math.cos(ang)
+                            coords[i, 2] = cone_r * math.sin(ang)
+                    else:
+                        golden_ratio = (1 + math.sqrt(5)) / 2
+                        for i in range(nc):
+                            phi = math.acos(1 - 2 * (i + 0.5) / max(1, nc))
+                            theta = 2 * math.pi * i / golden_ratio
+                            r = 80.0 + (i % 7) * 8.0
+                            coords[i, 0] = r * math.sin(phi) * math.cos(theta)
+                            coords[i, 1] = r * math.sin(phi) * math.sin(theta)
+                            coords[i, 2] = r * math.cos(phi)
 
                 for i in range(nc):
                     cid = i

@@ -593,7 +593,7 @@ export function updateFromBackendState(data) {
     const solidCount = (views && views.cells) ? views.cells.length : 0;
     const ptCount = (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.position) ? lodPointsMesh.geometry.attributes.position.count : realCells;
     const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || macroCells || realCells;
-    const isLargeScale = (cellScale >= 1000) || (realCells > 256);
+    const isLargeScale = (realCells > 3000);
 
     if (!isLargeScale) {
       realCellsEl.textContent = `${solidCount}/${realCells} 实体全量 (100% 显微实化)`;
@@ -725,11 +725,10 @@ export function updateFromBackendState(data) {
     for (const v of views.cells) {
       const remote = byId.get(v.cell.id);
       if (remote) {
-        v.cell.x += (remote.x - v.cell.x) * 0.35;
-        v.cell.y += (remote.y - v.cell.y) * 0.35;
-        v.cell.z += (remote.z - v.cell.z) * 0.35;
         v.cell.out = remote.out;
         v.cell.state = remote.s;
+        if (remote.acts) v.cell.acts = remote.acts;
+        if (remote.gain !== undefined) v.cell.gain = remote.gain;
       }
     }
   }

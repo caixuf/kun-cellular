@@ -362,12 +362,36 @@ def train_natural_champion(generations=45, pop_size=20):
     coords_off = w_off + w_size
 
     coords = np.zeros((num_cells, 3), dtype=np.float32)
-    for i in range(num_cells):
-        theta = (i / num_cells) * math.tau * 8.0
-        r = 10.0 + (i % 32) * 0.5
-        coords[i, 0] = r * math.cos(theta)
-        coords[i, 1] = r * math.sin(theta)
-        coords[i, 2] = (i // 32) * 2.5
+    # 1. 感觉前庭区 (32 感受器细胞)：前向全景感知半环
+    for i in range(min(32, num_cells)):
+        phi = -math.pi * 0.42 + (i / 31.0) * (math.pi * 0.84)
+        r_horiz = 145.0 + (i % 4) * 4.0
+        coords[i, 0] = -r_horiz * math.cos(phi * 0.5) - 10.0
+        coords[i, 1] = r_horiz * math.sin(phi)
+        coords[i, 2] = ((i % 8) - 3.5) * 10.0
+    # 2. 联合关联皮层 (768 联络记忆神经元)：双侧大脑半球对称叶与自然脑回沟裂
+    cortex_cells = min(768, max(0, num_cells - 32 - 224))
+    for k in range(cortex_cells):
+        i = 32 + k
+        sign = 1.0 if (k % 2 == 0) else -1.0
+        h = k // 2
+        v = (h + 0.5) / max(1.0, cortex_cells / 2.0)
+        u = v * 2.0 - 1.0
+        theta = h * 2.399963229728653
+        r_xy = math.sqrt(max(0.01, 1.0 - u * u))
+        coords[i, 0] = u * 100.0
+        coords[i, 1] = sign * (28.0 + r_xy * abs(math.sin(theta)) * 85.0)
+        coords[i, 2] = math.cos(theta) * r_xy * 70.0 + math.sin(coords[i, 0] * 0.05) * 15.0
+    # 3. 运动效应器尾极 (224 动作效应元)：后方运动核与脊髓输出环
+    motor_start = 32 + cortex_cells
+    for m in range(max(0, num_cells - motor_start)):
+        i = motor_start + m
+        prog = m / max(1.0, float(num_cells - motor_start - 1))
+        coords[i, 0] = 110.0 + prog * 45.0
+        cone_r = 45.0 * (1.0 - prog * 0.65) + (m % 5) * 3.0
+        ang = m * 2.399963229728653
+        coords[i, 1] = cone_r * math.cos(ang)
+        coords[i, 2] = cone_r * math.sin(ang)
 
     meta = {
         "organism_id": "adas_track_champion",

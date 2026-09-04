@@ -362,13 +362,15 @@ export class CellView {
     this.outerMembraneMesh.material.opacity = 0.38 + Math.min(0.20, actIntensity * 0.15);
 
     // 1.2 内层膜同步呼吸 (保持在膜间质腔内侧)
-    const innerScale = memScale * 0.96;
-    this.innerMembraneMesh.scale.set(innerScale, innerScale, innerScale);
-    this.innerMembraneMesh.rotation.y -= 0.004;
-    this.innerMembraneMesh.material.opacity = 0.20 + Math.min(0.15, actIntensity * 0.12);
+    if (this.innerMembraneMesh && this.innerMembraneMesh.visible) {
+      const innerScale = memScale * 0.96;
+      this.innerMembraneMesh.scale.set(innerScale, innerScale, innerScale);
+      this.innerMembraneMesh.rotation.y -= 0.004;
+      this.innerMembraneMesh.material.opacity = 0.20 + Math.min(0.15, actIntensity * 0.12);
+    }
 
     // 1.3 跨膜通道孔开合脉动与离子发光
-    if (this.poresMesh && this.poresMesh.material) {
+    if (this.poresMesh && this.poresMesh.visible && this.poresMesh.material) {
       this.poresMesh.material.emissiveIntensity = 0.30 + Math.min(1.8, actIntensity * 1.2);
       const poreBreath = 1.0 + Math.sin(time * 3.2 + this.phase) * 0.04;
       this.poresMesh.scale.set(poreBreath, poreBreath, poreBreath);
@@ -402,10 +404,12 @@ export class CellView {
     }
 
     // 1.5 细胞微管骨架随动慢旋
-    this.cytoMesh.scale.set(memScale, memScale, memScale);
-    this.cytoMesh.rotation.y += 0.004;
-    this.cytoMesh.rotation.z += 0.002;
-    this.cytoMesh.material.opacity = 0.10 + actIntensity * 0.15;
+    if (this.cytoMesh && this.cytoMesh.visible) {
+      this.cytoMesh.scale.set(memScale, memScale, memScale);
+      this.cytoMesh.rotation.y += 0.004;
+      this.cytoMesh.rotation.z += 0.002;
+      this.cytoMesh.material.opacity = 0.10 + actIntensity * 0.15;
+    }
 
     // 2. 最外层氛围光晕
     const haloScale = (22 + breath * 4) * (1.0 + actIntensity * 0.20);
@@ -418,27 +422,33 @@ export class CellView {
     this.nucleus.material.emissiveIntensity = 0.45 + actIntensity * 0.65;
 
     // 3.5 16阶环形时滞数据轮盘旋转自旋
-    this.delayRing.rotation.z += (0.012 + actIntensity * 0.03) * warpMultiplier;
-    this.delayRing.rotation.x = Math.sin(time * 0.5 + this.phase) * 0.25;
-    this.delayRing.material.opacity = 0.25 + actIntensity * 0.35;
-    this.delayRing.material.size = 1.8 + actIntensity * 1.2;
+    if (this.delayRing && this.delayRing.visible) {
+      this.delayRing.rotation.z += (0.012 + actIntensity * 0.03) * warpMultiplier;
+      this.delayRing.rotation.x = Math.sin(time * 0.5 + this.phase) * 0.25;
+      this.delayRing.material.opacity = 0.25 + actIntensity * 0.35;
+      this.delayRing.material.size = 1.8 + actIntensity * 1.2;
+    }
 
     // 3.8 相空间极限环双纽吸引子实时翻滚
-    this.attrRibbon.rotation.x += 0.010 * warpMultiplier;
-    this.attrRibbon.rotation.y += 0.016 * warpMultiplier;
-    const ribScale = 1.0 + Math.sin(time * 3.0 + this.phase) * 0.12 + Math.min(0.3, Math.abs(c.state || 0) * 0.15);
-    this.attrRibbon.scale.set(ribScale, ribScale, ribScale);
-    this.attrRibbon.material.opacity = 0.22 + actIntensity * 0.45;
+    if (this.attrRibbon && this.attrRibbon.visible) {
+      this.attrRibbon.rotation.x += 0.010 * warpMultiplier;
+      this.attrRibbon.rotation.y += 0.016 * warpMultiplier;
+      const ribScale = 1.0 + Math.sin(time * 3.0 + this.phase) * 0.12 + Math.min(0.3, Math.abs(c.state || 0) * 0.15);
+      this.attrRibbon.scale.set(ribScale, ribScale, ribScale);
+      this.attrRibbon.material.opacity = 0.22 + actIntensity * 0.45;
+    }
 
     // 4. 线粒体能量颗粒公转
-    for (let k = 0; k < this.organelles.length; ++k) {
-      const o = this.organelles[k];
-      const ang = time * o.speed + this.phase + (k * Math.PI * 2) / 3;
-      const ox = Math.cos(ang) * o.orbitR;
-      const oy = Math.sin(ang) * o.orbitR * Math.cos(o.tilt);
-      const oz = Math.sin(ang) * o.orbitR * Math.sin(o.tilt);
-      o.mesh.position.set(ox, oy, oz);
-      o.mesh.material.emissiveIntensity = 0.45 + Math.sin(time * 3.0 + k) * 0.20 + actIntensity * 0.35;
+    if (this.organelles && this.organelles.length > 0 && this.organelles[0].mesh && this.organelles[0].mesh.visible) {
+      for (let k = 0; k < this.organelles.length; ++k) {
+        const o = this.organelles[k];
+        const ang = time * o.speed + this.phase + (k * Math.PI * 2) / 3;
+        const ox = Math.cos(ang) * o.orbitR;
+        const oy = Math.sin(ang) * o.orbitR * Math.cos(o.tilt);
+        const oz = Math.sin(ang) * o.orbitR * Math.sin(o.tilt);
+        o.mesh.position.set(ox, oy, oz);
+        o.mesh.material.emissiveIntensity = 0.45 + Math.sin(time * 3.0 + k) * 0.20 + actIntensity * 0.35;
+      }
     }
 
     // 5. 动作电位放电冲击波环扩散

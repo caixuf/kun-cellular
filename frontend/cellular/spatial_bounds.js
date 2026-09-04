@@ -83,6 +83,10 @@ export function updateOrganismBounds(arg1 = null, arg2 = null, cellViewsMap = nu
     c.x = (c._rawX - cx) * scale;
     c.y = (c._rawY - cy) * scale;
     c.z = (c._rawZ - cz) * scale;
+    // 若原生数据为纯 2D 扁平结构 (dz < 10)，赋予自然的三维生物微曲面深度，防止纸片化坍缩
+    if (dz < 10.0) {
+      c.z += Math.sin(c.id * 0.55) * 16.0;
+    }
     if (cellViewsMap) {
       const v = cellViewsMap.get(c.id);
       if (v) {
