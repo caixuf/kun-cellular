@@ -3,6 +3,7 @@
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/evolvable_task.hpp"
 #include <vector>
+#include <unordered_set>
 #include <cmath>
 #include <string>
 #include <sstream>
@@ -30,24 +31,28 @@ public:
         uint64_t id{0};
         float x{1.5f};
         float y{1.5f};
+        float prev_x{1.5f};
+        float prev_y{1.5f};
         float theta{0.0f}; // 朝向角度 (弧度)
         float vx{0.0f};
         float vy{0.0f};
         bool reached_goal{false};
         int steps{0};
+        int stuck_frames{0};
         float min_dist_to_goal{999.0f};
         int collision_count{0};
         std::vector<std::pair<float, float>> trail;
-        float ray_dists[3]{1.0f, 1.0f, 1.0f}; // 前, 左45°, 右45°
+        float ray_dists[3]{1.0f, 1.0f, 1.0f}; // 前, 左侧最近, 右侧最近
         float goal_bearing{0.0f};
     };
 
-    MazeEnvironment(int width = 21, int height = 21, uint32_t seed = 42)
-        : width_(width), height_(height), rng_(seed) {
-        generate_classic_maze();
+    MazeEnvironment(int width = 21, int height = 21, uint32_t seed = 42, float braid_prob = 0.15f)
+        : width_(width), height_(height), braid_prob_(braid_prob), rng_(seed) {
+        generate_classic_maze(braid_prob_);
     }
 
-    void generate_classic_maze() {
+    void generate_classic_maze(float braid_prob = 0.15f) {
+        braid_prob_ = braid_prob;
         grid_.assign(width_ * height_, 1); // 1 = 墙, 0 = 通道
         heatmap_.assign(width_ * height_, 0);
 
@@ -78,6 +83,29 @@ public:
             }
             if (!carved) {
                 stack.pop_back();
+            }
+        }
+
+        // Braiding: 随机消除部分死胡同墙壁，创造环路与欺骗性旁路 (Loops & Alternate Routes)
+        if (braid_prob_ > 0.0f) {
+            std::uniform_real_distribution<float> p_dist(0.0f, 1.0f);
+            for (int y = 1; y < height_ - 1; y += 2) {
+                for (int x = 1; x < width_ - 1; x += 2) {
+                    if (grid_[y * width_ + x] != 0) continue;
+                    // 统计四周墙壁数量，若为死胡同 (3面墙) 则按概率打通一面内墙
+                    int wall_count = 0;
+                    std::vector<std::pair<int, int>> wall_dirs;
+                    if (grid_[(y - 1) * width_ + x] == 1 && y - 2 > 0) { wall_count++; wall_dirs.push_back({0, -1}); }
+                    if (grid_[(y + 1) * width_ + x] == 1 && y + 2 < height_ - 1) { wall_count++; wall_dirs.push_back({0, 1}); }
+                    if (grid_[y * width_ + (x - 1)] == 1 && x - 2 > 0) { wall_count++; wall_dirs.push_back({-1, 0}); }
+                    if (grid_[y * width_ + (x + 1)] == 1 && x + 2 < width_ - 1) { wall_count++; wall_dirs.push_back({1, 0}); }
+
+                    if (wall_count >= 3 && !wall_dirs.empty() && p_dist(rng_) < braid_prob_) {
+                        std::shuffle(wall_dirs.begin(), wall_dirs.end(), rng_);
+                        auto [wx, wy] = wall_dirs.front();
+                        grid_[(y + wy) * width_ + (x + wx)] = 0; // 打通墙壁
+                    }
+                }
             }
         }
 
@@ -159,8 +187,17 @@ public:
 
     void update_sensors(Agent& agent) const {
         agent.ray_dists[0] = cast_ray(agent.x, agent.y, agent.theta);
-        agent.ray_dists[1] = cast_ray(agent.x, agent.y, agent.theta - 0.785398f); // -45°
-        agent.ray_dists[2] = cast_ray(agent.x, agent.y, agent.theta + 0.785398f); // +45°
+
+        // 侧向感知扇区 (覆盖 30°, 45°, 75°，消除转角盲区与贴墙视野缺失)
+        float l30 = cast_ray(agent.x, agent.y, agent.theta - 0.523599f);
+        float l45 = cast_ray(agent.x, agent.y, agent.theta - 0.785398f);
+        float l75 = cast_ray(agent.x, agent.y, agent.theta - 1.308997f);
+        agent.ray_dists[1] = std::min({l30, l45, l75});
+
+        float r30 = cast_ray(agent.x, agent.y, agent.theta + 0.523599f);
+        float r45 = cast_ray(agent.x, agent.y, agent.theta + 0.785398f);
+        float r75 = cast_ray(agent.x, agent.y, agent.theta + 1.308997f);
+        agent.ray_dists[2] = std::min({r30, r45, r75});
 
         float to_goal_x = goal_x_ - agent.x;
         float to_goal_y = goal_y_ - agent.y;
@@ -178,16 +215,35 @@ public:
         agent.steps++;
 
         // 动力学控制: positive_action 驱动前进, negative_action 驱动旋转角速度
-        // 护栏: 积分细胞可能溢出至 inf/NaN, 先截断到有限区间
-        float thrust = std::clamp(static_cast<float>(acts.positive_action), -5.0f, 5.0f) * 2.5f;
-        float turn_rate = std::clamp(static_cast<float>(acts.negative_action), -5.0f, 5.0f) * 3.0f;
+        // defensive_reset 驱动倒车, immune_lock 驱动应急脱困
+        float fwd_thrust = std::clamp(static_cast<float>(acts.positive_action), -3.0f, 5.0f);
+        float rev_thrust = std::clamp(static_cast<float>(acts.defensive_reset), 0.0f, 5.0f);
+        float thrust = (fwd_thrust - rev_thrust) * 2.5f;
+        float turn_rate = std::clamp(static_cast<float>(acts.negative_action), -5.0f, 5.0f) * 3.2f;
         if (!std::isfinite(thrust)) thrust = 0.0f;
         if (!std::isfinite(turn_rate)) turn_rate = 0.0f;
 
         if (acts.immune_lock) {
-            // 碰撞免疫自锁：触发倒车与原地旋转脱困
-            thrust = -1.0f;
-            turn_rate = 3.14f;
+            // 碰撞免疫自锁：触发倒车与向开阔侧旋转脱困
+            thrust = -1.8f;
+            turn_rate = (agent.ray_dists[1] >= agent.ray_dists[2]) ? 3.14f : -3.14f;
+        }
+
+        // 检测停滞并触发本能自解脱反射 (Tactile Anti-Jamming Reflex)
+        float disp = std::hypot(agent.x - agent.prev_x, agent.y - agent.prev_y);
+        agent.prev_x = agent.x;
+        agent.prev_y = agent.y;
+        if (disp < 0.02f) {
+            agent.stuck_frames++;
+        } else {
+            agent.stuck_frames = 0;
+        }
+
+        if (agent.stuck_frames >= 5) {
+            // 持续受困：实施反冲冲量与自旋摆脱死角
+            thrust = -2.2f;
+            float escape_dir = (agent.ray_dists[1] >= agent.ray_dists[2]) ? 1.0f : -1.0f;
+            turn_rate = escape_dir * 3.8f;
         }
 
         agent.theta += turn_rate * dt;
@@ -214,9 +270,21 @@ public:
             agent.y = next_y;
         } else {
             agent.collision_count++;
-            if (!is_wall(next_x, agent.y)) agent.x = next_x;
-            else if (!is_wall(agent.x, next_y)) agent.y = next_y;
-            else { agent.vx = 0.0f; agent.vy = 0.0f; }
+            if (!is_wall(next_x, agent.y)) {
+                agent.x = next_x;
+                agent.vy *= 0.5f;
+            } else if (!is_wall(agent.x, next_y)) {
+                agent.y = next_y;
+                agent.vx *= 0.5f;
+            } else {
+                agent.vx = 0.0f;
+                agent.vy = 0.0f;
+                // 陷入死角微小反弹力：轻轻弹离通道中心，防止贴死在网格顶点
+                float center_x = std::floor(agent.x) + 0.5f;
+                float center_y = std::floor(agent.y) + 0.5f;
+                agent.x += (center_x - agent.x) * 0.08f;
+                agent.y += (center_y - agent.y) * 0.08f;
+            }
         }
 
         // 记录热力图
@@ -226,9 +294,9 @@ public:
 
         // 记录历史轨迹
         if (agent.trail.empty() || 
-            (std::hypot(agent.x - agent.trail.back().first, agent.y - agent.trail.back().second) > 0.3f)) {
+            (std::hypot(agent.x - agent.trail.back().first, agent.y - agent.trail.back().second) > 0.25f)) {
             agent.trail.push_back({agent.x, agent.y});
-            if (agent.trail.size() > 150) agent.trail.erase(agent.trail.begin());
+            if (agent.trail.size() > 200) agent.trail.erase(agent.trail.begin());
         }
 
         float cur_dist = std::hypot(goal_x_ - agent.x, goal_y_ - agent.y);
@@ -255,6 +323,7 @@ public:
 private:
     int width_{21};
     int height_{21};
+    float braid_prob_{0.15f};
     float start_x_{1.5f};
     float start_y_{1.5f};
     float goal_x_{19.5f};
@@ -269,8 +338,8 @@ private:
  */
 class MazeTask : public EvolvableTask {
 public:
-    explicit MazeTask(int width = 11, int height = 11, uint32_t seed = 42, int max_steps = 160)
-        : width_(width), height_(height), max_steps_(max_steps), maze_(width, height, seed) {
+    explicit MazeTask(int width = 11, int height = 11, uint32_t seed = 42, int max_steps = 160, float braid_prob = 0.15f)
+        : width_(width), height_(height), max_steps_(max_steps), braid_prob_(braid_prob), maze_(width, height, seed, braid_prob) {
         reset(seed);
     }
 
@@ -279,15 +348,20 @@ public:
     size_t act_dim() const override { return 4; }
 
     void reset(uint32_t episode_seed) override {
-        maze_ = MazeEnvironment(width_, height_, episode_seed);
+        maze_ = MazeEnvironment(width_, height_, episode_seed, braid_prob_);
         agent_ = MazeEnvironment::Agent{};
         agent_.x = maze_.get_start_x();
         agent_.y = maze_.get_start_y();
+        agent_.prev_x = agent_.x;
+        agent_.prev_y = agent_.y;
         agent_.theta = 0.0f;
         agent_.min_dist_to_goal = std::hypot(maze_.get_goal_x() - agent_.x, maze_.get_goal_y() - agent_.y);
         maze_.update_sensors(agent_);
         step_count_ = 0;
         init_dist_ = agent_.min_dist_to_goal;
+        visited_tiles_.clear();
+        int init_tile = static_cast<int>(std::floor(agent_.y)) * width_ + static_cast<int>(std::floor(agent_.x));
+        visited_tiles_.insert(init_tile);
     }
 
     std::vector<float> current_observation() const override {
@@ -305,13 +379,15 @@ public:
             acts.positive_action = 1.0;  // 直行
             acts.negative_action = 0.0;
         } else if (action == 1) {
-            acts.positive_action = 0.5;
+            acts.positive_action = 0.6;
             acts.negative_action = 1.0;  // 左转
         } else if (action == 2) {
-            acts.positive_action = 0.5;
+            acts.positive_action = 0.6;
             acts.negative_action = -1.0; // 右转
         } else {
-            acts.immune_lock = true;     // 倒车/脱困
+            acts.positive_action = 0.0;
+            acts.defensive_reset = 1.0;  // 倒车/脱困
+            acts.immune_lock = true;
         }
         return step_continuous(acts);
     }
@@ -323,11 +399,18 @@ public:
         maze_.step_agent(agent_, acts, dt);
         float new_dist = std::hypot(maze_.get_goal_x() - agent_.x, maze_.get_goal_y() - agent_.y);
 
-        double step_reward = (prev_dist - new_dist) * 10.0; // 势能差奖励
-        if (agent_.reached_goal) {
-            step_reward += 300.0 + static_cast<double>(max_steps_ - step_count_) * 1.5;
+        double step_reward = (prev_dist - new_dist) * 12.0; // 势能差奖励
+
+        // 探索全新网格加成 (鼓励走出死胡同深入迷宫)
+        int tile = static_cast<int>(std::floor(agent_.y)) * width_ + static_cast<int>(std::floor(agent_.x));
+        if (visited_tiles_.insert(tile).second) {
+            step_reward += 6.0;
         }
-        step_reward -= static_cast<double>(agent_.collision_count) * 0.2;
+
+        if (agent_.reached_goal) {
+            step_reward += 300.0 + static_cast<double>(max_steps_ - step_count_) * 2.0;
+        }
+        step_reward -= static_cast<double>(agent_.collision_count) * 0.1;
 
         StepResult res;
         res.obs = current_observation();
@@ -342,11 +425,17 @@ public:
 
     double current_fitness() const override {
         float progress = (init_dist_ - agent_.min_dist_to_goal) / std::max(0.1f, init_dist_);
-        double fit = progress * 100.0;
+        float cur_dist = std::hypot(maze_.get_goal_x() - agent_.x, maze_.get_goal_y() - agent_.y);
+        float final_progress = (init_dist_ - cur_dist) / std::max(0.1f, init_dist_);
+
+        // 综合适应度: 探索广度 + 终点逼近 + 通关大奖 - 碰撞惩罚
+        double fit = progress * 60.0 + final_progress * 40.0;
+        fit += static_cast<double>(visited_tiles_.size()) * 4.0;
+
         if (agent_.reached_goal) {
-            fit += 300.0 + static_cast<double>(max_steps_ - step_count_) * 1.5;
+            fit += 300.0 + static_cast<double>(max_steps_ - step_count_) * 2.0;
         }
-        fit -= static_cast<double>(agent_.collision_count) * 0.5;
+        fit -= static_cast<double>(agent_.collision_count) * 0.2;
         return fit;
     }
 
@@ -360,7 +449,9 @@ private:
     int height_{11};
     int max_steps_{160};
     int step_count_{0};
+    float braid_prob_{0.15f};
     float init_dist_{10.0f};
+    std::unordered_set<int> visited_tiles_;
     MazeEnvironment maze_;
     MazeEnvironment::Agent agent_;
 };
@@ -370,8 +461,8 @@ private:
  */
 class MazeEvolutionEngine {
 public:
-    explicit MazeEvolutionEngine(size_t population_size = 24, int maze_size = 21, uint32_t seed = 42, SeedInitMode init_mode = SeedInitMode::HANDCRAFTED_PROGENITOR)
-        : pop_size_(population_size), maze_(maze_size, maze_size, seed), morph_engine_(population_size, seed, init_mode) {
+    explicit MazeEvolutionEngine(size_t population_size = 32, int maze_size = 21, uint32_t seed = 42, SeedInitMode init_mode = SeedInitMode::CONTRACT_PROGENITOR, float braid_prob = 0.15f)
+        : pop_size_(population_size), maze_(maze_size, maze_size, seed, braid_prob), morph_engine_(population_size, seed, init_mode) {
         reset_simulation();
     }
 
@@ -440,13 +531,18 @@ public:
             auto& org = pop[i];
 
             float progress = (init_dist - ag.min_dist_to_goal) / init_dist;
-            float fit = progress * 100.0f;
+            float cur_dist = std::hypot(maze_.get_goal_x() - ag.x, maze_.get_goal_y() - ag.y);
+            float final_progress = (init_dist - cur_dist) / init_dist;
+            float fit = progress * 60.0f + final_progress * 40.0f;
+
+            // 轨迹探索度加成
+            fit += static_cast<float>(ag.trail.size()) * 1.5f;
 
             if (ag.reached_goal) {
-                fit += 300.0f + (static_cast<float>(max_steps_per_gen_ - ag.steps) * 1.5f);
+                fit += 300.0f + (static_cast<float>(max_steps_per_gen_ - ag.steps) * 2.0f);
                 success_count++;
             }
-            fit -= static_cast<float>(ag.collision_count) * 0.5f;
+            fit -= static_cast<float>(ag.collision_count) * 0.2f;
 
             org.fitness_score = fit;
             if (fit > best_fit) {
@@ -533,7 +629,7 @@ public:
     float get_best_fitness() const { return best_fitness_; }
 
 private:
-    size_t pop_size_{24};
+    size_t pop_size_{32};
     int max_steps_per_gen_{160};
     int step_count_{0};
     int generation_{1};
