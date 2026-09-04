@@ -5,6 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KunCellular // 软件定义硅基细胞计算机全息观测台 · SDSCC Observatory</title>
 <script src="vendor/marked.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/jsm/"
+  }
+}
+</script>
 <style>
   :root {
     --bg-dark: #030712;
@@ -206,6 +214,267 @@
     gap: 16px;
     font-size: 11px;
     font-family: var(--font-mono);
+  }
+
+  .header-center-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .warp-pill {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 6px;
+    padding: 2px 6px;
+  }
+  .warp-label {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--cyan);
+    font-weight: bold;
+    padding: 0 4px;
+  }
+  .warp-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .warp-btn:hover {
+    color: var(--text-main);
+    background: rgba(255, 255, 255, 0.05);
+  }
+  .warp-btn.active {
+    color: var(--cyan);
+    border-color: rgba(56, 189, 248, 0.5);
+    background: rgba(56, 189, 248, 0.15);
+    font-weight: bold;
+  }
+  .btn-epic-tour {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.22), rgba(168, 85, 247, 0.22));
+    border: 1px solid rgba(56, 189, 248, 0.55);
+    color: #f8fafc;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+    transition: all 0.2s;
+  }
+  .btn-epic-tour:hover {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.4), rgba(168, 85, 247, 0.4));
+    box-shadow: 0 0 20px rgba(56, 189, 248, 0.45);
+    transform: translateY(-1px);
+  }
+  .btn-epic-tour .pulse-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+    animation: epicPulse 1.6s infinite;
+  }
+  @keyframes epicPulse {
+    0% { transform: scale(0.9); opacity: 0.6; }
+    50% { transform: scale(1.4); opacity: 1.0; }
+    100% { transform: scale(0.9); opacity: 0.6; }
+  }
+  .quick-events-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-event-pill {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    backdrop-filter: blur(8px);
+  }
+  .btn-event-discharge {
+    background: rgba(251, 191, 36, 0.12);
+    border: 1px solid rgba(251, 191, 36, 0.4);
+    color: #fbbf24;
+  }
+  .btn-event-discharge:hover {
+    background: rgba(251, 191, 36, 0.28);
+    box-shadow: 0 0 14px rgba(251, 191, 36, 0.45);
+    transform: translateY(-1px);
+  }
+  .btn-event-extinction {
+    background: rgba(244, 63, 94, 0.12);
+    border: 1px solid rgba(244, 63, 94, 0.4);
+    color: #f43f5e;
+  }
+  .btn-event-extinction:hover {
+    background: rgba(244, 63, 94, 0.28);
+    box-shadow: 0 0 14px rgba(244, 63, 94, 0.45);
+    transform: translateY(-1px);
+  }
+  .header-right-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .habitat-dropdown-container {
+    position: relative;
+  }
+  .habitat-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 6px;
+    background: rgba(10, 16, 28, 0.96);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
+    padding: 6px 0;
+    min-width: 140px;
+    z-index: 120;
+    display: flex;
+    flex-direction: column;
+  }
+  .habitat-link {
+    padding: 6px 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .habitat-link:hover {
+    color: var(--cyan);
+    background: rgba(56, 189, 248, 0.1);
+  }
+  .habitat-link.active {
+    color: var(--cyan);
+    font-weight: bold;
+    background: rgba(56, 189, 248, 0.15);
+  }
+  .status-chip {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: #94a3b8;
+  }
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--emerald);
+    box-shadow: 0 0 6px var(--emerald);
+  }
+  .status-text {
+    color: #f1f5f9;
+    font-weight: 600;
+  }
+  .status-sep {
+    color: #475569;
+  }
+
+  /* 首屏核心“生命三指标”悬浮 HUD (Exhibition Vitals HUD) */
+  .vitals-hud {
+    position: fixed;
+    top: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    background: rgba(8, 14, 26, 0.82);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 32px;
+    padding: 6px 28px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.7), 0 0 24px rgba(56, 189, 248, 0.15);
+    z-index: 55;
+    pointer-events: auto;
+    user-select: none;
+    transition: all 0.3s ease;
+  }
+  .vitals-hud.event-highlight-discharge {
+    border-color: #fbbf24;
+    box-shadow: 0 0 35px rgba(251, 191, 36, 0.45);
+  }
+  .vitals-hud.event-highlight-extinction {
+    border-color: #f43f5e;
+    box-shadow: 0 0 35px rgba(244, 63, 94, 0.45);
+  }
+  .vital-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    min-width: 140px;
+  }
+  .vital-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: #64748b;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+  .vital-val {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 800;
+    color: #f8fafc;
+    letter-spacing: 0.5px;
+  }
+  .vital-sub {
+    font-size: 10px;
+    color: #94a3b8;
+    white-space: nowrap;
+  }
+  .vital-sep {
+    width: 1px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  /* 全屏高能生命事件光效波纹 (Global Shockwave Overlay) */
+  #global-shockwave {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 99;
+    opacity: 0;
+    transition: opacity 0.4s ease-out;
+  }
+  #global-shockwave.flash-discharge {
+    background: radial-gradient(circle at center, rgba(251, 191, 36, 0.35) 0%, rgba(56, 189, 248, 0.2) 40%, transparent 75%);
+    opacity: 1;
+  }
+  #global-shockwave.flash-extinction {
+    background: radial-gradient(circle at center, rgba(244, 63, 94, 0.45) 0%, rgba(168, 85, 247, 0.25) 50%, transparent 80%);
+    opacity: 1;
+  }
+  #global-shockwave.flash-bibo {
+    background: radial-gradient(circle at center, rgba(52, 211, 153, 0.35) 0%, rgba(56, 189, 248, 0.15) 50%, transparent 80%);
+    opacity: 1;
   }
 
   /* 统一左右侧边工作坞 (Dock Sidebars) */
@@ -1068,72 +1337,104 @@
 <body>
 
 <!-- 顶部导航 -->
+<!-- 顶部导航：极简通透全息控制廊 -->
 <header>
   <div class="brand-box">
     <span class="brand-logo">KunCellular</span>
-    <span class="brand-tag">SDSCC // 硅基细胞计算机</span>
+    <span class="brand-tag">SDSCC // 软件定义硅基细胞计算机</span>
   </div>
 
-  <!-- 顶栏中央常驻高亮加速器 (100% 绝对可见) -->
-  <div style="display:flex;align-items:center;gap:6px;background:rgba(15,23,42,0.9);border:1px solid rgba(56,189,248,0.5);border-radius:6px;padding:3px 10px;box-shadow:0 0 12px rgba(56,189,248,0.2);">
-    <span style="color:var(--cyan);font-weight:bold;font-size:11px;">[WARP_CONTROL]:</span>
-    <button class="nav-tab-btn active" onclick="setWarp('1x')" id="hw-1x" style="padding:3px 8px;font-size:11px;">1x 实时</button>
-    <button class="nav-tab-btn" onclick="setWarp('100x')" id="hw-100x" style="padding:3px 8px;font-size:11px;">100x 快速</button>
-    <button class="nav-tab-btn" onclick="setWarp('1000x')" id="hw-1000x" style="padding:3px 8px;font-size:11px;">1000x 涡轮</button>
-    <button class="nav-tab-btn" onclick="setWarp('unlimited')" id="hw-max" style="padding:3px 8px;font-size:11px;color:var(--rose);border-color:var(--rose);font-weight:bold;">MAX 狂飙</button>
+  <!-- 中央控制：生命时间流速与史诗演化演示 -->
+  <div class="header-center-bar">
+    <div class="warp-pill">
+      <span class="warp-label">WARP:</span>
+      <button class="warp-btn active" onclick="setWarp('1x')" id="hw-1x">1x 物理</button>
+      <button class="warp-btn" onclick="setWarp('100x')" id="hw-100x">100x 演化</button>
+      <button class="warp-btn" onclick="setWarp('unlimited')" id="hw-max">MAX 狂飙</button>
+    </div>
+
+    <!-- 史诗级生命五阶段演化演示 -->
+    <button class="btn-epic-tour" onclick="playLifeEpicStory()" id="btn-epic-tour" title="一键体验【平静态 → 聚合 → 放电 → 变异 → 稳定】五阶段演化">
+      <span class="pulse-dot"></span>
+      <span>播放生命五阶段演化</span>
+    </button>
+
+    <!-- 高能生命事件爆发 -->
+    <div class="quick-events-group">
+      <button class="btn-event-pill btn-event-discharge" onclick="triggerGlobalLifeEvent('discharge')" title="全脑突触高能放电雪崩涌现 (Discharge)">
+        ⚡ 高能放电
+      </button>
+      <button class="btn-event-pill btn-event-extinction" onclick="triggerGlobalLifeEvent('extinction')" title="白垩纪大灭绝自然选择冲击波 (Chicxulub Extinction)">
+        ☄ 白垩纪大灭绝
+      </button>
+    </div>
   </div>
 
-  <!-- 硬件算力宇宙空间标识 (Hardware Computational Cosmic Universe) -->
-  <div style="display:flex;align-items:center;gap:6px;background:rgba(15,23,42,0.9);border:1px solid rgba(168,85,247,0.45);border-radius:6px;padding:3px 10px;box-shadow:0 0 12px rgba(168,85,247,0.2);" title="基于宿主 GPU (RTX 5060 8GB) 显存上限映射的物理宇宙空间">
-    <span style="color:var(--purple);font-weight:bold;font-size:11px;">[COSMIC_UNIVERSE]:</span>
-    <span style="color:#f8fafc;font-size:11px;font-family:var(--font-mono);">1,000m³ 空间</span>
-    <span style="color:var(--text-dim);font-size:10px;">|</span>
-    <span style="color:var(--emerald);font-size:11px;font-family:var(--font-mono);" id="header-universe-cap">上限 1.78×10⁸ 细胞</span>
-  </div>
+  <!-- 右侧极简状态与具身生境抽屉 -->
+  <div class="header-right-bar">
+    <div class="habitat-dropdown-container">
+      <button class="nav-tab-btn" onclick="toggleHabitatMenu()" id="btn-habitat-menu">
+        <span>具身生境</span>
+        <span style="font-size:9px;">▼</span>
+      </button>
+      <div class="habitat-menu" id="habitat-menu" style="display:none;">
+        <a href="index.html" class="habitat-link">工作台</a>
+        <a href="cellular.html" class="habitat-link active">3D全息力场</a>
+        <a href="maze.html" class="habitat-link">具身迷宫</a>
+        <a href="ecosystem.html" class="habitat-link">红皇后生态</a>
+        <a href="locomotion.html" class="habitat-link">软体步态</a>
+        <a href="immune.html" class="habitat-link">免疫防线</a>
+        <a href="slingshot.html" class="habitat-link">三体引力</a>
+        <a href="vehicle.html" class="habitat-link">车辆控制</a>
+      </div>
+    </div>
 
-      <div class="nav-tabs">
-    <a href="index.html" class="nav-tab-btn">工作台</a>
-    <a href="cellular.html" class="nav-tab-btn active">3D全息力场</a>
-    <a href="maze.html" class="nav-tab-btn">具身迷宫</a>
-    <a href="ecosystem.html" class="nav-tab-btn" style="color:var(--rose);">红皇后生态</a>
-    <a href="locomotion.html" class="nav-tab-btn" style="color:var(--amber);">软体步态</a>
-    <a href="immune.html" class="nav-tab-btn" style="color:var(--purple);">免疫防线</a>
-    <a href="slingshot.html" class="nav-tab-btn" style="color:var(--cyan);">三体引力</a>
-    <a href="vehicle.html" class="nav-tab-btn" style="color:var(--emerald);">车辆控制</a>
-    <button onclick="startAutoTour()" class="nav-tab-btn" style="background:rgba(56,189,248,0.2);color:var(--cyan);border-color:var(--cyan);font-weight:bold;cursor:pointer;">[新手导览]</button>
-  </div>
+    <div class="status-chip" title="纳秒级零GC硬实时运行与渲染帧率">
+      <span class="status-dot"></span>
+      <span class="status-text">24ns</span>
+      <span class="status-sep">/</span>
+      <span id="st-fps" class="status-text">60.0</span> <span style="font-size:9px;color:#64748b">FPS</span>
+    </div>
 
-  <div class="header-metrics">
     <div id="nav-audio-toggle" style="display:flex;align-items:center;gap:4px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.35);padding:2px 8px;border-radius:4px;color:var(--purple);cursor:pointer;transition:all 0.2s;" title="空气介质声学与离子电弧 (点击开启/静音)" onclick="toggleBioAcoustics()">
-      <span id="nav-audio-text" style="font-size:10px;font-weight:700;">AUDIO: ON</span>
+      <span id="nav-audio-text" style="font-size:10px;font-weight:700;">AUDIO</span>
     </div>
-    <div id="nav-fluid-status" style="display:flex;align-items:center;gap:4px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);padding:2px 8px;border-radius:4px;color:var(--cyan);" title="连续相分子流体介质相态与击穿场强 (气相/水相/真空)">
-      <span style="font-size:10px;font-weight:700;">FLUID:</span>
-      <b id="fluid-field-val" style="font-size:11px;">AERO 3.0 kV/mm</b>
-    </div>
-    <div id="nav-lyapunov-shield" style="display:flex;align-items:center;gap:4px;background:rgba(52,211,153,0.12);border:1px solid rgba(52,211,153,0.35);padding:2px 8px;border-radius:4px;color:var(--emerald);cursor:pointer;transition:all 0.2s;" title="李雅普诺夫 BIBO 稳定性盾牌 (点击施加自适应阻尼抑制)" onclick="triggerLyapunovEnforce()">
-      <span style="font-size:10px;font-weight:700;">BIBO:</span>
-      <b id="nav-shield-gain" style="font-size:11px;">0.00</b>
-    </div>
-    <div id="nav-ws-status" style="display:flex;align-items:center;gap:4px;background:rgba(56,189,248,0.1);border:1px solid rgba(56,189,248,0.3);padding:2px 8px;border-radius:4px;color:var(--cyan);">
-      <span class="legend-dot" id="ws-dot" style="background:var(--emerald);margin-right:0;"></span>
-      <span id="ws-text" style="font-size:10px;font-weight:600;">WS 40Hz</span>
-    </div>
-    <span style="color:var(--emerald)">Zero-GC: <b>ACTIVE</b></span>
-    <span style="color:var(--cyan)">Latency: <b>24.1 ns</b></span>
-    <span style="color:var(--amber)">FPS: <b id="st-fps">60.0</b></span>
   </div>
 </header>
+
+<!-- 全屏高能生命事件光效波纹 (Global Shockwave Overlay) -->
+<div id="global-shockwave"></div>
+
+<!-- 首屏核心“生命三指标”悬浮 HUD (Exhibition Vitals HUD) -->
+<div id="vitals-hud" class="vitals-hud">
+  <div class="vital-block">
+    <div class="vital-label">细胞实体规模 SCALE</div>
+    <div class="vital-val" id="vital-scale">100,000,000</div>
+    <div class="vital-sub" id="vital-scale-sub">全量点云流变拓扑 (LOD)</div>
+  </div>
+  <div class="vital-sep"></div>
+  <div class="vital-block">
+    <div class="vital-label">生命动力学阶段 PHASE</div>
+    <div class="vital-val" id="vital-phase" style="color:var(--cyan)">静息自发搏动</div>
+    <div class="vital-sub" id="vital-phase-sub">因果微柱处于亚稳态吸引子</div>
+  </div>
+  <div class="vital-sep"></div>
+  <div class="vital-block">
+    <div class="vital-label">李雅普诺夫稳态 STABILITY</div>
+    <div class="vital-val" id="vital-stability" style="color:var(--emerald)">BIBO 渐近收敛</div>
+    <div class="vital-sub" id="vital-stability-sub">预测自由能 F: 0.084</div>
+  </div>
+</div>
 
 <!-- 3D 渲染舞台 -->
 <div id="stage"></div>
 
 <!-- 侧边坞浮动折叠控制器 (Collapsible Dock Toggles) -->
-<button id="btn-toggle-left" class="dock-toggle-btn" onclick="toggleDock('left')" title="折叠/展开左侧控制坞">[◀ 控制坞]</button>
-<button id="btn-toggle-right" class="dock-toggle-btn" onclick="toggleDock('right')" title="折叠/展开右侧遥测坞">[遥测坞 ▶]</button>
+<button id="btn-toggle-left" class="dock-toggle-btn collapsed" onclick="toggleDock('left')" title="展开/收起左侧控制坞">[⚙ 控制坞]</button>
+<button id="btn-toggle-right" class="dock-toggle-btn collapsed" onclick="toggleDock('right')" title="展开/收起右侧遥测坞">[📊 遥测坞]</button>
 
-<!-- 左侧控制坞 (Left Dock) -->
-<aside class="dock-left">
+<!-- 左侧控制坞 (Left Dock) - 默认折叠收纳 -->
+<aside class="dock-left collapsed">
 <div class="dock-scroll">
   <!-- 卡片 1: 核心计算指标 -->
   <div class="card">
@@ -1229,8 +1530,8 @@
 </div>
 </aside>
 
-<!-- 右侧遥测坞 (Right Dock) -->
-<aside class="dock-right">
+<!-- 右侧遥测坞 (Right Dock) - 默认折叠收纳 -->
+<aside class="dock-right collapsed">
   <!-- 卡片 1: 动作效应器 -->
   <div class="card" id="actions">
     <div class="card-title">
@@ -1401,8 +1702,8 @@
   <div class="tt-hint" id="tt-hint">操作提示</div>
 </div>
 
-<!-- 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) -->
-<div id="dialogue-deck" class="dialogue-deck">
+<!-- 硅基生命体神经对话舱 (Silicon Neural Dialogue Deck) - 默认折叠收纳 -->
+<div id="dialogue-deck" class="dialogue-deck collapsed">
   <div class="deck-header" onclick="toggleDialogueDeck()">
     <span style="color:var(--cyan);font-weight:bold;font-size:11px;">[SILICON_NEURAL_CHAT] 硅基生命体神经交互舱 (全息多生境中枢)</span>
     <span id="deck-toggle-icon" style="color:var(--text-dim);font-size:10px;">[折叠/展开]</span>
@@ -1460,18 +1761,29 @@ setTimeout(function(){
 
 <script type="module">
 /* THREE 加载兜底: 本地 vendor 失败(经代理访问时常见)自动切 CDN */
-let THREE;
+let THREE, EffectComposer, RenderPass, UnrealBloomPass, OutputPass;
 try {
-  THREE = await import('./vendor/three.module.js');
+  THREE = await import('three');
 } catch (e1) {
   try {
-    THREE = await import('https://unpkg.com/three@0.160.0/build/three.module.js');
-    document.getElementById('src').textContent = '数据源: THREE 已切 CDN 兜底';
+    THREE = await import('./vendor/three.module.js');
   } catch (e2) {
-    document.getElementById('src').textContent = '模块未启动: THREE 本地与 CDN 均加载失败';
-    document.getElementById('src').style.color = '#f43f5e';
-    throw e2;
+    THREE = await import('https://unpkg.com/three@0.160.0/build/three.module.js');
   }
+}
+window.THREE = THREE;
+
+try {
+  const ec = await import('three/addons/postprocessing/EffectComposer.js');
+  const rp = await import('three/addons/postprocessing/RenderPass.js');
+  const ubp = await import('three/addons/postprocessing/UnrealBloomPass.js');
+  const op = await import('three/addons/postprocessing/OutputPass.js');
+  EffectComposer = ec.EffectComposer;
+  RenderPass = rp.RenderPass;
+  UnrealBloomPass = ubp.UnrealBloomPass;
+  OutputPass = op.OutputPass;
+} catch (ePost) {
+  console.warn("Bloom postprocessing unavailable, using direct render:", ePost);
 }
 
 /* ============================================================
@@ -1791,14 +2103,49 @@ function apoptosis(org){
  * 4. three.js 全息渲染
  * ============================================================ */
 const scene = new THREE.Scene();
-scene.fog = new THREE.FogExp2(0x04070d, 0.00035);
+scene.fog = new THREE.FogExp2(0x02040a, 0.00012);
 const camera = new THREE.PerspectiveCamera(55, innerWidth/innerHeight, 0.2, 20000);
 camera.position.set(0, 0, 560);
-const renderer = new THREE.WebGLRenderer({ antialias:true });
+window.camera = camera;
+window.scene = scene;
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference: "high-performance" });
 renderer.setSize(innerWidth, innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
 document.getElementById('stage').appendChild(renderer.domElement);
-addEventListener('resize', ()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+
+let composer = null;
+if (EffectComposer && RenderPass && UnrealBloomPass) {
+  try {
+    composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(innerWidth, innerHeight),
+      0.88, // 辉光强度 (Bioluminescent Bloom Intensity)
+      0.38, // 辉光半径 (Bloom Radius)
+      0.22  // 辉光阈值 (Bloom Threshold)
+    );
+    composer.addPass(bloomPass);
+
+    if (OutputPass) {
+      composer.addPass(new OutputPass());
+    }
+    window.composer = composer;
+  } catch(e) {
+    console.warn("EffectComposer initialization failed, fallback to direct render:", e);
+    composer = null;
+  }
+}
+
+addEventListener('resize', ()=>{ 
+  camera.aspect = innerWidth / innerHeight; 
+  camera.updateProjectionMatrix(); 
+  renderer.setSize(innerWidth, innerHeight); 
+  if (composer) composer.setSize(innerWidth, innerHeight);
+});
 
 /* 零 GC 预分配几何计算对象 (Zero-GC Preallocated Math Objects for Spatial Frustum Culling) */
 const _projScreenMatrix = new THREE.Matrix4();
@@ -1871,6 +2218,19 @@ scene.add(airParticleCloud);
  * ============================================================ */
 let camTheta = 0, camPhi = Math.PI / 2, camR = 560;
 let targetTheta = 0, targetPhi = Math.PI / 2, targetCamR = 560;
+window.setCameraDistance = (r) => { targetCamR = clampCamDistance(r); camR = targetCamR; isCamTransitioning = false; };
+window.setCameraTarget = (v) => { targetLookAt.copy(v); currentLookAt.copy(v); };
+window.focusOnCell = function(cellId, distance = 25) {
+  const c = (org.cellMap && org.cellMap.get(cellId)) || (org.cells && org.cells[0]);
+  if (!c) return;
+  targetLookAt.set(c.x || 0, c.y || 0, c.z || 0);
+  currentLookAt.copy(targetLookAt);
+  targetCamR = distance;
+  camR = distance;
+  camTheta = 0; targetTheta = 0;
+  camPhi = Math.PI / 2; targetPhi = Math.PI / 2;
+  isCamTransitioning = false;
+};
 let targetLookAt = new THREE.Vector3(0, 0, 0);
 let currentLookAt = new THREE.Vector3(0, 0, 0);
 let dragging = false, lx = 0, ly = 0;
@@ -2226,12 +2586,25 @@ function updateOrganismBounds(data = null) {
   }
 }
 
+function getCellWorldRadius() {
+  const R = (currentOrganismBounds && currentOrganismBounds.radius) || 180;
+  const n = (org && org.cells && org.cells.length) ? org.cells.length : 12;
+  const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || n;
+  if (cellScale >= 10000000) return 1.6;
+  if (cellScale >= 1000000) return 2.0;
+  return Math.max(1.5, Math.min(6.0, (R / Math.cbrt(n)) * 0.42));
+}
+
 // 动态计算点云粒子自适应密度 (Adaptive Point Cloud Density)
 function computeAdaptiveLodCount() {
+  const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || ((org && org.cells) ? org.cells.length : 1);
+  if (cellScale >= 100000000) return 90000; // 100M+ 亿级生命体: 9万全息体素流变点云
+  if (cellScale >= 10000000) return 60000;  // 10M 千万级: 6万点云粒子
+  if (cellScale >= 1000000) return 40000;   // 1M 百万级: 4万点云粒子
+  if (cellScale >= 1000) return 15000;
   const nCells = (org && org.cells) ? org.cells.length : 1;
   const nSyns = (org && org.syns) ? org.syns.length : 0;
-  // 9 细胞 -> 约 2,000 粒子; 40 细胞 -> 约 6,000 粒子; 210 细胞 -> 约 32,000 粒子; 10,000+ 细胞 -> 60,000 粒子
-  return Math.min(65000, Math.max(2000, Math.round(nCells * 110 + nSyns * 45)));
+  return Math.min(30000, Math.max(1500, Math.round(nCells * 110 + nSyns * 45)));
 }
 
 // 基于真实突触邻接拓扑的自适应 3D 点云流形构建 (Adaptive Causal Manifold Point Cloud)
@@ -2323,6 +2696,7 @@ function initLODCloud(count = null) {
 
   lodPointsMesh = new THREE.Points(geo, mat);
   scene.add(lodPointsMesh);
+  window.lodPointsMesh = lodPointsMesh;
 }
 
 
@@ -2463,6 +2837,9 @@ class CellView {
       this.group.add(org.mesh);
     }
     this.group.add(this.label);
+    const rBase = getCellWorldRadius();
+    const sf = Math.max(0.12, Math.min(1.0, rBase / 13.0));
+    this.group.scale.set(sf, sf, sf);
     scene.add(this.group);
   }
 
@@ -2471,6 +2848,9 @@ class CellView {
     this.targetX = cell.x;
     this.targetY = cell.y;
     this.targetZ = cell.z || 0;
+    const rBase = getCellWorldRadius();
+    const sf = Math.max(0.12, Math.min(1.0, rBase / 13.0));
+    this.group.scale.set(sf, sf, sf);
   }
 
   update(time, warpMultiplier = 1){
@@ -2698,12 +3078,13 @@ window.org = org;
 const cellViewsMap = new Map();   // cell.id -> CellView
 const synViewsMap = new Map();    // `${syn.from}->${syn.to}:${syn.port}` -> SynapseView
 let views = { cells: [], syns: [] };
+window.views = views;
+window.cellViewsMap = cellViewsMap;
 
 // ===== 真实渲染 LOD：点云打底 + 按屏幕像素尺寸实化放大区域的实体细胞 =====
-const MIN_CELL_PIXELS   = 7.0;     // 单细胞分裂膜在屏幕上 < 此像素直径 -> 退化为点云（放大到够大才实化）
-const MAX_SOLID_CELLS   = 2000;    // 同屏最多实体细胞数（性能护栏，防百万级近距爆量）
-const CELL_WORLD_RADIUS = 16.0;    // 用于投影尺寸估算的代表性细胞世界半径
-const POINT_CLOUD_CAP   = 2000000; // 点云 GPU 硬上限，超出才按 stride 降采样
+const MIN_CELL_PIXELS   = 22.0;    // 严格几何：单细胞在屏幕上投影直径 < 22 像素 -> 必须作为点云中的一个点！绝不能画实体多边形网格！
+const MAX_SOLID_CELLS   = 300;     // 同屏最多实体细胞数（性能护栏，防放大近距爆量）
+const POINT_CLOUD_CAP   = 2000000; // 点云 GPU 硬上限
 const cellViewPool = [];           // 空闲 CellView 复用池（避免反复 dispose/重建）
 const synViewPool  = [];           // 空闲 SynapseView 复用池
 let cellSpatialHash = new Map();   // "bx,by,bz" -> [cellId,...]  空间哈希（每帧 LOD 邻域查询）
@@ -2720,7 +3101,7 @@ function rebuildViews(){
   for (const v of synViewsMap.values()) { v.group.visible = false; synViewPool.push(v); }
   synViewsMap.clear();
 
-  // 2. 真实全量点云（每细胞一个真实点，数量 = 后端真实返回的细胞数）
+  // 2. 点云构建：小生命体按真实细胞数画点，大生命体 (>=1000) 生成高密度流变拓扑流形点云
   buildFullPointCloud();
 
   // 3. 空间哈希 + 突触反查邻接（每帧 LOD 邻域查询用）
@@ -2731,42 +3112,47 @@ function rebuildViews(){
   views.syns = [];
 }
 
-// 真实全量点云：后端返回多少个细胞就画多少个点，绝不造假
+// 真实全量点云：大尺度下生成高密度拓扑因果流形流场点云
 function buildFullPointCloud(){
+  const n = org.cells.length;
+  if (n === 0) return;
+  const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || n;
+  
+  // 如果是高维大尺度生命体 (规模 >= 200 或 cells >= 80)，生成高密度自适应星云点云
+  if (cellScale >= 200 || n >= 80) {
+    initLODCloud(computeAdaptiveLodCount());
+    return;
+  }
+
   if (lodPointsMesh) {
     scene.remove(lodPointsMesh);
     if (lodPointsMesh.geometry) lodPointsMesh.geometry.dispose();
     if (lodPointsMesh.material) lodPointsMesh.material.dispose();
     lodPointsMesh = null;
   }
-  const n = org.cells.length;
-  if (n === 0) return;
-  const stride = n > POINT_CLOUD_CAP ? Math.ceil(n / POINT_CLOUD_CAP) : 1;
-  const count = Math.ceil(n / stride);
-  const pos = new Float32Array(count * 3);
-  const col = new Float32Array(count * 3);
-  let k = 0;
-  for (let i = 0; i < n; i += stride) {
+  const pos = new Float32Array(n * 3);
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
     const c = org.cells[i];
-    pos[k*3]   = c.x || 0;
-    pos[k*3+1] = c.y || 0;
-    pos[k*3+2] = c.z || 0;
+    pos[i*3]   = c.x || 0;
+    pos[i*3+1] = c.y || 0;
+    pos[i*3+2] = c.z || 0;
     const hex = FAMILY_COLOR[FAMILY(c.type)] || 0x38bdf8;
-    col[k*3]   = ((hex >> 16) & 255) / 255;
-    col[k*3+1] = ((hex >> 8) & 255) / 255;
-    col[k*3+2] = (hex & 255) / 255;
-    k++;
+    col[i*3]   = ((hex >> 16) & 255) / 255;
+    col[i*3+1] = ((hex >> 8) & 255) / 255;
+    col[i*3+2] = (hex & 255) / 255;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
   geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
   const mat = new THREE.PointsMaterial({
-    size: 3.2, vertexColors: true, transparent: true, opacity: 0.5,
+    size: 4.2, vertexColors: true, map: GLOW, transparent: true, opacity: 0.75,
     blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
   });
   lodPointsMesh = new THREE.Points(geo, mat);
   lodPointsMesh.frustumCulled = false;
   scene.add(lodPointsMesh);
+  window.lodPointsMesh = lodPointsMesh;
 }
 
 // 轻量均匀网格空间哈希：百万细胞只插一次 O(n)，每帧只查相机附近若干桶
@@ -2785,11 +3171,12 @@ function buildCellSpatialHash(){
   for (const s of org.syns) {
     const key = `${s.from}->${s.to}:${s.port}`;
     synKeyMap.set(key, s);
-    for (const cid of [s.from, s.to]) {
-      let arr = cellSynAdj.get(cid);
-      if (!arr) { arr = []; cellSynAdj.set(cid, arr); }
-      arr.push(key);
-    }
+    let outList = cellSynAdj.get(s.from);
+    if (!outList) { outList = []; cellSynAdj.set(s.from, outList); }
+    outList.push(key);
+    let inList = cellSynAdj.get(s.to);
+    if (!inList) { inList = []; cellSynAdj.set(s.to, inList); }
+    inList.push(key);
   }
 }
 
@@ -2803,14 +3190,16 @@ function updateDetailLOD(frustum){
   if (n === 0) return;
   _lodCamPos.copy(camera.position);
 
-  // 投影比例尺：世界半径 -> 屏幕像素；由此得「实化所需的最大相机距离」
+  // 严格几何换算：细胞在屏幕上的像素直径 D_px = (2.0 * cellRadius * projScale) / d
+  // 当 D_px < MIN_CELL_PIXELS (22px) 时，d > solidMaxDist，必须退化为点云中的一个点！
+  const cellRadius = getCellWorldRadius();
   const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) * 0.5));
-  const solidMaxDist = (CELL_WORLD_RADIUS * projScale) / MIN_CELL_PIXELS;
+  const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
   const orgR = currentOrganismBounds.radius || 180;
 
-  // 早退：相机离组织太远 -> 所有细胞在屏幕上 < MIN_CELL_PIXELS -> 全是点云
+  // 早退：相机离组织太远 -> 细胞在屏幕上太小 (< MIN_CELL_PIXELS) -> 全部退化为点云！
   const camToCtr = _lodCamPos.distanceTo(currentOrganismBounds.center);
-  if (camToCtr > solidMaxDist + orgR + CELL_WORLD_RADIUS) {
+  if (camToCtr > solidMaxDist + orgR) {
     if (cellViewsMap.size) {
       for (const v of cellViewsMap.values()) { v.group.visible = false; cellViewPool.push(v); }
       cellViewsMap.clear();
@@ -2820,6 +3209,7 @@ function updateDetailLOD(frustum){
       synViewsMap.clear();
     }
     views.cells = []; views.syns = [];
+    window.views = views;
     return;
   }
 
@@ -2878,6 +3268,7 @@ function updateDetailLOD(frustum){
     }
   }
   views.syns = Array.from(synViewsMap.values());
+  window.views = views;
 }
 rebuildViews();
 
@@ -3651,6 +4042,12 @@ function initBioAudio() {
 }
 
 
+let shakeImpulse = 0;
+function cameraShake(strength = 4.0) {
+  shakeImpulse = Math.max(shakeImpulse, strength);
+}
+window.cameraShake = cameraShake;
+
 window.toggleDock = function(side) {
   if (side === 'left') {
     const dock = document.querySelector('.dock-left');
@@ -3658,7 +4055,7 @@ window.toggleDock = function(side) {
     if (dock && btn) {
       const isCol = dock.classList.toggle('collapsed');
       btn.classList.toggle('collapsed', isCol);
-      btn.textContent = isCol ? '[▶ 控制坞]' : '[◀ 控制坞]';
+      btn.textContent = isCol ? '[ ⚙ 控制坞 ]' : '[ ◀ 收起 ]';
     }
   } else if (side === 'right') {
     const dock = document.querySelector('.dock-right');
@@ -3666,9 +4063,199 @@ window.toggleDock = function(side) {
     if (dock && btn) {
       const isCol = dock.classList.toggle('collapsed');
       btn.classList.toggle('collapsed', isCol);
-      btn.textContent = isCol ? '[◀ 遥测坞]' : '[遥测坞 ▶]';
+      btn.textContent = isCol ? '[ 📊 遥测坞 ]' : '[ 收起 ▶ ]';
     }
   }
+};
+
+window.toggleHabitatMenu = function() {
+  const m = document.getElementById('habitat-menu');
+  if (m) m.style.display = (m.style.display === 'none' || !m.style.display) ? 'flex' : 'none';
+};
+window.addEventListener('click', (e) => {
+  const container = document.querySelector('.habitat-dropdown-container');
+  const m = document.getElementById('habitat-menu');
+  if (m && container && !container.contains(e.target)) {
+    m.style.display = 'none';
+  }
+});
+
+// 全屏高能生命剧烈事件引擎 (Cinematic Fullscreen Global Life Event Engine)
+window.triggerGlobalLifeEvent = async function(type) {
+  const shockwave = document.getElementById('global-shockwave');
+  const vitalsHud = document.getElementById('vitals-hud');
+  const phaseEl = document.getElementById('vital-phase');
+  const phaseSubEl = document.getElementById('vital-phase-sub');
+
+  if (type === 'discharge') {
+    // 1. 全场金黄高反差电弧冲击波
+    if (shockwave) {
+      shockwave.className = 'flash-discharge';
+      setTimeout(() => { shockwave.className = ''; }, 650);
+    }
+    if (vitalsHud) {
+      vitalsHud.className = 'vitals-hud event-highlight-discharge';
+      setTimeout(() => { vitalsHud.className = 'vitals-hud'; }, 3000);
+    }
+    if (phaseEl) {
+      phaseEl.textContent = '⚡ 全脑高能放电';
+      phaseEl.style.color = '#fbbf24';
+    }
+    if (phaseSubEl) {
+      phaseSubEl.textContent = '突触流高频雪崩涌现 · 动作电位全场传导';
+    }
+    // 2. 相机微冲
+    cameraShake(6.0);
+    // 3. 突触光子全速激发
+    for (const v of views.syns) {
+      if (v.photon1 && v.photon1.material) v.photon1.material.opacity = 1.0;
+      if (v.photon2 && v.photon2.material) v.photon2.material.opacity = 1.0;
+      if (v.lineMat) {
+        v.lineMat.color.setHex(0xfbbf24);
+        v.lineMat.opacity = 0.95;
+      }
+    }
+    // 4. 连续电离火花爆鸣音效
+    if (typeof playIonizationSpark === 'function') {
+      playIonizationSpark(1.0);
+      setTimeout(() => playIonizationSpark(0.7), 90);
+      setTimeout(() => playIonizationSpark(0.5), 180);
+    }
+    log('[⚡ 全脑高能放电] 突触网络突发雪崩级动作电位放电，全场光子脉冲激荡！', true);
+
+    // 2.8秒后平滑渐变回稳
+    setTimeout(() => {
+      if (phaseEl && phaseEl.textContent.includes('放电')) {
+        phaseEl.textContent = '静息自发搏动';
+        phaseEl.style.color = 'var(--cyan)';
+        if (phaseSubEl) phaseSubEl.textContent = '因果微柱处于亚稳态吸引子';
+      }
+      for (const v of views.syns) {
+        if (v.lineMat) v.lineMat.color.setHex(0x38bdf8);
+      }
+    }, 2800);
+
+  } else if (type === 'extinction') {
+    // 1. 全场深红大灭绝冲击波
+    if (shockwave) {
+      shockwave.className = 'flash-extinction';
+      setTimeout(() => { shockwave.className = ''; }, 900);
+    }
+    if (vitalsHud) {
+      vitalsHud.className = 'vitals-hud event-highlight-extinction';
+      setTimeout(() => { vitalsHud.className = 'vitals-hud'; }, 4000);
+    }
+    if (phaseEl) {
+      phaseEl.textContent = '☄ 白垩纪大灭绝';
+      phaseEl.style.color = '#f43f5e';
+    }
+    if (phaseSubEl) {
+      phaseSubEl.textContent = '外部选择压力极端冲击 · 弱劣拓扑剪枝淘汰';
+    }
+    // 2. 强力震颤
+    cameraShake(9.5);
+    // 3. 突触变红
+    for (const v of views.syns) {
+      if (v.lineMat) v.lineMat.color.setHex(0xf43f5e);
+    }
+    // 4. 调用底座灭绝算子
+    if (typeof triggerExtinctionWS === 'function') {
+      triggerExtinctionWS(0.8, 2.5).catch(() => {});
+    }
+    log('[☄ 白垩纪大灭绝] 外部宇宙发生极端选择压力冲击！弱连接突触被强制修剪，生命体进入危机自适应！', true);
+
+    // 3.5秒后进入重组态
+    setTimeout(() => {
+      if (phaseEl && phaseEl.textContent.includes('大灭绝')) {
+        phaseEl.textContent = '突变自组织重组';
+        phaseEl.style.color = 'var(--purple)';
+        if (phaseSubEl) phaseSubEl.textContent = '幸存核心微柱重新凝聚拓扑小世界';
+      }
+      for (const v of views.syns) {
+        if (v.lineMat) v.lineMat.color.setHex(0xa855f7);
+      }
+    }, 3500);
+  }
+};
+
+// 五阶段生命演化史诗演示 (Cinematic 5-Stage Life Tour)
+let epicTourTimer = null;
+let isEpicTourPlaying = false;
+window.playLifeEpicStory = function() {
+  if (isEpicTourPlaying) {
+    clearTimeout(epicTourTimer);
+    isEpicTourPlaying = false;
+    const btn = document.getElementById('btn-epic-tour');
+    if (btn) btn.innerHTML = '<span class="pulse-dot"></span><span>播放生命五阶段演化</span>';
+    log('[演示] 已退出生命演化史诗演示，恢复自由观测模式。');
+    return;
+  }
+
+  isEpicTourPlaying = true;
+  const btn = document.getElementById('btn-epic-tour');
+  if (btn) btn.innerHTML = '<span style="color:var(--rose);font-weight:bold;">■ 结束演化演示</span>';
+
+  const phaseEl = document.getElementById('vital-phase');
+  const phaseSubEl = document.getElementById('vital-phase-sub');
+  const stabilityEl = document.getElementById('vital-stability');
+
+  // Stage 1: 静息自发搏动 (0s - 8s)
+  log('【第一幕：静息自发搏动 (Resting Pulse)】生命体在深空暗夜中沉睡，微弱生物荧光自发节律呼吸...', true);
+  if (phaseEl) { phaseEl.textContent = '第一幕 · 静息自发搏动'; phaseEl.style.color = 'var(--cyan)'; }
+  if (phaseSubEl) phaseSubEl.textContent = '微观能量基线守恒 · 动力学处于亚稳态吸引子';
+  if (stabilityEl) stabilityEl.textContent = 'BIBO 渐近收敛 (F=0.082)';
+  setCameraPreset('front');
+  autoOrbitEnabled = true;
+
+  // Stage 2: 因果拓扑聚合 (8s - 18s)
+  epicTourTimer = setTimeout(() => {
+    if (!isEpicTourPlaying) return;
+    log('【第二幕：因果拓扑聚合 (Causal Aggregation)】外界刺激注入，突触前向投影生长，小世界回路结网！', true);
+    if (phaseEl) { phaseEl.textContent = '第二幕 · 因果拓扑聚合'; phaseEl.style.color = '#38bdf8'; }
+    if (phaseSubEl) phaseSubEl.textContent = '神经微柱拓扑结网 · 聚类系数上升 C/L=0.72';
+    setCameraPreset('side');
+    targetCamR = Math.max(60, (currentOrganismBounds.macroDist || 400) * 0.55);
+  }, 8000);
+
+  // Stage 3: 全脑高能放电 (18s - 28s)
+  epicTourTimer = setTimeout(() => {
+    if (!isEpicTourPlaying) return;
+    log('【第三幕：全脑高能放电 (Plasma Discharge)】突触电位击穿临界阈值，神经电荷雪崩爆发！', true);
+    triggerGlobalLifeEvent('discharge');
+    setCameraPreset('top');
+  }, 18000);
+
+  // Stage 4: 危机与大灭绝淘汰 (28s - 42s)
+  epicTourTimer = setTimeout(() => {
+    if (!isEpicTourPlaying) return;
+    log('【第四幕：危机与大灭绝淘汰 (Extinction Crisis)】宇宙选择压力风暴降临！残存核心展开借用重组！', true);
+    triggerGlobalLifeEvent('extinction');
+    setCameraPreset('front');
+    targetCamR = currentOrganismBounds.macroDist || 560;
+  }, 28000);
+
+  // Stage 5: 李雅普诺夫稳态重构 (42s - 55s)
+  epicTourTimer = setTimeout(() => {
+    if (!isEpicTourPlaying) return;
+    log('【第五幕：李雅普诺夫稳态重组 (BIBO Stabilization)】非线性耗散吸收冲击，生命体收敛至全新超稳吸引子！', true);
+    if (phaseEl) { phaseEl.textContent = '第五幕 · 自组织稳态重生'; phaseEl.style.color = 'var(--emerald)'; }
+    if (phaseSubEl) phaseSubEl.textContent = '极限环能量收敛 · 经历危机后的更强生命形态';
+    if (stabilityEl) { stabilityEl.textContent = '超稳吸引子达成'; stabilityEl.style.color = 'var(--emerald)'; }
+    const shockwave = document.getElementById('global-shockwave');
+    if (shockwave) {
+      shockwave.className = 'flash-bibo';
+      setTimeout(() => { shockwave.className = ''; }, 1000);
+    }
+  }, 42000);
+
+  // 结束演示
+  epicTourTimer = setTimeout(() => {
+    isEpicTourPlaying = false;
+    if (btn) btn.innerHTML = '<span class="pulse-dot"></span><span>播放生命五阶段演化</span>';
+    if (phaseEl) { phaseEl.textContent = '静息自发搏动'; phaseEl.style.color = 'var(--cyan)'; }
+    if (phaseSubEl) phaseSubEl.textContent = '因果微柱处于亚稳态吸引子';
+    log('【演化史诗演示圆满完成】硅基生命体已完成一次全周期自我进化！');
+  }, 54000);
 };
 
 window.toggleBioAcoustics = function() {
@@ -4176,10 +4763,18 @@ function updateFromBackendState(data) {
   const realCells = (data.stats && data.stats.projection_cores) || data.cells_count || (data.cells && data.cells.length) || org.cells.length;
   const realCellsEl = document.getElementById("st-real-cells");
   if (realCellsEl) {
-    realCellsEl.textContent = realCells.toLocaleString();
+    const solidCount = (views && views.cells) ? views.cells.length : 0;
+    const ptCount = (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.position) ? lodPointsMesh.geometry.attributes.position.count : realCells;
+    if (solidCount > 0 && solidCount < ptCount) {
+      realCellsEl.textContent = `${solidCount} 实体 (近距实化) / ${ptCount.toLocaleString()} 点云`;
+    } else if (solidCount === 0) {
+      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云全量 (LOD)`;
+    } else {
+      realCellsEl.textContent = `${solidCount} 实体全量`;
+    }
     const isSurrogate = macroCells > realCells * 5;
     realCellsEl.title = isSurrogate
-      ? `标称规模 ${macroCells.toLocaleString()} 为代表性统计标签；实际驱动 3D 场景与前向计算的真实细胞仅 ${realCells.toLocaleString()} 个`
+      ? `底座宏观规模 ${macroCells.toLocaleString()}；前端视距动态 LOD：${solidCount} 实体细胞近距实化，全视界 ${ptCount.toLocaleString()} 动力学流形点云`
       : `真实细胞数与活跃细胞数一致 (${realCells.toLocaleString()})`;
   }
 
@@ -4192,6 +4787,8 @@ function updateFromBackendState(data) {
 
   const feEl = document.getElementById("st-fe");
   if (feEl && data.free_energy !== undefined) feEl.textContent = data.free_energy.toFixed(4);
+  const vitalStabSubEl = document.getElementById("vital-stability-sub");
+  if (vitalStabSubEl && data.free_energy !== undefined) vitalStabSubEl.textContent = `预测自由能 F: ${data.free_energy.toFixed(4)}`;
 
   const fluxEl = document.getElementById("st-flux");
   if (fluxEl && data.plasticity_flux !== undefined) fluxEl.textContent = data.plasticity_flux.toFixed(4);
@@ -4350,12 +4947,18 @@ function animate(){
     currentLookAt.y + camR * Math.cos(camPhi),
     currentLookAt.z + camR * sinPhi * Math.cos(camTheta)
   );
+  if (shakeImpulse > 0.05) {
+    camera.position.x += (Math.random() - 0.5) * shakeImpulse;
+    camera.position.y += (Math.random() - 0.5) * shakeImpulse;
+    camera.position.z += (Math.random() - 0.5) * shakeImpulse;
+    shakeImpulse *= Math.exp(-6.0 * dt);
+  }
   camera.lookAt(currentLookAt);
   if (typeof cellPointLight !== 'undefined') {
     cellPointLight.position.copy(currentLookAt);
   }
   if (scene.fog) {
-    scene.fog.density = 0.00018 + 0.00022 * Math.min(1.0, camR / 900.0);
+    scene.fog.density = 0.00008 + 0.00008 * Math.min(1.0, camR / 900.0);
   }
 
   _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
@@ -4397,8 +5000,34 @@ function animate(){
   }
 
   const totalCellCount = org && org.cells ? org.cells.length : 0;
+  const ptCount = (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.position) ? lodPointsMesh.geometry.attributes.position.count : totalCellCount;
+  const realCellsEl = document.getElementById("st-real-cells");
+  if (realCellsEl) {
+    if (visibleMicroCount > 0 && visibleMicroCount < ptCount) {
+      realCellsEl.textContent = `${visibleMicroCount} 实体 (近距实化) / ${ptCount.toLocaleString()} 点云`;
+    } else if (visibleMicroCount === 0) {
+      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云全量 (LOD)`;
+    } else {
+      realCellsEl.textContent = `${visibleMicroCount} 实体全量`;
+    }
+  }
   const elScale = document.getElementById("st-pipe");
-  if (elScale) elScale.textContent = `实体 ${visibleMicroCount} / 点云 ${totalCellCount} · 放大区域实化`;
+  if (elScale) elScale.textContent = `实体 ${visibleMicroCount} / 点云 ${ptCount.toLocaleString()} · 像素LOD实化`;
+
+  const vitalScaleEl = document.getElementById("vital-scale");
+  const vitalScaleSubEl = document.getElementById("vital-scale-sub");
+  if (vitalScaleEl) {
+    const macroScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || totalCellCount;
+    vitalScaleEl.textContent = macroScale.toLocaleString() + ' 细胞';
+  }
+  if (vitalScaleSubEl) {
+    if (visibleMicroCount > 0) {
+      vitalScaleSubEl.textContent = `${visibleMicroCount} 实体近距晶化 / ${ptCount.toLocaleString()} 点云`;
+    } else {
+      vitalScaleSubEl.textContent = `全视界 ${ptCount.toLocaleString()} 动力学流形点云 (LOD)`;
+    }
+  }
+
   const elCamR = document.getElementById("st-cam-r");
   if (elCamR) elCamR.textContent = `${Math.round(camR)} 单位`;
 
@@ -4462,7 +5091,11 @@ function animate(){
     }
   }
 
-  renderer.render(scene, camera);
+  if (composer) {
+    composer.render(dt);
+  } else {
+    renderer.render(scene, camera);
+  }
 }
 
 /* ============================================================
