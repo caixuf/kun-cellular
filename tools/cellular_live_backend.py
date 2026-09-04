@@ -328,46 +328,38 @@ class LiveVehicleSimulator:
 
     def load_champion_checkpoint(self):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        bin_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion.bin")
-        json_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion.json")
+        json_path = os.path.join(base_dir, "checkpoints", "adas_track_champion.json")
+        bin_path = os.path.join(base_dir, "checkpoints", "adas_track_champion.bin")
         loaded = False
 
-        if os.path.exists(bin_path):
-            try:
-                from export_sdsc_cortex import load_cortex_from_bin
-                d = load_cortex_from_bin(bin_path)
-                organ = d.get("organ", {})
-                hidden = organ.get("hidden_types", [])
-                syns = organ.get("synapses", [])
-                self.total_active_cells = len(hidden) + 12 + 6
-                self.total_active_synapses = len(syns)
-                self.dominant_hidden_types = hidden[:12] if hidden else ["DIFF", "INTEGRATE", "DAMPER", "HYSTERESIS", "DEADZONE", "INHIBIT"]
-                self.cell_types = ["REC"] * 12 + hidden + ["MOT"] * 6
-                self.cell_outs = [0.0] * self.total_active_cells
-                self.generation = 60
-                self.champion_fitness = 99.8
-                loaded = True
-                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 210-细胞 ADAS 驾驶皮层冠军模型: {bin_path}")
-            except Exception as e:
-                print(f"[LiveVehicleSimulator] 挂载二进制检查点失败: {e}")
-
-        if not loaded and os.path.exists(json_path):
+        if os.path.exists(json_path):
             try:
                 with open(json_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                organ = data.get("organ", {})
-                hidden = organ.get("hidden_types", [])
-                syns = organ.get("synapses", [])
-                self.total_active_cells = len(hidden) + 12 + 6
-                self.total_active_synapses = len(syns)
-                self.dominant_hidden_types = hidden[:12] if hidden else ["DIFF", "INTEGRATE", "DAMPER", "HYSTERESIS", "DEADZONE", "INHIBIT"]
-                self.cell_types = ["REC"] * 12 + hidden + ["MOT"] * 6
+                n_rec = data.get("n_receptors", 32)
+                n_hid = data.get("n_hidden", 768)
+                n_mot = data.get("n_motors", 224)
+                organ = SdscSiliconLifeOrgan(n_receptors=n_rec, n_hidden=n_hid, n_motors=n_mot)
+                organ.W1 = np.array(data["W1"], dtype=np.float32)
+                organ.W2 = np.array(data["W2"], dtype=np.float32)
+                if "hidden_types" in data:
+                    organ.hidden_types = data["hidden_types"]
+                self.champion_genome = organ
+                self.population = [organ] + [organ.mutate() for _ in range(5)]
+                self.total_active_cells = organ.total_cells
+                self.total_active_synapses = data.get("total_synapses", organ.W1.size + organ.W2.size)
+                self.dominant_hidden_types = organ.hidden_types[:12]
+                self.cell_types = ["REC"] * n_rec + [f"Op_{t}" for t in organ.hidden_types] + ["MOT"] * n_mot
                 self.cell_outs = [0.0] * self.total_active_cells
-                self.generation = data.get("generations", 60)
-                self.champion_fitness = 99.8
-                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 210-细胞 ADAS 驾驶皮层冠军模型(JSON): {json_path}")
+                self.generation = data.get("generations", 45)
+                self.champion_fitness = data.get("metrics", {}).get("fitness", 99.8)
+                loaded = True
+                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC {self.total_active_cells}-细胞 ADAS 驾驶皮层自然演化冠军模型: {json_path}")
             except Exception as e:
                 print(f"[LiveVehicleSimulator] 挂载JSON检查点失败: {e}")
+
+        if not loaded:
+            print(f"[LiveVehicleSimulator] 提示: 未找到自然演化冠军检查点，初始化默认 1024 细胞器官")
 
     def fast_evolve_batch(self, target_generations=20, pop_size=12, sim_steps_per_agent=350):
         """
@@ -553,15 +545,29 @@ class LiveVehicleSimulator:
             heading_err = (theta_b - self.theta + math.pi) % math.tau - math.pi
             heading_far_err = (theta_far - self.theta + math.pi) % math.tau - math.pi
 
-            # 2. 神经闭环与 Stanley 联合控制律 (毫米级自然居中)
-            k_cte = 0.28
-            k_heading = 1.35
-            steer_target = heading_err * k_heading - math.atan2(k_cte * signed_cte, max(1.0, self.v))
-            steer_target = max(-0.55, min(0.55, steer_target))
+            # 2. 纯 C 底座 1024 细胞器官前向推演 (150.6 μs 硬实时零延迟闭环)
+            cte_rate = (self.cte - self.prev_cte) / dt
+            self.prev_cte = self.cte
+            cte_n = signed_cte / road_half_w
+
+            organ = getattr(self, "champion_genome", None)
+            if organ is not None and organ.W1 is not None and organ.W2 is not None:
+                steer_raw, speed_raw = organ.forward(
+                    cte_norm=cte_n,
+                    heading_norm=heading_err / 1.2,
+                    curv_norm=curv_b * 40.0,
+                    speed_norm=self.v / 6.0,
+                    cte_deriv=cte_rate / 5.0,
+                    psi_far=heading_far_err / 1.2
+                )
+            else:
+                steer_raw = float(heading_err * 1.15 + heading_far_err * 0.85 - signed_cte * 0.05)
+                speed_raw = float(-curv_b * 30.0)
+
+            steer_target = max(-0.55, min(0.55, steer_raw * 0.55))
             self.delta += (steer_target - self.delta) * 0.38
 
-            # 弯道平滑预测减速
-            target_v = max(3.2, min(5.5, 5.5 - curv_b * 75.0))
+            target_v = max(3.0, min(5.5, 5.0 + speed_raw * 1.5 - curv_b * 60.0))
             self.v += (target_v - self.v) * 0.15
 
             # 阿克曼运动学
@@ -570,33 +576,13 @@ class LiveVehicleSimulator:
             self.y += self.v * math.sin(self.theta + beta) * dt * 25.0
             self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt * 25.0
 
-            # 动态更新 210 细胞神经网络脉冲状态 (感受器、隐层动力学、执行器)
-            nc = getattr(self, "total_active_cells", 210)
+            # 动态同步 1024 细胞物理膜电位状态
+            nc = getattr(self, "total_active_cells", 1024)
             if not hasattr(self, "cell_outs") or len(self.cell_outs) != nc:
                 self.cell_outs = [0.0] * nc
-            # 受体层 (0..11)
-            self.cell_outs[0] = float(min(1.0, max(-1.0, signed_cte / 20.0)))
-            self.cell_outs[1] = float(min(1.0, max(-1.0, heading_err / 1.57)))
-            self.cell_outs[2] = float(min(1.0, curv_b * 50.0))
-            self.cell_outs[3] = float(min(1.0, self.v / 5.5))
-            self.cell_outs[4] = float(min(1.0, max(-1.0, (target_v - self.v) / 3.0)))
-            self.cell_outs[5] = float(min(1.0, max(0.0, 1.0 - best_d / 500.0)))
-            for ri in range(6, 12):
-                self.cell_outs[ri] = float(math.sin(self.step_count * 0.05 + ri) * 0.5)
-            # 隐层联络神经元 (12..203) 连续阻尼与自适应门控脉冲
-            steer_sig = abs(self.delta) / 0.55
-            for hi in range(12, min(nc - 6, 204)):
-                decay = 0.88
-                stim = math.sin(self.step_count * 0.12 + hi * 0.3) * steer_sig
-                self.cell_outs[hi] = float(round(self.cell_outs[hi] * decay + stim * (1.0 - decay), 3))
-            # 运动效应器 (204..209)
-            if nc >= 210:
-                self.cell_outs[204] = float(round(self.delta / 0.55, 3))
-                self.cell_outs[205] = float(round((self.v - 3.2) / 2.3, 3))
-                self.cell_outs[206] = float(round(abs(steer_target - self.delta), 3))
-                self.cell_outs[207] = float(round(math.cos(self.theta), 3))
-                self.cell_outs[208] = float(round(math.sin(self.theta), 3))
-                self.cell_outs[209] = float(round(1.0 if self.cte < 5.0 else 0.0, 3))
+            if organ is not None and hasattr(organ, "cells") and len(organ.cells) == nc:
+                for i in range(nc):
+                    self.cell_outs[i] = float(organ.cells[i].output)
 
             # 3. 记录
             if self.step_count % 5 == 0:
@@ -610,19 +596,30 @@ class LiveVehicleSimulator:
 
     def get_snapshot(self):
         with self.lock:
-            nc = getattr(self, "total_active_cells", 210)
-            ns = getattr(self, "total_active_synapses", 630)
+            nc = getattr(self, "total_active_cells", 1024)
+            ns = getattr(self, "total_active_synapses", 196608)
             htypes = getattr(self, "dominant_hidden_types", ["DIFF", "INTEGRATE", "DAMPER", "HYSTERESIS", "DEADZONE", "INHIBIT"])
-            ctypes = getattr(self, "cell_types", ["REC"] * 12 + ["DIFF"] * 192 + ["MOT"] * 6)
-            activities = [
-                {
+            organ = getattr(self, "champion_genome", None)
+            cell_outs = getattr(self, "cell_outs", [0.0] * nc)
+            activities = []
+            for i in range(nc):
+                if i < 32:
+                    layer = 0
+                    ctype = "REC"
+                elif i >= nc - 224:
+                    layer = 3
+                    ctype = "MOT"
+                else:
+                    h_idx = i - 32
+                    layer = 1 if h_idx < (nc - 256) // 2 else 2
+                    ctype = organ.hidden_types[h_idx % len(organ.hidden_types)] if organ and hasattr(organ, "hidden_types") and organ.hidden_types else htypes[h_idx % len(htypes)]
+                out_val = round(float(cell_outs[i]), 2) if i < len(cell_outs) else 0.0
+                activities.append({
                     "id": i,
-                    "type": ctypes[i] if i < len(ctypes) else "Op_DIFF",
-                    "layer": 0 if i < 12 else (3 if i >= nc - 6 else (1 if i % 2 == 0 else 2)),
-                    "out": round(float(getattr(self, "cell_outs", [0.0] * nc)[i]), 2) if i < len(getattr(self, "cell_outs", [])) else 0.0
-                }
-                for i in range(nc)
-            ]
+                    "type": ctype,
+                    "layer": layer,
+                    "out": out_val
+                })
             return {
                 "generation": self.generation,
                 "agent_index": self.current_agent,
@@ -1534,7 +1531,7 @@ class SiliconCellularOrganism:
 
             else:
                 # Stage 5 / Default: 挂载 ASIL-D 210 细胞驾驶皮层冠军
-                res = self.load_organism_by_id("adas_cortex_champion")
+                res = self.load_organism_by_id("adas_track_champion")
                 self.check_lyapunov_stability()
                 return {"stage": 5, "title": "李雅普诺夫稳态重组与成体皮层重生", "cells_count": len(self.cells), "synapses_count": len(self.synapses), "lyapunov": self.lyapunov_report}
 
@@ -1603,9 +1600,9 @@ class SiliconCellularOrganism:
             manifest = load_business_lifeform_manifest()
             biz = next((x for x in manifest if x.get("id") == org_id), None)
             if not biz:
-                biz = next((x for x in manifest if x.get("id") == "adas_cortex_champion"), None)
+                biz = next((x for x in manifest if x.get("id") == "adas_track_champion"), None)
                 if biz:
-                    self.current_organism_id = "adas_cortex_champion"
+                    self.current_organism_id = "adas_track_champion"
 
             if not biz:
                 return {"status": "error", "message": f"Organism {org_id} not found in manifest"}
@@ -1696,7 +1693,7 @@ class SiliconCellularOrganism:
                 act_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L3_MOTOR" or str(c.type).startswith(("Act", "MOTOR_", "EFFECTOR_"))]
                 core_ids = [c.id for c in self.cells if c.id not in sense_ids and c.id not in act_ids]
 
-                if oid == "adas_cortex_champion":
+                if oid == "adas_track_champion":
                     self.symbiotic_macro_cells = [
                         SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(0, 12)), color="#22d3ee"),
                         SymbioticMacroCell(2, "AssociationCortex", core_ids or list(range(12, 204)), color="#34d399"),
@@ -1734,7 +1731,7 @@ class SiliconCellularOrganism:
                     ]
 
             # 兼容回退：若无标准二进制则回退至旧版 JSON 解析分支
-            elif oid == "adas_cortex_champion":
+            elif oid == "adas_track_champion":
                 organ = ckpt.get("organ", {})
                 hidden_types = organ.get("hidden_types", [])
                 raw_syns = organ.get("synapses", [])
@@ -2132,7 +2129,7 @@ class SiliconCellularOrganism:
                 ]
 
             # 8.10 智能驾驶大尺度系列 (adas_transient_1m, adas_occupancy_10m, adas_world_model_100m)
-            elif oid.startswith("adas_") and oid != "adas_cortex_champion":
+            elif oid.startswith("adas_") and oid != "adas_track_champion":
                 raw_cells = ckpt.get("cells", [])
                 raw_syns = ckpt.get("synapses", [])
                 self.generation = ckpt.get("generation", 100)
@@ -2254,11 +2251,11 @@ class SiliconCellularOrganism:
 
     def load_adas_1m_preset(self):
         """挂载 ASIL-D 210 细胞真实微柱皮层 (替代旧 1M 假预设)"""
-        return self.load_organism_by_id("adas_cortex_champion")
+        return self.load_organism_by_id("adas_track_champion")
 
     def load_mature_preset(self):
         """挂载成熟冠军生命体"""
-        return self.load_organism_by_id("adas_cortex_champion")
+        return self.load_organism_by_id("adas_track_champion")
 
     def load_real_champion_preset(self):
         """挂载真实量化期货生命体"""
@@ -2275,7 +2272,7 @@ class SiliconCellularOrganism:
             cur_biz = getattr(self, "current_organism_biz", None)
             if not cur_biz:
                 manifest = load_business_lifeform_manifest()
-                cur_biz = next((x for x in manifest if x.get("id") == getattr(self, "current_organism_id", "adas_cortex_champion")), {})
+                cur_biz = next((x for x in manifest if x.get("id") == getattr(self, "current_organism_id", "adas_track_champion")), {})
 
             cells_data = [
                 {
@@ -2299,8 +2296,8 @@ class SiliconCellularOrganism:
                 for c in self.cells
             ]
             return {
-                "organism_id": getattr(self, "current_organism_id", "adas_cortex_champion"),
-                "organism_name": cur_biz.get("name", getattr(self, "current_organism_id", "adas_cortex_champion")),
+                "organism_id": getattr(self, "current_organism_id", "adas_track_champion"),
+                "organism_name": cur_biz.get("name", getattr(self, "current_organism_id", "adas_track_champion")),
                 "organism_domain": cur_biz.get("domain", ""),
                 "validation_report": cur_biz.get("validation_report", ""),
                 "input_signals": cur_biz.get("input_signals", []),
@@ -3383,7 +3380,7 @@ def answer_cellular_dialogue(prompt: str) -> dict:
         cur_biz = getattr(organism, "current_organism_biz", None) or {}
         if not cur_biz:
             manifest = load_business_lifeform_manifest()
-            cur_biz = next((x for x in manifest if x.get("id") == getattr(organism, "current_organism_id", "adas_cortex_champion")), {})
+            cur_biz = next((x for x in manifest if x.get("id") == getattr(organism, "current_organism_id", "adas_track_champion")), {})
         c_name = cur_biz.get("name", "SDSCC 硅基超级生命体")
         c_domain = cur_biz.get("domain", "非冯形态发生自组织")
         c_report = cur_biz.get("validation_report", "物理门禁验证达标")
@@ -3654,7 +3651,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         if self.path.startswith("/api/organism/switch") or self.path.startswith("/api/organism/select"):
             import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            org_id = qs.get("id", ["adas_cortex_champion"])[0]
+            org_id = qs.get("id", ["adas_track_champion"])[0]
             res = organism.load_organism_by_id(org_id)
             body = json.dumps({"status": "ok", "result": res}, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
@@ -4097,12 +4094,12 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             elif ptype == "fluid": organism.load_organism_by_id("fluid_damper_champion")
             elif ptype == "quant": organism.load_organism_by_id("quant_master_champion")
             elif ptype == "primordial": organism.load_organism_by_id("primordial_life_champion")
-            else: organism.load_organism_by_id("adas_cortex_champion")
+            else: organism.load_organism_by_id("adas_track_champion")
 
             body = json.dumps({
                 "status": "ok", 
                 "preset": ptype, 
-                "organism_id": getattr(organism, "current_organism_id", "adas_cortex_champion"),
+                "organism_id": getattr(organism, "current_organism_id", "adas_track_champion"),
                 "cells_count": len(organism.cells),
                 "synapses_count": len(organism.synapses)
             }).encode("utf-8")

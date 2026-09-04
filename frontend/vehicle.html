@@ -247,17 +247,17 @@
         </div>
 
         <div class="sidebar">
-            <!-- 1. SDSCC 210-细胞 ADAS 驾驶皮层拓扑器官 -->
+            <!-- 1. SDSCC 1024-细胞 ADAS 驾驶皮层自然演化生命体 -->
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[SDSCC_210_CELL_ADAS_CORTEX]</span>
-                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">GEN: 60 // L3 TUNED</span>
+                    <span>[SDSCC_1024_CELL_NATURAL_CHAMPION]</span>
+                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">GEN: 45 // 1000Hz HARD REAL-TIME</span>
                 </div>
                 
                 <div class="stat-grid">
                     <div class="stat-box">
                         <div class="stat-label">GENERATION / AGENT</div>
-                        <div class="stat-val emerald" id="stat-gen">Gen 60 #1</div>
+                        <div class="stat-val emerald" id="stat-gen">Gen 45 #1</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">CHAMPION_FITNESS</div>
@@ -265,11 +265,11 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">ACTIVE_CELLS</div>
-                        <div class="stat-val cyan" id="stat-cells">210 细胞</div>
+                        <div class="stat-val cyan" id="stat-cells">1,024 细胞</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">SYNAPSE_EDGES</div>
-                        <div class="stat-val emerald" id="stat-synapses">630 突触</div>
+                        <div class="stat-val emerald" id="stat-synapses">196,608 突触</div>
                     </div>
                 </div>
 
@@ -277,7 +277,7 @@
                 <div style="padding: 4px 12px 8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                         <span class="stat-label">ORGAN PULSE (微柱皮层点阵):</span>
-                        <span style="font-size:9px; color:var(--cyan-glow);">[12 REC | 192 INTER | 6 MOT]</span>
+                        <span style="font-size:9px; color:var(--cyan-glow);">[32 REC | 768 INTER | 224 MOT]</span>
                     </div>
                     <canvas id="cortex-canvas" width="340" height="96" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
                 </div>
@@ -473,14 +473,14 @@
                         "HYSTERESIS": "rgba(251,191,36,0.2); color:#fbbf24; border:1px solid #fbbf24",
                         "INHIBIT": "rgba(239,68,68,0.2); color:#ef4444; border:1px solid #ef4444"
                     };
-                    let html = `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">12 REC</span>`;
+                    let html = `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">32 REC</span>`;
                     html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
                     vehState.hidden_types.forEach(ptype => {
                         const style = colors[ptype] || "background:#1e293b; color:#94a3b8; border:1px solid #334155";
                         html += `<span style="background:${style}; padding:1px 5px; border-radius:3px; font-weight:700;">${ptype}</span>`;
                     });
                     html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">6 MOT</span>`;
+                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">224 MOT</span>`;
                     chainDiv.innerHTML = html;
                 }
 

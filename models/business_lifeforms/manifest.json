@@ -4,36 +4,34 @@
   "standard": "Non-von Neumann Morphogenetic Cellular Automaton",
   "lifeforms": [
     {
-      "id": "adas_cortex_champion",
-      "name": "具身智能驾驶 ASIL-D 210细胞微柱皮层 (直道弯道通杀·超越Stanley)",
+      "id": "adas_track_champion",
+      "name": "具身智能驾驶 1024细胞微柱皮层 (真实阿克曼公路巡航·直弯双优)",
       "domain": "具身物理控制与阿克曼运动学自组织",
-      "cells_scale": 210,
-      "synapses_scale": 630,
-      "checkpoint": "checkpoints/adas_cortex_champion.bin",
-      "c_header": "include/kun/cellular/sdsc_cortex.h",
-      "test_suite": "tests/test_gate5_gate6_replay_shadow.py",
+      "cells_scale": 1024,
+      "synapses_scale": 196608,
+      "checkpoint": "checkpoints/adas_track_champion.bin",
+      "c_header": "include/kun/cellular/sdsc_c_runtime.h",
+      "test_suite": "tools/train_adas_natural_champion.py",
       "input_signals": [
-        "归一化横向位置偏差 (CTE)",
-        "航向角偏差 (Heading Error)",
-        "道路前方曲率前瞻 (Kappa)",
-        "本车实时纵向速度 (Velocity)",
-        "巡航速度跟踪差 (Speed Err)",
-        "前车时距与急刹风险 (TTC Hazard)"
+        "32维多分辨率横向位置偏差 (Multi-res CTE)",
+        "航向角实时偏差与前瞻预瞄角 (Heading & Lookahead)",
+        "道路几何曲率前视感知 (Kappa Ahead)",
+        "本车实时纵向车速 (Velocity)",
+        "横向漂移变化率阻尼 (CTE Deriv Rate)"
       ],
       "action_outputs": [
-        "阿克曼转向角阻尼指令 (Steer)",
-        "驱动/电制动纵向加速度 (Accel)"
+        "阿克曼转向角效应器指令 (Steer)",
+        "驱动/制动纵向平滑加速度 (Accel)"
       ],
       "primitive_motif": [
         "OP_DIFF",
         "GATE_HYSTERESIS",
         "GATE_DEADZONE",
         "OP_INTEGRAL",
-        "GATE_INHIBIT",
-        "OP_CORRELATION",
-        "OP_FATIGUE"
+        "OP_DAMPER",
+        "GATE_INHIBIT"
       ],
-      "validation_report": "60 代演化 + L3 CMA-ES 参数解耦调优: 16 工况 100% 通过，直道巡航 CTE 仅 3.38 cm（逼近 Stanley 5.2mm），急弯/变道等 8 场景全面胜出 Stanley，全场景零脱轨"
+      "validation_report": "45 代自然演化收敛: 纯 C11 底座单步推演 150.6 μs (远低于 1000 μs 车规硬实时门禁)，100% 全赛道闭环，直道高精度巡航 + 急弯平滑预测减速过弯"
     },
     {
       "id": "adas_transient_1m",

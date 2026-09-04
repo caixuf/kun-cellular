@@ -51,7 +51,7 @@ export const LIFEFORM_SCALES = {
   adas_world_model_100m: 100000000,
   adas_occupancy_10m: 10000000,
   adas_transient_1m: 1000000,
-  adas_cortex_champion: 210,
+  adas_track_champion: 1024,
   quant_world_model_100m: 100000000,
   quant_cross_asset_10m: 10000000,
   quant_market_making_1m: 1000000,
