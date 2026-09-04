@@ -11,8 +11,8 @@ import { getCellWorldRadius } from './spatial_bounds.js';
 import { CellView } from './cell_view.js';
 import { SynapseView } from './synapse_view.js';
 
-export const MIN_CELL_PIXELS = 26.0;
-export const MAX_SOLID_CELLS = 220;
+export const MIN_CELL_PIXELS = 20.0;
+export const MAX_SOLID_CELLS = 3000;
 
 export const cellViewPool = [];
 export const synViewPool = [];
@@ -303,17 +303,14 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
 
   _lodCamPos.copy(cam.position);
 
-  const isCompact = n <= 220; // <= 220 个细胞全部全量实化渲染 (如 210 细胞 ADAS Cortex、Quant等)
-  const isLODMode = (renderMode === 'lod');
 
   const cellRadius = getCellWorldRadius(orgObj);
   const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5));
   const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
 
   // 1. 严格物理光学显微分辨门禁 (Physical Optical Microscope Gate)
-  // 当且仅当相机推进到微观视距、细胞在屏幕上的物理投影尺寸 >= MIN_CELL_PIXELS (26px) 时，
-  // 光学显微镜才允许实化质膜、骨架、核仁等微观三维细节！
-  // 宏观远景未放大时 (d > solidMaxDist)，细胞保持真实物理亚像素尺寸，由高密流形点云真实呈现，绝不虚假放大数百倍！
+  // 当相机推进到显微视距级别、细胞屏幕投影尺寸 >= MIN_CELL_PIXELS 时，
+  // 达到该放大级别的【每一个】细胞 100% 全部全量实化生物真实细节！严禁任何 cherry-picking 配额筛选！
   _lodCandidates.length = 0;
   const isPureMesh = (renderMode === 'puremesh');
 
@@ -321,7 +318,7 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
     _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
     const d = _lodCamPos.distanceTo(_lodCellPos);
 
-    // 核心物理真实门禁：未放大到显微级别 (d > solidMaxDist)，坚决不生成实体细胞！
+    // 未放大到该物理显微级别时，保持为真实亚像素点云；一旦放大到该级别，每一个都实化！
     if (!isPureMesh && d > solidMaxDist) continue;
 
     _lodSphere.center.copy(_lodCellPos);
@@ -331,9 +328,7 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
     _lodCandidates.push({ id: c.id, d });
   }
 
-  _lodCandidates.sort((a, b) => a.d - b.d);
-  if (_lodCandidates.length > MAX_SOLID_CELLS) _lodCandidates.length = MAX_SOLID_CELLS;
-
+  // 达到该放大级别的每一个细胞全量实化，绝不人为设限截断！
   const wantIds = new Set();
   for (const cd of _lodCandidates) wantIds.add(cd.id);
 
@@ -353,32 +348,27 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   }
   views.cells = Array.from(cellViewsMap.values());
 
-  // 2. 突触实化物理门禁：
-  // 只有当突触两端关联的细胞处于显微实化区，或者突触为宏观主干骨架时，才实化 3D 贝塞尔光缆；
-  // 其余远景突触完全由点云流形中的下垂悬链线自然呈现！
+  // 2. 突触全量实化：
+  // 凡是实化细胞之间的全部突触通道，100% 全量物理实化，绝不截断丢弃！
   const wantSyn = new Set();
-  const totalSynCount = orgObj.syns ? orgObj.syns.length : 0;
-  const maxSyns = Math.min(totalSynCount, 220);
-
   if (wantIds.size > 0) {
     for (const id of wantIds) {
       const adj = cellSynAdj.get(id);
       if (adj) {
         for (const key of adj) {
           wantSyn.add(key);
-          if (wantSyn.size >= 120) break;
         }
       }
-      if (wantSyn.size >= 120) break;
     }
   }
 
-  // 宏观骨干突触（若隐若现微光提示）
-  const majorLimit = (wantIds.size === 0) ? 36 : maxSyns;
-  const majorKeys = getMajorSynapseKeys(orgObj, bnds);
-  for (const key of majorKeys) {
-    wantSyn.add(key);
-    if (wantSyn.size >= majorLimit) break;
+  // 如果全场景处于宏观未放大远景，保留主干高速公路导轨提示信息流向
+  if (wantIds.size === 0) {
+    const majorKeys = getMajorSynapseKeys(orgObj, bnds);
+    for (const key of majorKeys) {
+      wantSyn.add(key);
+      if (wantSyn.size >= 48) break;
+    }
   }
 
   for (const [key, v] of synViewsMap) {

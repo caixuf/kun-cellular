@@ -7,6 +7,46 @@ import { FAMILY, FAMILY_COLOR } from './config.js';
 import { getGlowTexture, getLabelTexture } from './texture_cache.js';
 import { getCellWorldRadius } from './spatial_bounds.js';
 
+let _sharedGeos = null;
+function getSharedGeos() {
+  if (!_sharedGeos) {
+    const delayPoints = new Float32Array(16 * 3);
+    const delayRadius = 8.4;
+    for (let i = 0; i < 16; i++) {
+      const th = (i / 16) * Math.PI * 2;
+      delayPoints[i * 3]     = Math.cos(th) * delayRadius;
+      delayPoints[i * 3 + 1] = Math.sin(th) * delayRadius;
+      delayPoints[i * 3 + 2] = 0;
+    }
+    const delayGeo = new THREE.BufferGeometry();
+    delayGeo.setAttribute('position', new THREE.BufferAttribute(delayPoints, 3));
+
+    const ATTR_SEGS = 24;
+    const attrPoints = new Float32Array((ATTR_SEGS + 1) * 3);
+    for (let i = 0; i <= ATTR_SEGS; i++) {
+      const t = (i / ATTR_SEGS) * Math.PI * 2;
+      const a = 6.2;
+      const denom = 1.0 + Math.sin(t) * Math.sin(t);
+      attrPoints[i * 3]     = (a * Math.cos(t)) / denom;
+      attrPoints[i * 3 + 1] = (a * Math.sin(t) * Math.cos(t)) / denom;
+      attrPoints[i * 3 + 2] = Math.sin(t * 2.0) * 2.0;
+    }
+    const attrGeo = new THREE.BufferGeometry();
+    attrGeo.setAttribute('position', new THREE.BufferAttribute(attrPoints, 3));
+
+    _sharedGeos = {
+      membrane: new THREE.IcosahedronGeometry(13, 2),
+      cyto: new THREE.IcosahedronGeometry(12.5, 1),
+      nucleus: new THREE.SphereGeometry(5.8, 14, 14),
+      delay: delayGeo,
+      attr: attrGeo,
+      org: new THREE.SphereGeometry(1.6, 8, 8),
+      shock: new THREE.RingGeometry(9, 13, 24)
+    };
+  }
+  return _sharedGeos;
+}
+
 export class CellView {
   constructor(cell, scene, org) {
     this.cell = cell;
@@ -24,9 +64,9 @@ export class CellView {
     const fam = FAMILY(cell.type);
     const col = FAMILY_COLOR[fam] || 0x38bdf8;
     const glow = getGlowTexture();
+    const geos = getSharedGeos();
 
     // 1. 3D 半透明双脂质细胞质膜 (Lipid Bilayer Shell)
-    const membraneGeo = new THREE.IcosahedronGeometry(13, 3);
     const membraneMat = new THREE.MeshStandardMaterial({
       color: col,
       roughness: 0.35,
@@ -37,10 +77,9 @@ export class CellView {
       emissiveIntensity: 0.08,
       depthWrite: false
     });
-    this.membraneMesh = new THREE.Mesh(membraneGeo, membraneMat);
+    this.membraneMesh = new THREE.Mesh(geos.membrane, membraneMat);
 
     // 1.5 细胞微管蛋白骨架晶格 (Cytoskeleton Microtubule Lattice)
-    const cytoGeo = new THREE.IcosahedronGeometry(12.5, 2);
     const cytoMat = new THREE.MeshBasicMaterial({
       color: col,
       wireframe: true,
@@ -48,7 +87,7 @@ export class CellView {
       opacity: 0.14,
       depthWrite: false
     });
-    this.cytoMesh = new THREE.Mesh(cytoGeo, cytoMat);
+    this.cytoMesh = new THREE.Mesh(geos.cyto, cytoMat);
 
     // 2. 外层生物发光晕
     const haloMat = new THREE.SpriteMaterial({
@@ -63,7 +102,6 @@ export class CellView {
     this.membrane.scale.set(24, 24, 1);
 
     // 3. 细胞核中枢与致密核仁 (26类动力学原语内核)
-    const coreGeo = new THREE.SphereGeometry(5.8, 20, 20);
     const coreMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       emissive: col,
@@ -71,19 +109,9 @@ export class CellView {
       roughness: 0.2,
       metalness: 0.1
     });
-    this.nucleus = new THREE.Mesh(coreGeo, coreMat);
+    this.nucleus = new THREE.Mesh(geos.nucleus, coreMat);
 
     // 3.5 16阶环形时滞数据轮盘 (16-step Ring Delay Buffer Carousel)
-    const delayPoints = new Float32Array(16 * 3);
-    const delayRadius = 8.4;
-    for (let i = 0; i < 16; i++) {
-      const th = (i / 16) * Math.PI * 2;
-      delayPoints[i * 3]     = Math.cos(th) * delayRadius;
-      delayPoints[i * 3 + 1] = Math.sin(th) * delayRadius;
-      delayPoints[i * 3 + 2] = 0;
-    }
-    const delayGeo = new THREE.BufferGeometry();
-    delayGeo.setAttribute('position', new THREE.BufferAttribute(delayPoints, 3));
     const delayMat = new THREE.PointsMaterial({
       size: 2.0,
       map: glow,
@@ -93,21 +121,9 @@ export class CellView {
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
-    this.delayRing = new THREE.Points(delayGeo, delayMat);
+    this.delayRing = new THREE.Points(geos.delay, delayMat);
 
     // 3.8 动力学相空间极限环吸引子 (Phase-Space Limit Cycle Ribbon)
-    const ATTR_SEGS = 36;
-    const attrPoints = new Float32Array((ATTR_SEGS + 1) * 3);
-    for (let i = 0; i <= ATTR_SEGS; i++) {
-      const t = (i / ATTR_SEGS) * Math.PI * 2;
-      const a = 6.2;
-      const denom = 1.0 + Math.sin(t) * Math.sin(t);
-      attrPoints[i * 3]     = (a * Math.cos(t)) / denom;
-      attrPoints[i * 3 + 1] = (a * Math.sin(t) * Math.cos(t)) / denom;
-      attrPoints[i * 3 + 2] = Math.sin(t * 2.0) * 2.0;
-    }
-    const attrGeo = new THREE.BufferGeometry();
-    attrGeo.setAttribute('position', new THREE.BufferAttribute(attrPoints, 3));
     const attrMat = new THREE.LineBasicMaterial({
       color: col,
       transparent: true,
@@ -115,11 +131,10 @@ export class CellView {
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
-    this.attrRibbon = new THREE.Line(attrGeo, attrMat);
+    this.attrRibbon = new THREE.Line(geos.attr, attrMat);
 
     // 4. 围绕细胞核公转的 3 颗线粒体/能量细胞器
     this.organelles = [];
-    const orgGeo = new THREE.SphereGeometry(1.6, 12, 12);
     for (let k = 0; k < 3; ++k) {
       const orgMat = new THREE.MeshStandardMaterial({
         color: 0xffffff,
@@ -127,7 +142,7 @@ export class CellView {
         emissiveIntensity: 0.55,
         roughness: 0.2
       });
-      const orgMesh = new THREE.Mesh(orgGeo, orgMat);
+      const orgMesh = new THREE.Mesh(geos.org, orgMat);
       this.organelles.push({
         mesh: orgMesh,
         orbitR: 9.8 + k * 1.5,
@@ -137,7 +152,6 @@ export class CellView {
     }
 
     // 5. 动作电位电离冲击波圆环
-    const ringGeo = new THREE.RingGeometry(9, 13, 32);
     const ringMat = new THREE.MeshBasicMaterial({
       color: col,
       transparent: true,
@@ -146,7 +160,7 @@ export class CellView {
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
-    this.shockwaveRing = new THREE.Mesh(ringGeo, ringMat);
+    this.shockwaveRing = new THREE.Mesh(geos.shock, ringMat);
     this.shockwaveRing.rotation.x = Math.PI / 2;
 
     // 6. 生物原语全息浮动标签
@@ -278,21 +292,14 @@ export class CellView {
   dispose() {
     if (this.scene) this.scene.remove(this.group);
     if (this.labelMat) this.labelMat.dispose();
-    if (this.membraneMesh.geometry) this.membraneMesh.geometry.dispose();
-    if (this.membraneMesh.material) this.membraneMesh.material.dispose();
-    if (this.cytoMesh.geometry) this.cytoMesh.geometry.dispose();
-    if (this.cytoMesh.material) this.cytoMesh.material.dispose();
-    if (this.nucleus.geometry) this.nucleus.geometry.dispose();
-    if (this.nucleus.material) this.nucleus.material.dispose();
-    if (this.delayRing.geometry) this.delayRing.geometry.dispose();
-    if (this.delayRing.material) this.delayRing.material.dispose();
-    if (this.attrRibbon.geometry) this.attrRibbon.geometry.dispose();
-    if (this.attrRibbon.material) this.attrRibbon.material.dispose();
-    if (this.shockwaveRing.geometry) this.shockwaveRing.geometry.dispose();
-    if (this.shockwaveRing.material) this.shockwaveRing.material.dispose();
+    if (this.membraneMesh && this.membraneMesh.material) this.membraneMesh.material.dispose();
+    if (this.cytoMesh && this.cytoMesh.material) this.cytoMesh.material.dispose();
+    if (this.nucleus && this.nucleus.material) this.nucleus.material.dispose();
+    if (this.delayRing && this.delayRing.material) this.delayRing.material.dispose();
+    if (this.attrRibbon && this.attrRibbon.material) this.attrRibbon.material.dispose();
+    if (this.shockwaveRing && this.shockwaveRing.material) this.shockwaveRing.material.dispose();
     for (const o of this.organelles) {
-      if (o.mesh.geometry) o.mesh.geometry.dispose();
-      if (o.mesh.material) o.mesh.material.dispose();
+      if (o.mesh && o.mesh.material) o.mesh.material.dispose();
     }
   }
 }
