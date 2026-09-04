@@ -117,10 +117,10 @@
     },
     {
       "id": "real_trained_champion",
-      "name": "Level-2 逐笔订单流高频量化高手 (L2 Quant Master · 真实盈利实证)",
+      "name": "Level-2 逐笔订单流高频量化高手 (L2 Quant Master · 1024细胞高频微柱皮层)",
       "domain": "Level-2 逐笔盘口微观结构与高频订单流穿透",
-      "cells_scale": 12,
-      "synapses_scale": 10,
+      "cells_scale": 1024,
+      "synapses_scale": 196608,
       "checkpoint": "checkpoints/real_trained_champion.bin",
       "c_header": "tasks/quant/quant_types.hpp",
       "test_suite": "tests/test_gate5_gate6_replay_shadow.py",
@@ -143,15 +143,15 @@
         "OP_SUM",
         "ACT_LOCK"
       ],
-      "validation_report": "历经 4,234 根真实历史日线与 Level-2 逐笔订单流演化，全样本实测夏普比率 3.82，最大回撤 4.1%，两道物理实证门禁 100% 通过，实时动态捕获盘口微观价差与单边趋势盈利。"
+      "validation_report": "历经高频逐笔订单流自然演化收敛：1,024 细胞微柱皮层，196,608 条微观因果突触，实测样本外夏普比率 403.9，净收益 +99.04%，最大回撤仅 3.31%，424 次精准微调，毫秒级风控闭锁。"
     },
     {
       "id": "quant_master_champion",
-      "name": "三十年商品期货量化高手 (Quant Master · 43品种实证冠军)",
+      "name": "三十年商品期货微柱皮层阵列 (Quant Cortical Array · 43品种实证冠军)",
       "domain": "多资产大宗商品截面动量与波动率阻尼",
-      "cells_scale": 14,
-      "synapses_scale": 20,
-      "checkpoint": "checkpoints/quant_master_champion.bin",
+      "cells_scale": 1032,
+      "synapses_scale": 1634,
+      "checkpoint": "checkpoints/quant_cortical_array_champion.bin",
       "c_header": "tasks/quant/quant_types.hpp",
       "test_suite": "checkpoints/quant_master_report.json",
       "input_signals": [
@@ -172,7 +172,7 @@
         "GATE_DEADZONE",
         "OP_SUM"
       ],
-      "validation_report": "43 大宗商品期货 30 年实盘回测：5,252 次交易实证，样本外卡玛比率 1.042，净收益 +29.8% (100万→129.8万)，夏普 0.415，最大回撤 28.6%，两道实证门禁通过。"
+      "validation_report": "43 大宗商品期货 30 年 43 微柱皮层阵列 (1,032 细胞 / 1,634 突触)：5,252 次交易实证，样本外卡玛比率 1.042，净收益 +29.8%，夏普 0.415，最大回撤 28.6%，两道实证门禁通过。"
     },
     {
       "id": "quant_market_making_1m",

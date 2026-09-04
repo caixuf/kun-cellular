@@ -1713,9 +1713,9 @@ class SiliconCellularOrganism:
                     ]
                 elif oid in ("quant_master_champion", "quant_futures_champion", "real_trained_champion"):
                     self.symbiotic_macro_cells = [
-                        SymbioticMacroCell(1, "MomentumSensoryCore", sense_ids or [0, 1], color="#22d3ee"),
-                        SymbioticMacroCell(2, "HysteresisDecisionManifold", core_ids or list(range(2, 6)), color="#34d399"),
-                        SymbioticMacroCell(3, "ExecutionRiskLock", act_ids or [6, 7, 8], color="#f43f5e")
+                        SymbioticMacroCell(1, "MomentumSensoryCore", sense_ids or list(range(min(32, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "HysteresisDecisionManifold", core_ids or list(range(min(32, len(self.cells)), max(min(32, len(self.cells)), len(self.cells) - 64))), color="#34d399"),
+                        SymbioticMacroCell(3, "ExecutionRiskLock", act_ids or list(range(max(0, len(self.cells) - 64), len(self.cells))), color="#f43f5e")
                     ]
                 elif oid.startswith("quant_"):
                     self.symbiotic_macro_cells = [

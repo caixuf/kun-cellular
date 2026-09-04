@@ -11,7 +11,7 @@ export const currentOrganismBounds = {
   max: { x: 180, y: 180, z: 180, set(x, y, z) { this.x = x; this.y = y; this.z = z; } },
   macroDist: 540,
   microDist: 180,
-  cellScale: 12,
+  cellScale: 1024,
   volumeRatio: 0.000001,
   trueRadius: 14.0
 };
@@ -28,11 +28,8 @@ export function getOrganismCellScale(data = null, org = defaultOrg, currentSelec
   if (o && o.lastOrganismId && LIFEFORM_SCALES[o.lastOrganismId]) {
     return LIFEFORM_SCALES[o.lastOrganismId];
   }
-  if (currentOrganismBounds && currentOrganismBounds.cellScale > 0) {
-    return currentOrganismBounds.cellScale;
-  }
-  if (data && data.macro_cells && data.macro_cells > 100) return Number(data.macro_cells);
-  return (o && o.cells && o.cells.length > 0) ? o.cells.length : 12;
+  if (data && data.macro_cells && data.macro_cells > 0) return Number(data.macro_cells);
+  return (o && o.cells && o.cells.length > 0) ? o.cells.length : 1024;
 }
 
 export function updateOrganismBounds(arg1 = null, arg2 = null, cellViewsMap = null, currentSelectedOrgId = null) {

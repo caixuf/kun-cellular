@@ -55,8 +55,8 @@ export const LIFEFORM_SCALES = {
   quant_world_model_100m: 100000000,
   quant_cross_asset_10m: 10000000,
   quant_market_making_1m: 1000000,
-  quant_master_champion: 14,
-  real_trained_champion: 12
+  quant_master_champion: 1032,
+  real_trained_champion: 1024
 };
 
 export const TOOLTIP_DICT = {
@@ -64,7 +64,7 @@ export const TOOLTIP_DICT = {
   'st-cells': { title: '活跃神经细胞', desc: '当前大脑中承担感知、计算和决策的基本神经元总量。', hint: '点击右侧[有丝分裂]可诞生新细胞' },
   'st-real-cells': { title: '显微实体细胞', desc: '后端实际生成并驱动 3D 场景/前向计算的物理细胞实体数，与活跃细胞数同源同值。', hint: '放大视距时按像素密度自动实化为实体细节' },
   'st-universe-rad': { title: '宇宙占据半径', desc: '当前生命体在 1000m 算力宇宙中真实的物理分布半径。基于宿主硬件算力上限按立方根正比映射。', hint: '小生命体紧凑凝聚，亿级生命体漫布全宇宙' },
-  'st-universe-vol': { title: '算力宇宙体积占比', desc: '当前生命体规模占当前硬件显存与算力极限容量 (1.78×10⁸ 细胞) 的物理体积占比。', hint: '12细胞反射弧占比0.000007%，1亿细胞世界模型占比55.88%' },
+  'st-universe-vol': { title: '算力宇宙体积占比', desc: '当前生命体规模占当前硬件显存与算力极限容量 (1.78×10⁸ 细胞) 的物理体积占比。', hint: '1024细胞微柱皮层占比0.00057%，1亿细胞世界模型占比55.88%' },
   'st-free-energy': { title: '预测自由能', desc: '贝叶斯主动推断自由能，衡量生命体对外界环境的预测与适应精确度。自由能越低越适应。', hint: '数值越低代表对环境建模越精确' },
   'st-plasticity': { title: '突触动态塑性通量', desc: '脉冲时间依赖可塑性（STDP）通量，代表神经突触权重的动态自组织演化速率。', hint: '活跃学习期塑性通量高，成熟期收敛' },
   'st-small-world': { title: '小世界网络流形', desc: '高聚类系数与短路径长度的小世界网络特征，兼具局部高效模块化处理与全局快速信息整合。', hint: 'C/L 比值反映小世界特性' },
