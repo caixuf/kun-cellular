@@ -74,17 +74,18 @@ function getLabelTexture(typeStr) {
 }
 
 /* ============================================================
- * 单个生物拟真 3D 细胞计算结构
+ * 微观尺度回路高精度节点与光子 (用于 <=64 细胞的微回路精密剖析)
+ * 绝无任何巨型包裹球体，以科研级晶体核与柔和光晕呈现
  * ============================================================ */
-class LivingCellView {
-  constructor(cellData, trueScaleMultiplier, glowTex) {
+class MicroCellNodeView {
+  constructor(cellData, posX, posY, posZ, cellRadius, glowTex) {
     this.id = cellData.id;
     this.type = cellData.type || "Op_Core";
-    this.baseX = (cellData.x || 0) * trueScaleMultiplier;
-    this.baseY = (cellData.y || 0) * trueScaleMultiplier;
-    this.baseZ = (cellData.z || 0) * trueScaleMultiplier;
+    this.baseX = posX;
+    this.baseY = posY;
+    this.baseZ = posZ;
+    this.radius = cellRadius;
     this.phase = (this.id * 0.785) % (Math.PI * 2);
-    this.shockwaveRadius = 1.0;
 
     const col = getCellColorHex(this.type);
     this.colorHex = col;
@@ -92,249 +93,93 @@ class LivingCellView {
     this.group = new THREE.Group();
     this.group.position.set(this.baseX, this.baseY, this.baseZ);
 
-    // 1. 3D 半透明双脂质质膜 (Lipid Bilayer Shell)
-    const memGeo = new THREE.IcosahedronGeometry(7.5, 2);
-    this.membraneMat = new THREE.MeshStandardMaterial({
-      color: col,
-      roughness: 0.2,
-      metalness: 0.1,
-      transparent: true,
-      opacity: 0.72,
-      emissive: col,
-      emissiveIntensity: 0.45,
-      depthWrite: false
-    });
-    this.membraneMesh = new THREE.Mesh(memGeo, this.membraneMat);
-    this.group.add(this.membraneMesh);
-
-    // 2. 外层生物发光晕 (Halo Sprite)
+    // 1. 柔和生物发光晕 (Halo Sprite)
     const haloMat = new THREE.SpriteMaterial({
       map: glowTex,
       color: col,
       transparent: true,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      opacity: 0.6
+      opacity: 0.75
     });
     this.haloSprite = new THREE.Sprite(haloMat);
-    this.haloSprite.scale.set(32, 32, 1);
+    const haloScale = this.radius * 3.8;
+    this.haloSprite.scale.set(haloScale, haloScale, 1);
     this.group.add(this.haloSprite);
 
-    // 3. 高能细胞核中枢与致密核仁 (Karyon Core & Nucleolus)
-    const coreGeo = new THREE.SphereGeometry(3.6, 16, 16);
+    // 2. 晶体核仁 (Jewel Core)
+    const coreGeo = new THREE.SphereGeometry(this.radius, 12, 12);
     const coreMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       emissive: col,
       emissiveIntensity: 1.8,
       roughness: 0.1,
-      metalness: 0.3
+      metalness: 0.2
     });
     this.nucleus = new THREE.Mesh(coreGeo, coreMat);
     this.group.add(this.nucleus);
 
-    // 4. 围绕细胞核公转的 3 颗微观线粒体细胞器 (Orbiting Mitochondria)
-    this.organelles = [];
-    const orgGeo = new THREE.SphereGeometry(1.2, 8, 8);
-    for (let k = 0; k < 3; ++k) {
-      const orgMat = new THREE.MeshStandardMaterial({
-        color: 0xffffff,
-        emissive: col,
-        emissiveIntensity: 2.2,
-        roughness: 0.1
-      });
-      const orgMesh = new THREE.Mesh(orgGeo, orgMat);
-      this.group.add(orgMesh);
-      this.organelles.push({
-        mesh: orgMesh,
-        orbitR: 5.5 + k * 1.2,
-        speed: 2.5 + k * 0.9,
-        tilt: (k * Math.PI) / 3
-      });
-    }
-
-    // 5. 动作电位电离冲击波圆环 (Action Potential Ion Shockwave Ring)
-    const ringGeo = new THREE.RingGeometry(5, 8, 24);
-    this.ringMat = new THREE.MeshBasicMaterial({
-      color: col,
-      transparent: true,
-      opacity: 0.0,
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    this.shockwaveRing = new THREE.Mesh(ringGeo, this.ringMat);
-    this.shockwaveRing.rotation.x = Math.PI / 2;
-    this.group.add(this.shockwaveRing);
-
-    // 6. 全息浮动原语名牌 (Holographic Label Badge)
+    // 3. 全息标签 (微观时展示)
     const labelMat = new THREE.SpriteMaterial({
       map: getLabelTexture(this.type),
       transparent: true,
       depthWrite: false,
-      opacity: 0.88
+      opacity: 0.9
     });
     this.labelSprite = new THREE.Sprite(labelMat);
-    this.labelSprite.scale.set(24, 6, 1);
-    this.labelSprite.position.set(0, -11, 0);
+    this.labelSprite.scale.set(this.radius * 4.8, this.radius * 1.2, 1);
+    this.labelSprite.position.set(0, -this.radius * 1.6, 0);
     this.group.add(this.labelSprite);
   }
 
   update(time) {
-    // 自然生物呼吸律动
-    const breath = Math.sin(time * 2.5 + this.phase) * 0.15;
-    const memScale = 1.0 + breath;
-    this.membraneMesh.scale.set(memScale, memScale, memScale);
-
-    // 线粒体公转轨道
-    for (let k = 0; k < this.organelles.length; ++k) {
-      const org = this.organelles[k];
-      const ang = time * org.speed + (k * Math.PI * 2) / 3;
-      const ox = Math.cos(ang) * org.orbitR;
-      const oy = Math.sin(ang) * org.orbitR * Math.cos(org.tilt);
-      const oz = Math.sin(ang) * org.orbitR * Math.sin(org.tilt);
-      org.mesh.position.set(ox, oy, oz);
-    }
-
-    // 周期性动作电位放电扩散
-    this.shockwaveRadius += 0.05;
-    if (this.shockwaveRadius > 3.0) this.shockwaveRadius = 1.0;
-    const ringScale = this.shockwaveRadius;
-    this.shockwaveRing.scale.set(ringScale, ringScale, ringScale);
-    this.ringMat.opacity = Math.max(0.0, (3.0 - this.shockwaveRadius) * 0.35);
+    const breath = 1.0 + Math.sin(time * 3.0 + this.phase) * 0.12;
+    this.nucleus.scale.set(breath, breath, breath);
   }
 
   dispose() {
-    this.membraneMesh.geometry.dispose();
-    this.membraneMat.dispose();
     this.nucleus.geometry.dispose();
     this.nucleus.material.dispose();
-    this.shockwaveRing.geometry.dispose();
-    this.ringMat.dispose();
     this.haloSprite.material.dispose();
     this.labelSprite.material.dispose();
-    for (const org of this.organelles) {
-      org.mesh.geometry.dispose();
-      org.mesh.material.dispose();
-    }
   }
 }
 
-/* ============================================================
- * 突触光流纤维与流动光子 (Synapse Axon Fiber & Traveling Photons)
- * ============================================================ */
-class LivingSynapseView {
-  constructor(synData, fromCell, toCell, glowTex) {
+class MicroSynapsePhotonView {
+  constructor(synData, fromPos, toPos, glowTex) {
     this.syn = synData;
-    this.fromCell = fromCell;
-    this.toCell = toCell;
-    this.numSegments = 16;
+    this.fromPos = fromPos;
+    this.toPos = toPos;
 
     this.group = new THREE.Group();
 
-    // 1. 二次贝塞尔曲线几何体
-    this.curvePoints = new Float32Array((this.numSegments + 1) * 3);
-    this.geo = new THREE.BufferGeometry();
-    this.geo.setAttribute("position", new THREE.BufferAttribute(this.curvePoints, 3));
-
-    const w = this.syn.weight || this.syn.w || 1.0;
+    const w = this.syn.weight !== undefined ? this.syn.weight : (this.syn.w || 1.0);
     const colHex = w >= 0 ? 0x38bdf8 : 0xf43f5e;
 
-    this.lineMat = new THREE.LineBasicMaterial({
-      color: colHex,
-      transparent: true,
-      opacity: 0.65,
-      blending: THREE.AdditiveBlending,
-      linewidth: 1.5
-    });
-    this.line = new THREE.Line(this.geo, this.lineMat);
-    this.group.add(this.line);
-
-    // 2. 突触上奔涌的 2 颗能量光子
-    this.photonMat1 = new THREE.SpriteMaterial({
-      map: glowTex,
-      color: 0x38bdf8,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    this.photonMat2 = new THREE.SpriteMaterial({
-      map: glowTex,
-      color: 0xa855f7,
-      transparent: true,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
-    });
-    this.photon1 = new THREE.Sprite(this.photonMat1);
-    this.photon2 = new THREE.Sprite(this.photonMat2);
-    this.photon1.scale.set(8, 8, 1);
-    this.photon2.scale.set(6, 6, 1);
-    this.group.add(this.photon1);
-    this.group.add(this.photon2);
-
-    // 3. 突触终扣发光小球 (Synaptic Bouton)
-    this.boutonMat = new THREE.SpriteMaterial({
+    // 奔涌光子 (Action Potential Photon)
+    const pMat = new THREE.SpriteMaterial({
       map: glowTex,
       color: colHex,
       transparent: true,
+      opacity: 0.95,
       blending: THREE.AdditiveBlending,
       depthWrite: false
     });
-    this.bouton = new THREE.Sprite(this.boutonMat);
-    this.bouton.scale.set(10, 10, 1);
-    this.bouton.position.set(toCell.baseX, toCell.baseY, toCell.baseZ);
-    this.group.add(this.bouton);
+    this.photon = new THREE.Sprite(pMat);
+    const pScale = Math.max(0.25, fromPos.distanceTo(toPos) * 0.08);
+    this.photon.scale.set(pScale, pScale, 1);
+    this.group.add(this.photon);
 
-    // 计算二次贝塞尔控制点
-    const p0 = new THREE.Vector3(fromCell.baseX, fromCell.baseY, fromCell.baseZ);
-    const p2 = new THREE.Vector3(toCell.baseX, toCell.baseY, toCell.baseZ);
-    const chord = new THREE.Vector3().subVectors(p2, p0);
-    const dist = chord.length();
-    const arcHeight = Math.min(24.0, dist * 0.2);
-
-    const up = Math.abs(chord.y) < 0.95 * dist ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
-    const norm = new THREE.Vector3().crossVectors(chord, up).normalize();
-
-    this.p0 = p0;
-    this.p2 = p2;
-    this.p1 = new THREE.Vector3().addVectors(p0, p2).multiplyScalar(0.5).addScaledVector(norm, arcHeight);
-
-    // 采样贝塞尔点
-    const pos = this.geo.attributes.position;
-    for (let i = 0; i <= this.numSegments; i++) {
-      const t = i / this.numSegments;
-      const it = 1.0 - t;
-      const bx = it * it * this.p0.x + 2.0 * it * t * this.p1.x + t * t * this.p2.x;
-      const by = it * it * this.p0.y + 2.0 * it * t * this.p1.y + t * t * this.p2.y;
-      const bz = it * it * this.p0.z + 2.0 * it * t * this.p1.z + t * t * this.p2.z;
-      pos.setXYZ(i, bx, by, bz);
-    }
-    pos.needsUpdate = true;
-
-    this.flowT1 = Math.random();
-    this.flowT2 = (this.flowT1 + 0.5) % 1.0;
+    this.flowT = Math.random();
   }
 
   update(time) {
-    this.flowT1 = (this.flowT1 + 0.015) % 1.0;
-    this.flowT2 = (this.flowT2 + 0.015) % 1.0;
-
-    const evalBezier = (t, outVec) => {
-      const it = 1.0 - t;
-      outVec.x = it * it * this.p0.x + 2.0 * it * t * this.p1.x + t * t * this.p2.x;
-      outVec.y = it * it * this.p0.y + 2.0 * it * t * this.p1.y + t * t * this.p2.y;
-      outVec.z = it * it * this.p0.z + 2.0 * it * t * this.p1.z + t * t * this.p2.z;
-    };
-
-    evalBezier(this.flowT1, this.photon1.position);
-    evalBezier(this.flowT2, this.photon2.position);
+    this.flowT = (this.flowT + 0.02) % 1.0;
+    this.photon.position.lerpVectors(this.fromPos, this.toPos, this.flowT);
   }
 
   dispose() {
-    this.geo.dispose();
-    this.lineMat.dispose();
-    this.photonMat1.dispose();
-    this.photonMat2.dispose();
-    this.boutonMat.dispose();
+    this.photon.material.dispose();
   }
 }
 
@@ -359,8 +204,10 @@ export class CosmicView {
     this.starfield = null;         // 背景深空星系
     this.airParticles = null;      // 空气流动微粒场 (900颗热对流微粒)
     this.organismGroup = null;     // 活体细胞组织根节点
+    this.pointCloudMesh = null;    // 全量原生科研点云流形
+    this.synapseMesh = null;       // 全量全息突触光流纤维网络
 
-    // 活体微元图元列表
+    // 活体微元图元列表 (仅微观使用)
     this.livingCells = [];
     this.livingSynapses = [];
 
@@ -808,13 +655,14 @@ export class CosmicView {
   }
 
   /**
-   * 零拷贝构建震撼的活体 3D 细胞组织与突触光流
+   * 科研级真·点云流形与全息突触网络渲染
+   * 绝无任何丑陋的线框外壳或包裹球体，生命体自由悬浮在宇宙深空中
    */
   _renderOrganismGeometry(org) {
     const geo = org.geometry;
     if (!geo) return;
 
-    // 清理旧活体对象
+    // 清理旧活体微元
     for (const c of this.livingCells) c.dispose();
     for (const s of this.livingSynapses) s.dispose();
     this.livingCells = [];
@@ -827,67 +675,91 @@ export class CosmicView {
       if (obj.material) obj.material.dispose();
     }
 
-    // 原始细胞列表与突触列表
     const rawCells = org.rawCells || [];
     const rawSyns = org.rawSynapses || [];
+    const isMicroScale = org.nominalScale <= 64;
 
-    // 计算真实空间坐标乘数
-    const r = geo.trueRadius;
-    const trueMultiplier = Math.max(0.25, Math.min(2.5, r / 120.0));
+    // 1. 全量宏观点云流形 (Full Point Cloud Manifold - 严谨科研级原生点云)
+    const pcGeom = new THREE.BufferGeometry();
+    pcGeom.setAttribute("position", new THREE.BufferAttribute(geo.positions, 3));
+    pcGeom.setAttribute("color", new THREE.BufferAttribute(geo.colors, 3));
 
-    // 1. 逐个实例化高精活体 3D 细胞
-    const cellMap = new Map();
-    for (let i = 0; i < rawCells.length; i++) {
-      const cData = rawCells[i];
-      const livingCell = new LivingCellView(cData, trueMultiplier, this.glowTexture);
-      this.livingCells.push(livingCell);
-      this.organismGroup.add(livingCell.group);
-      cellMap.set(cData.id !== undefined ? cData.id : i, livingCell);
+    // 视觉尺寸自适应：大尺度形成细腻星云，微观尺度形成璀璨星团
+    const pcSize = org.nominalScale > 10000000 ? 3.2 : (org.nominalScale > 100000 ? 4.6 : (isMicroScale ? 8.5 : 6.0));
+    const pcMat = new THREE.PointsMaterial({
+      size: pcSize,
+      map: this.glowTexture,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.88,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+    this.pointCloudMesh = new THREE.Points(pcGeom, pcMat);
+    this.organismGroup.add(this.pointCloudMesh);
+
+    // 2. 全量突触全息光流纤维网络 (Synaptic Connectome Filament Web)
+    if (geo.synPositions && geo.synPositions.length > 0) {
+      const synGeom = new THREE.BufferGeometry();
+      synGeom.setAttribute("position", new THREE.BufferAttribute(geo.synPositions, 3));
+      if (geo.synColors && geo.synColors.length > 0) {
+        synGeom.setAttribute("color", new THREE.BufferAttribute(geo.synColors, 3));
+      }
+      const synMat = new THREE.LineBasicMaterial({
+        vertexColors: Boolean(geo.synColors && geo.synColors.length > 0),
+        color: geo.synColors ? 0xffffff : 0x38bdf8,
+        transparent: true,
+        opacity: org.nominalScale > 10000000 ? 0.35 : 0.65,
+        blending: THREE.AdditiveBlending,
+        linewidth: 1.2
+      });
+      this.synapseMesh = new THREE.LineSegments(synGeom, synMat);
+      this.organismGroup.add(this.synapseMesh);
     }
 
-    // 2. 逐个实例化高精二次贝塞尔突触与奔涌光子
-    const maxSyns = Math.min(rawSyns.length, 300);
-    for (let s = 0; s < maxSyns; s++) {
-      const syn = rawSyns[s];
-      const from = cellMap.get(syn.from);
-      const to = cellMap.get(syn.to);
-      if (from && to && syn.active !== false) {
-        const livingSyn = new LivingSynapseView(syn, from, to, this.glowTexture);
-        this.livingSynapses.push(livingSyn);
-        this.organismGroup.add(livingSyn.group);
+    // 3. 微观回路高精度拟真与光子 (仅在微回路模式开启，绝不破坏宏观纯粹性)
+    if (isMicroScale) {
+      const cellRadius = Math.max(0.18, geo.trueRadius * 0.07);
+      const posMap = new Map();
+
+      for (let i = 0; i < rawCells.length; i++) {
+        const cData = rawCells[i];
+        const cid = cData.id !== undefined ? cData.id : i;
+        const px = geo.positions[i * 3];
+        const py = geo.positions[i * 3 + 1];
+        const pz = geo.positions[i * 3 + 2];
+        const posVec = new THREE.Vector3(px, py, pz);
+        posMap.set(cid, posVec);
+
+        const node = new MicroCellNodeView(cData, px, py, pz, cellRadius, this.glowTexture);
+        this.livingCells.push(node);
+        this.organismGroup.add(node.group);
+      }
+
+      for (let s = 0; s < rawSyns.length && this.livingSynapses.length < 80; s++) {
+        const syn = rawSyns[s];
+        const fromPos = posMap.get(syn.from);
+        const toPos = posMap.get(syn.to);
+        if (fromPos && toPos && syn.active !== false) {
+          const photonView = new MicroSynapsePhotonView(syn, fromPos, toPos, this.glowTexture);
+          this.livingSynapses.push(photonView);
+          this.organismGroup.add(photonView.group);
+        }
       }
     }
 
-    // 3. 构造宇宙空间物理引力包络光环 (Aura)
-    const auraGeom = new THREE.SphereGeometry(r * 1.1, 24, 16);
-    const auraMat = new THREE.MeshBasicMaterial({
-      color: 0x38bdf8,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.18
-    });
-    this.organismGroup.add(new THREE.Mesh(auraGeom, auraMat));
-
-    // 4. 微观生命体高亮准星信标 (微尘雷达)
-    if (r < 25.0) {
-      const reticle = new THREE.Mesh(
-        new THREE.RingGeometry(r * 2.2, r * 2.5, 32),
-        new THREE.MeshBasicMaterial({ color: 0xfbbf24, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
-      );
-      reticle.rotation.x = Math.PI / 2;
-      this.organismGroup.add(reticle);
-    }
-
+    // 确保宇宙场景可见，无任何外包球体，真正呈现硅基神经网络的数学与物理之美
     this.organismGroup.visible = (this.activeScenario === "cosmic");
-    console.log(`[CosmicView] Rendered Living Tissue: ${this.livingCells.length} cells, ${this.livingSynapses.length} synapses at R=${r.toFixed(1)}m`);
+    console.log(`[CosmicView] Organism Loaded: ${geo.numCells} cells (scale: ${org.nominalScale}), trueRadius=${geo.trueRadius.toFixed(1)}m. Pure point cloud & neural filaments rendered.`);
   }
 
   _adjustCameraToOrganism(org) {
     if (!org || !org.geometry) return;
     const r = org.geometry.trueRadius;
 
-    // 自适应最佳观赏视角：微尘拉近到 25m，大生命体拉远到 2.2倍半径
-    const viewDist = Math.max(30.0, r * 2.2);
+    // 自适应最佳观赏视角：微尘拉近至 16m，大生命体拉远至 2.2倍半径
+    const viewDist = Math.max(16.0, r * 2.2);
     this.targetCameraPos.set(0, viewDist * 0.45, viewDist * 1.05);
     this.targetControlsTarget.set(0, 0, 0);
   }
@@ -1004,15 +876,19 @@ export class CosmicView {
       this.airParticles.geometry.attributes.position.needsUpdate = true;
     }
 
-    // 1. 活体生命体微观运动 (细胞呼吸、核仁线粒体公转、突触光子疾驰)
+    // 1. 活体生命体与点云呼吸自转 (微观节点脉冲、光子流动与宏观点云呼吸)
     if (this.organismGroup && this.organismGroup.visible && this.model.status.isPlaying) {
+      if (this.pointCloudMesh && this.pointCloudMesh.material) {
+        const pulse = 0.85 + 0.15 * Math.sin(this.animClock * 2.0);
+        this.pointCloudMesh.material.opacity = 0.88 * pulse;
+      }
       for (let i = 0; i < this.livingCells.length; i++) {
         this.livingCells[i].update(this.animClock);
       }
       for (let i = 0; i < this.livingSynapses.length; i++) {
         this.livingSynapses[i].update(this.animClock);
       }
-      this.organismGroup.rotation.y += 0.001;
+      this.organismGroup.rotation.y += 0.0008;
     }
 
     // 2. 4D 全息世界模型流变动画
