@@ -312,40 +312,35 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5));
   const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
 
-  // 尺度判定：真实细胞节点数 <= MAX_SOLID_CELLS (3000) 均为离散微柱生命体 (1024-ADAS、1024-量化、1032-皮层阵列等)
-  // 必须 100% 全量实体物理实化，绝不截断或丢弃任何细胞！
-  const cellScale = (bnds && bnds.cellScale) || n;
-  const isDiscrete = (n <= MAX_SOLID_CELLS);
-  const isLargeScale = !isDiscrete;
+  // 尺度与宏微观判定：
+  // cellScale >= 100,000 为超大规模世界模型/流场 (1M, 10M, 100M+ 细胞)
+  // 其余为离散微柱生命体 (1024 细胞 ADAS 冠军、1024 细胞量化冠军、1032 阵列等)
+  const cellScale = (bnds && bnds.cellScale) || ((orgObj && orgObj.cellScale) ? orgObj.cellScale : n);
+  const isLargeScale = (cellScale >= 100000) || (n > 3000);
 
   _lodCandidates.length = 0;
 
-  if (isDiscrete) {
-    // 1. 离散硅基微观皮层柱 (1024 细胞微柱皮层、1032 细胞阵列、210 细胞 ASIL-D 皮层等)
-    // 100% 全部细胞全量物理实化，绝不因视距裁剪只渲染十几个细胞！
-    for (const c of orgObj.cells) {
-      _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
-      const d = _lodCamPos.distanceTo(_lodCellPos);
-      _lodCandidates.push({ id: c.id, d });
-    }
-  } else {
-    // 2. 超大规模生命体 (1M, 10M, 100M+ 细胞全息世界模型与体素流场)
-    // 宏观远景下，以 GPU 高性能密集点云流形 (Point Cloud) 主导呈现！
-    // 只有相机推进到微观视距内 (d <= solidMaxDist) 且位于视锥内的局部细胞才实化为细节网格
-    for (const c of orgObj.cells) {
-      _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
-      const d = _lodCamPos.distanceTo(_lodCellPos);
+  for (const c of orgObj.cells) {
+    _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
+    const d = _lodCamPos.distanceTo(_lodCellPos);
 
-      // 宏观远景下不实化为巨大实体球，保留纯粹点云流形
-      if (d > solidMaxDist) continue;
+    // 1. 核心光学门禁：屏幕投影像素 < MIN_CELL_PIXELS 时，坚决不实例化 3D 实体网格，100% 由 GPU 点云流形承载！
+    if (d > solidMaxDist) continue;
 
-      _lodSphere.center.copy(_lodCellPos);
-      _lodSphere.radius = Math.max(12.0, cellRadius * 2.0);
-      if (frustum && !frustum.intersectsSphere(_lodSphere)) continue;
+    // 2. 视锥裁剪：不在相机视锥范围内的细胞不占用网格与内存资源
+    _lodSphere.center.copy(_lodCellPos);
+    _lodSphere.radius = Math.max(8.0, cellRadius * 1.5);
+    if (frustum && !frustum.intersectsSphere(_lodSphere)) continue;
 
-      _lodCandidates.push({ id: c.id, d });
-      if (_lodCandidates.length >= 512) break;
-    }
+    _lodCandidates.push({ id: c.id, d });
+  }
+
+  // 3. 视锥实化预算控制：
+  // 离散微柱 (N <= 1536) 在视距与视锥内全量实化，绝不截断丢弃任何细胞；
+  // 百万级/亿级流场在相机推进到微距时，仅对视锥内距离最近的局部微区 (上限 512) 进行实体显微实化，确保 60 FPS 丝滑！
+  if (isLargeScale && _lodCandidates.length > 512) {
+    _lodCandidates.sort((a, b) => a.d - b.d);
+    _lodCandidates.length = 512;
   }
 
   // 视锥实化集合

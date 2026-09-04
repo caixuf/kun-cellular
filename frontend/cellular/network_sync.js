@@ -594,19 +594,19 @@ export function updateFromBackendState(data) {
     const solidCount = (views && views.cells) ? views.cells.length : 0;
     const ptCount = (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.position) ? lodPointsMesh.geometry.attributes.position.count : realCells;
     const cellScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || macroCells || realCells;
-    const isLargeScale = (realCells > 3000);
+    const isLargeScale = (cellScale >= 100000) || (realCells > 3000);
 
-    if (!isLargeScale) {
-      realCellsEl.textContent = `${solidCount}/${realCells} 实体全量 (100% 显微实化)`;
-    } else if (solidCount > 0) {
-      realCellsEl.textContent = `${solidCount} 实体视锥局部实化 / ${ptCount.toLocaleString()} 点云流形`;
+    if (solidCount === 0) {
+      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观视距: 像素 < 20px)`;
+    } else if (isLargeScale) {
+      realCellsEl.textContent = `${solidCount} 显微实体 (像素 ≥ 20px) / ${ptCount.toLocaleString()} 点云流形`;
     } else {
-      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观视距)`;
+      realCellsEl.textContent = `${solidCount}/${realCells} 实体实化 (视锥内像素 ≥ 20px)`;
     }
     const isSurrogate = macroCells > realCells * 5;
     realCellsEl.title = isSurrogate
-      ? `底座宏观规模 ${macroCells.toLocaleString()}；前端视距动态 LOD：${solidCount} 实体细胞近距实化，全视界 ${ptCount.toLocaleString()} 动力学流形点云`
-      : `真实细胞数与活跃细胞数一致 (${realCells.toLocaleString()})`;
+      ? `底座宏观规模 ${macroCells.toLocaleString()}；屏幕空间动态 LOD：视锥内 ${solidCount} 细胞实体显微实化（投影 ≥ 20px），全景 ${ptCount.toLocaleString()} 动力学流形点云（投影 < 20px）`
+      : `离散微柱生命体：${solidCount}/${realCells} 细胞实体实化（视距投影 ≥ 20px 进入视锥），远景拉远自动转入点云流形`;
   }
 
   const macroSyns = data.macro_synapses || data.n_macro_synapses || (data.stats && data.stats.total_synapses) || org.syns.length;

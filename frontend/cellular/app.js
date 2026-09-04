@@ -71,26 +71,29 @@ function animate() {
   const closeLook = camState.camR < Math.max(160, (currentOrganismBounds.microDist || 220) * 0.85);
   const totalCellCount = org && org.cells ? org.cells.length : 0;
   const macroScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || totalCellCount;
-  const isLargeScale = (macroScale >= 1000) || (totalCellCount > 256);
+  const isLargeScale = (macroScale >= 100000) || (totalCellCount > 3000);
   const isDiscrete = !isLargeScale;
 
   let showPointCloud = true;
   if (currentRenderMode === "puremesh") {
     showPointCloud = false;
   } else if (currentRenderMode === "lod") {
-    showPointCloud = isLargeScale || !closeLook;
+    showPointCloud = isLargeScale || (views.cells.length === 0) || !closeLook;
   } else { // "symbiosis"
     showPointCloud = true;
   }
 
   if (lodPointsMesh && lodPointsMesh.material) {
     lodPointsMesh.visible = showPointCloud;
+    const hasSolid = views.cells && views.cells.length > 0;
     if (isLargeScale) {
-      lodPointsMesh.material.opacity = closeLook ? 0.35 : 0.85;
+      // 百万级/亿级生命体：宏观远景纯点云流形 (opacity 0.85)，微观聚焦实化时点云退为柔和背景 (0.35)
+      lodPointsMesh.material.opacity = !hasSolid ? 0.85 : (closeLook ? 0.35 : 0.60);
       lodPointsMesh.material.size = closeLook ? 3.0 : 4.2;
     } else {
-      lodPointsMesh.material.opacity = closeLook ? 0.18 : (currentRenderMode === "lod" ? 0.70 : 0.45);
-      lodPointsMesh.material.size = (currentRenderMode === "lod") ? 3.6 : 2.6;
+      // 离散微柱生命体：有实体时点云为代谢辉光光晕，全景拉远实体退化为点云时增强为点云本体
+      lodPointsMesh.material.opacity = hasSolid ? (closeLook ? 0.18 : (currentRenderMode === "lod" ? 0.30 : 0.40)) : 0.85;
+      lodPointsMesh.material.size = hasSolid ? ((currentRenderMode === "lod") ? 3.0 : 2.6) : 4.0;
     }
   }
 
