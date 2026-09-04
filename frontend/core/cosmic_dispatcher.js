@@ -162,6 +162,12 @@ export class CosmicDispatcher {
     this.model.updateStatus({ cameraMode: mode });
   }
 
+  setScenarioMode(mode) {
+    if (this.view) {
+      this.view.setScenarioMode(mode);
+    }
+  }
+
   togglePlayPause() {
     const cur = this.model.status.isPlaying;
     this.model.updateStatus({ isPlaying: !cur });

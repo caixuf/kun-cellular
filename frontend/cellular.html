@@ -556,19 +556,22 @@
   </div>
 </aside>
 
-<!-- 底部控制台 (宇宙视距与运镜) -->
+<!-- 底部控制台 (宇宙视距与具身实证巡礼) -->
 <div class="bottom-bar">
-  <button id="btn-mode-cosmic" class="btn-action active" onclick="switchCameraMode('cosmic')">
-    🌌 算力宇宙全景 (Cosmic View)
+  <button id="btn-mode-cosmic" class="btn-action active" onclick="switchScenario('cosmic')">
+    🌌 算力宇宙视界 (Cosmic)
   </button>
-  <button id="btn-mode-focus" class="btn-action" onclick="switchCameraMode('focus')">
-    🎯 真实物理聚焦 (Focus)
+  <button id="btn-mode-world" class="btn-action" onclick="switchScenario('world_model')">
+    🚗 100M+ 4D体素场·盲区反事实
+  </button>
+  <button id="btn-mode-blowout" class="btn-action" onclick="switchScenario('transient_blowout')">
+    ⚡ 1M 10kHz爆胎稳控·相空间对账
   </button>
 
   <span style="color:var(--border);">|</span>
 
   <button id="btn-play-pause" class="btn-action" onclick="togglePlayPause()">
-    ⏸ 暂停流推演
+    ⏸ 暂停推演
   </button>
 
   <span style="color:var(--border);">|</span>
@@ -603,8 +606,9 @@
   window.addEventListener("DOMContentLoaded", async () => {
     await dispatcher.init(document.getElementById("stage"));
 
-    // 默认加载 1 亿细胞旗舰生命体 (展示真实算力宇宙震撼)
+    // 默认加载 1 亿细胞旗舰生命体并进入 4D 全息世界模型视界
     await selectOrganism("adas_world_model_100m");
+    switchScenario("world_model");
   });
 
   // 全局交互暴露
@@ -618,7 +622,6 @@
       const res = await fetch("/api/organism/switch?id=" + encodeURIComponent(orgId));
       const resData = await res.json();
       if (resData.status === "ok") {
-        // 抓取拓扑快照，全部丢给 Worker 解算，UI 线程绝不阻塞
         const stateRes = await fetch("/api/cellular/organism");
         const rawTopo = await stateRes.json();
         dispatcher.loadOrganism({
@@ -626,9 +629,18 @@
           name: resData.result.name || orgId,
           domain: resData.result.domain || "具身控制"
         }, rawTopo);
+
+        // 智能场景联动：若选 100M 则自动进入 4D 体素世界模型，若选 1M 则进入爆胎稳控，其余进入算力宇宙
+        if (orgId === "adas_world_model_100m") {
+          switchScenario("world_model");
+        } else if (orgId === "adas_transient_1m") {
+          switchScenario("transient_blowout");
+        } else {
+          switchScenario("cosmic");
+        }
       }
     } catch (e) {
-      console.warn("加载生命体异常，使用本地离线检查点兜底:", e);
+      console.warn("加载生命体异常，使用离线兜底:", e);
       try {
         const ckptRes = await fetch(`/checkpoints/${orgId}.json`);
         if (ckptRes.ok) {
@@ -639,15 +651,20 @@
     }
   };
 
-  window.switchCameraMode = function(mode) {
-    dispatcher.setCameraMode(mode);
-    document.getElementById("btn-mode-cosmic").classList.toggle("active", mode === "cosmic");
-    document.getElementById("btn-mode-focus").classList.toggle("active", mode === "focus");
+  window.switchScenario = function(mode) {
+    dispatcher.setScenarioMode(mode);
+    const btnCosmic = document.getElementById("btn-mode-cosmic");
+    const btnWorld = document.getElementById("btn-mode-world");
+    const btnBlowout = document.getElementById("btn-mode-blowout");
+
+    if (btnCosmic) btnCosmic.classList.toggle("active", mode === "cosmic");
+    if (btnWorld) btnWorld.classList.toggle("active", mode === "world_model");
+    if (btnBlowout) btnBlowout.classList.toggle("active", mode === "transient_blowout");
   };
 
   window.togglePlayPause = function() {
     const isPlaying = dispatcher.togglePlayPause();
-    document.getElementById("btn-play-pause").innerText = isPlaying ? "⏸ 暂停流推演" : "▶ 恢复流推演";
+    document.getElementById("btn-play-pause").innerText = isPlaying ? "⏸ 暂停推演" : "▶ 恢复推演";
   };
 
   window.onZoomSliderChange = function(val) {
