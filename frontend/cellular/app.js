@@ -127,9 +127,9 @@ function animate() {
   const realCellsEl = document.getElementById("st-real-cells");
   if (realCellsEl) {
     if (visibleMicroCount > 0 && visibleMicroCount < ptCount) {
-      realCellsEl.textContent = `${visibleMicroCount} 实体 (近距实化) / ${ptCount.toLocaleString()} 点云`;
+      realCellsEl.textContent = `${visibleMicroCount} 实体 (显微实化) / ${ptCount.toLocaleString()} 点云流形`;
     } else if (visibleMicroCount === 0) {
-      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云全量 (LOD)`;
+      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观亚像素，真实未放大)`;
     } else {
       realCellsEl.textContent = `${visibleMicroCount} 实体全量`;
     }

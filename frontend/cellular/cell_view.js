@@ -169,9 +169,7 @@ export class CellView {
     this.group.add(this.label);
 
     const rBase = getCellWorldRadius(this.org);
-    const nCells = (this.org && this.org.cells) ? this.org.cells.length : 12;
-    const isLargeScale = nCells > 120;
-    const sf = Math.max(0.08, Math.min(1.0, (rBase / 13.0) * (isLargeScale ? 0.65 : 1.0)));
+    const sf = rBase / 13.0;
     this.group.scale.set(sf, sf, sf);
 
     if (this.scene) {
@@ -186,9 +184,7 @@ export class CellView {
     this.targetY = cell.y;
     this.targetZ = cell.z || 0;
     const rBase = getCellWorldRadius(this.org);
-    const nCells = (this.org && this.org.cells) ? this.org.cells.length : 12;
-    const isLargeScale = nCells > 120;
-    const sf = Math.max(0.08, Math.min(1.0, (rBase / 13.0) * (isLargeScale ? 0.65 : 1.0)));
+    const sf = rBase / 13.0;
     this.group.scale.set(sf, sf, sf);
 
     const fam = FAMILY(cell.type);

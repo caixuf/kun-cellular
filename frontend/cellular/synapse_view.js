@@ -3,6 +3,7 @@
  * ============================================================ */
 import * as THREE from 'three';
 import { getGlowTexture } from './texture_cache.js';
+import { getCellWorldRadius } from './spatial_bounds.js';
 
 const _tmpP0 = new THREE.Vector3();
 const _tmpP1 = new THREE.Vector3();
@@ -115,9 +116,16 @@ export class SynapseView {
         it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
         it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
       );
-      const pScale1 = isDense
-        ? (2.2 + Math.sin(t * Math.PI) * 1.4) * (0.8 + Math.abs(w) * 0.25)
-        : (5.2 + Math.sin(t * Math.PI) * 3.2) * (0.8 + Math.abs(w) * 0.3);
+    const rBase = getCellWorldRadius(this.org);
+    // 动作电位囊泡与终扣大小严格遵循真实物理细胞比例 (光子 ~ 0.25 rBase, 终扣 ~ 0.35 rBase)
+    {
+      const t = this.flowT1, it = 1.0 - t;
+      this.photon1.position.set(
+        it * it * _tmpP0.x + 2.0 * it * t * _tmpP1.x + t * t * _tmpP2.x,
+        it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
+        it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
+      );
+      const pScale1 = Math.max(0.4, (rBase * 0.28 + Math.sin(t * Math.PI) * (rBase * 0.12)) * (0.8 + Math.abs(w) * 0.2));
       this.photon1.scale.set(pScale1, pScale1, 1);
       this.photon1.material.opacity = (0.18 + Math.sin(t * Math.PI) * 0.32) * (isDense ? 0.75 : 1.0);
     }
@@ -130,19 +138,15 @@ export class SynapseView {
         it * it * _tmpP0.y + 2.0 * it * t * _tmpP1.y + t * t * _tmpP2.y,
         it * it * _tmpP0.z + 2.0 * it * t * _tmpP1.z + t * t * _tmpP2.z
       );
-      const pScale2 = isDense
-        ? (1.8 + Math.sin(t * Math.PI) * 1.2) * (0.8 + Math.abs(w) * 0.25)
-        : (4.2 + Math.sin(t * Math.PI) * 2.4) * (0.8 + Math.abs(w) * 0.3);
+      const pScale2 = Math.max(0.3, (rBase * 0.22 + Math.sin(t * Math.PI) * (rBase * 0.10)) * (0.8 + Math.abs(w) * 0.2));
       this.photon2.scale.set(pScale2, pScale2, 1);
       this.photon2.material.opacity = (0.15 + Math.sin(t * Math.PI) * 0.28) * (isDense ? 0.75 : 1.0);
     }
 
-    // 突触终端小体 (精致微末结节，隐隐若现)
+    // 突触终端小体 (严格依照细胞质膜物理尺度，作为微末接触点)
     this.bouton.position.copy(_tmpP2);
     const boutonFlash = (1.0 - Math.min(1.0, this.flowT1)) * (a.glow || 0.2);
-    const bScale = isDense
-      ? 2.4 + boutonFlash * 2.0
-      : 6.0 + boutonFlash * 5.0;
+    const bScale = Math.max(0.5, rBase * 0.36 + boutonFlash * (rBase * 0.20));
     this.bouton.scale.set(bScale, bScale, 1);
     this.bouton.material.opacity = (0.18 + boutonFlash * 0.25) * (isDense ? 0.75 : 1.0);
     this.bouton.material.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);

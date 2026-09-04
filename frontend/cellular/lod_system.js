@@ -310,37 +310,29 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   const projScale = window.innerHeight / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) * 0.5));
   const solidMaxDist = (2.0 * cellRadius * projScale) / MIN_CELL_PIXELS;
 
-  // 1. 实体细胞筛选
+  // 1. 严格物理光学显微分辨门禁 (Physical Optical Microscope Gate)
+  // 当且仅当相机推进到微观视距、细胞在屏幕上的物理投影尺寸 >= MIN_CELL_PIXELS (26px) 时，
+  // 光学显微镜才允许实化质膜、骨架、核仁等微观三维细节！
+  // 宏观远景未放大时 (d > solidMaxDist)，细胞保持真实物理亚像素尺寸，由高密流形点云真实呈现，绝不虚假放大数百倍！
   _lodCandidates.length = 0;
+  const isPureMesh = (renderMode === 'puremesh');
 
-  if (isCompact) {
-    // 紧凑生命体 (<= 220 细胞)：全量实化展示全部拓扑细胞，视锥剔除保底
-    for (const c of orgObj.cells) {
-      _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
-      const d = _lodCamPos.distanceTo(_lodCellPos);
-      _lodSphere.center.copy(_lodCellPos);
-      _lodSphere.radius = 70.0;
-      if (frustum && !frustum.intersectsSphere(_lodSphere)) continue;
-      _lodCandidates.push({ id: c.id, d });
-    }
-    _lodCandidates.sort((a, b) => a.d - b.d);
-  } else {
-    // 超大规模生命体 (320~1536+ 细胞)：宏观以细腻点云流形为主，精确实化 64~80 个视锥核心代表细胞，绝不让巨球霸屏
-    const maxLargeSolid = 80;
-    for (const arr of cellSpatialHash.values()) {
-      for (const c of arr) {
-        _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
-        const d = _lodCamPos.distanceTo(_lodCellPos);
-        if (isLODMode && d > solidMaxDist) continue;
-        _lodSphere.center.copy(_lodCellPos);
-        _lodSphere.radius = 35.0;
-        if (!frustum.intersectsSphere(_lodSphere)) continue;
-        _lodCandidates.push({ id: c.id, d });
-      }
-    }
-    _lodCandidates.sort((a, b) => a.d - b.d);
-    if (_lodCandidates.length > maxLargeSolid) _lodCandidates.length = maxLargeSolid;
+  for (const c of orgObj.cells) {
+    _lodCellPos.set(c.x || 0, c.y || 0, c.z || 0);
+    const d = _lodCamPos.distanceTo(_lodCellPos);
+
+    // 核心物理真实门禁：未放大到显微级别 (d > solidMaxDist)，坚决不生成实体细胞！
+    if (!isPureMesh && d > solidMaxDist) continue;
+
+    _lodSphere.center.copy(_lodCellPos);
+    _lodSphere.radius = Math.max(12.0, cellRadius * 2.0);
+    if (frustum && !frustum.intersectsSphere(_lodSphere)) continue;
+
+    _lodCandidates.push({ id: c.id, d });
   }
+
+  _lodCandidates.sort((a, b) => a.d - b.d);
+  if (_lodCandidates.length > MAX_SOLID_CELLS) _lodCandidates.length = MAX_SOLID_CELLS;
 
   const wantIds = new Set();
   for (const cd of _lodCandidates) wantIds.add(cd.id);
@@ -361,36 +353,32 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   }
   views.cells = Array.from(cellViewsMap.values());
 
-  // 2. 突触实化：紧凑生命体全量实化；超大规模生命体实化核心突触高速公路 (160 条隐隐若现，其余由点云承载)
+  // 2. 突触实化物理门禁：
+  // 只有当突触两端关联的细胞处于显微实化区，或者突触为宏观主干骨架时，才实化 3D 贝塞尔光缆；
+  // 其余远景突触完全由点云流形中的下垂悬链线自然呈现！
   const wantSyn = new Set();
   const totalSynCount = orgObj.syns ? orgObj.syns.length : 0;
-  const maxSyns = isCompact ? Math.min(totalSynCount, 650) : Math.min(totalSynCount, 160);
+  const maxSyns = Math.min(totalSynCount, 220);
 
-  if (isCompact && orgObj.syns) {
-    for (const s of orgObj.syns) {
-      const key = `${s.from}->${s.to}:${s.port || 0}`;
-      wantSyn.add(key);
-      if (wantSyn.size >= maxSyns) break;
-    }
-  } else {
-    if (wantIds.size > 0) {
-      for (const id of wantIds) {
-        const adj = cellSynAdj.get(id);
-        if (adj) {
-          for (const key of adj) {
-            wantSyn.add(key);
-            if (wantSyn.size >= 120) break;
-          }
+  if (wantIds.size > 0) {
+    for (const id of wantIds) {
+      const adj = cellSynAdj.get(id);
+      if (adj) {
+        for (const key of adj) {
+          wantSyn.add(key);
+          if (wantSyn.size >= 120) break;
         }
-        if (wantSyn.size >= 120) break;
       }
+      if (wantSyn.size >= 120) break;
     }
+  }
 
-    const majorKeys = getMajorSynapseKeys(orgObj, bnds);
-    for (const key of majorKeys) {
-      wantSyn.add(key);
-      if (wantSyn.size >= maxSyns) break;
-    }
+  // 宏观骨干突触（若隐若现微光提示）
+  const majorLimit = (wantIds.size === 0) ? 36 : maxSyns;
+  const majorKeys = getMajorSynapseKeys(orgObj, bnds);
+  for (const key of majorKeys) {
+    wantSyn.add(key);
+    if (wantSyn.size >= majorLimit) break;
   }
 
   for (const [key, v] of synViewsMap) {
