@@ -12,7 +12,7 @@ import { CellView } from './cell_view.js';
 import { SynapseView } from './synapse_view.js';
 
 export const MIN_CELL_PIXELS = 26.0;
-export const MAX_SOLID_CELLS = 500;
+export const MAX_SOLID_CELLS = 700;
 
 export const cellViewPool = [];
 export const synViewPool = [];
@@ -364,11 +364,12 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   }
   views.cells = Array.from(cellViewsMap.values());
 
-  // 2. 突触实化：对于紧凑生命体，全量实化所有突触连接与电位光子
+  // 2. 突触实化：对于 <= 800 突触的生命体，100% 全量实化所有拓扑突触连接与电位光子
   const wantSyn = new Set();
-  const maxSyns = isCompact ? Math.min(orgObj.syns ? orgObj.syns.length : 0, 800) : 160;
+  const totalSynCount = orgObj.syns ? orgObj.syns.length : 0;
+  const maxSyns = Math.min(totalSynCount, 800);
 
-  if (isCompact && orgObj.syns) {
+  if (totalSynCount <= 800 && orgObj.syns) {
     for (const s of orgObj.syns) {
       const key = `${s.from}->${s.to}:${s.port || 0}`;
       wantSyn.add(key);
@@ -381,17 +382,17 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
         if (adj) {
           for (const key of adj) {
             wantSyn.add(key);
-            if (wantSyn.size >= 140) break;
+            if (wantSyn.size >= 500) break;
           }
         }
-        if (wantSyn.size >= 140) break;
+        if (wantSyn.size >= 500) break;
       }
     }
 
     const majorKeys = getMajorSynapseKeys(orgObj, bnds);
     for (const key of majorKeys) {
       wantSyn.add(key);
-      if (wantSyn.size >= 160) break;
+      if (wantSyn.size >= maxSyns) break;
     }
   }
 
