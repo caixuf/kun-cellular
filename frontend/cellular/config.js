@@ -32,6 +32,52 @@ export const FAMILY_COLOR = {
   effector: 0xf43f5e
 };
 
+export const PRIMITIVE_COLORS_26 = {
+  SUM: 0x38bdf8,
+  DIFF: 0x0ea5e9,
+  INTEGRAL: 0x10b981,
+  INTEGRATE: 0x10b981,
+  DAMPER: 0x14b8a6,
+  AMPLIFY: 0xf59e0b,
+  INVERT: 0xef4444,
+  THRESH: 0xf97316,
+  THRESHOLD: 0xf97316,
+  CLIP: 0xec4899,
+  ABS: 0xa855f7,
+  MUL: 0x6366f1,
+  MULTIPLY: 0x6366f1,
+  HYST: 0xd946ef,
+  HYSTERESIS: 0xd946ef,
+  DEADZONE: 0x94a3b8,
+  INHIB: 0xe11d48,
+  INHIBIT: 0xe11d48,
+  SUB: 0x06b6d4,
+  RATIO: 0x84cc16,
+  OSCILLATOR: 0xeab308,
+  CORRELATION: 0x8b5cf6,
+  FATIGUE: 0x64748b,
+  EXP: 0x34d399,
+  LOG: 0x22d3ee,
+  MIN: 0xfb923c,
+  MAX: 0xf43f5e,
+  MODULO: 0xc084fc,
+  QUANTIZE: 0x2dd4bf,
+  EMA: 0xfacc15,
+  RELU: 0xf87171,
+  QUADRATIC: 0x38bdf8,
+  AND: 0xa78bfa,
+  MIN_MAX: 0xf43f5e,
+  DELAY_N: 0x06b6d4
+};
+
+export function getPrimitiveColor(type) {
+  if (!type) return 0x38bdf8;
+  const s = String(type).toUpperCase().replace(/^OP_/, '').replace(/^T\./, '');
+  if (PRIMITIVE_COLORS_26[s] !== undefined) return PRIMITIVE_COLORS_26[s];
+  const fam = FAMILY(type);
+  return FAMILY_COLOR[fam] || 0x38bdf8;
+}
+
 export const MUT_CANDIDATES = [
   T.EMA, T.DIFF, T.INTEGRAL, T.SUM, T.SUB, T.MUL, T.RATIO, T.ABS,
   T.DELAY_N, T.OSCILLATOR, T.QUADRATIC,
@@ -56,7 +102,10 @@ export const LIFEFORM_SCALES = {
   quant_cross_asset_10m: 10000000,
   quant_market_making_1m: 1000000,
   quant_master_champion: 1032,
-  real_trained_champion: 1024
+  real_trained_champion: 1024,
+  sdsc_mega_1million: 1000000,
+  mega: 1000000,
+  '1m': 1000000
 };
 
 export const TOOLTIP_DICT = {

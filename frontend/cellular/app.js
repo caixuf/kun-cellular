@@ -20,6 +20,7 @@ import { currentFluidPhase, setFluidPhase, generateFractalLightningPoints, spawn
 import { initOrganSystem, updateOrganSystem, toggleOrganVisibility, focusOrgan } from './organ_view.js';
 import { patchClampHUD } from './patch_clamp_hud.js';
 import { tractography } from './tractography.js';
+import { updateManifoldSystem } from './manifold_system.js';
 
 // 1. 初始化后处理通道与镜头控制
 initPostprocessing(renderer, scene, camera);
@@ -96,6 +97,10 @@ function animate() {
       lodPointsMesh.material.size = hasSolid ? ((currentRenderMode === "lod") ? 3.0 : 2.6) : 4.0;
     }
   }
+
+  // 2.2 硬件级纯二进制高维流形 GLSL 材质时钟驱动
+  const manifoldOpacity = !isLargeScale ? 0.0 : (views.cells && views.cells.length > 0 ? (closeLook ? 0.35 : 0.65) : 0.88);
+  updateManifoldSystem(now * 0.001, manifoldOpacity, showPointCloud && isLargeScale);
 
   // 3. 动态屏幕像素视锥实化 LOD
   updateDetailLOD(_frustum, scene, camera, org, currentOrganismBounds, currentRenderMode);

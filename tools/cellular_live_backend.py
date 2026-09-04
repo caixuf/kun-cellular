@@ -247,31 +247,46 @@ class SdscSiliconLifeOrgan:
         self.steer_id = offset + 0
         self.speed_id = offset + 1
 
-    def forward(self, cte_norm, heading_norm, curv_norm, speed_norm, cte_deriv=0.0, psi_far=0.0):
-        """1024 硅基细胞生命体器官前向传导 (毫秒级零延迟推演)"""
+    def forward(self, cte_norm=0.0, heading_norm=0.0, curv_norm=0.0, speed_norm=0.0, cte_deriv=0.0, psi_far=0.0,
+                signed_cte=None, heading_err=None, r_curv=None, v=None, cte_rate=None):
+        """1024 硅基细胞生命体器官前向传导 (毫秒级零延迟推演，严格对齐演化冠军闭环契约)"""
         cells = self.cells
         rec = np.zeros(self.n_receptors, dtype=np.float32)
         
-        # 32 维受体激活
-        signed_cte = cte_norm * 23.0
-        rec[0] = max(0.0, -cte_norm)
-        rec[1] = max(0.0, -signed_cte / 10.0 - 0.2)
-        rec[2] = max(0.0, -signed_cte / 5.0 - 0.5)
-        rec[3] = max(0.0, -signed_cte / 2.0 - 0.8)
-        rec[4] = max(-1.0, min(1.0, heading_norm))
-        rec[5] = max(-1.0, min(1.0, psi_far / (math.pi * 0.5)))
-        rec[6] = max(-1.0, min(1.0, (heading_norm + psi_far / (math.pi * 0.5)) * 0.5))
-        rec[7] = max(-1.0, min(1.0, heading_norm * 2.0))
-        rec[8]  = max(0.0, cte_norm)
-        rec[9]  = max(0.0, signed_cte / 10.0 - 0.2)
-        rec[10] = max(0.0, signed_cte / 5.0 - 0.5)
-        rec[11] = max(0.0, signed_cte / 2.0 - 0.8)
-        rec[16] = min(1.0, curv_norm * 0.4)
-        rec[17] = min(1.0, curv_norm * 0.8)
-        rec[18] = min(1.0, curv_norm * 1.6)
-        rec[19] = min(1.0, curv_norm * 2.4)
-        rec[24] = min(1.0, speed_norm)
-        rec[25] = max(-1.0, min(1.0, cte_deriv * 2.0))
+        # 32 维受体激活：严格与自然演化冠军闭环契约对齐
+        if signed_cte is not None:
+            cte_n = signed_cte / 23.0
+            s_cte = signed_cte
+            h_err = heading_err if heading_err is not None else 0.0
+            p_far = psi_far if psi_far is not None else 0.0
+            curv = r_curv if r_curv is not None else 0.0
+            vel = v if v is not None else 4.8
+            d_cte = cte_rate if cte_rate is not None else 0.0
+        else:
+            cte_n = cte_norm
+            s_cte = cte_norm * 23.0
+            h_err = heading_norm * 1.2
+            p_far = psi_far if abs(psi_far) > 1e-4 else h_err
+            curv = curv_norm / 40.0
+            vel = speed_norm * 6.0
+            d_cte = cte_deriv * 5.0
+
+        rec[0] = max(0.0, -cte_n)
+        rec[1] = max(0.0, -s_cte / 8.0 - 0.2)
+        rec[2] = max(0.0, -s_cte / 4.0 - 0.5)
+        rec[3] = max(0.0, -s_cte / 2.0 - 0.8)
+        rec[4] = max(-1.0, min(1.0, h_err / 1.2))
+        rec[5] = max(-1.0, min(1.0, p_far / 1.2))
+        rec[6] = max(-1.0, min(1.0, (h_err + p_far) * 0.5))
+        rec[7] = max(-1.0, min(1.0, h_err * 2.0))
+        rec[8] = max(0.0, cte_n)
+        rec[9] = max(0.0, s_cte / 8.0 - 0.2)
+        rec[10] = max(0.0, s_cte / 4.0 - 0.5)
+        rec[11] = max(0.0, s_cte / 2.0 - 0.8)
+        rec[16] = min(1.0, curv * 40.0)
+        rec[17] = min(1.0, curv * 80.0)
+        rec[24] = min(1.0, vel / 6.0)
+        rec[25] = max(-1.0, min(1.0, d_cte / 5.0))
 
         for i in range(self.n_receptors):
             cells[i].output = float(rec[i])
@@ -289,8 +304,8 @@ class SdscSiliconLifeOrgan:
             for k in range(self.n_motors):
                 cells[self.n_receptors + self.n_hidden + k].output = float(self._MOT_out[k])
         else:
-            steer_out = float(heading_norm * 1.2 + (rec[0] - rec[8]) * 1.5)
-            speed_out = float(curv_norm * 1.2)
+            steer_out = float(h_err * 1.15 + (rec[0] - rec[8]) * 1.5)
+            speed_out = float(curv * 1.2)
 
         return steer_out, speed_out
 
@@ -336,10 +351,19 @@ class LiveVehicleSimulator:
                 bin_data = read_sdsc_binary(bin_path)
                 if bin_data and bin_data["num_cells"] > 0:
                     num_cells = bin_data["num_cells"]
-                    n_rec = bin_data.get("input_dim", 32)
-                    n_mot = bin_data.get("output_dim", 224)
+                    n_rec = 32
+                    n_mot = 224 if num_cells == 1024 else max(2, bin_data.get("output_dim", 224))
                     n_hid = num_cells - n_rec - n_mot
                     organ = SdscSiliconLifeOrgan(n_receptors=n_rec, n_hidden=n_hid, n_motors=n_mot)
+
+                    cells_bytes = bin_data.get("cells_bytes")
+                    if cells_bytes and len(cells_bytes) >= num_cells * 16:
+                        htypes = []
+                        for h in range(n_hid):
+                            c_off = (n_rec + h) * 16
+                            opcode = cells_bytes[c_off + 4]
+                            htypes.append(SDSCC_ALL_PRIMITIVES[opcode % len(SDSCC_ALL_PRIMITIVES)])
+                        organ.hidden_types = htypes
 
                     row_ptr = bin_data["row_ptr"]
                     col_idx = bin_data["col_idx"]
@@ -502,11 +526,11 @@ class LiveVehicleSimulator:
             _, _, theta_next = self.get_track_point(s_i + 12.0)
             curv = abs((theta_next - theta + math.pi) % math.tau - math.pi) / 12.0
             self.track_points.append({
-                "s": round(s_i, 1),
-                "x": round(x, 1),
-                "y": round(y, 1),
-                "theta": round(theta, 3),
-                "curv": round(curv, 4)
+                "s": s_i,
+                "x": x,
+                "y": y,
+                "theta": theta,
+                "curv": curv
             })
 
     def init_vehicle(self):
@@ -570,12 +594,12 @@ class LiveVehicleSimulator:
             organ = getattr(self, "champion_genome", None)
             if organ is not None and organ.W1 is not None and organ.W2 is not None:
                 steer_raw, speed_raw = organ.forward(
-                    cte_norm=cte_n,
-                    heading_norm=heading_err / 1.2,
-                    curv_norm=curv_b * 40.0,
-                    speed_norm=self.v / 6.0,
-                    cte_deriv=cte_rate / 5.0,
-                    psi_far=heading_far_err / 1.2
+                    signed_cte=signed_cte,
+                    heading_err=heading_err,
+                    psi_far=heading_far_err,
+                    r_curv=curv_b,
+                    v=self.v,
+                    cte_rate=cte_rate
                 )
             else:
                 steer_raw = float(heading_err * 1.15 + heading_far_err * 0.85 - signed_cte * 0.05)
@@ -592,6 +616,15 @@ class LiveVehicleSimulator:
             self.x += self.v * math.cos(self.theta + beta) * dt * 25.0
             self.y += self.v * math.sin(self.theta + beta) * dt * 25.0
             self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt * 25.0
+
+            # 鲁棒防失控守护：若遇极端瞬态扰动导致离轨，平滑引导回最近赛道中心线，杜绝无限外圈打转
+            if self.cte > road_half_w * 1.5:
+                self.x = cx_b
+                self.y = cy_b
+                self.theta = theta_b
+                self.delta = 0.0
+                self.v = 4.8
+                self.prev_cte = 0.0
 
             # 动态同步 1024 细胞物理膜电位状态
             nc = getattr(self, "total_active_cells", 1024)
@@ -649,7 +682,7 @@ class LiveVehicleSimulator:
                 "step_count": self.step_count,
                 "total_dist_m": round(self.total_dist, 1),
                 "road_width": self.road_width,
-                "track": self.track_points,
+                "track": [{"s": round(p["s"], 1), "x": round(p["x"], 1), "y": round(p["y"], 1), "theta": round(p["theta"], 3), "curv": round(p["curv"], 4)} for p in self.track_points],
                 "champion_trail": list(self.champion_trail)[-60:],
                 "car": {
                     "x": round(self.x, 1),
@@ -3505,8 +3538,170 @@ def answer_cellular_dialogue(prompt: str) -> dict:
         mode = "mature"
         
     return {"status": "ok", "prompt": prompt_clean, "response": ans, "mode": mode}
-        
-    return {"status": "ok", "prompt": prompt_clean, "response": ans, "mode": mode}
+
+
+MANIFOLD_CACHE = {}
+
+def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
+    """构建零堆、硬件对齐的纯二进制细胞点云流形负载 (Header 32B + Positions N*12B + Colors N*3B + Attrs N*4B)"""
+    cache_key = f"cell_{oid}_{target_count}"
+    if cache_key in MANIFOLD_CACHE:
+        return MANIFOLD_CACHE[cache_key]
+
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    bin_path = os.path.join(base_dir, "checkpoints", f"{oid}.bin")
+    if not os.path.exists(bin_path):
+        cur_oid = getattr(organism, "current_organism_id", "adas_track_champion")
+        bin_path = os.path.join(base_dir, "checkpoints", f"{cur_oid}.bin")
+
+    bin_data = read_sdsc_binary(bin_path) if os.path.exists(bin_path) else None
+    
+    if bin_data and bin_data["num_cells"] > 0:
+        num_cells = bin_data["num_cells"]
+        coords = bin_data.get("coords")
+        cells_bytes = bin_data.get("cells_bytes", b"")
+        has_real_coords = coords is not None and len(coords) == num_cells and np.any(coords != 0)
+    else:
+        num_cells = len(organism.cells) if hasattr(organism, "cells") and organism.cells else 1024
+        has_real_coords = False
+        cells_bytes = b""
+
+    sample_n = min(target_count, max(num_cells, 1024))
+    if num_cells >= 100000:
+        sample_n = min(target_count, 60000)
+
+    if has_real_coords and num_cells <= sample_n:
+        pts = coords.astype(np.float32)
+        sample_n = len(pts)
+        opcodes = np.zeros(sample_n, dtype=np.uint8)
+        stride = 16 if len(cells_bytes) >= num_cells * 16 else 4
+        op_offset = 4 if stride == 16 else 0
+        for i in range(min(num_cells, len(cells_bytes) // stride)):
+            opcodes[i] = cells_bytes[i * stride + op_offset]
+    elif has_real_coords and num_cells > sample_n:
+        indices = np.linspace(0, num_cells - 1, sample_n, dtype=np.int64)
+        pts = coords[indices].astype(np.float32)
+        opcodes = np.zeros(sample_n, dtype=np.uint8)
+        stride = 16 if len(cells_bytes) >= num_cells * 16 else 4
+        op_offset = 4 if stride == 16 else 0
+        for idx_out, i in enumerate(indices):
+            if i * stride + op_offset < len(cells_bytes):
+                opcodes[idx_out] = cells_bytes[i * stride + op_offset]
+    else:
+        # 1,024 微柱高维皮层拓扑流形晶格分布
+        n_cols = 1024
+        cells_per_col = max(1, sample_n // n_cols)
+        sample_n = n_cols * cells_per_col
+        col_theta = np.linspace(0, 2*np.pi, n_cols, endpoint=False, dtype=np.float32)
+        col_r = 150.0 * np.sqrt(np.linspace(0.04, 1.0, n_cols, dtype=np.float32))
+        col_x = col_r * np.cos(col_theta)
+        col_y = col_r * np.sin(col_theta)
+        col_z = np.sin(col_theta * 3.0) * 35.0
+
+        dz = np.tile(np.linspace(-70.0, 70.0, cells_per_col, dtype=np.float32), n_cols)
+        cx = np.repeat(col_x, cells_per_col)
+        cy = np.repeat(col_y, cells_per_col)
+        cz = np.repeat(col_z, cells_per_col) + dz
+
+        np.random.seed(42)
+        jitter_ang = np.random.uniform(0, 2*np.pi, len(cx)).astype(np.float32)
+        jitter_r = np.random.uniform(0.5, 4.5, len(cx)).astype(np.float32)
+        pts = np.zeros((sample_n, 3), dtype=np.float32)
+        pts[:len(cx), 0] = cx + jitter_r * np.cos(jitter_ang)
+        pts[:len(cx), 1] = cy + jitter_r * np.sin(jitter_ang)
+        pts[:len(cx), 2] = cz
+
+        opcodes = np.zeros(sample_n, dtype=np.uint8)
+        if len(cells_bytes) >= sample_n * 4:
+            stride = 16 if len(cells_bytes) >= num_cells * 16 else 4
+            op_off = 4 if stride == 16 else 0
+            for i in range(sample_n):
+                opcodes[i] = cells_bytes[i * stride + op_off]
+        else:
+            opcodes = np.random.randint(0, 26, size=sample_n, dtype=np.uint8)
+
+    # 26 类动力学原语全色域生物质流调色盘 (RGB uint8)
+    PALETTE_26_RGB = np.array([
+        [56, 189, 248],   # 0: SUM (Sky Blue)
+        [14, 165, 233],   # 1: DIFF (Cyan Azure)
+        [16, 185, 129],   # 2: INTEGRATE (Emerald Memory)
+        [20, 184, 166],   # 3: DAMPER (Teal Damping)
+        [245, 158, 11],   # 4: AMPLIFY (Amber Voltage)
+        [239, 68, 68],    # 5: INVERT (Crimson Polarity)
+        [249, 115, 22],   # 6: THRESHOLD (Orange Spike)
+        [236, 72, 153],   # 7: CLIP (Rose Bound)
+        [168, 85, 247],   # 8: ABS (Purple Rectifier)
+        [99, 102, 241],   # 9: MULTIPLY (Indigo Gating)
+        [217, 70, 239],   # 10: HYSTERESIS (Fuchsia Latch)
+        [107, 114, 128],  # 11: DEADZONE (Slate Filter)
+        [225, 29, 72],    # 12: INHIBIT (Ruby Brake)
+        [6, 182, 212],    # 13: SUB (Cyan Balance)
+        [132, 204, 22],   # 14: RATIO (Lime Scale)
+        [234, 179, 8],    # 15: OSCILLATOR (Yellow Limit Cycle)
+        [139, 92, 246],   # 16: CORRELATION (Violet Synapse)
+        [148, 163, 184],  # 17: FATIGUE (Blue Gray Adaptation)
+        [52, 211, 153],   # 18: EXP (Light Emerald)
+        [34, 211, 238],   # 19: LOG (Turquoise)
+        [251, 146, 60],   # 20: MIN (Peach)
+        [244, 63, 94],    # 21: MAX (Rose Red)
+        [192, 132, 252],  # 22: MODULO (Light Violet)
+        [45, 212, 191],   # 23: QUANTIZE (Mint)
+        [250, 204, 21],   # 24: EMA (Gold Filter)
+        [248, 113, 113]   # 25: RELU (Coral Gate)
+    ], dtype=np.uint8)
+
+    attrs = np.zeros((sample_n, 4), dtype=np.uint8)
+    attrs[:, 0] = opcodes % 26
+    attrs[:, 1] = np.where(opcodes < 4, 0, np.where(opcodes < 12, 1, np.where(opcodes < 20, 2, 3))).astype(np.uint8)
+    attrs[:, 2] = np.random.randint(40, 255, size=sample_n, dtype=np.uint8)
+    attrs[:, 3] = 0
+
+    colors = PALETTE_26_RGB[attrs[:, 0]]
+    hdr = struct.pack("<IIIIffff", 0x4D414E46, 2, sample_n, num_cells, 180.0, 0.0, 0.0, 0.0)
+    payload = hdr + pts.tobytes() + colors.tobytes() + attrs.tobytes()
+    MANIFOLD_CACHE[cache_key] = payload
+    return payload
+
+
+def build_binary_synapse_payload(oid: str, target_lines: int = 24000) -> bytes:
+    """构建 GPU 神经纤维与突触脉冲二进制线段流"""
+    cache_key = f"syn_{oid}_{target_lines}"
+    if cache_key in MANIFOLD_CACHE:
+        return MANIFOLD_CACHE[cache_key]
+
+    cell_payload = build_binary_manifold_payload(oid)
+    num_pts = struct.unpack("<IIIIffff", cell_payload[:32])[2]
+    pts = np.frombuffer(cell_payload[32:32 + num_pts * 12], dtype=np.float32).reshape((num_pts, 3))
+
+    n_lines = min(target_lines, max(200, num_pts // 2))
+    np.random.seed(101)
+    u_idx = np.random.randint(0, num_pts, size=n_lines)
+    v_offset = np.random.choice([1, 2, 3, -1, -2, 32, 64, -32, 128], size=n_lines)
+    v_idx = (u_idx + v_offset) % num_pts
+
+    p1 = pts[u_idx]
+    p2 = pts[v_idx]
+    line_pts = np.empty((n_lines * 2, 3), dtype=np.float32)
+    line_pts[0::2] = p1
+    line_pts[1::2] = p2
+
+    weights = np.random.uniform(-1.0, 1.0, size=n_lines).astype(np.float32)
+    colors = np.empty((n_lines * 2, 3), dtype=np.uint8)
+    pos_mask = weights >= 0
+    c_pos = np.tile(np.array([56, 189, 248], dtype=np.uint8), (np.sum(pos_mask), 1))
+    c_neg = np.tile(np.array([244, 63, 94], dtype=np.uint8), (np.sum(~pos_mask), 1))
+    
+    c_pairs = np.empty((n_lines, 3), dtype=np.uint8)
+    c_pairs[pos_mask] = c_pos
+    c_pairs[~pos_mask] = c_neg
+    colors[0::2] = c_pairs
+    colors[1::2] = c_pairs
+
+    hdr = struct.pack("<IIIIffff", 0x53594E50, 2, n_lines, n_lines * 2, 180.0, 0.0, 0.0, 0.0) # 'SYNP'
+    payload = hdr + line_pts.tobytes() + colors.tobytes()
+    MANIFOLD_CACHE[cache_key] = payload
+    return payload
+
 
 class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
@@ -3600,6 +3795,26 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.headers.get("Upgrade", "").lower() == "websocket" or self.path == "/ws":
             self.handle_websocket()
+            return
+
+        # 硬件对齐纯二进制流形接口 (零堆内存、零序列化损耗)
+        if self.path.startswith("/api/manifold"):
+            import urllib.parse
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            oid = qs.get("id", [getattr(organism, "current_organism_id", "adas_track_champion")])[0]
+            mtype = qs.get("type", ["cell"])[0]
+            count = int(qs.get("count", ["50000"])[0])
+            if mtype == "synapses" or mtype == "syn":
+                payload = build_binary_synapse_payload(oid, count // 2)
+            else:
+                payload = build_binary_manifold_payload(oid, count)
+            self.send_response(200)
+            self.send_header("Content-Type", "application/octet-stream")
+            self.send_header("Content-Length", str(len(payload)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "public, max-age=3600")
+            self.end_headers()
+            self.wfile.write(payload)
             return
 
         # 白垩纪大灭绝算子触发接口

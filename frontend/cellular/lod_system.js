@@ -5,12 +5,13 @@ import * as THREE from 'three';
 import { scene, camera } from './scene_setup.js';
 import { org as defaultOrg } from './organism_model.js';
 import { currentOrganismBounds } from './spatial_bounds.js';
-import { FAMILY, FAMILY_COLOR } from './config.js';
+import { FAMILY, FAMILY_COLOR, getPrimitiveColor } from './config.js';
 import { getGlowTexture } from './texture_cache.js';
 import { getCellWorldRadius } from './spatial_bounds.js';
 import { CellView } from './cell_view.js';
 import { SynapseView } from './synapse_view.js';
 import { tractography } from './tractography.js';
+import { loadBinaryManifold, clearBinaryManifold } from './manifold_system.js';
 
 export const MIN_CELL_PIXELS = 20.0;
 export const MAX_SOLID_CELLS = 3000;
@@ -137,8 +138,7 @@ export function initLODCloud(s = scene, o = defaultOrg, b = currentOrganismBound
       py = cy + r * Math.sin(phi) * Math.sin(theta);
       pz = cz + r * Math.cos(phi);
 
-      const fam = c ? FAMILY(c.type) : 'metabolic';
-      colHex = FAMILY_COLOR[fam] || 0x38bdf8;
+      colHex = c ? getPrimitiveColor(c.type) : 0x38bdf8;
     }
 
     lodPositions[i * 3]     = px;
@@ -179,6 +179,14 @@ export function buildFullPointCloud(s = scene, o = defaultOrg, b = currentOrgani
   if (n === 0) return;
   const cellScale = (bnds && bnds.cellScale) || n;
 
+  if (cellScale >= 100000) {
+    loadBinaryManifold((orgObj && orgObj.lastOrganismId) || 'sdsc_mega_1million', scn, bnds);
+    if (lodPointsMesh) { lodPointsMesh.visible = false; }
+    return;
+  } else {
+    clearBinaryManifold(scn);
+  }
+
   if (cellScale >= 200 || n >= 80) {
     initLODCloud(scn, orgObj, bnds, computeAdaptiveLodCount(bnds, orgObj));
     return;
@@ -197,7 +205,7 @@ export function buildFullPointCloud(s = scene, o = defaultOrg, b = currentOrgani
     pos[i * 3]     = c.x || 0;
     pos[i * 3 + 1] = c.y || 0;
     pos[i * 3 + 2] = c.z || 0;
-    const hex = FAMILY_COLOR[FAMILY(c.type)] || 0x38bdf8;
+    const hex = c ? getPrimitiveColor(c.type) : 0x38bdf8;
     col[i * 3]     = ((hex >> 16) & 255) / 255;
     col[i * 3 + 1] = ((hex >> 8) & 255) / 255;
     col[i * 3 + 2] = (hex & 255) / 255;
@@ -316,7 +324,26 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
   // cellScale >= 100,000 为超大规模世界模型/流场 (1M, 10M, 100M+ 细胞)
   // 其余为离散微柱生命体 (1024 细胞 ADAS 冠军、1024 细胞量化冠军、1032 阵列等)
   const cellScale = (bnds && bnds.cellScale) || ((orgObj && orgObj.cellScale) ? orgObj.cellScale : n);
-  const isLargeScale = (cellScale >= 100000) || (n > 3000);
+  const isLargeScale = (cellScale >= 100000) || (n > 3000) || (typeof window !== 'undefined' && (window.currentLOD === '1m' || window.currentLOD === '10m' || window.currentLOD === '100m'));
+  const isCloseLook = _lodCamPos.length() < Math.max(160, (bnds.microDist || 180) * 1.05);
+
+  if (isLargeScale && !isCloseLook) {
+    // 宏观远景：超大规模 (1M/10M/100M) 100% 由 GPU 点云流形呈现，严禁任何实体圆球在全景下生成！
+    for (const [id, v] of cellViewsMap) {
+      v.group.visible = false;
+      cellViewPool.push(v);
+    }
+    cellViewsMap.clear();
+    views.cells = [];
+
+    for (const [key, v] of synViewsMap) {
+      v.group.visible = false;
+      synViewPool.push(v);
+    }
+    synViewsMap.clear();
+    views.syns = [];
+    return;
+  }
 
   _lodCandidates.length = 0;
 
