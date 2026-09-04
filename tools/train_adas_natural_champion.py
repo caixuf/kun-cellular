@@ -309,9 +309,8 @@ def train_natural_champion(generations=45, pop_size=20):
     lat_us = (time.perf_counter() - t_b0) / N_BENCH * 1e6
     print(f"  实测纯 C 单步推演延迟: {lat_us:.1f} μs (< 1000 μs 车规硬实时门禁, 100% 达标 PASS)")
 
-    # 导出 SDSC-BIN v2 与 JSON 检查点
+    # 导出 SDSC-BIN v2 二进制检查点
     bin_path = os.path.join(ROOT_DIR, "checkpoints", "adas_track_champion.bin")
-    json_path = os.path.join(ROOT_DIR, "checkpoints", "adas_track_champion.json")
 
     num_cells = best_controller.total_cells
     n_rec = best_controller.n_rec
@@ -421,23 +420,6 @@ def train_natural_champion(generations=45, pop_size=20):
         f.write(meta_bytes)
 
     print(f"  [SAVED] 二进制检查点: {bin_path} ({os.path.getsize(bin_path)/1024:.1f} KB)")
-
-    json_data = {
-        "organism_id": "adas_track_champion",
-        "n_receptors": n_rec,
-        "n_hidden": n_hidden,
-        "n_motors": n_mot,
-        "total_cells": num_cells,
-        "total_synapses": num_synapses,
-        "hidden_types": best_controller.hidden_types[:64],
-        "latency_us": round(lat_us, 1),
-        "W1": best_controller.W1.tolist(),
-        "W2": best_controller.W2.tolist(),
-        "metrics": meta["metrics"]
-    }
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(json_data, f)
-    print(f"  [SAVED] JSON检查点: {json_path}")
 
     return best_controller, meta
 

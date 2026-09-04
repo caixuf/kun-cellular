@@ -328,38 +328,55 @@ class LiveVehicleSimulator:
 
     def load_champion_checkpoint(self):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        json_path = os.path.join(base_dir, "checkpoints", "adas_track_champion.json")
         bin_path = os.path.join(base_dir, "checkpoints", "adas_track_champion.bin")
         loaded = False
 
-        if os.path.exists(json_path):
+        if os.path.exists(bin_path):
             try:
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                n_rec = data.get("n_receptors", 32)
-                n_hid = data.get("n_hidden", 768)
-                n_mot = data.get("n_motors", 224)
-                organ = SdscSiliconLifeOrgan(n_receptors=n_rec, n_hidden=n_hid, n_motors=n_mot)
-                organ.W1 = np.array(data["W1"], dtype=np.float32)
-                organ.W2 = np.array(data["W2"], dtype=np.float32)
-                if "hidden_types" in data:
-                    organ.hidden_types = data["hidden_types"]
-                self.champion_genome = organ
-                self.population = [organ] + [organ.mutate() for _ in range(5)]
-                self.total_active_cells = organ.total_cells
-                self.total_active_synapses = data.get("total_synapses", organ.W1.size + organ.W2.size)
-                self.dominant_hidden_types = organ.hidden_types[:12]
-                self.cell_types = ["REC"] * n_rec + [f"Op_{t}" for t in organ.hidden_types] + ["MOT"] * n_mot
-                self.cell_outs = [0.0] * self.total_active_cells
-                self.generation = data.get("generations", 45)
-                self.champion_fitness = data.get("metrics", {}).get("fitness", 99.8)
-                loaded = True
-                print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC {self.total_active_cells}-细胞 ADAS 驾驶皮层自然演化冠军模型: {json_path}")
+                bin_data = read_sdsc_binary(bin_path)
+                if bin_data and bin_data["num_cells"] > 0:
+                    num_cells = bin_data["num_cells"]
+                    n_rec = bin_data.get("input_dim", 32)
+                    n_mot = bin_data.get("output_dim", 224)
+                    n_hid = num_cells - n_rec - n_mot
+                    organ = SdscSiliconLifeOrgan(n_receptors=n_rec, n_hidden=n_hid, n_motors=n_mot)
+
+                    row_ptr = bin_data["row_ptr"]
+                    col_idx = bin_data["col_idx"]
+                    weights = bin_data["weights"]
+                    W1 = np.zeros((n_rec, n_hid), dtype=np.float32)
+                    W2 = np.zeros((n_hid, n_mot), dtype=np.float32)
+                    for r in range(n_rec):
+                        for idx in range(row_ptr[r], row_ptr[r+1]):
+                            c = int(col_idx[idx]) - n_rec
+                            if 0 <= c < n_hid:
+                                W1[r, c] = weights[idx]
+                    for h in range(n_hid):
+                        c_idx = n_rec + h
+                        for idx in range(row_ptr[c_idx], row_ptr[c_idx+1]):
+                            m = int(col_idx[idx]) - (n_rec + n_hid)
+                            if 0 <= m < n_mot:
+                                W2[h, m] = weights[idx]
+
+                    organ.W1 = W1
+                    organ.W2 = W2
+                    self.champion_genome = organ
+                    self.population = [organ] + [organ.mutate() for _ in range(5)]
+                    self.total_active_cells = organ.total_cells
+                    self.total_active_synapses = bin_data["num_synapses"]
+                    self.dominant_hidden_types = organ.hidden_types[:12]
+                    self.cell_types = ["REC"] * n_rec + [f"Op_{t}" for t in organ.hidden_types] + ["MOT"] * n_mot
+                    self.cell_outs = [0.0] * self.total_active_cells
+                    self.generation = bin_data.get("generation", 45) or 45
+                    meta = bin_data.get("meta", {})
+                    self.champion_fitness = meta.get("metrics", {}).get("fitness", 99.8) if meta else 99.8
+                    loaded = True
+                    print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 纯二进制 (SDSC-BIN v2) {self.total_active_cells}-细胞 ADAS 驾驶皮层自然演化冠军模型: {bin_path}")
             except Exception as e:
-                print(f"[LiveVehicleSimulator] 挂载JSON检查点失败: {e}")
+                print(f"[LiveVehicleSimulator] 挂载二进制检查点失败: {e}")
 
         if not loaded:
-            print(f"[LiveVehicleSimulator] 提示: 未找到自然演化冠军检查点，初始化默认 1024 细胞器官")
+            print(f"[LiveVehicleSimulator] 提示: 未找到自然演化冠军二进制检查点，初始化默认 1024 细胞器官")
 
     def fast_evolve_batch(self, target_generations=20, pop_size=12, sim_steps_per_agent=350):
         """
@@ -1612,14 +1629,12 @@ class SiliconCellularOrganism:
             ckpt_rel = biz.get("checkpoint", "")
             ckpt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ckpt_rel)
 
-            # 自动寻址与格式适配：优先使用当前指定路径，若不存在则检查 .bin / .json 伴侣文件
+            # 严格使用纯二进制 SDSC-BIN v2 (.bin) 检查点
             if not os.path.exists(ckpt_path):
-                if ckpt_path.endswith(".bin") and os.path.exists(ckpt_path[:-4] + ".json"):
-                    ckpt_path = ckpt_path[:-4] + ".json"
-                elif ckpt_path.endswith(".json") and os.path.exists(ckpt_path[:-5] + ".bin"):
+                if ckpt_path.endswith(".json") and os.path.exists(ckpt_path[:-5] + ".bin"):
                     ckpt_path = ckpt_path[:-5] + ".bin"
                 else:
-                    return {"status": "error", "message": f"Checkpoint not found: {ckpt_path}"}
+                    return {"status": "error", "message": f"Binary checkpoint not found: {ckpt_path}"}
 
             # 优先读取配套的 JSON 元数据（如有）用于特化物种逻辑
             json_fallback_path = ckpt_path[:-4] + ".json" if ckpt_path.endswith(".bin") else ckpt_path
@@ -1730,76 +1745,6 @@ class SiliconCellularOrganism:
                         SymbioticMacroCell(3, "EffectorRing", act_ids or [self.cells[-1].id], color="#f43f5e")
                     ]
 
-            # 兼容回退：若无标准二进制则回退至旧版 JSON 解析分支
-            elif oid == "adas_track_champion":
-                organ = ckpt.get("organ", {})
-                hidden_types = organ.get("hidden_types", [])
-                raw_syns = organ.get("synapses", [])
-                cell_gains = organ.get("cell_gains", [])
-                self.generation = ckpt.get("generations", 40)
-
-                rec_names = [
-                    "REC_CTE_L", "REC_CTE_R", "REC_CTE_COARSE_L", "REC_CTE_COARSE_R",
-                    "REC_PSI", "REC_PSI_STRONG", "REC_KAPPA", "REC_CENTRIPETAL",
-                    "REC_SPEED", "REC_VERR", "REC_VERR_NEG", "REC_DANGER"
-                ]
-                motor_names = [
-                    "MOTOR_STEER_P", "MOTOR_STEER_D", "MOTOR_ACC", "MOTOR_BRK",
-                    "EFFECTOR_STEER", "EFFECTOR_ACCEL"
-                ]
-
-                # 12 个感知受体
-                for i, rname in enumerate(rec_names):
-                    gain = float(cell_gains[i]) if i < len(cell_gains) else 1.0
-                    phi = math.pi * (i + 0.5) / len(rec_names)
-                    x = -170.0
-                    y = 90.0 * math.cos(phi)
-                    z = 80.0 * math.sin(phi)
-                    cell = PhysicalCell3D(i, rname, x, y, z, layer="L1_SENSORY")
-                    cell.gain = gain
-                    self.cells.append(cell)
-
-                # 192 个中间微柱代谢/记忆细胞
-                golden_ratio = (1 + math.sqrt(5)) / 2
-                hid_start = len(rec_names)
-                for i, ptype in enumerate(hidden_types):
-                    cid = hid_start + i
-                    gain = float(cell_gains[cid]) if cid < len(cell_gains) else 1.0
-                    phi = math.acos(1 - 2 * (i + 0.5) / len(hidden_types))
-                    theta = 2 * math.pi * i / golden_ratio
-                    rx, ry, rz = 85.0, 95.0, 115.0
-                    x = rx * math.sin(phi) * math.cos(theta)
-                    y = ry * math.sin(phi) * math.sin(theta)
-                    z = rz * math.cos(phi)
-                    cell = PhysicalCell3D(cid, ptype, x, y, z, layer="L2_ASSOCIATION")
-                    cell.gain = gain
-                    self.cells.append(cell)
-
-                # 6 个运动控制与效应器
-                mot_start = hid_start + len(hidden_types)
-                for i, mname in enumerate(motor_names):
-                    cid = mot_start + i
-                    gain = float(cell_gains[cid]) if cid < len(cell_gains) else 1.0
-                    x = 170.0
-                    y = -50.0 + (i % 3) * 50.0
-                    z = -30.0 + (i // 3) * 60.0
-                    cell = PhysicalCell3D(cid, mname, x, y, z, layer="L3_MOTOR")
-                    cell.gain = gain
-                    self.cells.append(cell)
-
-                # 真实 610 条突触
-                for syn in raw_syns:
-                    if len(syn) >= 3:
-                        u, v, w = int(syn[0]), int(syn[1]), float(syn[2])
-                        self.synapses.append({"from": u, "to": v, "weight": round(w, 4), "active": True})
-
-                self.macro_cells = len(self.cells)
-                self.macro_synapses = len(self.synapses)
-                self.symbiotic_macro_cells = [
-                    SymbioticMacroCell(1, "SensoryColumn", list(range(0, 12)), color="#22d3ee"),
-                    SymbioticMacroCell(2, "AssociationCortex", list(range(12, 204)), color="#34d399"),
-                    SymbioticMacroCell(3, "MotorEffectorCore", list(range(204, 210)), color="#f43f5e")
-                ]
 
             # 2. 空间迷宫自主寻优脱困生命体 (13 细胞)
             elif oid == "maze_navigation_champion":
@@ -4077,24 +4022,16 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/preset"):
-            ptype = "adas"
-            if "seed" in self.path: ptype = "seed"
-            elif "mega" in self.path or "1m" in self.path: ptype = "mega"
-            elif "maze" in self.path: ptype = "maze"
-            elif "doudizhu" in self.path or "game" in self.path: ptype = "doudizhu"
-            elif "fluid" in self.path: ptype = "fluid"
-            elif "primordial" in self.path: ptype = "primordial"
-            elif "quant" in self.path or "real" in self.path or "champion" in self.path: ptype = "quant"
-            elif "adas" in self.path or "vehicle" in self.path: ptype = "adas"
-
+            qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            ptype = qs.get("type", ["adas"])[0]
             if ptype == "seed": organism.load_seed_preset()
-            elif ptype == "mega": organism.load_mega_1m_preset()
+            elif ptype in ("mega", "1m"): organism.load_mega_1m_preset()
             elif ptype == "maze": organism.load_organism_by_id("maze_navigation_champion")
             elif ptype == "doudizhu": organism.load_organism_by_id("doudizhu_game_champion")
             elif ptype == "fluid": organism.load_organism_by_id("fluid_damper_champion")
             elif ptype == "quant": organism.load_organism_by_id("quant_master_champion")
-            elif ptype == "primordial": organism.load_organism_by_id("primordial_life_champion")
-            else: organism.load_organism_by_id("adas_track_champion")
+            elif ptype in ("adas", "vehicle"): organism.load_organism_by_id("adas_track_champion")
+            else: organism.load_organism_by_id(ptype)
 
             body = json.dumps({
                 "status": "ok", 

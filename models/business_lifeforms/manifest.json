@@ -153,7 +153,7 @@
       "synapses_scale": 1634,
       "checkpoint": "checkpoints/quant_cortical_array_champion.bin",
       "c_header": "tasks/quant/quant_types.hpp",
-      "test_suite": "checkpoints/quant_master_report.json",
+      "test_suite": "tools/train_multi_asset_cortical_array.cpp",
       "input_signals": [
         "价格动量多尺度频谱 (Momentum)",
         "高阶波动率曲率流 (Volatility)",
