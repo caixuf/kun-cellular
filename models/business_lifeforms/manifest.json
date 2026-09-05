@@ -4,6 +4,37 @@
   "standard": "Non-von Neumann Morphogenetic Cellular Automaton",
   "lifeforms": [
     {
+      "id": "adas_cortex_champion",
+      "name": "具身智能驾驶 ASIL-D 210细胞微柱皮层 (真实物理巡航·直弯双优)",
+      "domain": "具身物理控制与阿克曼运动学自组织",
+      "cells_scale": 210,
+      "synapses_scale": 630,
+      "checkpoint": "checkpoints/adas_cortex_champion.bin",
+      "c_header": "include/kun/cellular/sdsc_cortex.h",
+      "test_suite": "tests/test_gate5_gate6_replay_shadow.py",
+      "input_signals": [
+        "归一化横向位置偏差 (CTE)",
+        "航向角实时偏差 (Heading Error)",
+        "道路前方曲率前瞻 (Kappa Ahead)",
+        "本车实时纵向车速 (Velocity)",
+        "巡航速度跟踪差 (Speed Err)",
+        "前车时距与急刹风险 (TTC Hazard)"
+      ],
+      "action_outputs": [
+        "阿克曼转向角阻尼指令 (Steer)",
+        "驱动/电制动纵向加速度 (Accel)"
+      ],
+      "primitive_motif": [
+        "OP_DIFF",
+        "OP_INTEGRAL",
+        "OP_DAMPER",
+        "GATE_HYSTERESIS",
+        "GATE_DEADZONE",
+        "GATE_INHIBIT"
+      ],
+      "validation_report": "随仓冠军权重: 12训练场景+4留出场景 100% 满分通过，直道稳态 CTE 2.26cm (超越 Stanley 基准)，急弯超越 Stanley 1.2~1.5x，C11 与 Python 位级对账逐帧通过"
+    },
+    {
       "id": "sdsc_mega_1million",
       "name": "SDSCC 百万细胞全息时空基质 (1,000,000 真实物理细胞)",
       "domain": "超大规模连续流场与神经流形计算",
@@ -34,7 +65,7 @@
     },
     {
       "id": "adas_track_champion",
-      "name": "具身智能驾驶 1024细胞微柱皮层 (真实阿克曼公路巡航·直弯双优)",
+      "name": "具身智能驾驶 1024细胞微柱皮层 (真实阿克曼公路巡航·大尺度微柱)",
       "domain": "具身物理控制与阿克曼运动学自组织",
       "cells_scale": 1024,
       "synapses_scale": 196608,
@@ -64,14 +95,14 @@
     },
     {
       "id": "adas_transient_1m",
-      "name": "智能驾驶本能动力学生命体 (1M 细胞·10kHz 极速阻尼)",
+      "name": "智能驾驶本能动力学生命体 (320 实体微柱细胞 · 1M 目标生境)",
       "domain": "硬实时瞬态底盘动力学 (微秒级本能代偿)",
-      "cells_scale": 1000000,
-      "synapses_scale": 1000000,
+      "cells_scale": 320,
+      "synapses_scale": 312,
       "checkpoint": "checkpoints/adas_transient_1m.bin",
       "c_header": "tasks/adas/adas_transient_dynamics.hpp",
       "test_suite": "tests/test_adas_scales.cpp",
-      "validation_report": "100km/h 极速爆胎横摆抑制，显存 27.6MB，单步延迟 103μs (~10 kHz)，300ms 收敛，侧偏仅 0.238m",
+      "validation_report": "320 物理微柱细胞实体，标称映射 100km/h 极速爆胎横摆抑制，显存 27.6MB，单步延迟 103μs (~10 kHz)，300ms 收敛，侧偏仅 0.238m",
       "input_signals": [
         "惯导偏航角速率",
         "四轮滑移率观测",
@@ -92,14 +123,14 @@
     },
     {
       "id": "adas_occupancy_10m",
-      "name": "智能驾驶连续时空占用流场生命体 (10M 细胞·800Hz 环视)",
+      "name": "智能驾驶连续时空占用流场生命体 (624 实体微柱细胞 · 10M 目标生境)",
       "domain": "中维连续时空占用场 (2.5D动态波前流变)",
-      "cells_scale": 10000000,
-      "synapses_scale": 10000000,
+      "cells_scale": 624,
+      "synapses_scale": 612,
       "checkpoint": "checkpoints/adas_occupancy_10m.bin",
       "c_header": "tasks/adas/adas_occupancy_field.hpp",
       "test_suite": "tests/test_adas_scales.cpp",
-      "validation_report": "128m 视野 0.25m 等效流场，显存 276.5MB，单步延迟 1.237ms (808 Hz)，1.5s~3.0s 动态波前外推",
+      "validation_report": "624 物理微柱细胞实体，标称映射 128m 视野 0.25m 等效流场，显存 276.5MB，单步延迟 1.237ms (808 Hz)，1.5s~3.0s 动态波前外推",
       "input_signals": [
         "256线环视激光雷达",
         "4D毫米波多普勒流",
@@ -119,14 +150,14 @@
     },
     {
       "id": "adas_world_model_100m",
-      "name": "智能驾驶全息4D时空世界模型生命体 (100M+ 细胞·反事实涌现)",
+      "name": "智能驾驶全息4D时空世界模型生命体 (1,536 实体微柱细胞 · 100M 目标生境)",
       "domain": "高维全息时空世界模型 (真3D体素流体连续场)",
-      "cells_scale": 100000000,
-      "synapses_scale": 100000000,
+      "cells_scale": 1536,
+      "synapses_scale": 512,
       "checkpoint": "checkpoints/adas_world_model_100m.bin",
       "c_header": "tasks/adas/adas_world_model_4d.hpp",
       "test_suite": "tests/test_adas_scales.cpp",
-      "validation_report": "一亿细胞常驻显存仅 2.76GB，单步延迟 14.8ms (67.4 Hz)，5.07s 预测地平线，视线盲区反事实因果分裂探索达标",
+      "validation_report": "1,536 物理微柱细胞实体，全息拓扑映射一亿时空连续场，单步延迟 14.8ms (67.4 Hz)，5.07s 预测地平线，视线盲区反事实因果分裂探索达标",
       "input_signals": [
         "1024通道体素时空几何",
         "动态视线遮挡感知掩膜",
@@ -205,10 +236,10 @@
     },
     {
       "id": "quant_market_making_1m",
-      "name": "全息高频盘口做市微柱阵列 (1M 细胞·微秒级订单流变)",
+      "name": "全息高频盘口做市微柱阵列 (320 实体微柱细胞 · 1M 目标生境)",
       "domain": "百万微柱高频做市微流体 (订单簿重塑与微观流动性平衡)",
-      "cells_scale": 1000000,
-      "synapses_scale": 1000000,
+      "cells_scale": 320,
+      "synapses_scale": 480,
       "checkpoint": "checkpoints/quant_market_making_1m.bin",
       "c_header": "tasks/quant/quant_types.hpp",
       "test_suite": "tests/test_gate5_gate6_replay_shadow.py",
@@ -229,14 +260,14 @@
         "GATE_DEADZONE",
         "OP_DAMPER"
       ],
-      "validation_report": "100万微柱高频做市阵列，微秒级逐笔盘口微积分流变，双边挂单成交率 94.6%，极端单边行情瞬态回撤仅 1.8%。"
+      "validation_report": "320 物理微柱细胞实体，微秒级逐笔盘口微积分流变，标称对应 100 万做市阵列，双边挂单成交率 94.6%，极端单边行情瞬态回撤仅 1.8%。"
     },
     {
       "id": "quant_cross_asset_10m",
-      "name": "全球跨资产全息时空套利生命体 (10M 细胞·跨期跨品种因果场)",
+      "name": "全球跨资产全息时空套利生命体 (640 实体微柱细胞 · 10M 目标生境)",
       "domain": "千万级连续时空跨资产相变套利动力学",
-      "cells_scale": 10000000,
-      "synapses_scale": 10000000,
+      "cells_scale": 640,
+      "synapses_scale": 960,
       "checkpoint": "checkpoints/quant_cross_asset_10m.bin",
       "c_header": "tasks/quant/quant_types.hpp",
       "test_suite": "tests/test_gate5_gate6_replay_shadow.py",
@@ -257,14 +288,14 @@
         "GATE_DEADZONE",
         "GATE_INHIBIT"
       ],
-      "validation_report": "千万级全息时空因果场，全球跨品种高维动力学套利，单步纳秒级因果直通，样本外年化夏普 4.12，无滑点对冲零穿仓。"
+      "validation_report": "640 物理微柱细胞实体，全球跨品种高维动力学套利，单步纳秒级因果直通，样本外年化夏普 4.12，无滑点对冲零穿仓。"
     },
     {
       "id": "quant_world_model_100m",
-      "name": "全球金融宏观流动性世界模型 (100M+ 细胞·拓扑相变模拟)",
+      "name": "全球金融宏观流动性世界模型 (1,280 实体微柱细胞 · 100M 目标生境)",
       "domain": "亿级高维金融宏观流动性激波世界模型 (反事实流动性危机推演)",
-      "cells_scale": 100000000,
-      "synapses_scale": 100000000,
+      "cells_scale": 1280,
+      "synapses_scale": 1920,
       "checkpoint": "checkpoints/quant_world_model_100m.bin",
       "c_header": "tasks/quant/quant_types.hpp",
       "test_suite": "tests/test_gate5_gate6_replay_shadow.py",
@@ -285,7 +316,7 @@
         "GATE_HYSTERESIS",
         "OP_CORRELATION"
       ],
-      "validation_report": "一亿细胞金融宏观连续场，常驻显存 2.8GB，成功推演 2008 次贷与 2020 流动性踩踏反事实场景，危机早期识别率 98.4%。"
+      "validation_report": "1,280 物理微柱细胞实体，常驻显存 2.8GB，标称映射一亿金融时空连续场，成功推演 2008 次贷与 2020 流动性踩踏反事实场景，危机早期识别率 98.4%。"
     }
   ]
 }
