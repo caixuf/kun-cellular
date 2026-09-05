@@ -240,7 +240,7 @@
       "domain": "百万微柱高频做市微流体与三十年商品宏观因果储层",
       "cells_scale": 1000000,
       "synapses_scale": 2000000,
-      "checkpoint": "runs/quant_million_brain_evolved_champion.pt",
+      "checkpoint": "checkpoints/quant_market_making_1m.bin",
       "c_header": "tasks/quant/quant_types.hpp",
       "test_suite": "runs/quant_million_brain_walkforward_summary.json",
       "input_signals": [
@@ -297,7 +297,7 @@
       "domain": "亿级高维金融宏观流动性激波世界模型 (反事实流动性危机推演与UHF逐笔订单流穿透)",
       "cells_scale": 100000000,
       "synapses_scale": 200000000,
-      "checkpoint": "runs/hundred_million_champion.pt",
+      "checkpoint": "checkpoints/quant_world_model_100m.bin",
       "c_header": "tasks/quant/quant_types.hpp",
       "test_suite": "runs/hundred_million_summary.json",
       "input_signals": [

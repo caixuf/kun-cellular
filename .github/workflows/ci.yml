@@ -13,6 +13,20 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install Python Dependencies
+      run: |
+        python3 -m pip install --upgrade pip
+        pip install numpy torch pytest --index-url https://download.pytorch.org/whl/cpu
+
+    - name: Generate Scaled Checkpoint
+      run: |
+        python3 tools/export_sdsc_binary.py
+
     - name: Configure CMake
       run: cmake -B build -DCMAKE_BUILD_TYPE=Release
 
@@ -31,15 +45,10 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '22'
 
     - name: Run Frontend Syntax & Asset Check
       run: python3 tools/ci/check_frontend.py
-
-    - name: Install Python Dependencies
-      run: |
-        python3 -m pip install --upgrade pip
-        pip install numpy torch pytest --index-url https://download.pytorch.org/whl/cpu
 
     - name: Run Python Parity & System Gate Tests
       run: |

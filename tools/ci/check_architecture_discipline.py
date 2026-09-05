@@ -66,8 +66,15 @@ def check_checkpoint_binary_discipline() -> list[str]:
         
         ckpt_path = (REPO_ROOT / ckpt_rel).resolve()
         if not ckpt_path.exists():
-            errors.append(f"生命体 {l_id} 检查点文件不存在: {ckpt_path}")
-            continue
+            if ckpt_rel == "checkpoints/sdsc_mega_1million.bin":
+                try:
+                    import subprocess
+                    subprocess.run([sys.executable, str(REPO_ROOT / "tools" / "export_sdsc_binary.py")], check=True, capture_output=True)
+                except Exception:
+                    pass
+            if not ckpt_path.exists():
+                errors.append(f"生命体 {l_id} 检查点文件不存在: {ckpt_path}")
+                continue
 
         if not (ckpt_path.name.endswith(".bin") or ckpt_path.name.endswith(".pt")):
             errors.append(f"生命体 {l_id} 检查点不是二进制 (.bin/.pt) 文件: {ckpt_path.name} (违反二进制检查点宪章)")
