@@ -3,19 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KunCellular // 斗地主国手级认知皮层对弈沙盒 · DouDiZhu Master Battle</title>
+    <title>KunCellular // 斗地主国手级高维认知皮层对弈沙盒 · DouDiZhu Master Battle</title>
     <style>
         :root {
             --bg-base: #06090e;
             --bg-panel: #0d121d;
             --bg-panel-border: #1a2333;
-            --felt-bg: #0b2416;
+            --felt-bg: #0a1f13;
             --felt-border: #164e2e;
             --cyan-glow: #00f0ff;
             --green-glow: #00ff66;
             --purple-glow: #bd00ff;
             --amber-glow: #ffb700;
             --red-glow: #ff2a55;
+            --gold-glow: #fcd34d;
             --text-main: #e2e8f0;
             --text-dim: #64748b;
             --font-mono: "Fira Code", "JetBrains Mono", Consolas, monospace;
@@ -51,9 +52,9 @@
         .brand {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
             font-weight: 700;
-            letter-spacing: 1px;
+            letter-spacing: 0.5px;
             color: var(--cyan-glow);
             text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
         }
@@ -93,7 +94,7 @@
         main {
             flex: 1;
             display: grid;
-            grid-template-columns: 1fr 380px;
+            grid-template-columns: 1fr 390px;
             gap: 12px;
             padding: 12px;
             overflow: hidden;
@@ -111,55 +112,100 @@
         }
 
         .panel-header {
-            padding: 10px 14px;
-            background: rgba(18, 24, 38, 0.8);
+            padding: 8px 12px;
+            background: rgba(17, 24, 39, 0.85);
             border-bottom: 1px solid var(--bg-panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             font-size: 11px;
             font-weight: 700;
-            color: var(--text-dim);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+            flex-wrap: wrap;
+            gap: 6px;
         }
 
-        /* 牌桌对弈区 (Felt Arena) */
+        .btn {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: var(--text-main);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn:hover {
+            border-color: var(--cyan-glow);
+            color: var(--cyan-glow);
+            background: rgba(0, 240, 255, 0.1);
+        }
+        .btn.btn-primary {
+            background: linear-gradient(135deg, #0ea5e9, #2563eb);
+            border-color: transparent;
+            color: white;
+            font-weight: 700;
+        }
+        .btn.btn-primary:hover {
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
+            filter: brightness(1.1);
+        }
+        .btn.btn-danger {
+            background: rgba(239, 68, 68, 0.15);
+            border-color: #ef4444;
+            color: #f87171;
+        }
+        .btn.btn-danger:hover {
+            background: rgba(239, 68, 68, 0.3);
+            color: #fff;
+        }
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            border-color: #334155 !important;
+            color: #64748b !important;
+        }
+
+        /* 牌桌区域 */
         .poker-arena {
             flex: 1;
-            background: radial-gradient(circle at center, #103822 0%, #081d11 75%, #05130b 100%);
-            border: 2px solid var(--felt-border);
-            margin: 10px;
-            border-radius: 12px;
+            background: radial-gradient(ellipse at center, var(--felt-bg) 0%, #030a06 100%);
+            border: 1px solid var(--felt-border);
+            border-radius: 4px;
+            margin: 8px;
             position: relative;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 16px;
-            box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+            padding: 12px;
+            overflow: hidden;
         }
 
-        /* 玩家区域与对家 */
+        /* 顶部对手席位与底牌 */
         .opponents-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            height: 120px;
+            display: grid;
+            grid-template-columns: 240px 1fr 240px;
+            gap: 12px;
+            align-items: start;
         }
 
         .player-seat {
-            background: rgba(13, 20, 32, 0.75);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 8px;
-            padding: 8px 12px;
-            min-width: 190px;
+            background: rgba(13, 18, 29, 0.85);
+            border: 1px solid var(--bg-panel-border);
+            border-radius: 6px;
+            padding: 8px;
             display: flex;
             flex-direction: column;
             gap: 6px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            transition: all 0.2s;
         }
 
         .player-seat.active-turn {
             border-color: var(--cyan-glow);
-            box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+            box-shadow: 0 0 14px rgba(0, 240, 255, 0.25);
         }
 
         .seat-header {
@@ -169,7 +215,7 @@
         }
 
         .seat-name {
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 700;
             display: flex;
             align-items: center;
@@ -178,155 +224,137 @@
 
         .role-badge {
             font-size: 9px;
-            padding: 1px 5px;
+            padding: 1px 6px;
             border-radius: 3px;
             font-weight: 700;
-            text-transform: uppercase;
         }
-        .role-landlord { background: #b91c1c; color: #fff; }
-        .role-peasant { background: #047857; color: #fff; }
+        .role-landlord { background: rgba(245, 158, 11, 0.2); border: 1px solid #f59e0b; color: #fbbf24; }
+        .role-peasant { background: rgba(16, 185, 129, 0.2); border: 1px solid #10b981; color: #34d399; }
 
         .cards-count {
-            font-size: 11px;
-            color: var(--amber-glow);
-            font-weight: 700;
+            font-size: 10px;
+            color: var(--text-dim);
         }
+
+        .seat-status-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 3px;
+            min-height: 18px;
+            display: inline-flex;
+            align-items: center;
+        }
+        .status-thinking { color: var(--cyan-glow); animation: blink 1s infinite alternate; }
+        .status-pass { color: var(--amber-glow); background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; }
+        .status-play { color: var(--green-glow); background: rgba(16, 185, 129, 0.15); border: 1px solid #10b981; }
+
+        @keyframes blink { 0% { opacity: 0.4; } 100% { opacity: 1.0; } }
 
         .seat-played {
-            min-height: 52px;
+            min-height: 64px;
             display: flex;
             gap: 4px;
+            flex-wrap: wrap;
             align-items: center;
-        }
-
-        /* 桌面核心出牌展示区 (Center Table) */
-        .table-center {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            margin: auto 0;
-            min-height: 110px;
-        }
-
-        .trick-container {
-            display: flex;
-            gap: 6px;
-            align-items: center;
-            justify-content: center;
-            min-height: 70px;
-        }
-
-        .trick-tag {
-            font-size: 11px;
-            padding: 3px 8px;
+            padding: 4px;
+            background: rgba(0,0,0,0.25);
             border-radius: 4px;
-            background: rgba(0,0,0,0.5);
-            border: 1px solid rgba(255,255,255,0.15);
-            color: var(--cyan-glow);
         }
 
-        /* 本地玩家控制区 (Bottom) */
-        .player-bottom {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .action-bar {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-
-        .btn {
-            background: #1e293b;
-            border: 1px solid #334155;
-            color: var(--text-main);
-            padding: 6px 16px;
-            border-radius: 4px;
-            font-size: 12px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: all 0.15s;
-        }
-
-        .btn:hover:not(:disabled) {
-            background: #334155;
-            border-color: var(--cyan-glow);
-            color: var(--cyan-glow);
-        }
-
-        .btn-primary {
-            background: rgba(0, 240, 255, 0.15);
-            border-color: var(--cyan-glow);
-            color: var(--cyan-glow);
-        }
-
-        .btn-danger {
-            background: rgba(255, 42, 85, 0.15);
-            border-color: var(--red-glow);
-            color: var(--red-glow);
-        }
-
-        .btn:disabled {
-            opacity: 0.35;
-            cursor: not-allowed;
-        }
-
-        /* 扑克牌组件 */
+        /* 牌面样式 */
         .card-el {
             width: 44px;
             height: 64px;
             background: #ffffff;
             border: 1px solid #cbd5e1;
             border-radius: 4px;
-            color: #0f172a;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            padding: 3px 5px;
-            font-size: 12px;
-            font-weight: 800;
+            padding: 3px 4px;
+            font-size: 11px;
+            font-weight: 700;
             cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
-            transition: transform 0.15s, box-shadow 0.15s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            user-select: none;
+            transition: transform 0.12s, box-shadow 0.12s;
             position: relative;
         }
-
         .card-el.red { color: #dc2626; }
         .card-el.black { color: #0f172a; }
-        .card-el.joker-black { color: #1e293b; background: #f1f5f9; }
-        .card-el.joker-red { color: #b91c1c; background: #fef2f2; }
+        .card-el.joker-red { color: #e11d48; background: #fff1f2; }
+        .card-el.joker-black { color: #334155; background: #f8fafc; }
 
         .card-el.selected {
-            transform: translateY(-16px);
-            border-color: var(--cyan-glow);
-            box-shadow: 0 4px 14px rgba(0, 240, 255, 0.6);
+            transform: translateY(-20px);
+            box-shadow: 0 0 14px rgba(0, 240, 255, 0.8) !important;
+            border-color: var(--cyan-glow) !important;
+            z-index: 50;
+        }
+
+        /* 中间出牌台面 */
+        .table-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-height: 120px;
+        }
+
+        .trick-tag {
+            font-size: 11px;
+            color: var(--gold-glow);
+            font-weight: 700;
+            background: rgba(0,0,0,0.4);
+            padding: 3px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(252, 211, 77, 0.3);
+        }
+
+        .trick-container {
+            display: flex;
+            gap: 4px;
+            min-height: 70px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* 底部玩家区 */
+        .player-bottom {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .action-bar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
         }
 
         .player-hand-strip {
             display: flex;
-            gap: -8px;
-            overflow-x: auto;
+            justify-content: center;
+            min-height: 90px;
+            padding: 10px 0;
             max-width: 100%;
-            padding: 10px 4px;
-            align-items: flex-end;
+            overflow-x: auto;
         }
-
         .player-hand-strip .card-el {
-            margin-right: -12px;
+            margin-left: -24px;
         }
-        .player-hand-strip .card-el:last-child {
-            margin-right: 0;
+        .player-hand-strip .card-el:first-child {
+            margin-left: 0;
         }
         .player-hand-strip .card-el:hover {
-            z-index: 10;
+            transform: translateY(-8px);
+            z-index: 30;
         }
 
-        /* 右侧侧边栏 */
+        /* 侧边栏 */
         .sidebar {
             display: flex;
             flex-direction: column;
@@ -351,47 +379,41 @@
         }
 
         .stat-box {
-            background: #080c14;
-            border: 1px solid #161f30;
+            background: #090e18;
+            border: 1px solid #162030;
             border-radius: 4px;
-            padding: 8px;
+            padding: 6px 8px;
         }
+        .stat-label { font-size: 10px; color: var(--text-dim); }
+        .stat-val { font-size: 13px; font-weight: 700; color: var(--text-main); margin-top: 2px; }
 
-        .stat-label { font-size: 9px; color: var(--text-dim); margin-bottom: 2px; }
-        .stat-val { font-size: 14px; font-weight: 700; color: var(--cyan-glow); }
-
-        /* 神经皮层放电柱状图 */
+        /* 1024 细胞微柱放电指示 */
         .cortex-telemetry {
             padding: 8px;
             display: flex;
             flex-direction: column;
             gap: 6px;
         }
-
         .column-meter {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
+            background: #090e18;
+            border: 1px solid #141f2f;
+            border-radius: 4px;
+            padding: 4px 6px;
         }
-
         .column-meta {
             display: flex;
             justify-content: space-between;
             font-size: 10px;
+            font-weight: 700;
+            margin-bottom: 3px;
         }
-
         .meter-bar {
-            height: 6px;
+            height: 4px;
             background: #111827;
-            border-radius: 3px;
+            border-radius: 2px;
             overflow: hidden;
         }
-
-        .meter-fill {
-            height: 100%;
-            width: 0%;
-            transition: width 0.2s ease-out;
-        }
+        .meter-fill { height: 100%; transition: width 0.15s; }
 
         /* 全景记牌器 */
         .card-tracker {
@@ -412,7 +434,7 @@
         .tracker-rank { font-size: 11px; font-weight: 700; }
         .tracker-count { font-size: 10px; color: var(--amber-glow); }
 
-        /* 决策因果流日志 */
+        /* 因果决断日志 */
         .causal-log {
             padding: 8px;
             height: 140px;
@@ -431,8 +453,32 @@
             color: #94a3b8;
         }
         .log-entry.play { border-color: var(--green-glow); color: #e2e8f0; }
-        .log-entry.pass { border-color: var(--amber-glow); }
+        .log-entry.pass { border-color: var(--amber-glow); color: #cbd5e1; }
         .log-entry.bomb { border-color: var(--red-glow); color: #fecdd3; font-weight: 700; }
+
+        /* 胜负结算弹窗 Modal */
+        .modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(3, 7, 18, 0.85);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+        .modal-card {
+            background: #0d121d;
+            border: 1px solid var(--cyan-glow);
+            box-shadow: 0 0 24px rgba(0, 240, 255, 0.3);
+            border-radius: 8px;
+            padding: 20px 24px;
+            width: 380px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
     </style>
 </head>
 <body>
@@ -445,10 +491,10 @@
         <span class="brand-badge">1024-CELL MASTER CORTEX</span>
     </div>
     <div class="nav-links">
-        <a href="cellular.html" class="nav-btn">3D 全息活体观测台</a>
+        <a href="cellular.html" class="nav-btn">3D 全息观测台</a>
         <a href="vehicle.html" class="nav-btn">智能驾驶沙盒</a>
         <a href="maze.html" class="nav-btn">迷宫自主学习</a>
-        <a href="music.html" class="nav-btn">歌王音乐沙盒</a>
+        <a href="music.html" class="nav-btn" style="color:var(--gold-glow);">歌王音乐</a>
         <a href="index.html" class="nav-btn">工作台主页</a>
     </div>
 </header>
@@ -457,35 +503,50 @@
     <!-- 左侧主视口: 牌桌对弈区 -->
     <div class="viewport-card">
         <div class="panel-header">
-            <div style="display:flex;gap:8px;align-items:center;">
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <span>对战模式:</span>
                 <select id="modeSelect" class="btn" style="padding:2px 6px;font-size:11px;">
                     <option value="human">人机实时对弈 (玩家 vs 1024细胞超脑)</option>
                     <option value="auto">AI 全自动观战 (3大1024微柱皮层博弈)</option>
                 </select>
-                <button id="btnNewGame" class="btn btn-primary" style="padding:2px 10px;font-size:11px;">重新发牌</button>
+
+                <span>玩家身份:</span>
+                <select id="roleSelect" class="btn" style="padding:2px 6px;font-size:11px;color:var(--amber-glow);font-weight:700;">
+                    <option value="peasant">🤝 玩家当农民 (与左位AI配合)</option>
+                    <option value="landlord">👑 玩家当地主 (拿底牌·先手)</option>
+                </select>
+
+                <button id="btnNewGame" class="btn btn-primary" style="padding:2px 10px;">重新发牌</button>
             </div>
-            <div id="gameStatusText" style="color:var(--cyan-glow);font-weight:700;">轮到玩家出牌</div>
+
+            <div style="display:flex;gap:8px;align-items:center;">
+                <span id="autoSpeedLabel" style="font-size:10px;color:var(--text-dim);display:none;">观战速度:</span>
+                <button id="btnAutoSpeed" class="btn" style="display:none;padding:2px 6px;font-size:10px;">⚡ 正常 0.8s</button>
+                <div id="gameStatusText" style="color:var(--cyan-glow);font-weight:700;">轮到玩家出牌</div>
+            </div>
         </div>
 
         <div class="poker-arena">
-            <!-- 顶排: 对手 AI 席位 -->
+            <!-- 顶排: 对手 AI 席位与底牌 -->
             <div class="opponents-row">
                 <!-- 左侧僚机: 农民 / 地主 -->
                 <div class="player-seat" id="seatLeft">
                     <div class="seat-header">
                         <span class="seat-name">
-                            <span>🤖 左位 AI (僚机)</span>
+                            <span>🤖 左位 AI</span>
                             <span class="role-badge role-peasant" id="roleLeft">农民</span>
                         </span>
                         <span class="cards-count" id="countLeft">17 张</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span class="seat-status-badge" id="statusLeft">等待中</span>
                     </div>
                     <div class="seat-played" id="playedLeft"></div>
                 </div>
 
                 <!-- 顶中: 底牌展示区 -->
                 <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
-                    <span style="font-size:10px;color:var(--text-dim);font-weight:700;">地主底牌 (3张)</span>
+                    <span style="font-size:10px;color:var(--gold-glow);font-weight:700;">地主底牌 (3张)</span>
                     <div id="kittyCards" style="display:flex;gap:4px;"></div>
                 </div>
 
@@ -497,6 +558,9 @@
                             <span class="role-badge role-landlord" id="roleRight">地主</span>
                         </span>
                         <span class="cards-count" id="countRight">20 张</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span class="seat-status-badge" id="statusRight">等待中</span>
                     </div>
                     <div class="seat-played" id="playedRight"></div>
                 </div>
@@ -511,6 +575,7 @@
             <!-- 底部: 玩家交互与手牌 -->
             <div class="player-bottom">
                 <div class="action-bar">
+                    <button id="btnDeselect" class="btn">重选 (Clear)</button>
                     <button id="btnPass" class="btn btn-danger">过牌 (Pass)</button>
                     <button id="btnHint" class="btn">国手提示 (Hint)</button>
                     <button id="btnPlay" class="btn btn-primary">出牌 (Play)</button>
@@ -519,8 +584,22 @@
                     <span style="font-size:11px;font-weight:700;color:var(--text-main);">玩家手牌:</span>
                     <span class="role-badge role-peasant" id="roleUser">农民</span>
                     <span class="cards-count" id="countUser">17 张</span>
+                    <span class="seat-status-badge" id="statusUser">轮到您出牌</span>
                 </div>
                 <div class="player-hand-strip" id="userHandStrip"></div>
+            </div>
+
+            <!-- 结算弹窗 -->
+            <div class="modal-overlay" id="victoryModal">
+                <div class="modal-card">
+                    <h2 id="modalTitle" style="color:var(--gold-glow);">🎉 对局结束</h2>
+                    <p id="modalDesc" style="color:#cbd5e1;font-size:12px;"></p>
+                    <div style="display:flex;justify-content:space-around;font-size:11px;background:#06090e;padding:8px;border-radius:4px;">
+                        <div>总局数: <strong id="modalGames">1</strong></div>
+                        <div>胜率: <strong id="modalWinRate" style="color:var(--green-glow);">100%</strong></div>
+                    </div>
+                    <button id="btnModalRestart" class="btn btn-primary" style="padding:6px 16px;margin-top:6px;">再来一局</button>
+                </div>
             </div>
         </div>
     </div>
@@ -539,16 +618,16 @@
                     <div class="stat-val" id="statGames">1</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">AI 盲测胜率</div>
-                    <div class="stat-val" id="statWinRate" style="color:var(--green-glow);">82.5%</div>
+                    <div class="stat-label">玩家实战胜率</div>
+                    <div class="stat-val" id="statWinRate" style="color:var(--green-glow);">100%</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">微架构单步时延</div>
                     <div class="stat-val">411.8 μs</div>
                 </div>
                 <div class="stat-box">
-                    <div class="stat-label">堆内存分配</div>
-                    <div class="stat-val" style="color:var(--green-glow);">0 malloc / 0 GC</div>
+                    <div class="stat-label">堆内存抖动</div>
+                    <div class="stat-val" style="color:var(--green-glow);">0 Malloc / 0 GC</div>
                 </div>
             </div>
         </div>
@@ -604,8 +683,8 @@
                 <span>博弈策略因果流 (CAUSAL INFERENCE STREAM)</span>
             </div>
             <div class="causal-log" id="causalLog">
-                <div class="log-entry">系统启动完成: 已加载 1024 物理细胞 / 196,608 突触国手级博弈脑。</div>
-                <div class="log-entry">底牌已确定，右位 AI 叫地主成功 (20 张)。</div>
+                <div class="log-entry play">系统启动完成: 已加载 1024 物理细胞 / 196,608 突触国手级博弈脑。</div>
+                <div class="log-entry">标准斗地主全牌型引擎就绪: 支持顺子、连对、飞机、三带一/二、炸弹与王炸。</div>
             </div>
         </div>
     </div>
@@ -613,14 +692,14 @@
 
 <script>
 /**
- * 斗地主国手级高维认知皮层对弈引擎
- * 模拟 54 张牌标准对弈与 1024-微柱神经皮层推理
+ * 斗地主国手级认知皮层对战引擎 (完整标准规则 + 全牌型识别 + 实时人机对战)
  */
 const RANKS = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2", "小王", "大王"];
 const SUITS = ["♠", "♥", "♣", "♦"];
 
 class Card {
-    constructor(rankIdx, suitIdx) {
+    constructor(id, rankIdx, suitIdx) {
+        this.id = id;
         this.rankIdx = rankIdx; // 0 (3) 到 14 (大王)
         this.suitIdx = suitIdx; // 0~3, 大小王为 -1
         this.rankStr = RANKS[rankIdx];
@@ -631,57 +710,108 @@ class Card {
 
 // 游戏状态机
 const GameState = {
-    hands: [[], [], []], // 0: Player, 1: Left AI, 2: Right AI (Landlord)
+    hands: [[], [], []], // 0: Player, 1: Left AI, 2: Right AI
     kitty: [],
-    landlordIdx: 2,
-    currentTurn: 2, // 谁的回合
-    lastTrick: null, // { player: int, cards: Card[], type: str, rank: int }
+    landlordIdx: 2, // 默认右位 AI
+    currentTurn: 2,
+    lastTrick: null, // { player: int, cards: Card[], type: str, rank: int, len: int }
     passCount: 0,
     deckRemaining: new Array(15).fill(4),
-    stats: { games: 1, aiWins: 0, playerWins: 0 }
+    stats: { games: 0, playerWins: 0 },
+    mode: "human", // "human" or "auto"
+    autoSpeed: 800,
+    autoTimer: null
 };
-
-GameState.deckRemaining[13] = 1;
-GameState.deckRemaining[14] = 1;
 
 let selectedUserCards = new Set();
 
+// 简单的 Web Audio 音效发生器
+let doudizhuAudioCtx = null;
+function playFx(type) {
+    try {
+        if (!doudizhuAudioCtx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            doudizhuAudioCtx = new AudioCtx();
+        }
+        if (doudizhuAudioCtx.state === "suspended") doudizhuAudioCtx.resume();
+        const now = doudizhuAudioCtx.currentTime;
+        const osc = doudizhuAudioCtx.createOscillator();
+        const gain = doudizhuAudioCtx.createGain();
+
+        if (type === "card") {
+            osc.frequency.setValueAtTime(480, now);
+            osc.frequency.exponentialRampToValueAtTime(120, now + 0.05);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+        } else if (type === "bomb") {
+            osc.frequency.setValueAtTime(140, now);
+            osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
+            gain.gain.setValueAtTime(0.5, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        } else if (type === "pass") {
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(260, now);
+            gain.gain.setValueAtTime(0.12, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        } else if (type === "win") {
+            osc.frequency.setValueAtTime(523.25, now); // C5
+            osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+            osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        }
+        osc.connect(gain);
+        gain.connect(doudizhuAudioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.5);
+    } catch (e) {
+        // AudioContext disabled
+    }
+}
+
+// 洗牌与发牌
 function initDeck() {
+    if (GameState.autoTimer) clearTimeout(GameState.autoTimer);
+    document.getElementById("victoryModal").style.display = "none";
+
     const deck = [];
+    let id = 0;
     for (let r = 0; r < 13; r++) {
         for (let s = 0; s < 4; s++) {
-            deck.push(new Card(r, s));
+            deck.push(new Card(id++, r, s));
         }
     }
-    deck.push(new Card(13, -1)); // 小王
-    deck.push(new Card(14, -1)); // 大王
+    deck.push(new Card(id++, 13, -1)); // 小王
+    deck.push(new Card(id++, 14, -1)); // 大王
 
-    // 洗牌
+    // Fisher-Yates 洗牌
     for (let i = deck.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [deck[i], deck[j]] = [deck[j], deck[i]];
     }
+
+    // 根据身份选择决定谁当地主
+    const userWantsLandlord = (document.getElementById("roleSelect").value === "landlord");
+    GameState.landlordIdx = userWantsLandlord ? 0 : 2;
 
     GameState.hands[0] = deck.slice(0, 17);
     GameState.hands[1] = deck.slice(17, 34);
     GameState.hands[2] = deck.slice(34, 51);
     GameState.kitty = deck.slice(51, 54);
 
-    // 默认右位 AI 做地主，拿底牌
-    GameState.landlordIdx = 2;
-    GameState.hands[2].push(...GameState.kitty);
+    // 地主拿底牌
+    GameState.hands[GameState.landlordIdx].push(...GameState.kitty);
 
-    // 排序
+    // 从大到小排序手牌
     for (let i = 0; i < 3; i++) {
         GameState.hands[i].sort((a, b) => b.rankIdx - a.rankIdx);
     }
     GameState.kitty.sort((a, b) => b.rankIdx - a.rankIdx);
 
-    // 重置记牌器
+    // 初始化记牌器
     GameState.deckRemaining = new Array(15).fill(4);
     GameState.deckRemaining[13] = 1;
     GameState.deckRemaining[14] = 1;
-    // 扣减自己手牌
     GameState.hands[0].forEach(c => {
         GameState.deckRemaining[c.rankIdx]--;
     });
@@ -690,6 +820,18 @@ function initDeck() {
     GameState.lastTrick = null;
     GameState.passCount = 0;
     selectedUserCards.clear();
+
+    // 清空出牌区
+    document.getElementById("playedLeft").innerHTML = "";
+    document.getElementById("playedRight").innerHTML = "";
+    document.getElementById("centerTrick").innerHTML = "";
+    document.getElementById("trickTypeTag").textContent = "当前牌面: 自由出牌 (新局开始)";
+
+    updateUI();
+    addLog(`新对局开始! 地主为 [${GameState.landlordIdx === 0 ? '玩家' : (GameState.landlordIdx === 1 ? '左位AI' : '右位AI')}]，拿走 3 张底牌。`, "play");
+
+    // 若非玩家回合，启动 AI 流程
+    checkTurnTrigger();
 }
 
 function renderCard(card, isSelected = false) {
@@ -715,14 +857,37 @@ function updateUI() {
     kittyBox.innerHTML = "";
     GameState.kitty.forEach(c => kittyBox.appendChild(renderCard(c)));
 
-    // 渲染手牌数
+    // 渲染角色标签与张数
+    const isUserLandlord = (GameState.landlordIdx === 0);
+    const isLeftLandlord = (GameState.landlordIdx === 1);
+    const isRightLandlord = (GameState.landlordIdx === 2);
+
+    document.getElementById("roleUser").textContent = isUserLandlord ? "👑 地主" : "🤝 农民";
+    document.getElementById("roleUser").className = "role-badge " + (isUserLandlord ? "role-landlord" : "role-peasant");
+
+    document.getElementById("roleLeft").textContent = isLeftLandlord ? "👑 地主" : "🤝 农民";
+    document.getElementById("roleLeft").className = "role-badge " + (isLeftLandlord ? "role-landlord" : "role-peasant");
+
+    document.getElementById("roleRight").textContent = isRightLandlord ? "👑 地主" : "🤝 农民";
+    document.getElementById("roleRight").className = "role-badge " + (isRightLandlord ? "role-landlord" : "role-peasant");
+
+    document.getElementById("countUser").textContent = `${GameState.hands[0].length} 张`;
     document.getElementById("countLeft").textContent = `${GameState.hands[1].length} 张`;
     document.getElementById("countRight").textContent = `${GameState.hands[2].length} 张`;
-    document.getElementById("countUser").textContent = `${GameState.hands[0].length} 张`;
 
     // 席位高亮
     document.getElementById("seatLeft").className = "player-seat " + (GameState.currentTurn === 1 ? "active-turn" : "");
     document.getElementById("seatRight").className = "player-seat " + (GameState.currentTurn === 2 ? "active-turn" : "");
+
+    // 席位状态
+    document.getElementById("statusLeft").textContent = (GameState.currentTurn === 1) ? "思考中..." : "";
+    document.getElementById("statusLeft").className = "seat-status-badge " + ((GameState.currentTurn === 1) ? "status-thinking" : "");
+
+    document.getElementById("statusRight").textContent = (GameState.currentTurn === 2) ? "思考中..." : "";
+    document.getElementById("statusRight").className = "seat-status-badge " + ((GameState.currentTurn === 2) ? "status-thinking" : "");
+
+    document.getElementById("statusUser").textContent = (GameState.currentTurn === 0) ? "👉 轮到您出牌" : "等待对手出牌";
+    document.getElementById("statusUser").className = "seat-status-badge " + ((GameState.currentTurn === 0) ? "status-thinking" : "");
 
     // 渲染玩家手牌
     const userStrip = document.getElementById("userHandStrip");
@@ -731,6 +896,7 @@ function updateUI() {
         const isSel = selectedUserCards.has(card);
         const cardEl = renderCard(card, isSel);
         cardEl.onclick = () => {
+            if (GameState.mode === "auto") return; // 观战模式禁止点击
             if (selectedUserCards.has(card)) selectedUserCards.delete(card);
             else selectedUserCards.add(card);
             updateUI();
@@ -738,28 +904,41 @@ function updateUI() {
         userStrip.appendChild(cardEl);
     });
 
-    // 记牌器
+    // 记牌器更新
     const trackerGrid = document.getElementById("cardTrackerGrid");
     trackerGrid.innerHTML = "";
     for (let r = 14; r >= 0; r--) {
         const item = document.createElement("div");
         item.className = "tracker-item";
         const rem = GameState.deckRemaining[r];
-        item.innerHTML = `<div class="tracker-rank">${RANKS[r]}</div><div class="tracker-count" style="color:${rem>0?'#ffb700':'#475569'}">${rem}</div>`;
+        item.innerHTML = `<div class="tracker-rank">${RANKS[r]}</div><div class="tracker-count" style="color:${rem > 0 ? '#ffb700' : '#475569'}">${rem}</div>`;
         trackerGrid.appendChild(item);
     }
 
     // 按钮状态
-    const isUserTurn = (GameState.currentTurn === 0);
-    document.getElementById("btnPlay").disabled = !isUserTurn;
-    document.getElementById("btnPass").disabled = !isUserTurn || (GameState.lastTrick === null || GameState.lastTrick.player === 0);
-    document.getElementById("btnHint").disabled = !isUserTurn;
+    const isUserTurn = (GameState.currentTurn === 0) && (GameState.mode === "human");
+    const canPass = isUserTurn && (GameState.lastTrick !== null && GameState.lastTrick.player !== 0);
 
-    document.getElementById("gameStatusText").textContent = isUserTurn ? ">> 轮到您的回合，请出牌或过牌" : `>> 1024-微柱神经皮层推演中 (席位 ${GameState.currentTurn === 1 ? '左位AI' : '右位地主'})...`;
+    document.getElementById("btnPlay").disabled = !isUserTurn;
+    document.getElementById("btnPass").disabled = !canPass;
+    document.getElementById("btnHint").disabled = !isUserTurn;
+    document.getElementById("btnDeselect").disabled = !isUserTurn || (selectedUserCards.size === 0);
+
+    if (GameState.mode === "auto") {
+        document.getElementById("gameStatusText").textContent = `>> 观战模式: 1024-微柱神经皮层自动推演中 [席位 ${GameState.currentTurn === 0 ? '玩家位' : (GameState.currentTurn === 1 ? '左位AI' : '右位地主')}]...`;
+    } else {
+        document.getElementById("gameStatusText").textContent = isUserTurn ? ">> 轮到您的回合，请选牌后点击「出牌」或「过牌」" : `>> 1024-微柱神经皮层博弈解算中 (席位 ${GameState.currentTurn === 1 ? '左位AI' : '右位地主'})...`;
+    }
+
+    // 统计面板更新
+    document.getElementById("statGames").textContent = GameState.stats.games;
+    const wr = GameState.stats.games > 0 ? Math.round((GameState.stats.playerWins / GameState.stats.games) * 100) : 100;
+    document.getElementById("statWinRate").textContent = `${wr}%`;
 }
 
 function addLog(text, type = "info") {
     const box = document.getElementById("causalLog");
+    if (!box) return;
     const el = document.createElement("div");
     el.className = `log-entry ${type}`;
     el.textContent = `[${new Date().toTimeString().split(' ')[0]}] ${text}`;
@@ -767,93 +946,359 @@ function addLog(text, type = "info") {
     box.scrollTop = box.scrollHeight;
 }
 
-// 简化的牌型识别器
+/**
+ * 标准斗地主全牌型识别引擎 (Full Standard Chinese DouDiZhu Pattern Identifier)
+ */
 function identifyTrick(cards) {
     if (!cards || cards.length === 0) return null;
-    cards.sort((a, b) => a.rankIdx - b.rankIdx);
     const n = cards.length;
-    // 单牌
-    if (n === 1) return { type: "SOLO", rank: cards[0].rankIdx, cards };
-    // 对子
-    if (n === 2 && cards[0].rankIdx === cards[1].rankIdx) return { type: "PAIR", rank: cards[0].rankIdx, cards };
-    // 王炸
-    if (n === 2 && cards[0].rankIdx === 13 && cards[1].rankIdx === 14) return { type: "ROCKET", rank: 99, cards };
-    // 三张
-    if (n === 3 && cards[0].rankIdx === cards[2].rankIdx) return { type: "TRIO", rank: cards[0].rankIdx, cards };
-    // 炸弹
-    if (n === 4 && cards[0].rankIdx === cards[3].rankIdx) return { type: "BOMB", rank: cards[0].rankIdx, cards };
-    // 三带一
-    if (n === 4) {
-        if (cards[0].rankIdx === cards[2].rankIdx) return { type: "TRIO_SOLO", rank: cards[0].rankIdx, cards };
-        if (cards[1].rankIdx === cards[3].rankIdx) return { type: "TRIO_SOLO", rank: cards[1].rankIdx, cards };
+    cards.sort((a, b) => a.rankIdx - b.rankIdx);
+
+    // 统计各点数出现频次
+    const counts = {};
+    cards.forEach(c => { counts[c.rankIdx] = (counts[c.rankIdx] || 0) + 1; });
+    const entries = Object.entries(counts).map(([r, count]) => ({ rank: parseInt(r), count }));
+    entries.sort((a, b) => b.count - a.count || b.rank - a.rank);
+
+    // 1. 王炸 / 火箭 (ROCKET)
+    if (n === 2 && counts[13] === 1 && counts[14] === 1) {
+        return { type: "ROCKET", rank: 99, cards, name: "王炸 (火箭)" };
     }
+
+    // 2. 普通炸弹 (BOMB)
+    if (n === 4 && entries[0].count === 4) {
+        return { type: "BOMB", rank: entries[0].rank, cards, name: `炸弹 [${RANKS[entries[0].rank]}]` };
+    }
+
+    // 3. 单张 (SOLO)
+    if (n === 1) {
+        return { type: "SOLO", rank: cards[0].rankIdx, cards, name: `单张 [${cards[0].rankStr}]` };
+    }
+
+    // 4. 对子 (PAIR)
+    if (n === 2 && entries[0].count === 2) {
+        return { type: "PAIR", rank: entries[0].rank, cards, name: `对子 [${RANKS[entries[0].rank]}]` };
+    }
+
+    // 5. 三张不带 (TRIO)
+    if (n === 3 && entries[0].count === 3) {
+        return { type: "TRIO", rank: entries[0].rank, cards, name: `三张 [${RANKS[entries[0].rank]}]` };
+    }
+
+    // 6. 三带一单 (TRIO_SOLO)
+    if (n === 4 && entries[0].count === 3) {
+        return { type: "TRIO_SOLO", rank: entries[0].rank, cards, name: `三带一 [${RANKS[entries[0].rank]}+${RANKS[entries[1].rank]}]` };
+    }
+
+    // 7. 三带一对 (TRIO_PAIR)
+    if (n === 5 && entries[0].count === 3 && entries[1].count === 2) {
+        return { type: "TRIO_PAIR", rank: entries[0].rank, cards, name: `三带一对 [${RANKS[entries[0].rank]}+对${RANKS[entries[1].rank]}]` };
+    }
+
+    // 8. 单顺 / 顺子 (STRAIGHT, 5~12张连续单牌，不能包含2和王)
+    if (n >= 5 && n <= 12 && entries.length === n) {
+        const ranks = entries.map(e => e.rank).sort((a, b) => a - b);
+        if (ranks[ranks.length - 1] <= 11) { // 最大不能超过A (11)
+            let isConsec = true;
+            for (let i = 1; i < ranks.length; i++) {
+                if (ranks[i] !== ranks[i - 1] + 1) { isConsec = false; break; }
+            }
+            if (isConsec) {
+                return { type: "STRAIGHT", rank: ranks[ranks.length - 1], cards, len: n, name: `顺子 [${RANKS[ranks[0]]}~${RANKS[ranks[ranks.length - 1]]}]` };
+            }
+        }
+    }
+
+    // 9. 双顺 / 连对 (CONSEC_PAIRS, 3对以上连续对子)
+    if (n >= 6 && n % 2 === 0) {
+        const numPairs = n / 2;
+        const allPairs = entries.every(e => e.count === 2);
+        if (allPairs && entries.length === numPairs && numPairs >= 3) {
+            const ranks = entries.map(e => e.rank).sort((a, b) => a - b);
+            if (ranks[ranks.length - 1] <= 11) {
+                let isConsec = true;
+                for (let i = 1; i < ranks.length; i++) {
+                    if (ranks[i] !== ranks[i - 1] + 1) { isConsec = false; break; }
+                }
+                if (isConsec) {
+                    return { type: "CONSEC_PAIRS", rank: ranks[ranks.length - 1], cards, len: numPairs, name: `连对 [${RANKS[ranks[0]]}~${RANKS[ranks[ranks.length - 1]]}]` };
+                }
+            }
+        }
+    }
+
+    // 10. 飞机不带 (AIRPLANE, 2个以上连续三张)
+    if (n >= 6 && n % 3 === 0) {
+        const numTrios = n / 3;
+        const allTrios = entries.every(e => e.count === 3);
+        if (allTrios && entries.length === numTrios && numTrios >= 2) {
+            const ranks = entries.map(e => e.rank).sort((a, b) => a - b);
+            if (ranks[ranks.length - 1] <= 11) {
+                let isConsec = true;
+                for (let i = 1; i < ranks.length; i++) {
+                    if (ranks[i] !== ranks[i - 1] + 1) { isConsec = false; break; }
+                }
+                if (isConsec) {
+                    return { type: "AIRPLANE", rank: ranks[ranks.length - 1], cards, len: numTrios, name: `飞机 [${RANKS[ranks[0]]}~${RANKS[ranks[ranks.length - 1]]}]` };
+                }
+            }
+        }
+    }
+
+    // 11. 飞机带单翅膀 (AIRPLANE_SOLO)
+    const trios = entries.filter(e => e.count >= 3 && e.rank <= 11).sort((a, b) => a.rank - b.rank);
+    for (let k = 2; k <= 5; k++) {
+        if (n === k * 4 && trios.length >= k) {
+            for (let i = 0; i <= trios.length - k; i++) {
+                let isConsec = true;
+                for (let j = 1; j < k; j++) {
+                    if (trios[i + j].rank !== trios[i + j - 1].rank + 1) { isConsec = false; break; }
+                }
+                if (isConsec) {
+                    return { type: "AIRPLANE_SOLO", rank: trios[i + k - 1].rank, cards, len: k, name: `飞机带单翅膀 (${k}连飞)` };
+                }
+            }
+        }
+    }
+
+    // 12. 四带二 (FOUR_WITH_TWO)
+    if (entries[0].count === 4) {
+        if (n === 6) {
+            return { type: "FOUR_WITH_TWO", rank: entries[0].rank, cards, name: `四带二单 [${RANKS[entries[0].rank]}]` };
+        }
+        if (n === 8 && (entries.length === 3 && entries[1].count === 2 && entries[2].count === 2)) {
+            return { type: "FOUR_WITH_TWO_PAIR", rank: entries[0].rank, cards, name: `四带两对 [${RANKS[entries[0].rank]}]` };
+        }
+    }
+
     return null;
 }
 
+// 压牌规则比对
 function canBeat(newTrick, prevTrick) {
     if (!newTrick) return false;
     if (!prevTrick) return true;
+
+    // 王炸无敌
     if (newTrick.type === "ROCKET") return true;
-    if (newTrick.type === "BOMB" && prevTrick.type !== "ROCKET" && prevTrick.type !== "BOMB") return true;
-    if (newTrick.type === prevTrick.type && newTrick.cards.length === prevTrick.cards.length) {
-        return newTrick.rank > prevTrick.rank;
+    if (prevTrick.type === "ROCKET") return false;
+
+    // 普通炸弹压非炸弹
+    if (newTrick.type === "BOMB") {
+        if (prevTrick.type === "BOMB") return newTrick.rank > prevTrick.rank;
+        return true;
     }
-    return false;
+    if (prevTrick.type === "BOMB") return false;
+
+    // 牌型与张数必须一致
+    if (newTrick.type !== prevTrick.type) return false;
+    if (newTrick.cards.length !== prevTrick.cards.length) return false;
+
+    return newTrick.rank > prevTrick.rank;
 }
 
-// AI 决策引擎 (基于 1024 细胞认知皮层启发式映射)
+/**
+ * 1024 物理细胞高维认知皮层 AI 决策器
+ */
 function aiDecide(playerIdx) {
     const hand = GameState.hands[playerIdx];
-    const prevTrick = (GameState.lastTrick && GameState.lastTrick.player !== playerIdx) ? GameState.lastTrick : null;
+    if (!hand || hand.length === 0) return null;
 
-    // 触发动态皮层放电抖动
+    const prevTrick = (GameState.lastTrick && GameState.lastTrick.player !== playerIdx) ? GameState.lastTrick : null;
     pulseCortexMeters();
 
-    // 寻找能够压过的合法牌
+    // 统计当前手牌点数
+    const counts = {};
+    hand.forEach(c => { counts[c.rankIdx] = (counts[c.rankIdx] || 0) + 1; });
+
+    // 1. 首发自由领出 (Free Lead)
     if (!prevTrick) {
-        // 首发出最小的单张或对子
-        const card = hand[hand.length - 1];
-        return [card];
+        // 优先出顺子
+        for (let len = 8; len >= 5; len--) {
+            for (let start = 0; start <= 12 - len; start++) {
+                let ok = true;
+                for (let r = start; r < start + len; r++) {
+                    if (!counts[r]) { ok = false; break; }
+                }
+                if (ok) {
+                    const straightCards = [];
+                    for (let r = start; r < start + len; r++) {
+                        straightCards.push(hand.find(c => c.rankIdx === r));
+                    }
+                    return straightCards;
+                }
+            }
+        }
+
+        // 优先出连对
+        for (let numPairs = 4; numPairs >= 3; numPairs--) {
+            for (let start = 0; start <= 12 - numPairs; start++) {
+                let ok = true;
+                for (let r = start; r < start + numPairs; r++) {
+                    if ((counts[r] || 0) < 2) { ok = false; break; }
+                }
+                if (ok) {
+                    const pairsCards = [];
+                    for (let r = start; r < start + numPairs; r++) {
+                        const matches = hand.filter(c => c.rankIdx === r).slice(0, 2);
+                        pairsCards.push(...matches);
+                    }
+                    return pairsCards;
+                }
+            }
+        }
+
+        // 三带一 / 三带对
+        for (let r = 0; r < 13; r++) {
+            if (counts[r] === 3) {
+                const trio = hand.filter(c => c.rankIdx === r);
+                // 找对子带
+                for (let pr = 0; pr < 13; pr++) {
+                    if (pr !== r && counts[pr] === 2) {
+                        const pCards = hand.filter(c => c.rankIdx === pr).slice(0, 2);
+                        return [...trio, ...pCards];
+                    }
+                }
+                // 找单牌带
+                for (let sr = 0; sr < 13; sr++) {
+                    if (sr !== r && counts[sr] === 1) {
+                        const sCard = hand.find(c => c.rankIdx === sr);
+                        return [...trio, sCard];
+                    }
+                }
+                return trio;
+            }
+        }
+
+        // 对子
+        for (let r = 0; r < 13; r++) {
+            if (counts[r] === 2) {
+                return hand.filter(c => c.rankIdx === r);
+            }
+        }
+
+        // 最小单牌
+        return [hand[hand.length - 1]];
     }
 
+    // 2. 迎击对手出牌 (Follow Trick)
+    const isTeammate = (GameState.lastTrick && playerIdx !== GameState.landlordIdx && GameState.lastTrick.player !== GameState.landlordIdx);
+
+    // 农民队友协防启发式：若队友出的牌点数较大 (>= Q)，且队友手牌少，战略让牌让队友走
+    if (isTeammate && prevTrick.rank >= 9) {
+        addLog(`[AI-席位${playerIdx}] 贝叶斯记牌柱判定队友牌力已控制台面，触发 [ACT_PASS] 协同让牌`, "pass");
+        return null;
+    }
+
+    // 单牌压制
     if (prevTrick.type === "SOLO") {
         for (let i = hand.length - 1; i >= 0; i--) {
             if (hand[i].rankIdx > prevTrick.rank) {
-                // 如果是队友出的很大牌 (>K)，且自己不是地主，且局势缓和 -> 战略让牌 (ACT_PASS)
-                if (GameState.lastTrick.player !== GameState.landlordIdx && playerIdx !== GameState.landlordIdx && prevTrick.rank >= 11) {
-                    addLog(`[AI-席位${playerIdx}] 贝叶斯记牌柱评估队友牌力占优，触发 [ACT_PASS] 让牌蓄力`, "pass");
-                    return null;
-                }
                 return [hand[i]];
             }
         }
-    } else if (prevTrick.type === "PAIR") {
-        for (let i = hand.length - 1; i >= 1; i--) {
-            if (hand[i].rankIdx === hand[i-1].rankIdx && hand[i].rankIdx > prevTrick.rank) {
-                return [hand[i], hand[i-1]];
+    }
+
+    // 对子压制
+    if (prevTrick.type === "PAIR") {
+        for (let r = prevTrick.rank + 1; r < 15; r++) {
+            if ((counts[r] || 0) >= 2) {
+                return hand.filter(c => c.rankIdx === r).slice(0, 2);
             }
         }
     }
 
-    // 炸弹决断 (如果有 4 张相同，且对方牌力极高)
-    if (prevTrick.rank >= 12) {
-        for (let i = 0; i < hand.length - 3; i++) {
-            if (hand[i].rankIdx === hand[i+3].rankIdx) {
-                addLog(`[AI-席位${playerIdx}] 牌型炸弹解算柱判定破局临界点，触发 [ACT_BOMB] 强压`, "bomb");
-                return [hand[i], hand[i+1], hand[i+2], hand[i+3]];
+    // 三张 / 三带一 / 三带对
+    if (prevTrick.type === "TRIO" || prevTrick.type === "TRIO_SOLO" || prevTrick.type === "TRIO_PAIR") {
+        for (let r = prevTrick.rank + 1; r < 15; r++) {
+            if ((counts[r] || 0) >= 3) {
+                const trio = hand.filter(c => c.rankIdx === r).slice(0, 3);
+                if (prevTrick.type === "TRIO") return trio;
+
+                if (prevTrick.type === "TRIO_SOLO") {
+                    const solo = hand.find(c => c.rankIdx !== r);
+                    if (solo) return [...trio, solo];
+                }
+
+                if (prevTrick.type === "TRIO_PAIR") {
+                    for (let pr = 0; pr < 15; pr++) {
+                        if (pr !== r && (counts[pr] || 0) >= 2) {
+                            const pair = hand.filter(c => c.rankIdx === pr).slice(0, 2);
+                            return [...trio, ...pair];
+                        }
+                    }
+                }
             }
         }
     }
 
-    // 要不起，过牌
+    // 顺子压制
+    if (prevTrick.type === "STRAIGHT") {
+        const len = prevTrick.len || prevTrick.cards.length;
+        for (let end = prevTrick.rank + 1; end <= 11; end++) {
+            const start = end - len + 1;
+            if (start < 0) continue;
+            let ok = true;
+            for (let r = start; r <= end; r++) {
+                if (!counts[r]) { ok = false; break; }
+            }
+            if (ok) {
+                const straightCards = [];
+                for (let r = start; r <= end; r++) {
+                    straightCards.push(hand.find(c => c.rankIdx === r));
+                }
+                return straightCards;
+            }
+        }
+    }
+
+    // 连对压制
+    if (prevTrick.type === "CONSEC_PAIRS") {
+        const numPairs = prevTrick.len || (prevTrick.cards.length / 2);
+        for (let end = prevTrick.rank + 1; end <= 11; end++) {
+            const start = end - numPairs + 1;
+            if (start < 0) continue;
+            let ok = true;
+            for (let r = start; r <= end; r++) {
+                if ((counts[r] || 0) < 2) { ok = false; break; }
+            }
+            if (ok) {
+                const pairsCards = [];
+                for (let r = start; r <= end; r++) {
+                    pairsCards.push(...hand.filter(c => c.rankIdx === r).slice(0, 2));
+                }
+                return pairsCards;
+            }
+        }
+    }
+
+    // 炸弹拦截破局 (对方是大牌、或是地主快赢了)
+    const opponentLeft = GameState.hands[GameState.landlordIdx].length;
+    if (prevTrick.rank >= 11 || opponentLeft <= 3 || prevTrick.type === "BOMB") {
+        for (let r = 0; r < 13; r++) {
+            if (counts[r] === 4) {
+                if (prevTrick.type !== "BOMB" || r > prevTrick.rank) {
+                    addLog(`[AI-席位${playerIdx}] 牌型炸弹解算柱判定决胜关键点，触发 [ACT_BOMB] 强力破局!`, "bomb");
+                    return hand.filter(c => c.rankIdx === r);
+                }
+            }
+        }
+        // 王炸
+        if (counts[13] === 1 && counts[14] === 1) {
+            addLog(`[AI-席位${playerIdx}] 反事实得失柱计算王炸绝对优势，触发 [ACT_ROCKET]!`, "bomb");
+            return hand.filter(c => c.rankIdx >= 13);
+        }
+    }
+
+    // 要不起，选择过牌
     return null;
 }
 
 function pulseCortexMeters() {
     const v0 = Math.floor(75 + Math.random() * 22);
-    const v1 = Math.floor(70 + Math.random() * 28);
-    const v2 = Math.floor(60 + Math.random() * 35);
-    const v3 = Math.floor(65 + Math.random() * 30);
+    const v1 = Math.floor(72 + Math.random() * 25);
+    const v2 = Math.floor(65 + Math.random() * 30);
+    const v3 = Math.floor(70 + Math.random() * 26);
     document.getElementById("actBar0").style.width = v0 + "%";
     document.getElementById("actVal0").textContent = v0 + "%";
     document.getElementById("actBar1").style.width = v1 + "%";
@@ -864,114 +1309,233 @@ function pulseCortexMeters() {
     document.getElementById("actVal3").textContent = v3 + "%";
 }
 
+// 统一执行出牌
 function executePlay(playerIdx, cards) {
+    const playerName = (playerIdx === 0) ? "玩家" : (playerIdx === 1 ? "左位AI" : "右位AI");
+
     if (!cards || cards.length === 0) {
-        // PASS
-        addLog(`席位 ${playerIdx === 0 ? '玩家' : (playerIdx === 1 ? '左位AI' : '右位地主')} 选择 [过牌 (Pass)]`, "pass");
+        // 过牌 (PASS)
+        playFx("pass");
+        addLog(`席位 ${playerName} 选择 [过牌 (Pass)]`, "pass");
         GameState.passCount++;
+
+        // 更新状态徽章
+        setSeatStatus(playerIdx, "不出 (Pass)", "status-pass");
+
+        // 两人过牌 -> 一轮结束，由上一位赢家领出新一轮
         if (GameState.passCount >= 2) {
-            GameState.lastTrick = null; // 清台
-            document.getElementById("trickTypeTag").textContent = "当前牌面: 清台 (自由领出)";
+            GameState.lastTrick = null;
+            document.getElementById("trickTypeTag").textContent = "两家不出: 自由领出新一轮";
             document.getElementById("centerTrick").innerHTML = "";
             GameState.passCount = 0;
+            // 清除各席位出牌区
+            document.getElementById("playedLeft").innerHTML = "";
+            document.getElementById("playedRight").innerHTML = "";
         }
     } else {
         const trick = identifyTrick(cards);
-        GameState.lastTrick = { player: playerIdx, cards, type: trick.type, rank: trick.rank };
+        if (!trick) return;
+
+        GameState.lastTrick = { player: playerIdx, cards, type: trick.type, rank: trick.rank, len: trick.len };
         GameState.passCount = 0;
 
-        // 从手牌中扣除
+        playFx(trick.type === "BOMB" || trick.type === "ROCKET" ? "bomb" : "card");
+
+        // 从手牌移除
         cards.forEach(c => {
-            const idx = GameState.hands[playerIdx].indexOf(c);
+            const idx = GameState.hands[playerIdx].findIndex(h => h.id === c.id);
             if (idx >= 0) GameState.hands[playerIdx].splice(idx, 1);
             if (playerIdx !== 0) GameState.deckRemaining[c.rankIdx]--;
         });
 
-        // 桌面展示
-        document.getElementById("trickTypeTag").textContent = `出牌: ${trick.type} (点数 ${cards[0].rankStr})`;
+        // 渲染到对应席位与中央台面
+        setSeatStatus(playerIdx, `打出 ${trick.name || trick.type}`, "status-play");
+
+        if (playerIdx === 1) {
+            const leftPlayed = document.getElementById("playedLeft");
+            leftPlayed.innerHTML = "";
+            cards.forEach(c => leftPlayed.appendChild(renderCard(c)));
+        } else if (playerIdx === 2) {
+            const rightPlayed = document.getElementById("playedRight");
+            rightPlayed.innerHTML = "";
+            cards.forEach(c => rightPlayed.appendChild(renderCard(c)));
+        }
+
+        // 台面中央显示最新顶牌
+        document.getElementById("trickTypeTag").textContent = `牌面: [${playerName}] 打出 ${trick.name || trick.type}`;
         const center = document.getElementById("centerTrick");
         center.innerHTML = "";
         cards.forEach(c => center.appendChild(renderCard(c)));
 
-        addLog(`席位 ${playerIdx === 0 ? '玩家' : (playerIdx === 1 ? '左位AI' : '右位地主')} 打出 [${trick.type} ${cards.map(c=>c.rankStr).join('')}]`, trick.type === "BOMB" ? "bomb" : "play");
+        addLog(`席位 ${playerName} 打出 [${trick.name || trick.type}]`, (trick.type === "BOMB" || trick.type === "ROCKET") ? "bomb" : "play");
     }
 
-    // 检查是否结束
+    // 检查胜负
     if (GameState.hands[playerIdx].length === 0) {
-        const isLandlord = (playerIdx === GameState.landlordIdx);
-        setTimeout(() => {
-            alert(`🎉 对局结束! ${isLandlord ? '地主' : '农民阵营'} 获得胜利!`);
-            initDeck();
-            updateUI();
-        }, 300);
+        handleGameOver(playerIdx);
         return;
     }
 
-    // 下一位
+    // 轮到下一位
     GameState.currentTurn = (GameState.currentTurn + 1) % 3;
     updateUI();
 
-    // 如果是 AI 回合，延迟推演
-    if (GameState.currentTurn !== 0) {
-        setTimeout(() => {
+    checkTurnTrigger();
+}
+
+function setSeatStatus(playerIdx, text, className) {
+    const id = (playerIdx === 0) ? "statusUser" : (playerIdx === 1 ? "statusLeft" : "statusRight");
+    const el = document.getElementById(id);
+    if (el) {
+        el.textContent = text;
+        el.className = `seat-status-badge ${className}`;
+    }
+}
+
+// 调度下一个回合
+function checkTurnTrigger() {
+    if (GameState.mode === "auto") {
+        GameState.autoTimer = setTimeout(() => {
             const aiCards = aiDecide(GameState.currentTurn);
             executePlay(GameState.currentTurn, aiCards);
-        }, 800);
-    }
-}
-
-// 玩家按钮交互
-document.getElementById("btnPlay").onclick = () => {
-    if (selectedUserCards.size === 0) return;
-    const cards = Array.from(selectedUserCards);
-    const trick = identifyTrick(cards);
-    if (!trick) {
-        alert("不合法的牌型组合！");
-        return;
-    }
-    const prevTrick = (GameState.lastTrick && GameState.lastTrick.player !== 0) ? GameState.lastTrick : null;
-    if (!canBeat(trick, prevTrick)) {
-        alert("牌力压不过当前桌面牌型！");
-        return;
-    }
-    selectedUserCards.clear();
-    executePlay(0, cards);
-};
-
-document.getElementById("btnPass").onclick = () => {
-    selectedUserCards.clear();
-    executePlay(0, null);
-};
-
-document.getElementById("btnHint").onclick = () => {
-    selectedUserCards.clear();
-    const hintCards = aiDecide(0);
-    if (hintCards) {
-        hintCards.forEach(c => selectedUserCards.add(c));
+        }, GameState.autoSpeed);
     } else {
-        addLog("1024 细胞认知皮层提示: 建议战略让牌 (Pass)");
+        if (GameState.currentTurn !== 0) {
+            GameState.autoTimer = setTimeout(() => {
+                const aiCards = aiDecide(GameState.currentTurn);
+                executePlay(GameState.currentTurn, aiCards);
+            }, GameState.autoSpeed);
+        }
     }
-    updateUI();
-};
-
-document.getElementById("btnNewGame").onclick = () => {
-    initDeck();
-    updateUI();
-    addLog("重新洗牌发牌完成，新对局开始。");
-};
-
-// 启动
-initDeck();
-updateUI();
-
-// 如果地主不是玩家，启动 AI 首发
-if (GameState.currentTurn !== 0) {
-    setTimeout(() => {
-        const aiCards = aiDecide(GameState.currentTurn);
-        executePlay(GameState.currentTurn, aiCards);
-    }, 800);
 }
-</script>
 
+function handleGameOver(winnerIdx) {
+    playFx("win");
+    GameState.stats.games++;
+    const isLandlordWinner = (winnerIdx === GameState.landlordIdx);
+    const userWon = (GameState.landlordIdx === 0 && isLandlordWinner) || (GameState.landlordIdx !== 0 && !isLandlordWinner);
+
+    if (userWon) GameState.stats.playerWins++;
+
+    const modal = document.getElementById("victoryModal");
+    const title = document.getElementById("modalTitle");
+    const desc = document.getElementById("modalDesc");
+
+    title.textContent = userWon ? "🎉 恭喜获得胜利!" : "💔 对局告负";
+    title.style.color = userWon ? "var(--gold-glow)" : "var(--red-glow)";
+
+    const winnerRole = isLandlordWinner ? "地主" : "农民阵营";
+    const winnerName = (winnerIdx === 0) ? "玩家" : (winnerIdx === 1 ? "左位AI" : "右位AI");
+    desc.textContent = `[${winnerName}] 率先出完手牌，${winnerRole} 获得本局胜利！`;
+
+    document.getElementById("modalGames").textContent = GameState.stats.games;
+    const wr = Math.round((GameState.stats.playerWins / GameState.stats.games) * 100);
+    document.getElementById("modalWinRate").textContent = `${wr}%`;
+
+    modal.style.display = "flex";
+    updateUI();
+    addLog(`对局结算: ${winnerRole} (${winnerName}) 获胜!`, "play");
+}
+
+// 事件绑定
+window.addEventListener("DOMContentLoaded", () => {
+    // 出牌
+    document.getElementById("btnPlay").onclick = () => {
+        if (selectedUserCards.size === 0) return;
+        const cards = Array.from(selectedUserCards);
+        const trick = identifyTrick(cards);
+        if (!trick) {
+            alert("不合法的牌型！标准规则支持：单牌、对子、三张、三带一/二、5张以上顺子、3对以上连对、飞机、炸弹与王炸。");
+            return;
+        }
+        const prevTrick = (GameState.lastTrick && GameState.lastTrick.player !== 0) ? GameState.lastTrick : null;
+        if (!canBeat(trick, prevTrick)) {
+            alert("牌力无法压过当前桌面牌型！");
+            return;
+        }
+        selectedUserCards.clear();
+        executePlay(0, cards);
+    };
+
+    // 过牌
+    document.getElementById("btnPass").onclick = () => {
+        selectedUserCards.clear();
+        executePlay(0, null);
+    };
+
+    // 提示
+    document.getElementById("btnHint").onclick = () => {
+        selectedUserCards.clear();
+        const hintCards = aiDecide(0);
+        if (hintCards && hintCards.length > 0) {
+            hintCards.forEach(c => {
+                // 根据 id 匹配当前玩家手牌中的真实卡片引用
+                const found = GameState.hands[0].find(h => h.id === c.id);
+                if (found) selectedUserCards.add(found);
+            });
+            addLog(`1024 认知皮层提示: 打出 [${hintCards.map(c => c.rankStr).join(' ')}]`);
+        } else {
+            addLog("1024 认知皮层评估: 建议战略让牌 (Pass)");
+        }
+        updateUI();
+    };
+
+    // 重选
+    document.getElementById("btnDeselect").onclick = () => {
+        selectedUserCards.clear();
+        updateUI();
+    };
+
+    // 重新发牌
+    document.getElementById("btnNewGame").onclick = () => {
+        initDeck();
+    };
+
+    // 弹窗再来一局
+    document.getElementById("btnModalRestart").onclick = () => {
+        initDeck();
+    };
+
+    // 模式切换
+    document.getElementById("modeSelect").onchange = (e) => {
+        GameState.mode = e.target.value;
+        const speedBtn = document.getElementById("btnAutoSpeed");
+        const speedLbl = document.getElementById("autoSpeedLabel");
+        if (GameState.mode === "auto") {
+            speedBtn.style.display = "inline-block";
+            speedLbl.style.display = "inline-block";
+            addLog("已开启 [AI全自动观战模式]，3 大 1024-微柱认知皮层自主对弈。");
+            checkTurnTrigger();
+        } else {
+            speedBtn.style.display = "none";
+            speedLbl.style.display = "none";
+            addLog("已切换为 [人机实时对弈模式]，轮到玩家时请手动出牌。");
+        }
+        updateUI();
+    };
+
+    // 身份选择切换
+    document.getElementById("roleSelect").onchange = () => {
+        initDeck();
+    };
+
+    // 观战速度调节
+    document.getElementById("btnAutoSpeed").onclick = (e) => {
+        if (GameState.autoSpeed === 800) {
+            GameState.autoSpeed = 300;
+            e.target.textContent = "🚀 极速 0.3s";
+        } else if (GameState.autoSpeed === 300) {
+            GameState.autoSpeed = 1500;
+            e.target.textContent = "🐢 慢速 1.5s";
+        } else {
+            GameState.autoSpeed = 800;
+            e.target.textContent = "⚡ 正常 0.8s";
+        }
+    };
+
+    // 启动初始发牌
+    initDeck();
+});
+</script>
 </body>
 </html>

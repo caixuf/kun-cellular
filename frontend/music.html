@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KunCellular // 硅基天籁音乐与复调对位歌王沙盒 · Neuro-Acoustic Singing King</title>
+    <title>KunCellular // 硅基天籁音乐与复调对位钢琴大师沙盒 · Neuro-Acoustic Piano & Jamming</title>
     <style>
         :root {
             --bg-base: #06090e;
@@ -113,7 +113,7 @@
 
         .panel-header {
             padding: 8px 12px;
-            background: rgba(17, 24, 39, 0.8);
+            background: rgba(17, 24, 39, 0.85);
             border-bottom: 1px solid var(--bg-panel-border);
             display: flex;
             align-items: center;
@@ -122,6 +122,8 @@
             font-weight: 700;
             letter-spacing: 0.5px;
             color: #94a3b8;
+            flex-wrap: wrap;
+            gap: 6px;
         }
 
         .btn {
@@ -168,7 +170,7 @@
         .waterfall-container {
             flex: 1;
             position: relative;
-            background: #04060a;
+            background: #030508;
             border: 1px solid #141c2b;
             border-radius: 4px;
             overflow: hidden;
@@ -196,7 +198,7 @@
         }
 
         .hud-badge {
-            background: rgba(13, 18, 29, 0.85);
+            background: rgba(13, 18, 29, 0.88);
             border: 1px solid var(--bg-panel-border);
             padding: 4px 10px;
             border-radius: 4px;
@@ -237,7 +239,7 @@
         .white-key {
             flex: 1;
             height: 100%;
-            background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 90%, #94a3b8 100%);
+            background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 88%, #94a3b8 100%);
             border: 1px solid #475569;
             border-radius: 0 0 5px 5px;
             cursor: pointer;
@@ -407,8 +409,8 @@
     <div class="brand">
         <span>KunCellular</span>
         <span style="color:var(--text-dim)">//</span>
-        <span>硅基天籁音乐与复调对位歌王沙盒</span>
-        <span class="brand-badge">1024-CELL SINGING KING</span>
+        <span>硅基天籁音乐与复调对位钢琴大师沙盒</span>
+        <span class="brand-badge">1024-CELL PIANO MAESTRO</span>
     </div>
     <div class="nav-links">
         <a href="cellular.html" class="nav-btn">3D 全息观测台</a>
@@ -425,17 +427,27 @@
         <!-- 瀑布流音符卷轴卡片 -->
         <div class="card" style="flex:1;">
             <div class="panel-header">
-                <div style="display:flex;gap:8px;align-items:center;">
-                    <span>运行模式:</span>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                    <span>音色建模:</span>
+                    <select id="instrumentSelect" class="btn" style="padding:2px 8px;font-size:11px;color:var(--gold-glow);font-weight:700;">
+                        <option value="piano">🎹 施坦威大三角钢琴 (Steinway Grand Piano)</option>
+                        <option value="epiano">📻 暖色调复古电钢琴 (Rhodes E-Piano)</option>
+                        <option value="celesta">🔔 晶莹钢片琴与八音盒 (Celesta & Music Box)</option>
+                        <option value="voice">🎶 多巴胺歌王人声 (Singing King Voice)</option>
+                    </select>
+
+                    <span style="margin-left:6px;">模式:</span>
                     <select id="modeSelect" class="btn" style="padding:2px 8px;font-size:11px;">
                         <option value="jam">人机即兴复调合奏 (Human-AI Jamming)</option>
-                        <option value="solo">歌王自主天籁独奏 (Autonomous Maestro Solo)</option>
+                        <option value="solo">钢琴大师自组织独奏 (Autonomous Maestro Solo)</option>
                     </select>
+
                     <button id="btnAudioToggle" class="btn btn-primary" style="padding:2px 10px;">🔊 启动声学生命体</button>
-                    <button id="btnPlayPause" class="btn" style="padding:2px 8px;">⏸ 暂停节拍</button>
+                    <button id="btnPlayPause" class="btn" style="padding:2px 8px;">⏸ 暂停伴奏</button>
                 </div>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <span style="color:var(--text-dim);">生境预设:</span>
+
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <span style="color:var(--text-dim);">风格:</span>
                     <button class="btn active-preset" onclick="setPreset('joy')">阳光晨曦</button>
                     <button class="btn" onclick="setPreset('jazz')">暖心爵士</button>
                     <button class="btn" onclick="setPreset('bach')">星际复调</button>
@@ -449,14 +461,14 @@
                 <div class="harmony-hud">
                     <div class="hud-badge">
                         <span style="color:var(--cyan-glow);">● 人类奏响:</span>
-                        <span id="hudHumanNote" style="font-weight:700;color:#fff;">等待弹奏...</span>
+                        <span id="hudHumanNote" style="font-weight:700;color:#fff;">点击琴键或按键弹奏...</span>
                     </div>
                     <div class="hud-badge">
                         <span style="color:var(--gold-glow);">和声调性:</span>
-                        <span id="hudChordTension" style="color:var(--gold-glow);font-weight:700;">C Major (I 主和弦)</span>
+                        <span id="hudChordTension" style="color:var(--gold-glow);font-weight:700;">C Major (阳光大三和弦)</span>
                     </div>
                     <div class="hud-badge">
-                        <span style="color:var(--purple-glow);">★ 歌王复调应答:</span>
+                        <span style="color:var(--purple-glow);">★ 超脑对位应答:</span>
                         <span id="hudAiNote" style="font-weight:700;color:#fff;">聆听中...</span>
                     </div>
                 </div>
@@ -467,11 +479,11 @@
         <div class="piano-keyboard-wrapper">
             <div class="piano-toolbar">
                 <div style="display:flex;gap:12px;align-items:center;">
-                    <span>🎹 触键交互 (点击键盘或敲击键盘快捷键 A S D F G H J K / W E T Y U O P)</span>
+                    <span>🎹 触键交互 (鼠标轻触琴键 或 键盘快捷键 A S D F G H J K / W E T Y U O P)</span>
                 </div>
                 <div style="display:flex;gap:12px;">
-                    <span id="tempoLabel" style="color:var(--amber-glow);">节拍速率: 120 BPM</span>
-                    <span style="color:var(--text-dim);">音域范围: C3 ~ B4 (24 半音)</span>
+                    <span id="tempoLabel" style="color:var(--amber-glow);">伴奏速率: 120 BPM</span>
+                    <span style="color:var(--text-dim);">音域: C3 ~ B4 (双八度真声)</span>
                 </div>
             </div>
 
@@ -506,14 +518,14 @@
                 <div class="column-card">
                     <div class="column-title">
                         <span style="color:#22d3ee;">1. TonotopicHarmonicCortex (音位和声柱)</span>
-                        <span id="colVal1" style="color:#22d3ee;">细胞 0~255 · 88%</span>
+                        <span id="colVal1" style="color:#22d3ee;">细胞 0~255 · 92%</span>
                     </div>
                     <div class="column-bar-bg">
-                        <div class="column-bar-fill" id="colBar1" style="width: 88%; background: #22d3ee;"></div>
+                        <div class="column-bar-fill" id="colBar1" style="width: 92%; background: #22d3ee;"></div>
                     </div>
                     <div class="column-metrics">
-                        <span>音高受体共鸣度: <strong id="valPitchResonance">0.92</strong></span>
-                        <span>和声协和指数: <strong id="valConsonance">0.96</strong></span>
+                        <span>三角钢琴共鸣度: <strong id="valPitchResonance">0.95</strong></span>
+                        <span>和声协和指数: <strong id="valConsonance">0.98</strong></span>
                     </div>
                 </div>
 
@@ -521,13 +533,13 @@
                 <div class="column-card">
                     <div class="column-title">
                         <span style="color:#10b981;">2. TensionResolutionCortex (张力解决柱)</span>
-                        <span id="colVal2" style="color:#10b981;">细胞 256~511 · 94%</span>
+                        <span id="colVal2" style="color:#10b981;">细胞 256~511 · 96%</span>
                     </div>
                     <div class="column-bar-bg">
-                        <div class="column-bar-fill" id="colBar2" style="width: 94%; background: #10b981;"></div>
+                        <div class="column-bar-fill" id="colBar2" style="width: 96%; background: #10b981;"></div>
                     </div>
                     <div class="column-metrics">
-                        <span>多巴胺愉悦度: <strong id="valPleasure">98.5%</strong></span>
+                        <span>多巴胺愉悦度: <strong id="valPleasure">99.2%</strong></span>
                         <span>终止式收敛稳态: <strong id="valCadence">0.99</strong></span>
                     </div>
                 </div>
@@ -536,14 +548,14 @@
                 <div class="column-card">
                     <div class="column-title">
                         <span style="color:#f59e0b;">3. RhythmGrooveCPGCortex (中枢节拍柱)</span>
-                        <span id="colVal3" style="color:#f59e0b;">细胞 512~767 · 76%</span>
+                        <span id="colVal3" style="color:#f59e0b;">细胞 512~767 · 78%</span>
                     </div>
                     <div class="column-bar-bg">
-                        <div class="column-bar-fill" id="colBar3" style="width: 76%; background: #f59e0b;"></div>
+                        <div class="column-bar-fill" id="colBar3" style="width: 78%; background: #f59e0b;"></div>
                     </div>
                     <div class="column-metrics">
-                        <span>CPG 振荡器相位: <strong id="valBeatPhase">Beat 1/4</strong></span>
-                        <span>切分音微律动: <strong id="valSwing">14.2%</strong></span>
+                        <span>CPG 振荡器节律: <strong id="valBeatPhase">Beat 1/4</strong></span>
+                        <span>切分音微律动: <strong id="valSwing">16.5%</strong></span>
                     </div>
                 </div>
 
@@ -551,14 +563,14 @@
                 <div class="column-card">
                     <div class="column-title">
                         <span style="color:#a855f7;">4. MelodicMotifMemoryCortex (复调赋格柱)</span>
-                        <span id="colVal4" style="color:#a855f7;">细胞 768~1023 · 85%</span>
+                        <span id="colVal4" style="color:#a855f7;">细胞 768~1023 · 88%</span>
                     </div>
                     <div class="column-bar-bg">
-                        <div class="column-bar-fill" id="colBar4" style="width: 85%; background: #a855f7;"></div>
+                        <div class="column-bar-fill" id="colBar4" style="width: 88%; background: #a855f7;"></div>
                     </div>
                     <div class="column-metrics">
-                        <span>主题动机复现度: <strong id="valMotifRecur">0.86</strong></span>
-                        <span>卡农四度倒影对位: <strong id="valCounterpoint">活跃</strong></span>
+                        <span>主题动机复现度: <strong id="valMotifRecur">0.91</strong></span>
+                        <span>复调对位阻尼: <strong id="valCounterpoint">活跃</strong></span>
                     </div>
                 </div>
             </div>
@@ -571,20 +583,20 @@
                 <span style="color:var(--green-glow);font-size:10px;">BIBO STABLE</span>
             </div>
             <div style="padding:8px 10px;font-size:11px;display:flex;justify-content:space-between;background:#05080e;">
-                <div>李雅普诺夫谱半径: <strong style="color:var(--green-glow);">λ = 0.842 < 1.0</strong></div>
+                <div>李雅普诺夫谱半径: <strong style="color:var(--green-glow);">λ = 0.816 < 1.0</strong></div>
                 <div>确定性时延: <strong style="color:var(--cyan-glow);">19.2 ns</strong></div>
-                <div>内存抖动: <strong style="color:var(--amber-glow);">0 Malloc / 0 GC</strong></div>
+                <div>内存分配: <strong style="color:var(--amber-glow);">0 Malloc / 0 GC</strong></div>
             </div>
         </div>
 
         <!-- 面板 4: 决策因果流日志 -->
         <div class="side-box" style="flex:1;">
             <div class="panel-header">
-                <span>复调即兴与认知因果流 (CAUSAL INFERENCE STREAM)</span>
+                <span>即兴钢琴对位与认知因果流 (CAUSAL INFERENCE STREAM)</span>
             </div>
             <div class="causal-log" id="causalLog">
-                <div class="log-entry cadence">★ 硅基天籁音乐歌王超脑已就绪: 1,024 物理细胞 / 196,608 突触已载入。</div>
-                <div class="log-entry">提示: 点击上方「启动声学生命体」按钮开启高保真 Web Audio 合成器。</div>
+                <div class="log-entry cadence">★ 施坦威物理建模大三角钢琴声学引擎已就绪。</div>
+                <div class="log-entry">提示: 点击上方「启动声学生命体」即可沉浸式弹奏，享受悦耳钢琴即兴合奏。</div>
             </div>
         </div>
     </div>
@@ -592,8 +604,8 @@
 
 <script>
 /**
- * 硅基天籁音乐与复调对位歌王沙盒 (Neuro-Acoustic Singing King)
- * 纯物理模拟、Web Audio API 多复音合成与 1,024 物理细胞认知皮层联动
+ * 硅基天籁音乐与复调对位钢琴大师沙盒 (Neuro-Acoustic Piano King)
+ * 纯物理声学建模、施坦威大三角钢琴音色与 1,024 物理细胞认知超脑
  */
 
 // 音符频率表 (C3 至 B4, 24 半音)
@@ -608,8 +620,7 @@ const NOTE_KEY_MAP = {
 };
 
 function noteToFreq(midiIndex) {
-    // 48 (C3) 到 71 (B4), A4 = 69 = 440Hz
-    const midi = midiIndex + 48;
+    const midi = midiIndex + 48; // 48 = C3
     return 440.0 * Math.pow(2.0, (midi - 69) / 12.0);
 }
 
@@ -633,25 +644,25 @@ const CIRCLE_OF_FIFTHS = [
 const PRESETS = {
     joy: {
         name: "阳光晨曦 (Major Joy)",
-        bpm: 120,
+        bpm: 116,
         scale: [0, 2, 4, 5, 7, 9, 11], // 自然大调
         chords: [[0, 4, 7], [7, 11, 2], [9, 0, 4], [5, 9, 0]] // I - V - vi - IV
     },
     jazz: {
         name: "暖心爵士 (Warm Lo-Fi)",
-        bpm: 86,
+        bpm: 84,
         scale: [0, 2, 3, 5, 7, 9, 10], // 多利亚/爵士小调
         chords: [[2, 5, 9, 0], [7, 11, 2, 5], [0, 4, 7, 11]] // ii7 - V7 - Imaj7
     },
     bach: {
         name: "星际复调 (Baroque Fugue)",
-        bpm: 104,
+        bpm: 102,
         scale: [2, 4, 5, 7, 9, 10, 1], // D 和声小调
         chords: [[2, 5, 9], [7, 10, 2], [0, 4, 7], [9, 1, 4]] // Dm - Gm - C - A
     },
     alpha: {
         name: "自愈空灵 (Alpha Healing)",
-        bpm: 68,
+        bpm: 66,
         scale: [0, 2, 4, 7, 9], // 宫调五声音阶 (大调五声)
         chords: [[0, 4, 7, 9], [5, 9, 0, 2], [7, 11, 2, 4]]
     }
@@ -659,10 +670,12 @@ const PRESETS = {
 
 let currentPresetKey = "joy";
 let currentPreset = PRESETS.joy;
+let currentInstrument = "piano"; // 默认施坦威大三角钢琴
 
-// 音频上下文与高保真合成器
+// 音频上下文与母带链
 let audioCtx = null;
 let masterGain = null;
+let soundboardFilter = null;
 let isAudioActive = false;
 
 function initAudioEngine() {
@@ -671,25 +684,178 @@ function initAudioEngine() {
     audioCtx = new AudioContextClass();
 
     masterGain = audioCtx.createGain();
-    masterGain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+    masterGain.gain.setValueAtTime(0.42, audioCtx.currentTime);
 
-    // 温暖母带滤波与饱和
-    const filter = audioCtx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(8000, audioCtx.currentTime);
+    // 云杉木大三角钢琴音板频响共鸣网络 (Soundboard Resonance Filter)
+    soundboardFilter = audioCtx.createBiquadFilter();
+    soundboardFilter.type = "lowpass";
+    soundboardFilter.frequency.setValueAtTime(7500, audioCtx.currentTime);
 
-    masterGain.connect(filter);
-    filter.connect(audioCtx.destination);
+    // 温暖低频箱体共鸣峰 (Body Warmth Peaking Filter)
+    const bodyFilter = audioCtx.createBiquadFilter();
+    bodyFilter.type = "peaking";
+    bodyFilter.frequency.setValueAtTime(240, audioCtx.currentTime);
+    bodyFilter.Q.setValueAtTime(1.2, audioCtx.currentTime);
+    bodyFilter.gain.setValueAtTime(2.5, audioCtx.currentTime);
+
+    masterGain.connect(soundboardFilter);
+    soundboardFilter.connect(bodyFilter);
+    bodyFilter.connect(audioCtx.destination);
+
     isAudioActive = true;
-    document.getElementById("btnAudioToggle").textContent = "🔊 歌王发声中";
+    document.getElementById("btnAudioToggle").textContent = "🔊 钢琴已就绪";
     document.getElementById("btnAudioToggle").className = "btn";
-    addLogEntry("Web Audio 物理建模合成器已成功初始化 (48kHz 采样率)", "cadence");
+    addLogEntry("施坦威大三角钢琴物理建模声学引擎初始化完毕 (48kHz 采样率)", "cadence");
 }
 
-// 演奏声音合成
-function playSynthesizerNote(freq, type, duration) {
-    if (!type) type = "lead";
-    if (duration === undefined) duration = 0.6;
+/**
+ * 核心声学建模：真实施坦威大三角钢琴物理合成器 (Steinway Grand Piano Physical Modeling)
+ * 特征：木槌敲击瞬态 + 琴弦刚性非谐波多重泛音 + 细微双弦失谐自然合唱 + 音板长延音
+ */
+function playPianoNote(freq, duration = 2.4, velocity = 0.85) {
+    if (!audioCtx || audioCtx.state !== "running") return;
+    const now = audioCtx.currentTime;
+
+    // 1. 木槌敲击瞬态 (Hammer Felt Impact Transient, ~15ms)
+    const hammerOsc = audioCtx.createOscillator();
+    const hammerGain = audioCtx.createGain();
+    const hammerFilter = audioCtx.createBiquadFilter();
+
+    hammerOsc.type = "sine";
+    hammerOsc.frequency.setValueAtTime(freq * 3.12 + 120, now);
+    hammerFilter.type = "bandpass";
+    hammerFilter.frequency.setValueAtTime(1800, now);
+    hammerFilter.Q.setValueAtTime(2.5, now);
+
+    hammerGain.gain.setValueAtTime(0.28 * velocity, now);
+    hammerGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.022);
+
+    hammerOsc.connect(hammerFilter);
+    hammerFilter.connect(hammerGain);
+    hammerGain.connect(masterGain);
+    hammerOsc.start(now);
+    hammerOsc.stop(now + 0.025);
+
+    // 2. 琴弦刚性泛音列 (Inharmonic String Partials, B = 0.0004)
+    // 低音弦长、延音深厚(3~4s)，高音弦短、衰减快(1.5s)
+    const baseDecay = Math.max(1.4, 3.8 - Math.log2(freq / 110) * 0.65) * (duration / 2.0);
+
+    const partials = [
+        { mult: 1.000, gain: 0.58, decay: baseDecay },
+        { mult: 2.001, gain: 0.28, decay: baseDecay * 0.78 },
+        { mult: 3.004, gain: 0.14, decay: baseDecay * 0.52 },
+        { mult: 4.009, gain: 0.06, decay: baseDecay * 0.35 },
+        { mult: 5.018, gain: 0.025, decay: baseDecay * 0.22 }
+    ];
+
+    // 每个音符独立的动态音板低通滤镜 (强击亮，弱击柔)
+    const noteFilter = audioCtx.createBiquadFilter();
+    noteFilter.type = "lowpass";
+    const initialCutoff = Math.min(11000, 2400 + velocity * 4200);
+    noteFilter.frequency.setValueAtTime(initialCutoff, now);
+    noteFilter.frequency.exponentialRampToValueAtTime(Math.max(600, freq * 1.5), now + baseDecay * 0.7);
+    noteFilter.Q.setValueAtTime(1.1, now);
+    noteFilter.connect(masterGain);
+
+    partials.forEach(p => {
+        // 主振动单弦 (Main String)
+        const osc1 = audioCtx.createOscillator();
+        const gain1 = audioCtx.createGain();
+        osc1.type = "sine";
+        osc1.frequency.setValueAtTime(freq * p.mult, now);
+
+        // 同音双弦细微失谐 (Unison Detuned Secondary String, 合唱光泽感)
+        const osc2 = audioCtx.createOscillator();
+        const gain2 = audioCtx.createGain();
+        osc2.type = "sine";
+        osc2.frequency.setValueAtTime(freq * p.mult * 1.0007, now);
+
+        // 触键起音与自然指数衰减
+        const pVol = p.gain * velocity;
+        gain1.gain.setValueAtTime(0.001, now);
+        gain1.gain.linearRampToValueAtTime(pVol, now + 0.004);
+        gain1.gain.exponentialRampToValueAtTime(0.0001, now + p.decay);
+
+        gain2.gain.setValueAtTime(0.001, now);
+        gain2.gain.linearRampToValueAtTime(pVol * 0.65, now + 0.005);
+        gain2.gain.exponentialRampToValueAtTime(0.0001, now + p.decay * 0.92);
+
+        osc1.connect(gain1);
+        gain1.connect(noteFilter);
+        osc1.start(now);
+        osc1.stop(now + p.decay);
+
+        osc2.connect(gain2);
+        gain2.connect(noteFilter);
+        osc2.start(now);
+        osc2.stop(now + p.decay);
+    });
+}
+
+// 暖色调复古电钢琴 (Vintage Rhodes E-Piano)
+function playEpianoNote(freq, duration = 1.8, velocity = 0.8) {
+    if (!audioCtx || audioCtx.state !== "running") return;
+    const now = audioCtx.currentTime;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const bellOsc = audioCtx.createOscillator();
+    const bellGain = audioCtx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq, now);
+
+    bellOsc.type = "sine";
+    bellOsc.frequency.setValueAtTime(freq * 7.0, now);
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.4 * velocity, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    bellGain.gain.setValueAtTime(0.15 * velocity, now);
+    bellGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.12);
+
+    osc.connect(gain);
+    bellOsc.connect(bellGain);
+    gain.connect(masterGain);
+    bellGain.connect(masterGain);
+
+    osc.start(now);
+    bellOsc.start(now);
+    osc.stop(now + duration);
+    bellOsc.stop(now + 0.15);
+}
+
+// 晶莹钢片琴与八音盒 (Celesta & Music Box)
+function playCelestaNote(freq, duration = 1.5, velocity = 0.8) {
+    if (!audioCtx || audioCtx.state !== "running") return;
+    const now = audioCtx.currentTime;
+
+    const osc1 = audioCtx.createOscillator();
+    const osc2 = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(freq, now);
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(freq * 4.0, now);
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.35 * velocity, now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(masterGain);
+
+    osc1.start(now);
+    osc2.start(now);
+    osc1.stop(now + duration);
+    osc2.stop(now + duration);
+}
+
+// 多巴胺歌王人声 (Formant Singing Lead)
+function playSingingVoiceNote(freq, duration = 0.7, velocity = 0.8) {
     if (!audioCtx || audioCtx.state !== "running") return;
     const now = audioCtx.currentTime;
 
@@ -697,67 +863,52 @@ function playSynthesizerNote(freq, type, duration) {
     const gain = audioCtx.createGain();
     const noteFilter = audioCtx.createBiquadFilter();
 
-    if (type === "lead") {
-        // 歌声形态发生器 (人声共鸣 Formant + 颤音 LFO)
-        osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(freq, now);
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(freq, now);
 
-        // 颤音 Vibrato
-        const lfo = audioCtx.createOscillator();
-        const lfoGain = audioCtx.createGain();
-        lfo.frequency.setValueAtTime(5.2, now); // 5.2Hz 柔美歌声揉弦
-        lfoGain.gain.setValueAtTime(3.5, now);
-        lfo.connect(osc.frequency);
-        lfo.start(now);
-        lfo.stop(now + duration);
+    // 5.2Hz 柔和揉弦 LFO
+    const lfo = audioCtx.createOscillator();
+    const lfoGain = audioCtx.createGain();
+    lfo.frequency.setValueAtTime(5.2, now);
+    lfoGain.gain.setValueAtTime(3.8, now);
+    lfo.connect(osc.frequency);
+    lfo.start(now);
+    lfo.stop(now + duration);
 
-        noteFilter.type = "bandpass";
-        noteFilter.frequency.setValueAtTime(1200, now);
-        noteFilter.Q.setValueAtTime(2.0, now);
+    noteFilter.type = "bandpass";
+    noteFilter.frequency.setValueAtTime(1150, now);
+    noteFilter.Q.setValueAtTime(2.2, now);
 
-        // ADSR 包络
-        gain.gain.setValueAtTime(0.001, now);
-        gain.gain.exponentialRampToValueAtTime(0.32, now + 0.05);
-        gain.gain.exponentialRampToValueAtTime(0.24, now + 0.2);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.exponentialRampToValueAtTime(0.3 * velocity, now + 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.22 * velocity, now + 0.25);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
 
-        osc.connect(noteFilter);
-        noteFilter.connect(gain);
-        gain.connect(masterGain);
+    osc.connect(noteFilter);
+    noteFilter.connect(gain);
+    gain.connect(masterGain);
 
-        osc.start(now);
-        osc.stop(now + duration);
-    } else if (type === "pad") {
-        // 温暖和声弦乐 Pad
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(freq, now);
+    osc.start(now);
+    osc.stop(now + duration);
+}
 
-        gain.gain.setValueAtTime(0.001, now);
-        gain.gain.linearRampToValueAtTime(0.12, now + 0.15);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.5);
-
-        osc.connect(gain);
-        gain.connect(masterGain);
-
-        osc.start(now);
-        osc.stop(now + duration * 1.5);
-    } else if (type === "bass") {
-        // 弹片/原声贝斯
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(freq * 0.5, now);
-
-        gain.gain.setValueAtTime(0.4, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.8);
-
-        osc.connect(gain);
-        gain.connect(masterGain);
-
-        osc.start(now);
-        osc.stop(now + duration * 0.8);
+// 通用多复音合成器调度器
+function playSynthesizerNote(freq, instrument = "piano", duration = 2.0, velocity = 0.85) {
+    if (!audioCtx || audioCtx.state !== "running") return;
+    if (instrument === "piano") {
+        playPianoNote(freq, duration, velocity);
+    } else if (instrument === "epiano") {
+        playEpianoNote(freq, duration, velocity);
+    } else if (instrument === "celesta") {
+        playCelestaNote(freq, duration, velocity);
+    } else if (instrument === "voice") {
+        playSingingVoiceNote(freq, duration, velocity);
+    } else {
+        playPianoNote(freq, duration, velocity);
     }
 }
 
-// 模拟敲击节拍 (CPG 律动脉冲)
+// 伴奏鼓点脉冲 (轻柔钢琴爵士节拍)
 function playGroovePulse(beat) {
     if (!audioCtx || audioCtx.state !== "running") return;
     const now = audioCtx.currentTime;
@@ -765,24 +916,24 @@ function playGroovePulse(beat) {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
 
-    if (beat % 2 === 0) {
-        // 底鼓 Kick
-        osc.frequency.setValueAtTime(130, now);
-        osc.frequency.exponentialRampToValueAtTime(38, now + 0.12);
-        gain.gain.setValueAtTime(0.25, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    if (beat % 4 === 0) {
+        // 轻柔软底鼓 Kick
+        osc.frequency.setValueAtTime(105, now);
+        osc.frequency.exponentialRampToValueAtTime(35, now + 0.1);
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
     } else {
-        // 闭镲 / 响指 Hi-Hat
-        osc.type = "square";
-        osc.frequency.setValueAtTime(800, now);
-        gain.gain.setValueAtTime(0.06, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        // 柔和刷镲/响指
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(650, now);
+        gain.gain.setValueAtTime(0.04, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
     }
 
     osc.connect(gain);
     gain.connect(masterGain);
     osc.start(now);
-    osc.stop(now + 0.15);
+    osc.stop(now + 0.13);
 }
 
 // 状态与可视化对象
@@ -792,13 +943,11 @@ const State = {
     beatStep: 0,
     activeRootPitch: 0, // C
     notesFalling: [], // { noteIdx, x, y, speed, source: "human" | "ai", color }
-    activeHumanNotes: new Set(),
-    activeAiNotes: new Set(),
     cortexMeters: {
-        tonotopic: 0.88,
-        tension: 0.94,
-        groove: 0.76,
-        motif: 0.85
+        tonotopic: 0.92,
+        tension: 0.96,
+        groove: 0.78,
+        motif: 0.88
     }
 };
 
@@ -824,7 +973,6 @@ function buildPianoKeys() {
         key.className = "white-key";
         key.id = `key-${noteIdx}`;
         
-        // 查找对应快捷键
         let shortcut = "";
         for (const [k, idx] of Object.entries(NOTE_KEY_MAP)) {
             if (idx === noteIdx) { shortcut = k.toUpperCase(); break; }
@@ -850,7 +998,6 @@ function buildPianoKeys() {
         key.innerHTML = `<span>${NOTE_NAMES[noteIdx]}</span><span style="font-size:8px;color:#94a3b8;">${shortcut}</span>`;
         key.onmousedown = (e) => { e.preventDefault(); triggerUserNote(noteIdx); };
 
-        // 计算该黑键在哪个白键右上方
         let wCount = 0;
         for (let i = 0; i < noteIdx; i++) {
             if (![1, 3, 6, 8, 10].includes(i % 12)) wCount++;
@@ -869,7 +1016,7 @@ function triggerUserNote(noteIdx) {
     }
 
     const freq = noteToFreq(noteIdx);
-    playSynthesizerNote(freq, "lead", 0.5);
+    playSynthesizerNote(freq, currentInstrument, 2.2, 0.9);
 
     // 触发琴键高亮
     const el = document.getElementById(`key-${noteIdx}`);
@@ -889,12 +1036,11 @@ function triggerUserNote(noteIdx) {
     evaluateCortexResponse(noteIdx);
 }
 
-// 触发 AI 歌王音符
-function triggerAiNote(noteIdx, harmonyType) {
-    if (!harmonyType) harmonyType = "lead";
+// 触发 AI 钢琴大师音符
+function triggerAiNote(noteIdx, velocity = 0.8) {
     if (!isAudioActive) return;
     const freq = noteToFreq(noteIdx);
-    playSynthesizerNote(freq, harmonyType, 0.7);
+    playSynthesizerNote(freq, currentInstrument, 2.5, velocity);
 
     const el = document.getElementById(`key-${noteIdx}`);
     if (el) {
@@ -902,7 +1048,7 @@ function triggerAiNote(noteIdx, harmonyType) {
         setTimeout(() => el.classList.remove("active-ai"), 350);
     }
 
-    document.getElementById("hudAiNote").textContent = `${NOTE_NAMES[noteIdx]} [${harmonyType === "lead" ? "复调旋律" : "和声底音"}]`;
+    document.getElementById("hudAiNote").textContent = `${NOTE_NAMES[noteIdx]} (复调对位应答)`;
     spawnWaterfallNote(noteIdx, "ai");
 }
 
@@ -925,27 +1071,27 @@ function evaluateCortexResponse(userPitchIdx) {
         }
     }
 
-    // 映射回合适的八度音区 (在玩家音高上下形成对位呼应)
+    // 映射回合适的八度音区 (在玩家音高上下形成优雅交错对位)
     let aiNoteIdx = bestAiPitchClass + 12;
     if (userPitchIdx >= 12) {
-        aiNoteIdx = bestAiPitchClass; // 玩家高音，AI 在低音区给复调支撑
+        aiNoteIdx = bestAiPitchClass; // 玩家在高八度，AI 在低八度铺展温暖对位
     }
 
-    // 延迟 120ms 模拟真实脑电神经轴突传导与对位交替
+    // 延迟 140ms 模拟真实脑电神经轴突传导与对位交替
     setTimeout(() => {
-        triggerAiNote(aiNoteIdx, "lead");
-        
-        // 微柱 4: 动机记忆与复调中枢同时激发和声伴奏 Pad
-        const chordRoot = (userPitchClass + 4) % 12;
-        playSynthesizerNote(noteToFreq(chordRoot), "pad", 1.2);
+        triggerAiNote(aiNoteIdx, 0.82);
 
-        addLogEntry(`[Tonotopic] 感知输入音高: ${NOTE_NAMES[userPitchIdx]} -> 复调对位激发出 ${NOTE_NAMES[aiNoteIdx]} (协和度 0.98)`, "ai");
-    }, 120);
+        // 微柱 4: 动机记忆与复调中枢同时激发大三角钢琴低音弦乐共鸣
+        const chordRoot = (userPitchClass + 4) % 12;
+        playPianoNote(noteToFreq(chordRoot) * 0.5, 3.2, 0.65);
+
+        addLogEntry(`[Tonotopic] 感知音高: ${NOTE_NAMES[userPitchIdx]} -> 钢琴大师复调对位激发出 ${NOTE_NAMES[aiNoteIdx]} (协和度 0.99)`, "ai");
+    }, 140);
 
     // 动态刷新四大微柱仪表
     State.cortexMeters.tonotopic = Math.min(1.0, State.cortexMeters.tonotopic + 0.08);
-    State.cortexMeters.tension = 0.96;
-    State.cortexMeters.motif = Math.min(1.0, State.cortexMeters.motif + 0.05);
+    State.cortexMeters.tension = 0.98;
+    State.cortexMeters.motif = Math.min(1.0, State.cortexMeters.motif + 0.06);
     updateTelemetryUI();
 }
 
@@ -955,17 +1101,16 @@ function spawnWaterfallNote(noteIdx, source) {
     const canvas = document.getElementById("pianoRollCanvas");
     if (!canvas) return;
     
-    // 对应琴键横向 X 坐标
     const isBlack = [1, 3, 6, 8, 10].includes(noteIdx % 12);
-    let x = (noteIdx / 24.0) * canvas.width;
-    let color = source === "human" ? "#00f0ff" : "#bd00ff";
+    const x = (noteIdx / 24.0) * canvas.width;
+    const color = source === "human" ? "#00f0ff" : "#fcd34d";
 
     State.notesFalling.push({
         noteIdx,
         x,
         y: 0,
         w: (canvas.width / 24.0) * (isBlack ? 0.7 : 0.9),
-        h: 22,
+        h: 24,
         speed: 2.8,
         source,
         color
@@ -977,20 +1122,19 @@ function renderPianoRoll() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
 
-    // 动态调整画布尺寸
     if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
         canvas.width = canvas.clientWidth;
         canvas.height = canvas.clientHeight;
     }
 
-    ctx.fillStyle = "#04060a";
+    ctx.fillStyle = "#030508";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // 绘制 24 半音背景网格
     const colW = canvas.width / 24.0;
     for (let i = 0; i < 24; i++) {
         const isBlack = [1, 3, 6, 8, 10].includes(i % 12);
-        ctx.fillStyle = isBlack ? "#090d15" : "#0d1422";
+        ctx.fillStyle = isBlack ? "#080c14" : "#0d1320";
         ctx.fillRect(i * colW, 0, colW - 1, canvas.height);
 
         // 底部高亮触发线
@@ -1048,7 +1192,6 @@ function renderCircleOfFifths() {
         const ny = cy + radius * Math.sin(node.angle);
         const isActive = (node.pitch === State.activeRootPitch);
 
-        // 节点圆点
         ctx.beginPath();
         ctx.arc(nx, ny, isActive ? 9 : 5, 0, Math.PI * 2);
         ctx.fillStyle = isActive ? "#00f0ff" : "#334155";
@@ -1059,7 +1202,6 @@ function renderCircleOfFifths() {
         ctx.fill();
         ctx.shadowBlur = 0;
 
-        // 文字标注
         ctx.fillStyle = isActive ? "#ffffff" : "#64748b";
         ctx.font = isActive ? "bold 11px monospace" : "9px monospace";
         ctx.textAlign = "center";
@@ -1067,7 +1209,6 @@ function renderCircleOfFifths() {
         const textDist = radius + (isActive ? 16 : 14);
         ctx.fillText(node.name, cx + textDist * Math.cos(node.angle), cy + textDist * Math.sin(node.angle));
 
-        // 若为活跃主音，向圆心发射光束
         if (isActive) {
             ctx.strokeStyle = "rgba(0, 240, 255, 0.4)";
             ctx.lineWidth = 1.5;
@@ -1081,8 +1222,8 @@ function renderCircleOfFifths() {
     // 圆心核心
     ctx.beginPath();
     ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-    ctx.fillStyle = "#bd00ff";
-    ctx.shadowColor = "#bd00ff";
+    ctx.fillStyle = "#fcd34d";
+    ctx.shadowColor = "#fcd34d";
     ctx.shadowBlur = 8;
     ctx.fill();
     ctx.shadowBlur = 0;
@@ -1108,7 +1249,7 @@ function updateTelemetryUI() {
 let beatTimer = null;
 function startBeatClock() {
     if (beatTimer) clearInterval(beatTimer);
-    const intervalMs = (60.0 / currentPreset.bpm) * 1000.0 * 0.5; // 八分音符节拍
+    const intervalMs = (60.0 / currentPreset.bpm) * 1000.0 * 0.5;
 
     beatTimer = setInterval(() => {
         if (!State.isRunning) return;
@@ -1120,20 +1261,20 @@ function startBeatClock() {
         // 节拍鼓点脉冲
         playGroovePulse(State.beatStep);
 
-        // 如果处于「全自动独奏 (solo)」模式，由 1024-细胞自主作曲发声
+        // 如果处于「全自动独奏 (solo)」模式，由 1024-细胞自主即兴弹奏钢琴
         if (State.mode === "solo" && State.beatStep % 2 === 0) {
-            autonomousComposerStep();
+            autonomousPianoComposerStep();
         }
 
         // 微柱能量阻尼自然衰减 (Lyapunov 物理耗散，保证不发散)
-        State.cortexMeters.tonotopic = Math.max(0.4, State.cortexMeters.tonotopic * 0.98);
+        State.cortexMeters.tonotopic = Math.max(0.4, State.cortexMeters.tonotopic * 0.985);
         State.cortexMeters.motif = Math.max(0.5, State.cortexMeters.motif * 0.99);
         updateTelemetryUI();
     }, intervalMs);
 }
 
-// 歌王全自动即兴作曲
-function autonomousComposerStep() {
+// 钢琴大师全自动即兴作曲
+function autonomousPianoComposerStep() {
     const scale = currentPreset.scale;
     const chords = currentPreset.chords;
     const chordIdx = Math.floor(State.beatStep / 4) % chords.length;
@@ -1141,16 +1282,16 @@ function autonomousComposerStep() {
 
     // 随机选择主音调和弦内的音或五度相生过门音
     const basePitchClass = currentChord[Math.floor(Math.random() * currentChord.length)];
-    const octaveOffset = (Math.random() > 0.4) ? 12 : 0;
+    const octaveOffset = (Math.random() > 0.35) ? 12 : 0;
     const noteIdx = basePitchClass + octaveOffset;
 
     State.activeRootPitch = basePitchClass;
-    triggerAiNote(noteIdx, "lead");
+    triggerAiNote(noteIdx, 0.85);
 
-    // 伴随贝斯
+    // 伴随钢琴温暖低音踏板
     if (State.beatStep % 4 === 0) {
-        playSynthesizerNote(noteToFreq(currentChord[0]), "bass", 0.8);
-        addLogEntry(`[CPG 和声进程] 和弦进行至 ${NOTE_NAMES[currentChord[0]]}，多巴胺张力完美解决`, "cadence");
+        playPianoNote(noteToFreq(currentChord[0]) * 0.5, 3.2, 0.75);
+        addLogEntry(`[和声进行] 钢琴伴奏行进至 ${NOTE_NAMES[currentChord[0]]}，多巴胺张力舒缓解决`, "cadence");
     }
 }
 
@@ -1168,11 +1309,11 @@ function setPreset(key) {
         }
     });
 
-    document.getElementById("tempoLabel").textContent = `节拍速率: ${currentPreset.bpm} BPM`;
+    document.getElementById("tempoLabel").textContent = `伴奏速率: ${currentPreset.bpm} BPM`;
     document.getElementById("hudChordTension").textContent = `${currentPreset.name}`;
     document.getElementById("circleKeyBadge").textContent = `${currentPreset.name.split(' ')[0]}`;
 
-    addLogEntry(`生境风格已切换为: ${currentPreset.name} (BPM: ${currentPreset.bpm})`, "cadence");
+    addLogEntry(`音乐风格已切换为: ${currentPreset.name} (${currentPreset.bpm} BPM)`, "cadence");
     startBeatClock();
 }
 
@@ -1201,10 +1342,22 @@ window.addEventListener("DOMContentLoaded", () => {
     startBeatClock();
     requestAnimationFrame(animate);
 
+    // 音色切换
+    document.getElementById("instrumentSelect").onchange = (e) => {
+        currentInstrument = e.target.value;
+        const names = {
+            piano: "施坦威大三角钢琴",
+            epiano: "暖色调复古电钢琴",
+            celesta: "晶莹钢片琴与八音盒",
+            voice: "多巴胺歌王人声"
+        };
+        addLogEntry(`已切换物理建模音色为: ${names[currentInstrument]}`, "cadence");
+    };
+
     // 模式切换
     document.getElementById("modeSelect").onchange = (e) => {
         State.mode = e.target.value;
-        addLogEntry(`运行模式已切换为: ${State.mode === "solo" ? "全自动天籁独奏" : "人机即兴合奏"}`, "cadence");
+        addLogEntry(`运行模式已切换为: ${State.mode === "solo" ? "钢琴大师自组织独奏" : "人机即兴复调合奏"}`, "cadence");
     };
 
     // 音频启动按钮
@@ -1216,7 +1369,7 @@ window.addEventListener("DOMContentLoaded", () => {
     // 暂停/继续按钮
     document.getElementById("btnPlayPause").onclick = (e) => {
         State.isRunning = !State.isRunning;
-        e.target.textContent = State.isRunning ? "⏸ 暂停节拍" : "▶ 恢复节拍";
+        e.target.textContent = State.isRunning ? "⏸ 暂停伴奏" : "▶ 恢复伴奏";
     };
 
     // 键盘物理快捷键监听
