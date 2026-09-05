@@ -21,7 +21,8 @@ jobs:
     - name: Install Python Dependencies
       run: |
         python3 -m pip install --upgrade pip
-        pip install numpy torch pytest --index-url https://download.pytorch.org/whl/cpu
+        pip install numpy pytest
+        pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
 
     - name: Generate Scaled Checkpoint
       run: |
