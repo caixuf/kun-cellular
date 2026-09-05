@@ -7,6 +7,10 @@ KunCellular GPU vs C 硬件底座逐细胞全量数值保真对账测试
 
 import os
 import sys
+
+# Ensure repository root is on sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import subprocess
 import numpy as np
 import torch
@@ -89,7 +93,8 @@ def run_parity_audit():
     with open("/tmp/run_c_parity.c", "w") as f:
         f.write(c_driver)
 
-    compile_res = subprocess.run("gcc -O3 -I include /tmp/run_c_parity.c -o /tmp/run_c_parity -lm", shell=True, capture_output=True, text=True)
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    compile_res = subprocess.run(f"gcc -O3 -I {repo_root}/include /tmp/run_c_parity.c -o /tmp/run_c_parity -lm", shell=True, capture_output=True, text=True)
     if compile_res.returncode != 0:
         raise RuntimeError(f"C 编译失败: {compile_res.stderr}")
 

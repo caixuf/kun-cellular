@@ -61,7 +61,7 @@ void test_binary_checkpoint_roundtrip_fidelity() {
 }
 
 void test_all_cell_types_roundtrip_fidelity() {
-    std::cout << "\n[Test 2] 彻底审计全部 29 种 CellType 序列化无损保真度 (消灭类型坍缩 BUG 1)..." << std::endl;
+    std::cout << "\n[Test 2] 彻底审计全部 30 种 CellType 序列化无损保真度 (消灭类型坍缩 BUG 1)..." << std::endl;
 
     std::vector<CellType> all_types = {
         CellType::SENSE_RAW_INPUT_0, CellType::SENSE_RAW_INPUT_1,
@@ -142,12 +142,20 @@ void test_all_cell_types_roundtrip_fidelity() {
     std::cout << "    - PREDICT_SENSE_0: " << to_string(loaded.cells[27].type) << " [PASS]" << std::endl;
     std::cout << "    - SENSE_CHANNEL: " << to_string(loaded.cells[4].type) << " [PASS]" << std::endl;
 
+    // 验证 initial_weight 落盘无损保真度 (保护跨代塑性历史)
+    assert(loaded.synapses.size() == org.synapses.size());
+    for (size_t i = 0; i < org.synapses.size(); ++i) {
+        assert(std::abs(loaded.synapses[i].initial_weight - org.synapses[i].initial_weight) < 1e-5 &&
+               "initial_weight 必须在落盘反序列化中无损还原！");
+    }
+    std::cout << "  ✓ initial_weight 塑性基线落盘还原校验通过！" << std::endl;
+
     std::remove(tmp_bin.c_str());
-    std::cout << "[PASS] test_all_cell_types_roundtrip_fidelity 完美通过！(零类型坍缩)" << std::endl;
+    std::cout << "[PASS] test_all_cell_types_roundtrip_fidelity 完美通过！(零类型坍缩，30/30 类型与突触基线全保真)" << std::endl;
 }
 
 void test_integral_feedback_loop_boundedness() {
-    std::cout << "\n[Test 3] 验证 OP_INTEGRAL 反馈环路有界性 (杜绝指数爆炸 BUG 3)..." << std::endl;
+    std::cout << "\n[Test 3] 验证 OP_INTEGRAL 反馈环路有界性与病态输入防御 (杜绝指数爆炸与 NaN 穿透 BUG 3)..." << std::endl;
 
     CellularOrganism org;
     Cell c0;
@@ -159,7 +167,7 @@ void test_integral_feedback_loop_boundedness() {
     Cell c1;
     c1.id = 1;
     c1.type = CellType::OP_INTEGRAL;
-    c1.param1 = 0.50; // 增益 0.5
+    c1.param1 = 0.50; // 积分增益
     org.cells.push_back(c1);
 
     Cell c2;
@@ -168,15 +176,15 @@ void test_integral_feedback_loop_boundedness() {
     c2.param1 = 1.0;
     org.cells.push_back(c2);
 
-    // c0 -> c1 (输入注入)
+    // 构造正反馈自环: c1 -> c1 (权重 1.0, 强正反馈环路)
+    Synapse self_loop;
+    self_loop.from_cell_id = 1; self_loop.to_cell_id = 1; self_loop.weight = 1.0; self_loop.initial_weight = 1.0;
+    org.synapses.push_back(self_loop);
+
+    // c0 -> c1 (持续正输入注入)
     Synapse s0;
     s0.from_cell_id = 0; s0.to_cell_id = 1; s0.weight = 1.0; s0.initial_weight = 1.0;
     org.synapses.push_back(s0);
-
-    // c1 -> c1 (强正反馈自环: 增益 0.5 * 权重 1.0 = 持续倍增)
-    Synapse s_loop;
-    s_loop.from_cell_id = 1; s_loop.to_cell_id = 1; s_loop.weight = 1.0; s_loop.initial_weight = 1.0;
-    org.synapses.push_back(s_loop);
 
     // c1 -> c2 (输出至动作)
     Synapse s1;
@@ -195,15 +203,85 @@ void test_integral_feedback_loop_boundedness() {
         assert(std::abs(s) <= 4.0001 && "积分器状态必须严格钳位在 [-4.0, 4.0] 内!");
     }
 
-    std::cout << "  ✓ 强反馈环路推演 200 步后 state = " << org.cells[1].state_val
-              << " (严格限制在 [-4.0, 4.0]，零溢出，零 NaN)" << std::endl;
+    // 注入病态 NaN 与 Inf 输入，验证防御坚固性
+    double nan_inp = std::numeric_limits<double>::quiet_NaN();
+    org.forward_nd(&nan_inp, 1, false);
+    assert(std::isfinite(org.cells[1].state_val) && "NaN 输入下积分器状态依然必须严格有限且有界！");
+    assert(std::abs(org.cells[1].state_val) <= 4.0001);
+
+    double inf_inp = std::numeric_limits<double>::infinity();
+    org.forward_nd(&inf_inp, 1, false);
+    assert(std::isfinite(org.cells[1].state_val) && "Inf 输入下积分器状态依然必须严格有限且有界！");
+    assert(std::abs(org.cells[1].state_val) <= 4.0001);
+
+    std::cout << "  ✓ 强反馈环路推演 200 步 + NaN/Inf 压力注入后 state = " << org.cells[1].state_val
+              << " (严格限制在 [-4.0, 4.0]，零溢出，零 NaN 穿透)" << std::endl;
     std::cout << "[PASS] test_integral_feedback_loop_boundedness 完美通过！" << std::endl;
+}
+
+static std::string find_ckpt_path(const std::string& rel) {
+    if (std::ifstream(rel).good()) return rel;
+    std::string alt = "../" + rel;
+    if (std::ifstream(alt).good()) return alt;
+    return rel;
+}
+
+void test_legacy_v2_checkpoint_backward_compatibility() {
+    std::cout << "\n[Test 4] 验证历史 v2 检查点向后兼容保真度 (消灭 v2/v3 冲突回归)..." << std::endl;
+
+    // 1. adas_cortex_champion.bin 历史形态学普查
+    {
+        CellularOrganism org = CellularOrganism::load_checkpoint_bin(find_ckpt_path("checkpoints/adas_cortex_champion.bin"));
+        assert(org.cells.size() == 210);
+        int sense = 0, act = 0, sum = 0;
+        for (const auto& c : org.cells) {
+            if (is_receptor_cell(c.type)) sense++;
+            else if (is_effector_cell(c.type)) act++;
+            else if (c.type == CellType::OP_SUM) sum++;
+        }
+        std::cout << "  ✓ adas_cortex_champion.bin: cells=210, sense=" << sense 
+                  << ", act=" << act << ", sum=" << sum << std::endl;
+        assert(sense == 12 && "adas_cortex 受体数必须为 12！");
+        assert(act == 6 && "adas_cortex 效应器数必须为 6，绝不能坍缩为 0！");
+        assert(sum == 192 && "adas_cortex 线性运算细胞数必须为 192，绝不能被错译为受体！");
+    }
+
+    // 2. doudizhu_game_champion.bin 历史形态学普查
+    {
+        CellularOrganism org = CellularOrganism::load_checkpoint_bin(find_ckpt_path("checkpoints/doudizhu_game_champion.bin"));
+        assert(org.cells.size() == 1024);
+        int sense = 0, act = 0;
+        for (const auto& c : org.cells) {
+            if (is_receptor_cell(c.type)) sense++;
+            else if (is_effector_cell(c.type)) act++;
+        }
+        std::cout << "  ✓ doudizhu_game_champion.bin: cells=1024, sense=" << sense << ", act=" << act << std::endl;
+        assert(sense == 32 && "doudizhu 受体数必须为 32！");
+        assert(act == 266 && "doudizhu 效应器数必须为 266！");
+    }
+
+    // 3. cartpole_balance_champion.bin 历史形态学普查
+    {
+        CellularOrganism org = CellularOrganism::load_checkpoint_bin(find_ckpt_path("checkpoints/cartpole_balance_champion.bin"));
+        assert(org.cells.size() == 12);
+        int sense = 0, act = 0;
+        for (const auto& c : org.cells) {
+            if (is_receptor_cell(c.type)) sense++;
+            else if (is_effector_cell(c.type)) act++;
+        }
+        std::cout << "  ✓ cartpole_balance_champion.bin: cells=12, sense=" << sense << ", act=" << act << std::endl;
+        assert(sense == 2 && "cartpole 受体数必须为 2！");
+        assert(act == 3 && "cartpole 效应器数必须为 3！");
+    }
+
+    std::cout << "[PASS] test_legacy_v2_checkpoint_backward_compatibility 完美通过！" << std::endl;
 }
 
 int main() {
     test_binary_checkpoint_roundtrip_fidelity();
     test_all_cell_types_roundtrip_fidelity();
     test_integral_feedback_loop_boundedness();
-    std::cout << "\n✅ ALL CHECKPOINT ROUNDTRIP & BOUNDEDNESS TESTS PASSED!" << std::endl;
+    test_legacy_v2_checkpoint_backward_compatibility();
+    std::cout << "\n✅ ALL CHECKPOINT ROUNDTRIP & COMPATIBILITY TESTS PASSED!" << std::endl;
     return 0;
 }

@@ -1573,6 +1573,8 @@ public:
                     c.prev_input = in0;
                     break;
                 case CellType::OP_INTEGRAL:
+                    if (!std::isfinite(in0)) in0 = 0.0;
+                    if (!std::isfinite(c.state_val)) c.state_val = 0.0;
                     c.state_val = std::clamp(c.state_val + in0 * c.param1, -4.0, 4.0);
                     c.output_val = c.state_val;
                     break;
@@ -2155,7 +2157,12 @@ public:
             id_to_idx[cells[i].id] = i;
         }
 
-        std::vector<std::vector<std::pair<uint32_t, float>>> adj(num_cells);
+        struct EdgeEntry {
+            uint32_t packed_target;
+            float weight;
+            float initial_weight;
+        };
+        std::vector<std::vector<EdgeEntry>> adj(num_cells);
         uint32_t num_synapses = 0;
         for (const auto& syn : synapses) {
             if (!syn.is_active) continue;
@@ -2163,7 +2170,7 @@ public:
             auto it_v = id_to_idx.find(syn.to_cell_id);
             if (it_u != id_to_idx.end() && it_v != id_to_idx.end()) {
                 uint32_t packed_target = (static_cast<uint32_t>(syn.to_port & 0xFF) << 24) | (it_v->second & 0x00FFFFFF);
-                adj[it_u->second].push_back({packed_target, static_cast<float>(syn.weight)});
+                adj[it_u->second].push_back({packed_target, static_cast<float>(syn.weight), static_cast<float>(syn.initial_weight)});
                 num_synapses++;
             }
         }
@@ -2184,10 +2191,12 @@ public:
         uint64_t weights_off = col_idx_off + col_idx_sz;
         uint64_t weights_sz = num_synapses * 4;
         uint64_t coords_off = weights_off + weights_sz;
+        uint64_t coords_sz = num_cells * 3 * sizeof(float);
+        uint64_t init_w_off = (num_synapses > 0) ? (coords_off + coords_sz) : 0;
 
         struct SDSC_BIN_HDR {
             uint32_t magic{0x53445343};
-            uint32_t version{2};
+            uint32_t version{3};
             uint32_t n_cells{0};
             uint32_t n_syns{0};
             uint32_t in_d{0};
@@ -2208,6 +2217,7 @@ public:
         hdr.ci_off = col_idx_off;
         hdr.w_off = weights_off;
         hdr.coords_off = coords_off;
+        hdr.extra = init_w_off;
 
         ofs.write(reinterpret_cast<const char*>(&hdr), sizeof(hdr));
 
@@ -2229,15 +2239,18 @@ public:
         std::vector<uint32_t> row_ptr(num_cells + 1, 0);
         std::vector<uint32_t> col_idx;
         std::vector<float> weights;
+        std::vector<float> initial_weights;
         col_idx.reserve(num_synapses);
         weights.reserve(num_synapses);
+        initial_weights.reserve(num_synapses);
 
         uint32_t curr = 0;
         for (uint32_t i = 0; i < num_cells; ++i) {
             row_ptr[i] = curr;
             for (const auto& edge : adj[i]) {
-                col_idx.push_back(edge.first);
-                weights.push_back(edge.second);
+                col_idx.push_back(edge.packed_target);
+                weights.push_back(edge.weight);
+                initial_weights.push_back(edge.initial_weight);
                 curr++;
             }
         }
@@ -2257,14 +2270,20 @@ public:
         }
         ofs.write(reinterpret_cast<const char*>(coords.data()), coords.size() * sizeof(float));
 
+        if (num_synapses > 0 && !initial_weights.empty()) {
+            ofs.write(reinterpret_cast<const char*>(initial_weights.data()), initial_weights.size() * sizeof(float));
+        }
+
         return true;
     }
 
-    static CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags = 0) {
-        if (is_valid_cell_type_code(op)) {
-            return static_cast<CellType>(op);
+    static CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags = 0, uint32_t version = 3) {
+        if (version >= 3) {
+            if (is_valid_cell_type_code(op)) {
+                return static_cast<CellType>(op);
+            }
         }
-        // Legacy fallback mapping if loading older v1 checkpoints
+        // Legacy fallback mapping if loading older v2 or v1 checkpoints
         if (flags & 0x01) {
             if (op == 0) return CellType::SENSE_RAW_INPUT_0;
             if (op == 1) return CellType::SENSE_RAW_INPUT_1;
@@ -2334,7 +2353,7 @@ public:
         } hdr;
 
         ifs.read(reinterpret_cast<char*>(&hdr), sizeof(hdr));
-        if (!ifs || hdr.magic != 0x53445343 || hdr.version != 2 || hdr.n_cells == 0) {
+        if (!ifs || hdr.magic != 0x53445343 || (hdr.version != 2 && hdr.version != 3) || hdr.n_cells == 0) {
             return org;
         }
 
@@ -2357,7 +2376,7 @@ public:
             int8_t p2_i8 = static_cast<int8_t>(p2_u8);
 
             org.cells[i].id = i;
-            org.cells[i].type = sdsc_opcode_to_cell_type(op, flags);
+            org.cells[i].type = sdsc_opcode_to_cell_type(op, flags, hdr.version);
             org.cells[i].param1 = static_cast<double>(p1_i8) / 64.0;
             org.cells[i].param2 = static_cast<double>(p2_i8) / 64.0;
             org.cells[i].latch_state = false;
@@ -2391,6 +2410,14 @@ public:
             ifs.read(reinterpret_cast<char*>(weights.data()), num_syns * sizeof(float));
         }
 
+        // 读取 initial_weights (若存在，hdr.extra > 0)
+        std::vector<float> init_weights;
+        if (hdr.extra > 0 && num_syns > 0) {
+            ifs.seekg(hdr.extra);
+            init_weights.resize(num_syns);
+            ifs.read(reinterpret_cast<char*>(init_weights.data()), num_syns * sizeof(float));
+        }
+
         for (uint32_t u = 0; u < num_cells; ++u) {
             uint32_t start_edge = row_ptr[u];
             uint32_t end_edge = row_ptr[u + 1];
@@ -2404,7 +2431,11 @@ public:
                     s.to_cell_id = org.cells[v].id;
                     s.to_port = port;
                     s.weight = static_cast<double>(weights[e]);
-                    s.initial_weight = s.weight;
+                    if (!init_weights.empty() && e < init_weights.size()) {
+                        s.initial_weight = static_cast<double>(init_weights[e]);
+                    } else {
+                        s.initial_weight = s.weight;
+                    }
                     s.is_active = true;
                     org.synapses.push_back(s);
                 }
@@ -3370,7 +3401,7 @@ public:
         // 3.0 鲍德温可塑性基因跨代固化 (Baldwin Effect Crystallization)
         // 仅对顶层精英个体、且每 10 代周期性固化，保护整体种群塑性隔离
         uint32_t current_gen = population_.empty() ? 0 : population_[0].generation;
-        if (constraint_cfg_.enable_baldwin_crystallization && current_gen % 10 == 0) {
+        if (constraint_cfg_.enable_baldwin_crystallization && current_gen > 0 && current_gen % 10 == 0) {
             size_t elite_count = std::max<size_t>(1, population_.size() / 10);
             for (size_t i = 0; i < elite_count && i < population_.size(); ++i) {
                 population_[i].crystallize_plasticity(constraint_cfg_.crystallization_rate);

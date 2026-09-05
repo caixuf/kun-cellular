@@ -41,6 +41,7 @@ extern "C" {
 
 #define SDSC_BINARY_MAGIC 0x53445343 /* "SDSC" */
 #define SDSC_BINARY_VERSION 2
+#define SDSC_BINARY_VERSION_V3 3
 
 #pragma pack(push, 1)
 typedef struct {
@@ -114,7 +115,7 @@ static inline SDSCBinaryGraph* sdsc_binary_load(const char* filepath) {
 #endif
 
     const SDSCBinaryHeader* hdr = (const SDSCBinaryHeader*)raw_data;
-    if (hdr->magic != SDSC_BINARY_MAGIC || hdr->version != SDSC_BINARY_VERSION) {
+    if (hdr->magic != SDSC_BINARY_MAGIC || (hdr->version != SDSC_BINARY_VERSION && hdr->version != SDSC_BINARY_VERSION_V3)) {
 #if defined(_WIN32) || defined(_WIN64)
         free(raw_data);
 #else

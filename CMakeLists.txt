@@ -115,6 +115,9 @@ target_link_libraries(train_flagship_voxel PRIVATE kun_cellular Threads::Threads
 add_executable(train_field_3d_turbulence "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_field_3d_turbulence.cpp")
 target_link_libraries(train_field_3d_turbulence PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_domain_zoo "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_domain_zoo.cpp")
+target_link_libraries(train_domain_zoo PRIVATE kun_cellular Threads::Threads m)
+
 if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
     add_executable(bench_adas_scales "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_adas_scales.cpp")
     target_include_directories(bench_adas_scales PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_HEADER_PATH})
@@ -137,5 +140,9 @@ set_target_properties(kun_cellular_runtime PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-
-
+# 5. GPU vs C++ 硬件底座逐细胞全量数值保真对账测试
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_FOUND)
+    add_test(NAME test_gpu_cpp_bit_parity COMMAND ${Python3_EXECUTABLE} -m pytest ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_gpu_cpp_bit_parity.py)
+    set_tests_properties(test_gpu_cpp_bit_parity PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}:$ENV{PYTHONPATH}")
+endif()

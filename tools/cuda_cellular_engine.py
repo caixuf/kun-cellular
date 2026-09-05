@@ -25,6 +25,9 @@ class CUDACellularPopulation:
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+        # 强制单精度 IEEE-754，禁用 TF32 截断，保证与 C 底座严格位级一致
+        torch.backends.cuda.matmul.allow_tf32 = False
+        torch.backends.cudnn.allow_tf32 = False
 
         N = self.num_cells
         P = self.pop_size
@@ -220,7 +223,8 @@ class CUDACellularPopulation:
         self.inter_drive.zero_()
         self.inter_drive.scatter_add_(1, self.inter_dst_expanded, inter_weighted)
 
-        self.inputs_accum = intra_drive + self.inter_drive
+        self.inputs_accum.copy_(intra_drive)
+        self.inputs_accum.add_(self.inter_drive)
         self.activation_count += 1
 
         # 收集末尾效应器输出
