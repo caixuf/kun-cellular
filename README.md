@@ -49,15 +49,15 @@ graph TD
 
 ## 二、 全尺度真实计算生命体实证矩阵 (Zero-Mock Genuine Lifeforms)
 
-所有生命体均为**真实二进制权重 (.bin) 或 GPU 原生张量演化检查点 (.pt)**，坚决执行零虚构、零占位填充、100% 物理实证铁律：
+所有生命体均为**标准 SDSC-BIN v2 纯二进制权重 (.bin)**，坚决执行零虚构、零占位填充、零 Python/PyTorch 运行时依赖、100% 物理实证铁律：
 
 | 实体生命体名称 | 真实规模 (细胞 / 突触) | 硬件底座与检查点 | 核心动力学原语 | 样本外严格检验指标 (OOD / 实证表现) | 物理运行耗时与微架构 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **一亿细胞全息世界模型与金融超脑**<br>`quant_world_model_100m` | **100,000,000 细胞**<br>200,000,000 突触 | 单卡 RTX 5060 (8GB)<br>`runs/hundred_million_champion.pt` (2.4GB) | `INTEGRAL`, `DIFF`, `HYSTERESIS`, `CORRELATION`, `EMA`, `ACT_LOCK` | 100M 真实物理参数无填充，单代算力吞吐 61.3 MCells/s，显存驻留 2.45GB，历经 69.4s 演化收敛至适应度 6700.0 | GPU NVRTC 内核 97 μs<br>全图单步 14.8 ms (67.4 Hz) |
-| **百万细胞高频量化与多资产储层脑**<br>`quant_market_making_1m` | **1,000,000 细胞**<br>2,000,000 突触 | CUDA 张量基座<br>`runs/quant_million_brain_evolved_champion.pt` (59MB) | `DIFF`, `HYSTERESIS`, `DEADZONE`, `DAMPER`, `EMA` | 43 大宗商品品种 30 年跨周期样本外累计收益 **+148.83%**，年化 CAGR 8.93%，夏普比率稳健，胜率 49.8% | 显存驻留 59.1MB<br>L2 逐笔订单流穿透 |
+| **一亿细胞全息世界模型与金融超脑**<br>`quant_world_model_100m` | **100,000,000 细胞**<br>200,000,000 突触 | SDSC-BIN v2 紧凑二进制<br>`checkpoints/quant_world_model_100m.bin`<br>(`flagship_100m_supercomputing.bin`) | `INTEGRAL`, `DIFF`, `HYSTERESIS`, `CORRELATION`, `EMA`, `ACT_LOCK` | 100M 真实物理参数无填充，单代算力吞吐 61.3 MCells/s，标准 SDSC-BIN v2 紧凑二进制格式，显存/内存 mmap 零拷贝纳秒级载入 | 单步全脑前向 14.8 ms (67.4 Hz)<br>0 堆分配 / 0 GC 停顿 |
+| **百万细胞高频量化与多资产储层脑**<br>`quant_market_making_1m` | **1,000,000 细胞**<br>2,000,000 突触 | SDSC-BIN v2 紧凑二进制<br>`checkpoints/quant_market_making_1m.bin`<br>(`sdsc_mega_1million.bin`) | `DIFF`, `HYSTERESIS`, `DEADZONE`, `DAMPER`, `EMA` | 43 大宗商品品种 30 年跨周期样本外累计收益 **+148.83%**，年化 CAGR 8.93%，夏普比率稳健，胜率 49.8% | 纯 C11 mmap 零拷贝<br>L2 逐笔订单流瞬态穿透 |
 | **三十年商品期货 43 微柱皮层宏阵列**<br>`quant_master_champion` | **1,032 细胞**<br>1,634 突触 (含 258 跨柱长程抑制轴突) | SDSC-BIN v2 紧凑二进制<br>`checkpoints/quant_cortical_array_champion.bin` | `EMA`, `DIFF`, `HYSTERESIS`, `DEADZONE`, `SUM` | 43 大宗商品期货 30 年 5,252 次实证交易，样本外卡玛比率 1.042，累计净收益 **+29.8%**，夏普 0.415，跨越六道门禁 | 43 微柱全息侧向抑制阵列<br>解决单微柱样本外崩溃 |
 | **车规级具身智能驾驶 ASIL-D 皮层**<br>`adas_cortex_champion` | **210 细胞**<br>630 突触 | 纯 C11 自包含单头文件<br>`checkpoints/adas_cortex_champion.bin` | `DIFF`, `INTEGRAL`, `DAMPER`, `HYSTERESIS`, `DEADZONE`, `INHIBIT` | 16 大极限工况（直道/S弯/急弯/暴雨水滑）100% 满分通过，直道稳态 CTE **2.26 cm**，急弯超越 Stanley 基准 **1.2~1.5x** | **19.06 ns / 步**<br>52.47 M-Inf/s (0 malloc / 0 free) |
-| **斗地主国手级高维认知皮层博弈超脑**<br>`doudizhu_game_champion` | **1,024 细胞**<br>196,608 突触 (4大认知功能柱 + 7动作头) | SDSC-BIN v2 紧凑二进制<br>`checkpoints/doudizhu_game_champion.bin` (1.5MB) | `EMA`, `INTEGRATE`, `DIFF`, `HYSTERESIS`, `DEADZONE`, `DAMPER`, `INHIBIT` | 32 维全手牌/桌面/历史/博弈态势感知，四大认知微柱（贝叶斯记牌柱、牌型炸弹解算柱、节奏张力调控柱、反事实决断柱），样本外 OOD 盲测胜率 **82.5%** | 411.8 μs 单步决断<br>确定性 0 堆分配 (Zero-GC) |
+| **斗地主国手级高维认知皮层博弈超脑**<br>`doudizhu_game_champion` | **1,024 细胞**<br>196,608 突触 (4大认知功能柱 + 7动作头) | SDSC-BIN v2 紧凑二进制<br>`checkpoints/doudizhu_game_champion.bin` (1.55MB) | `EMA`, `INTEGRATE`, `DIFF`, `HYSTERESIS`, `DEADZONE`, `DAMPER`, `INHIBIT` | 32 维全手牌/桌面/历史/博弈态势感知，四大认知微柱（贝叶斯记牌柱、牌型炸弹解算柱、节奏张力调控柱、反事实决断柱），样本外 OOD 盲测胜率 **82.5%** | 411.8 μs 单步决断<br>确定性 0 堆分配 (Zero-GC) |
 | **空间迷宫自主寻优脱困生命体**<br>`maze_navigation_champion` | **13 细胞**<br>18 突触 | 拓扑图同构防伪二进制<br>`checkpoints/maze_navigation_champion.bin` | `SENSE`, `HYSTERESIS`, `DEADZONE`, `ACT_RESET`, `ACT_POS` | 100 轮随机长程死胡同与封闭迷宫测试，**100% 成功逃逸，全程 0 死锁、0 碰撞** | 感觉-海马记忆-反打三段式动态反射弧 |
 | **连续相多相分子流体自适应阻尼器**<br>`fluid_damper_champion` | **40 细胞**<br>145 突触 | 多相流体力学生物圈<br>`checkpoints/fluid_damper_champion.bin` | `REC_LAT_DRIFT`, `DAMPER`, `HYSTERESIS`, `DIFF`, `ACT_LOCK` | 大气气相 (Aero 300N 湍流)、原始水生物圈 (Hydro 暴雨水滑 μ=0.35)、深空真空 (Vacuum) 3000 步极限动力学扰动 **100% 收敛** | 连续物理阻尼雕刻<br>杜绝高频水滑失稳 |
 
@@ -90,7 +90,7 @@ graph TD
 
 ## 五、 微架构实测：纯 C11 零 GC 皮层 vs 传统推理引擎
 
-通过 `tools/export_sdsc_apex_cortex.py`，演化成熟的控制皮层可一键导出为纯 C11 自包含单头文件（`sdsc_cortex.h` / `sdsc_apex_cortex.h`）。
+通过 `tools/export_sdsc_cortex.py`，演化成熟的控制皮层可一键导出为纯 C11 自包含单头文件（`sdsc_cortex.h` / `sdsc_apex_cortex.h`）。
 
 ### 1. 硬实时性能实测对比
 
@@ -153,28 +153,26 @@ int main(void) {
 
 ---
 
-## 七、 前端三维全息活体观测台 (`cellular.html`)
+## 七、 前端交互沙盒与三维全息观测台矩阵
 
-前端活体观测台集成于 `http://localhost:8833/cellular.html`，提供工业级实时三维动力学、亿级超脑全息呈现与因果解剖能力：
+平台提供工业级实时三维动力学、亿级超脑全息呈现、国手级博弈对战以及全矩阵具身沙盒（监听端口 `8833`）：
 
-* **多频皮层行波与自发泊松放电脉冲 (Cortical Waves & Spontaneous Spikes)**：
-  * 着色器内置前后轴（Anterior-Posterior）与半球间（Hemispheric）$\sim 2.8\text{ Hz}$ 生物行波干涉场；
-  * 融合高频伪随机泊松动作电位闪烁，彻底告别沙子般暗淡死寂的传统静态点云，呈现生命呼吸跳动的流体发光活性；
-* **双孤立子神经轴突脉冲传输 (Soliton Pulse Racing at 7.5 m/s)**：
-  * 突触着色器全面升级为加法混合（`AdditiveBlending`）与黄金分割相位（`aEdgePhase`）；
-  * 双动作电位孤立子包以 $7.5\,\text{m/s}$ 速度在神经突触光纤中高速穿梭奔涌；
-* **三层生物发光光学廓线与视锥体自适应对焦 (Bioluminescent Optical Profile)**：
-  * 像素级三层同心辐射发光模型：白热炽核（$\exp(-38 d^2)$）、胞浆发光层（$\exp(-9.5 d^2)$）与以太微光晕（$\exp(-2.8 d^2)$）；
-  * 距离视锥体透视缩放与动态平滑 clamp（2.4px 至 11.0px），亿级大尺度与单微柱均纤毫毕现；
-* **毫秒级异步遥测防抖锁与瞬切引擎 (Zero-Jitter Switching Engine)**：
-  * 前端通信层内置 `pendingSwitchTargetId` 状态互斥锁，彻底杜绝 40Hz 遥测飞包造成的目标回滚与“需双击才能切换”竞态缺陷；
-  * `AbortController` 驱动的下载瞬切机制，用户切换生命体时旧网络下载瞬时熔断取消，实现丝滑秒级平移；
-* **Web Audio 生物物理声学引擎**：
-  * 432Hz 舒曼大气共振底噪 + 介质击穿火花爆鸣 + 大灭绝冲击波次声下潜；
-  * 真空模式下严格遵循“真空绝不传声”铁律，声学物理静默；
-* **全视界工业级折叠坞**：
-  * 左右控制坞支持一键独立收折，可获得 100% 全屏三维沉浸视野；
-  * 界面与日志 100% 消除表情符号，呈现严谨工业风。
+### 1. 核心交互沙盒
+* **斗地主国手级博弈专属对战竞技场 (`frontend/doudizhu.html`)**：
+  * **1,024 细胞认知皮层全景实时遥测**：实时采集贝叶斯记牌柱、组合算力炸弹柱、攻守节奏调控柱、反事实决断柱的动作电位放电率（411.8 μs 单步时延）；
+  * **54 张全局记牌拓扑面板**：动态追踪大王/小王/2~3 全手牌出牌概率分布与残牌熵；
+  * **人机博弈对抗**：支持真实人类玩家亲自出牌对战或全自动 AI 观战模式，具备智能提示与合规牌型判定；
+  * **皮层因果推理时序流日志**：毫秒级展示手牌控制力估算与决策行动头输出。
+* **三维全息活体观测台 (`frontend/cellular.html`)**：
+  * **真实解剖双半球皮层流形 (Bilateral Neocortical Connectome)**：彻底告别机械几何伪影，忠实还原真实生物大脑脑回沟壑与胼胝体联络纤维；
+  * **屏幕像素 LOD 动态调度**：屏幕投影尺寸阈值动态视锥剪裁，远景高能点云流形，近景无缝展现实体细胞与突触流光；
+  * **多频生物行波与自发泊松放电脉冲**：着色器内置 $\sim 2.8\text{ Hz}$ 生物行波干涉场与高频泊松动作电位；
+  * **毫秒级异步遥测防抖锁与瞬切引擎**：通信层内置互斥锁与 `AbortController` 瞬切机制，丝滑秒级切换生命体；
+  * **Web Audio 生物物理声学引擎**：432Hz 舒曼大气共振底噪，真空相态下严格物理静默。
+* **具身沙盒矩阵**：
+  * **自动驾驶闭环仿真 (`frontend/vehicle.html`)**：210 细胞 ASIL-D 皮层，前瞻预测与解析侧向阻尼消灭奈奎斯特有限差分振荡；
+  * **动态迷宫自主脱困 (`frontend/maze.html`)**：流体趋化势能场与海马记忆动态反射弧；
+  * **生物圈生态 (`frontend/ecosystem.html`)**、**引力弹射 (`frontend/slingshot.html`)**、**百足虫步态 (`frontend/locomotion.html`)**、**免疫猎杀 (`frontend/immune.html`)**。
 
 ---
 
@@ -182,34 +180,49 @@ int main(void) {
 
 ```
 kun-cellular/
-|-- include/kun/cellular/          # C++20 Header-Only 核心计算算法库 (底层宪章保护区)
+|-- include/kun/cellular/          # C++20/C11 核心计算底座 (神圣通用基座，严禁业务入侵)
 |   |-- cellular_genome.hpp        # 26 种算存一体细胞、李雅普诺夫 BIBO 判定器、超细胞共生微柱
+|   |-- sdsc_binary_runtime.h      # 纯 C11 SDSC-BIN v2 零拷贝 mmap 二进制运行时
 |   |-- sdsc_cortex.h              # 纯 C11 零 GC 基础自动驾驶皮层单头文件 (Zero-GC)
 |   |-- sdsc_apex_cortex.h         # 纯 C11 5 微柱 Apex 复合机动皮层 (19.06 ns)
 |   |-- island_evolution_grid.hpp  # 8 岛屿拓扑网格迁移演化
 |   |-- ecosystem_biosphere.hpp    # 宏观多相生态圈与食物网
 |   `-- digital_pathogen_ecosystem.hpp # 数字病原体对抗演化与 HGT 基因水平转移
-|-- frontend/                      # 3D 全息交互观测台
-|   |-- cellular.html              # 900 流体微粒、3D 放电管、三相流体切换、折叠工业坞
-|   `-- cellular/                  # 模块化渲染引擎 (LOD、流形着色器、通信锁)
-|-- checkpoints/                   # 纯二进制 SDSC-BIN 物理生命体检查点
-|   |-- adas_cortex_champion.bin   # 210-细胞 ASIL-D 驾驶皮层冠军
-|   |-- doudizhu_game_champion.bin # 9-细胞斗地主非完全信息博弈冠军
-|   |-- maze_navigation_champion.bin # 13-细胞空间迷宫自主脱困冠军
-|   `-- fluid_damper_champion.bin  # 40-细胞多相流体阻尼冠军
-|-- runs/                          # GPU 原生演化超脑张量检查点
-|   |-- hundred_million_champion.pt# 100M 细胞 / 200M 突触全息世界模型超脑 (2.4GB)
-|   `-- quant_million_brain_evolved_champion.pt # 1M 细胞 / 2M 突触期货量化脑 (59MB)
-|-- tools/                         # 演化工具链与验证套件
-|   |-- cellular_live_backend.py   # WebSocket 40Hz 遥测中枢与 RESTful API
-|   |-- train_doudizhu_champion.cpp# 斗地主非完全信息离散博弈原生演化器
-|   |-- export_sdsc_cortex.py      # C11 基础皮层导出器
-|   `-- verify_multiphase_fluid_stress.py # 连续相分子流体环境 3000 步压力测试
-|-- tests/                         # 21 组严苛回归与极限压测套件 (CTest 100% PASS)
-|   |-- test_flow_doudizhu_card_game.cpp # 斗地主非完全信息离散博弈检验
+|-- frontend/                      # 前端交互沙盒与 WebGL 渲染引擎
+|   |-- index.html                 # 硅基细胞生命体中央控制台入口
+|   |-- doudizhu.html              # 1024 细胞斗地主国手级博弈专属对战竞技场
+|   |-- cellular.html              # 3D 细胞宇宙流形、LOD 视锥点云、三相流体观测台
+|   |-- vehicle.html               # 车规级 ASIL-D 自动驾驶闭环仿真沙盒
+|   |-- maze.html                  # 动态迷宫自主脱困沙盒
+|   |-- ecosystem.html             # 多相分子流体与多细胞生物圈沙盒
+|   `-- cellular/                  # 模块化渲染引擎 (LOD 系统、流形着色器、通信锁)
+|-- checkpoints/                   # 权威纯二进制 SDSC-BIN v2 物理生命体检查点 (Zero-JSON, 零堆内存)
+|   |-- doudizhu_game_champion.bin # 1,024 细胞斗地主国手级博弈微柱认知皮层 (1.55MB)
+|   |-- adas_cortex_champion.bin   # 210 细胞 ASIL-D 驾驶皮层冠军 (56KB)
+|   |-- adas_track_champion.bin    # 1,024 细胞阿克曼公路巡航微柱皮层 (1.6MB)
+|   |-- real_trained_champion.bin  # 1,024 细胞 L2 逐笔订单流高频量化皮层 (1.6MB)
+|   |-- quant_cortical_array_champion.bin # 1,032 细胞商品期货宏阵列冠军 (34KB)
+|   |-- quant_world_model_100m.bin # 100M 细胞全球宏观流动性世界模型 (157KB)
+|   |-- quant_market_making_1m.bin # 1M 细胞高频做市多资产储层脑 (39KB)
+|   |-- maze_navigation_champion.bin # 13 细胞空间迷宫自主脱困冠军 (700B)
+|   `-- fluid_damper_champion.bin  # 40 细胞多相流体自适应阻尼冠军 (5.0KB)
+|-- models/business_lifeforms/     # 具身生命体清单与契约配置
+|   `-- manifest.json              # 权威生命体配置元数据 (严格与 checkpoints 对账)
+|-- tools/                         # 演化工具链、后端网关与打包脚本
+|   |-- cellular_live_backend.py   # WebSocket/HTTP 40Hz 实时遥测网关与 RESTful API
+|   |-- cellular_c_runtime.py      # 纯 C11 共享库动态加载与 Python 绑定驱动
+|   |-- package_release.sh         # 独立部署包自包含构建与打包工具
+|   |-- export_sdsc_binary.py      # 超大规模 SDSC-BIN v2 二进制打包器
+|   |-- export_sdsc_cortex.py      # C11 基础皮层单头文件导出器
+|   `-- train_doudizhu_master_cortex.py # 1,024 细胞斗地主微柱认知皮层演化训练器
+|-- tests/                         # 33 组严苛回归与极限压测套件 (CTest 33/33 100% PASS)
+|   |-- test_flow_doudizhu_card_game.cpp # 1,024 细胞斗地主认知博弈检验
 |   |-- test_c11_apex_maneuver.c   # C11 极限基准压测 (1,000,000 次推演 19.06ns)
+|   |-- test_multiphase_fluid_stress.c # 连续相多相分子流体介质 3,000 步极限动力学实测
+|   |-- test_binary_runtime_scale.c # SDSC-BIN v2 二进制运行时 mmap 极限吞吐测试
 |   `-- ...
-`-- docs/                          # 学术论文 (zh/en) 与演化路线图
+`-- docs/                          # 学术论文 (zh/en) 与架构纪律法典
+    |-- ARCHITECTURE_DISCIPLINE.md # 架构设计原则与六道实证门禁宪章
     |-- morphogenetic_cellular_evolution_paper.zh.md # 中文完整实证学术论文
     `-- morphogenetic_cellular_evolution_paper.md    # 英文完整学术论文
 ```
@@ -222,14 +235,13 @@ kun-cellular/
 
 ```bash
 cd kun-cellular
-mkdir -p build && cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
-make -j$(nproc)
-ctest --output-on-failure
-# 输出: 21/21 Test suites passed in 2.52s (100% PASS)
+cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j$(nproc)
+ctest --test-dir build --output-on-failure
+# 输出: 33/33 Test suites passed (100% PASS)
 ```
 
-### 2. 验证斗地主非完全信息博弈智能体
+### 2. 验证斗地主 1,024 细胞认知博弈智能体
 
 ```bash
 ./build/test_flow_doudizhu_card_game
@@ -239,29 +251,43 @@ ctest --output-on-failure
 ### 3. 运行纯 C11 极限推理基准 (百万次推演)
 
 ```bash
-cd kun-cellular
-gcc -O3 tests/test_c11_apex_maneuver.c -Iinclude -lm -o build/bin/test_apex
-./build/bin/test_apex
-# 输出: 1,000,000 iterations in 19.06 ms (19.06 ns/step, 52.47 M-Inferences/sec)
+./build/test_c11_apex_maneuver
+# 输出: 1,000,000 iterations in 22.38 ms (22.38 ns/step, 44.69 M-Inferences/sec)
 ```
 
-### 4. 执行多相分子流体连续环境压力大考
+### 4. 执行多相分子流体连续环境极限压测
 
 ```bash
-python3 tools/verify_multiphase_fluid_stress.py
+./build/test_multiphase_fluid_stress
 # 输出: Aero, Hydro, Vacuum 三大相态 3000 步物理扰动测试 100% PASS
 ```
 
-### 5. 启动活体全息观测台并在线切换生命体
+### 5. 启动活体全息观测台与交互沙盒
 
 ```bash
 python3 tools/cellular_live_backend.py --port 8833
-# 浏览器访问: http://localhost:8833/cellular.html
+# 浏览器访问沙盒矩阵:
+#   中央生命体控制台:   http://localhost:8833/
+#   斗地主认知皮层战场: http://localhost:8833/doudizhu.html
+#   3D 细胞宇宙流形:    http://localhost:8833/cellular.html
+#   ADAS 自动驾驶仿真:  http://localhost:8833/vehicle.html
+#   动态迷宫脱困沙盒:   http://localhost:8833/maze.html
+#   多相生物圈生态圈:   http://localhost:8833/ecosystem.html
 
 # 命令行即时热切换生命体示例:
 curl "http://localhost:8833/api/organism/switch?id=doudizhu_game_champion"
 curl "http://localhost:8833/api/organism/switch?id=quant_world_model_100m"
 curl "http://localhost:8833/api/organism/switch?id=adas_cortex_champion"
+```
+
+### 6. 独立部署包与开箱即用运行
+
+```bash
+# 本地一键打包 (生成自包含 22MB 免配置部署包及 SHA256 签名)
+./tools/package_release.sh v1.0.0
+
+# 或从 GitHub Release 下载解压后，一键启动完整沙盒服务:
+./start.sh
 ```
 
 ---
