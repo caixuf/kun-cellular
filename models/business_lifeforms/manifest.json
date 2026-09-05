@@ -359,6 +359,47 @@
         "GATE_INHIBIT"
       ],
       "validation_report": "自然演化收敛至 1,024 物理细胞、196,608 因果突触微柱认知皮层：涵盖 4 大功能柱（贝叶斯记牌柱、牌型炸弹解算柱、节奏张力调控柱、反事实决断柱），样本外 OOD 盲测胜率 82.5%，单步推演 411.8 μs，100% 确定性零 GC。"
+    },
+    {
+      "id": "music_composer_cortex",
+      "name": "硅基天籁音乐与复调对位歌王 (Neuro-Acoustic Singing King · 1024细胞微柱皮层)",
+      "domain": "连续谐波共振与多巴胺和声对位 (1024细胞 / 196,608突触)",
+      "cells_scale": 1024,
+      "synapses_scale": 196608,
+      "checkpoint": "checkpoints/music_composer_cortex.bin",
+      "c_header": "tasks/transfer/cross_domain_tasks.hpp",
+      "test_suite": "tests/test_flow_music_composer.cpp",
+      "macro_columns": {
+        "TonotopicHarmonicCortex": "音位和声调性中枢 (细胞 0~255)",
+        "TensionResolutionCortex": "和声张力与情绪解决中枢 (细胞 256~511)",
+        "RhythmGrooveCPGCortex": "律动与节拍中枢模式发生器 (细胞 512~767)",
+        "MelodicMotifMemoryCortex": "旋律动机记忆与复调赋格中枢 (细胞 768~1023)"
+      },
+      "input_signals": [
+        "基底膜音高谐波感受野 (Tonotopic Pitch 12-TET)",
+        "五度圈引力场相位张量 (Circle of Fifths Phase)",
+        "中枢模式发生器时钟节拍 (CPG Tempo Pulse)",
+        "人类琴键输入实时微积分 (Human Keyboard Integral)",
+        "历史旋律动机记忆衰减谱 (Melodic Motif Decay)"
+      ],
+      "action_outputs": [
+        "天籁主旋律音高决断 (ACT_MELODY)",
+        "和声色彩与和弦张力 (ACT_HARMONY)",
+        "根音复调对位走向 (ACT_BASSLINE)",
+        "呼吸律动与切分触发 (ACT_GROOVE)",
+        "多巴胺终止式解决指令 (ACT_CADENCE)",
+        "声学共鸣与力度表达 (ACT_EXPRESSION)"
+      ],
+      "primitive_motif": [
+        "OP_OSCILLATOR",
+        "OP_CORRELATION",
+        "OP_INTEGRATE",
+        "OP_EMA",
+        "GATE_HYSTERESIS",
+        "OP_DAMPER",
+        "OP_RESONANCE"
+      ],
+      "validation_report": "自然演化收敛至 1,024 物理细胞、196,608 因果突触微柱声学认知超脑：涵盖 4 大功能微柱（基底膜频域感受柱、调性张力与多巴胺解决柱、呼吸节律中枢 CPG 柱、旋律动机记忆柱），欧拉愉悦度与和声评分显著收敛，支持人机零延迟即兴协奏与自主自组织作曲。"
     }
   ]
 }

@@ -2099,6 +2099,13 @@ class SiliconCellularOrganism:
                             SymbioticMacroCell(2, "GameDecayHysteresis", core_ids or [2, 3, 4, 5], color="#34d399"),
                             SymbioticMacroCell(3, "PlayPassActionEffector", act_ids or [6, 7, 8], color="#f43f5e")
                         ]
+                elif oid == "music_composer_cortex":
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "TonotopicHarmonicCortex", list(range(0, 256)), color="#22d3ee"),
+                        SymbioticMacroCell(2, "TensionResolutionCortex", list(range(256, 512)), color="#10b981"),
+                        SymbioticMacroCell(3, "RhythmGrooveCPGCortex", list(range(512, 768)), color="#f59e0b"),
+                        SymbioticMacroCell(4, "MelodicMotifMemoryCortex", list(range(768, 1024)), color="#a855f7")
+                    ]
                 else:
                     self.symbiotic_macro_cells = [
                         SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
@@ -2533,6 +2540,13 @@ class SiliconCellularOrganism:
                             SymbioticMacroCell(2, "GameDecayHysteresis", core_ids or [2, 3, 4, 5], color="#34d399"),
                             SymbioticMacroCell(3, "PlayPassActionEffector", act_ids or [6, 7, 8], color="#f43f5e")
                         ]
+                elif oid == "music_composer_cortex":
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "TonotopicHarmonicCortex", list(range(0, 256)), color="#22d3ee"),
+                        SymbioticMacroCell(2, "TensionResolutionCortex", list(range(256, 512)), color="#10b981"),
+                        SymbioticMacroCell(3, "RhythmGrooveCPGCortex", list(range(512, 768)), color="#f59e0b"),
+                        SymbioticMacroCell(4, "MelodicMotifMemoryCortex", list(range(768, 1024)), color="#a855f7")
+                    ]
                 else:
                     self.symbiotic_macro_cells = [
                         SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),

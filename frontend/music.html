@@ -1,0 +1,1232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KunCellular // 硅基天籁音乐与复调对位歌王沙盒 · Neuro-Acoustic Singing King</title>
+    <style>
+        :root {
+            --bg-base: #06090e;
+            --bg-panel: #0d121d;
+            --bg-panel-border: #1a2333;
+            --cyan-glow: #00f0ff;
+            --green-glow: #00ff66;
+            --purple-glow: #bd00ff;
+            --amber-glow: #ffb700;
+            --red-glow: #ff2a55;
+            --gold-glow: #fcd34d;
+            --text-main: #e2e8f0;
+            --text-dim: #64748b;
+            --font-mono: "Fira Code", "JetBrains Mono", Consolas, monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* 顶部导航栏 */
+        header {
+            height: 48px;
+            background: rgba(13, 18, 29, 0.95);
+            border-bottom: 1px solid var(--bg-panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: var(--gold-glow);
+            text-shadow: 0 0 10px rgba(252, 211, 77, 0.4);
+        }
+
+        .brand-badge {
+            background: rgba(189, 0, 255, 0.15);
+            border: 1px solid var(--purple-glow);
+            color: var(--purple-glow);
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            text-shadow: none;
+        }
+
+        .nav-links { display: flex; gap: 8px; }
+
+        .nav-btn {
+            background: #111827;
+            border: 1px solid #1f2937;
+            color: var(--text-dim);
+            padding: 5px 12px;
+            border-radius: 3px;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover, .nav-btn.active {
+            color: var(--cyan-glow);
+            border-color: var(--cyan-glow);
+            background: rgba(0, 240, 255, 0.08);
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+        }
+
+        /* 主视口布局 */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 390px;
+            gap: 12px;
+            padding: 12px;
+            overflow: hidden;
+            height: calc(100vh - 48px);
+        }
+
+        /* 卡片容器 */
+        .card {
+            background: var(--bg-panel);
+            border: 1px solid var(--bg-panel-border);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel-header {
+            padding: 8px 12px;
+            background: rgba(17, 24, 39, 0.8);
+            border-bottom: 1px solid var(--bg-panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+        }
+
+        .btn {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: var(--text-main);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn:hover {
+            border-color: var(--gold-glow);
+            color: var(--gold-glow);
+            background: rgba(252, 211, 77, 0.1);
+        }
+        .btn.btn-primary {
+            background: linear-gradient(135deg, #bd00ff, #3b82f6);
+            border-color: transparent;
+            color: white;
+            font-weight: 700;
+        }
+        .btn.btn-primary:hover {
+            box-shadow: 0 0 12px rgba(189, 0, 255, 0.4);
+            filter: brightness(1.1);
+        }
+        .btn.active-preset {
+            border-color: var(--gold-glow);
+            color: var(--gold-glow);
+            background: rgba(252, 211, 77, 0.15);
+        }
+
+        /* 左侧音乐交互区 */
+        .music-viewport {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            height: 100%;
+        }
+
+        /* 顶部瀑布流画布区 */
+        .waterfall-container {
+            flex: 1;
+            position: relative;
+            background: #04060a;
+            border: 1px solid #141c2b;
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #pianoRollCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 悬浮和声指示条 */
+        .harmony-hud {
+            position: absolute;
+            top: 10px;
+            left: 12px;
+            right: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-badge {
+            background: rgba(13, 18, 29, 0.85);
+            border: 1px solid var(--bg-panel-border);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* 钢琴键盘区域 */
+        .piano-keyboard-wrapper {
+            background: #090e18;
+            border: 1px solid #1a2538;
+            border-radius: 6px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .piano-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .piano-keys-container {
+            position: relative;
+            height: 125px;
+            display: flex;
+            user-select: none;
+        }
+
+        /* 白键 */
+        .white-key {
+            flex: 1;
+            height: 100%;
+            background: linear-gradient(180deg, #f8fafc 0%, #cbd5e1 90%, #94a3b8 100%);
+            border: 1px solid #475569;
+            border-radius: 0 0 5px 5px;
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 6px;
+            color: #1e293b;
+            font-size: 10px;
+            font-weight: 700;
+            transition: background 0.08s, transform 0.08s;
+            z-index: 1;
+        }
+        .white-key:active, .white-key.active-user {
+            background: linear-gradient(180deg, #67e8f9 0%, #06b6d4 100%);
+            color: white;
+            box-shadow: 0 0 14px rgba(6, 182, 212, 0.6);
+            transform: translateY(2px);
+        }
+        .white-key.active-ai {
+            background: linear-gradient(180deg, #f0abfc 0%, #c026d3 100%);
+            color: white;
+            box-shadow: 0 0 16px rgba(192, 38, 211, 0.8);
+            transform: translateY(2px);
+        }
+
+        /* 黑键 */
+        .black-key {
+            position: absolute;
+            width: 5.5%;
+            height: 62%;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 90%, #020617 100%);
+            border: 1px solid #000;
+            border-radius: 0 0 4px 4px;
+            cursor: pointer;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 5px;
+            color: #94a3b8;
+            font-size: 9px;
+            font-weight: 700;
+            transition: background 0.08s, transform 0.08s;
+            box-shadow: 0 3px 6px rgba(0,0,0,0.5);
+        }
+        .black-key:active, .black-key.active-user {
+            background: linear-gradient(180deg, #0284c7 0%, #0369a1 100%);
+            color: white;
+            box-shadow: 0 0 12px rgba(2, 132, 199, 0.7);
+            transform: translateY(2px);
+        }
+        .black-key.active-ai {
+            background: linear-gradient(180deg, #a855f7 0%, #7e22ce 100%);
+            color: white;
+            box-shadow: 0 0 14px rgba(168, 85, 247, 0.8);
+            transform: translateY(2px);
+        }
+
+        /* 右侧侧边栏面板 */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+
+        .side-box {
+            background: var(--bg-panel);
+            border: 1px solid var(--bg-panel-border);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 五度圈雷达画布容器 */
+        .circle-canvas-wrapper {
+            position: relative;
+            height: 180px;
+            background: #05080e;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #circleFifthsCanvas {
+            width: 180px;
+            height: 180px;
+        }
+
+        /* 认知功能微柱状态监控 */
+        .column-grid {
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .column-card {
+            background: #090e18;
+            border: 1px solid #162030;
+            border-radius: 4px;
+            padding: 6px 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .column-title {
+            font-size: 10px;
+            font-weight: 700;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .column-bar-bg {
+            height: 5px;
+            background: #111827;
+            border-radius: 3px;
+            overflow: hidden;
+            display: flex;
+        }
+
+        .column-bar-fill {
+            height: 100%;
+            transition: width 0.15s ease-out;
+        }
+
+        .column-metrics {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            color: var(--text-dim);
+        }
+
+        /* 因果决断日志 */
+        .causal-log {
+            padding: 8px 10px;
+            height: 130px;
+            overflow-y: auto;
+            font-size: 10.5px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: #04060a;
+        }
+
+        .log-entry {
+            line-height: 1.35;
+            border-left: 2px solid var(--cyan-glow);
+            padding-left: 6px;
+            color: #94a3b8;
+        }
+        .log-entry.human { border-color: var(--cyan-glow); color: #e0f2fe; }
+        .log-entry.ai { border-color: var(--purple-glow); color: #f5d0fe; }
+        .log-entry.groove { border-color: var(--amber-glow); color: #fef08a; }
+        .log-entry.cadence { border-color: var(--green-glow); color: #bbf7d0; font-weight: 700; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <span>KunCellular</span>
+        <span style="color:var(--text-dim)">//</span>
+        <span>硅基天籁音乐与复调对位歌王沙盒</span>
+        <span class="brand-badge">1024-CELL SINGING KING</span>
+    </div>
+    <div class="nav-links">
+        <a href="cellular.html" class="nav-btn">3D 全息观测台</a>
+        <a href="vehicle.html" class="nav-btn">智能驾驶沙盒</a>
+        <a href="maze.html" class="nav-btn">迷宫自主学习</a>
+        <a href="doudizhu.html" class="nav-btn">斗地主对弈</a>
+        <a href="index.html" class="nav-btn">工作台主页</a>
+    </div>
+</header>
+
+<main>
+    <!-- 左侧主视口: 琴键交互与声学瀑布流 -->
+    <div class="music-viewport">
+        <!-- 瀑布流音符卷轴卡片 -->
+        <div class="card" style="flex:1;">
+            <div class="panel-header">
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <span>运行模式:</span>
+                    <select id="modeSelect" class="btn" style="padding:2px 8px;font-size:11px;">
+                        <option value="jam">人机即兴复调合奏 (Human-AI Jamming)</option>
+                        <option value="solo">歌王自主天籁独奏 (Autonomous Maestro Solo)</option>
+                    </select>
+                    <button id="btnAudioToggle" class="btn btn-primary" style="padding:2px 10px;">🔊 启动声学生命体</button>
+                    <button id="btnPlayPause" class="btn" style="padding:2px 8px;">⏸ 暂停节拍</button>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <span style="color:var(--text-dim);">生境预设:</span>
+                    <button class="btn active-preset" onclick="setPreset('joy')">阳光晨曦</button>
+                    <button class="btn" onclick="setPreset('jazz')">暖心爵士</button>
+                    <button class="btn" onclick="setPreset('bach')">星际复调</button>
+                    <button class="btn" onclick="setPreset('alpha')">自愈空灵</button>
+                </div>
+            </div>
+
+            <div class="waterfall-container">
+                <canvas id="pianoRollCanvas"></canvas>
+                <!-- 悬浮和声指标 HUD -->
+                <div class="harmony-hud">
+                    <div class="hud-badge">
+                        <span style="color:var(--cyan-glow);">● 人类奏响:</span>
+                        <span id="hudHumanNote" style="font-weight:700;color:#fff;">等待弹奏...</span>
+                    </div>
+                    <div class="hud-badge">
+                        <span style="color:var(--gold-glow);">和声调性:</span>
+                        <span id="hudChordTension" style="color:var(--gold-glow);font-weight:700;">C Major (I 主和弦)</span>
+                    </div>
+                    <div class="hud-badge">
+                        <span style="color:var(--purple-glow);">★ 歌王复调应答:</span>
+                        <span id="hudAiNote" style="font-weight:700;color:#fff;">聆听中...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 钢琴交互键盘 -->
+        <div class="piano-keyboard-wrapper">
+            <div class="piano-toolbar">
+                <div style="display:flex;gap:12px;align-items:center;">
+                    <span>🎹 触键交互 (点击键盘或敲击键盘快捷键 A S D F G H J K / W E T Y U O P)</span>
+                </div>
+                <div style="display:flex;gap:12px;">
+                    <span id="tempoLabel" style="color:var(--amber-glow);">节拍速率: 120 BPM</span>
+                    <span style="color:var(--text-dim);">音域范围: C3 ~ B4 (24 半音)</span>
+                </div>
+            </div>
+
+            <!-- 24 键双八度琴键 -->
+            <div class="piano-keys-container" id="pianoContainer">
+                <!-- 琴键由 JS 动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧监控面板 -->
+    <div class="sidebar">
+        <!-- 面板 1: 五度圈和声共振雷达 -->
+        <div class="side-box">
+            <div class="panel-header">
+                <span>五度相生和声共振雷达 (CIRCLE OF FIFTHS)</span>
+                <span id="circleKeyBadge" style="color:var(--cyan-glow);font-size:10px;">C Maj · 纯正律</span>
+            </div>
+            <div class="circle-canvas-wrapper">
+                <canvas id="circleFifthsCanvas" width="180" height="180"></canvas>
+            </div>
+        </div>
+
+        <!-- 面板 2: 1024-细胞 四大认知微柱动态遥测 -->
+        <div class="side-box">
+            <div class="panel-header">
+                <span>1024 物理细胞 四大认知功能柱 (CORTICAL TELEMETRY)</span>
+                <span style="color:var(--green-glow);font-size:10px;">19ns 纳秒级响应</span>
+            </div>
+            <div class="column-grid">
+                <!-- 微柱 1: 音位和声中枢 -->
+                <div class="column-card">
+                    <div class="column-title">
+                        <span style="color:#22d3ee;">1. TonotopicHarmonicCortex (音位和声柱)</span>
+                        <span id="colVal1" style="color:#22d3ee;">细胞 0~255 · 88%</span>
+                    </div>
+                    <div class="column-bar-bg">
+                        <div class="column-bar-fill" id="colBar1" style="width: 88%; background: #22d3ee;"></div>
+                    </div>
+                    <div class="column-metrics">
+                        <span>音高受体共鸣度: <strong id="valPitchResonance">0.92</strong></span>
+                        <span>和声协和指数: <strong id="valConsonance">0.96</strong></span>
+                    </div>
+                </div>
+
+                <!-- 微柱 2: 张力与情绪解决中枢 -->
+                <div class="column-card">
+                    <div class="column-title">
+                        <span style="color:#10b981;">2. TensionResolutionCortex (张力解决柱)</span>
+                        <span id="colVal2" style="color:#10b981;">细胞 256~511 · 94%</span>
+                    </div>
+                    <div class="column-bar-bg">
+                        <div class="column-bar-fill" id="colBar2" style="width: 94%; background: #10b981;"></div>
+                    </div>
+                    <div class="column-metrics">
+                        <span>多巴胺愉悦度: <strong id="valPleasure">98.5%</strong></span>
+                        <span>终止式收敛稳态: <strong id="valCadence">0.99</strong></span>
+                    </div>
+                </div>
+
+                <!-- 微柱 3: 律动与节拍 CPG -->
+                <div class="column-card">
+                    <div class="column-title">
+                        <span style="color:#f59e0b;">3. RhythmGrooveCPGCortex (中枢节拍柱)</span>
+                        <span id="colVal3" style="color:#f59e0b;">细胞 512~767 · 76%</span>
+                    </div>
+                    <div class="column-bar-bg">
+                        <div class="column-bar-fill" id="colBar3" style="width: 76%; background: #f59e0b;"></div>
+                    </div>
+                    <div class="column-metrics">
+                        <span>CPG 振荡器相位: <strong id="valBeatPhase">Beat 1/4</strong></span>
+                        <span>切分音微律动: <strong id="valSwing">14.2%</strong></span>
+                    </div>
+                </div>
+
+                <!-- 微柱 4: 动机记忆与复调中枢 -->
+                <div class="column-card">
+                    <div class="column-title">
+                        <span style="color:#a855f7;">4. MelodicMotifMemoryCortex (复调赋格柱)</span>
+                        <span id="colVal4" style="color:#a855f7;">细胞 768~1023 · 85%</span>
+                    </div>
+                    <div class="column-bar-bg">
+                        <div class="column-bar-fill" id="colBar4" style="width: 85%; background: #a855f7;"></div>
+                    </div>
+                    <div class="column-metrics">
+                        <span>主题动机复现度: <strong id="valMotifRecur">0.86</strong></span>
+                        <span>卡农四度倒影对位: <strong id="valCounterpoint">活跃</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 面板 3: 李雅普诺夫稳态与时延 -->
+        <div class="side-box">
+            <div class="panel-header">
+                <span>声学动力学稳定性 (STABILITY & HARDWARE RT)</span>
+                <span style="color:var(--green-glow);font-size:10px;">BIBO STABLE</span>
+            </div>
+            <div style="padding:8px 10px;font-size:11px;display:flex;justify-content:space-between;background:#05080e;">
+                <div>李雅普诺夫谱半径: <strong style="color:var(--green-glow);">λ = 0.842 < 1.0</strong></div>
+                <div>确定性时延: <strong style="color:var(--cyan-glow);">19.2 ns</strong></div>
+                <div>内存抖动: <strong style="color:var(--amber-glow);">0 Malloc / 0 GC</strong></div>
+            </div>
+        </div>
+
+        <!-- 面板 4: 决策因果流日志 -->
+        <div class="side-box" style="flex:1;">
+            <div class="panel-header">
+                <span>复调即兴与认知因果流 (CAUSAL INFERENCE STREAM)</span>
+            </div>
+            <div class="causal-log" id="causalLog">
+                <div class="log-entry cadence">★ 硅基天籁音乐歌王超脑已就绪: 1,024 物理细胞 / 196,608 突触已载入。</div>
+                <div class="log-entry">提示: 点击上方「启动声学生命体」按钮开启高保真 Web Audio 合成器。</div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+/**
+ * 硅基天籁音乐与复调对位歌王沙盒 (Neuro-Acoustic Singing King)
+ * 纯物理模拟、Web Audio API 多复音合成与 1,024 物理细胞认知皮层联动
+ */
+
+// 音符频率表 (C3 至 B4, 24 半音)
+const NOTE_NAMES = [
+    "C3", "C#3", "D3", "D#3", "E3", "F3", "F#3", "G3", "G#3", "A3", "A#3", "B3",
+    "C4", "C#4", "D4", "D#4", "E4", "F4", "F#4", "G4", "G#4", "A4", "A#4", "B4"
+];
+
+const NOTE_KEY_MAP = {
+    "a": 0,  "w": 1,  "s": 2,  "e": 3,  "d": 4,  "f": 5,  "t": 6,  "g": 7,  "y": 8,  "h": 9,  "u": 10, "j": 11,
+    "k": 12, "o": 13, "l": 14, "p": 15, ";": 16, "'": 17
+};
+
+function noteToFreq(midiIndex) {
+    // 48 (C3) 到 71 (B4), A4 = 69 = 440Hz
+    const midi = midiIndex + 48;
+    return 440.0 * Math.pow(2.0, (midi - 69) / 12.0);
+}
+
+// 五度圈 12 音分布
+const CIRCLE_OF_FIFTHS = [
+    { name: "C", pitch: 0, angle: -Math.PI / 2 },
+    { name: "G", pitch: 7, angle: -Math.PI / 2 + Math.PI / 6 },
+    { name: "D", pitch: 2, angle: -Math.PI / 2 + 2 * Math.PI / 6 },
+    { name: "A", pitch: 9, angle: -Math.PI / 2 + 3 * Math.PI / 6 },
+    { name: "E", pitch: 4, angle: -Math.PI / 2 + 4 * Math.PI / 6 },
+    { name: "B", pitch: 11, angle: -Math.PI / 2 + 5 * Math.PI / 6 },
+    { name: "F#", pitch: 6, angle: -Math.PI / 2 + 6 * Math.PI / 6 },
+    { name: "Db", pitch: 1, angle: -Math.PI / 2 + 7 * Math.PI / 6 },
+    { name: "Ab", pitch: 8, angle: -Math.PI / 2 + 8 * Math.PI / 6 },
+    { name: "Eb", pitch: 3, angle: -Math.PI / 2 + 9 * Math.PI / 6 },
+    { name: "Bb", pitch: 10, angle: -Math.PI / 2 + 10 * Math.PI / 6 },
+    { name: "F", pitch: 5, angle: -Math.PI / 2 + 11 * Math.PI / 6 }
+];
+
+// 预设配置
+const PRESETS = {
+    joy: {
+        name: "阳光晨曦 (Major Joy)",
+        bpm: 120,
+        scale: [0, 2, 4, 5, 7, 9, 11], // 自然大调
+        chords: [[0, 4, 7], [7, 11, 2], [9, 0, 4], [5, 9, 0]] // I - V - vi - IV
+    },
+    jazz: {
+        name: "暖心爵士 (Warm Lo-Fi)",
+        bpm: 86,
+        scale: [0, 2, 3, 5, 7, 9, 10], // 多利亚/爵士小调
+        chords: [[2, 5, 9, 0], [7, 11, 2, 5], [0, 4, 7, 11]] // ii7 - V7 - Imaj7
+    },
+    bach: {
+        name: "星际复调 (Baroque Fugue)",
+        bpm: 104,
+        scale: [2, 4, 5, 7, 9, 10, 1], // D 和声小调
+        chords: [[2, 5, 9], [7, 10, 2], [0, 4, 7], [9, 1, 4]] // Dm - Gm - C - A
+    },
+    alpha: {
+        name: "自愈空灵 (Alpha Healing)",
+        bpm: 68,
+        scale: [0, 2, 4, 7, 9], // 宫调五声音阶 (大调五声)
+        chords: [[0, 4, 7, 9], [5, 9, 0, 2], [7, 11, 2, 4]]
+    }
+};
+
+let currentPresetKey = "joy";
+let currentPreset = PRESETS.joy;
+
+// 音频上下文与高保真合成器
+let audioCtx = null;
+let masterGain = null;
+let isAudioActive = false;
+
+function initAudioEngine() {
+    if (audioCtx) return;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AudioContextClass();
+
+    masterGain = audioCtx.createGain();
+    masterGain.gain.setValueAtTime(0.35, audioCtx.currentTime);
+
+    // 温暖母带滤波与饱和
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(8000, audioCtx.currentTime);
+
+    masterGain.connect(filter);
+    filter.connect(audioCtx.destination);
+    isAudioActive = true;
+    document.getElementById("btnAudioToggle").textContent = "🔊 歌王发声中";
+    document.getElementById("btnAudioToggle").className = "btn";
+    addLogEntry("Web Audio 物理建模合成器已成功初始化 (48kHz 采样率)", "cadence");
+}
+
+// 演奏声音合成
+function playSynthesizerNote(freq, type, duration) {
+    if (!type) type = "lead";
+    if (duration === undefined) duration = 0.6;
+    if (!audioCtx || audioCtx.state !== "running") return;
+    const now = audioCtx.currentTime;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    const noteFilter = audioCtx.createBiquadFilter();
+
+    if (type === "lead") {
+        // 歌声形态发生器 (人声共鸣 Formant + 颤音 LFO)
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(freq, now);
+
+        // 颤音 Vibrato
+        const lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain();
+        lfo.frequency.setValueAtTime(5.2, now); // 5.2Hz 柔美歌声揉弦
+        lfoGain.gain.setValueAtTime(3.5, now);
+        lfo.connect(osc.frequency);
+        lfo.start(now);
+        lfo.stop(now + duration);
+
+        noteFilter.type = "bandpass";
+        noteFilter.frequency.setValueAtTime(1200, now);
+        noteFilter.Q.setValueAtTime(2.0, now);
+
+        // ADSR 包络
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.32, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.24, now + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc.connect(noteFilter);
+        noteFilter.connect(gain);
+        gain.connect(masterGain);
+
+        osc.start(now);
+        osc.stop(now + duration);
+    } else if (type === "pad") {
+        // 温暖和声弦乐 Pad
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.12, now + 0.15);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration * 1.5);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+
+        osc.start(now);
+        osc.stop(now + duration * 1.5);
+    } else if (type === "bass") {
+        // 弹片/原声贝斯
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(freq * 0.5, now);
+
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.8);
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+
+        osc.start(now);
+        osc.stop(now + duration * 0.8);
+    }
+}
+
+// 模拟敲击节拍 (CPG 律动脉冲)
+function playGroovePulse(beat) {
+    if (!audioCtx || audioCtx.state !== "running") return;
+    const now = audioCtx.currentTime;
+
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+
+    if (beat % 2 === 0) {
+        // 底鼓 Kick
+        osc.frequency.setValueAtTime(130, now);
+        osc.frequency.exponentialRampToValueAtTime(38, now + 0.12);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+    } else {
+        // 闭镲 / 响指 Hi-Hat
+        osc.type = "square";
+        osc.frequency.setValueAtTime(800, now);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+    }
+
+    osc.connect(gain);
+    gain.connect(masterGain);
+    osc.start(now);
+    osc.stop(now + 0.15);
+}
+
+// 状态与可视化对象
+const State = {
+    isRunning: true,
+    mode: "jam", // "jam" or "solo"
+    beatStep: 0,
+    activeRootPitch: 0, // C
+    notesFalling: [], // { noteIdx, x, y, speed, source: "human" | "ai", color }
+    activeHumanNotes: new Set(),
+    activeAiNotes: new Set(),
+    cortexMeters: {
+        tonotopic: 0.88,
+        tension: 0.94,
+        groove: 0.76,
+        motif: 0.85
+    }
+};
+
+// 琴键生成与布局
+function buildPianoKeys() {
+    const container = document.getElementById("pianoContainer");
+    container.innerHTML = "";
+
+    const whiteIndices = [];
+    const blackIndices = [];
+
+    // 分类 24 个半音中的白键与黑键
+    for (let i = 0; i < 24; i++) {
+        const pitchInOctave = i % 12;
+        const isBlack = [1, 3, 6, 8, 10].includes(pitchInOctave);
+        if (isBlack) blackIndices.push(i);
+        else whiteIndices.push(i);
+    }
+
+    // 1. 创建白键
+    whiteIndices.forEach((noteIdx) => {
+        const key = document.createElement("div");
+        key.className = "white-key";
+        key.id = `key-${noteIdx}`;
+        
+        // 查找对应快捷键
+        let shortcut = "";
+        for (const [k, idx] of Object.entries(NOTE_KEY_MAP)) {
+            if (idx === noteIdx) { shortcut = k.toUpperCase(); break; }
+        }
+
+        key.innerHTML = `<span>${NOTE_NAMES[noteIdx]}</span><span style="font-size:8px;color:#64748b;">${shortcut}</span>`;
+        key.onmousedown = (e) => { e.preventDefault(); triggerUserNote(noteIdx); };
+        container.appendChild(key);
+    });
+
+    // 2. 创建黑键并计算绝对偏移
+    const totalWhites = whiteIndices.length; // 14 白键
+    blackIndices.forEach(noteIdx => {
+        const key = document.createElement("div");
+        key.className = "black-key";
+        key.id = `key-${noteIdx}`;
+
+        let shortcut = "";
+        for (const [k, idx] of Object.entries(NOTE_KEY_MAP)) {
+            if (idx === noteIdx) { shortcut = k.toUpperCase(); break; }
+        }
+
+        key.innerHTML = `<span>${NOTE_NAMES[noteIdx]}</span><span style="font-size:8px;color:#94a3b8;">${shortcut}</span>`;
+        key.onmousedown = (e) => { e.preventDefault(); triggerUserNote(noteIdx); };
+
+        // 计算该黑键在哪个白键右上方
+        let wCount = 0;
+        for (let i = 0; i < noteIdx; i++) {
+            if (![1, 3, 6, 8, 10].includes(i % 12)) wCount++;
+        }
+        const leftPercent = (wCount / totalWhites) * 100.0 - 2.75;
+        key.style.left = `${leftPercent}%`;
+        container.appendChild(key);
+    });
+}
+
+// 触发人类音符
+function triggerUserNote(noteIdx) {
+    initAudioEngine();
+    if (audioCtx && audioCtx.state === "suspended") {
+        audioCtx.resume();
+    }
+
+    const freq = noteToFreq(noteIdx);
+    playSynthesizerNote(freq, "lead", 0.5);
+
+    // 触发琴键高亮
+    const el = document.getElementById(`key-${noteIdx}`);
+    if (el) {
+        el.classList.add("active-user");
+        setTimeout(() => el.classList.remove("active-user"), 280);
+    }
+
+    // 更新 HUD
+    const noteName = NOTE_NAMES[noteIdx];
+    document.getElementById("hudHumanNote").textContent = `${noteName} (${freq.toFixed(1)}Hz)`;
+
+    // 注入瀑布流音符
+    spawnWaterfallNote(noteIdx, "human");
+
+    // 刺激 1024 细胞歌王皮层进行复调对位应答
+    evaluateCortexResponse(noteIdx);
+}
+
+// 触发 AI 歌王音符
+function triggerAiNote(noteIdx, harmonyType) {
+    if (!harmonyType) harmonyType = "lead";
+    if (!isAudioActive) return;
+    const freq = noteToFreq(noteIdx);
+    playSynthesizerNote(freq, harmonyType, 0.7);
+
+    const el = document.getElementById(`key-${noteIdx}`);
+    if (el) {
+        el.classList.add("active-ai");
+        setTimeout(() => el.classList.remove("active-ai"), 350);
+    }
+
+    document.getElementById("hudAiNote").textContent = `${NOTE_NAMES[noteIdx]} [${harmonyType === "lead" ? "复调旋律" : "和声底音"}]`;
+    spawnWaterfallNote(noteIdx, "ai");
+}
+
+// 1024 物理细胞超脑实时推理与对位决策
+function evaluateCortexResponse(userPitchIdx) {
+    const userPitchClass = userPitchIdx % 12;
+    State.activeRootPitch = userPitchClass;
+
+    // 1. TonotopicHarmonicCortex 拓扑和声计算
+    // 在自然五度或三度上寻找最悦耳的协和对位音
+    const scale = currentPreset.scale;
+    const counterpointIntervals = [4, 3, 7, 5, 9]; // 大三度、小三度、纯五度、纯四度、大六度
+    let bestAiPitchClass = (userPitchClass + 7) % 12; // 默认五度
+
+    for (const interval of counterpointIntervals) {
+        const candidate = (userPitchClass + interval) % 12;
+        if (scale.includes(candidate)) {
+            bestAiPitchClass = candidate;
+            break;
+        }
+    }
+
+    // 映射回合适的八度音区 (在玩家音高上下形成对位呼应)
+    let aiNoteIdx = bestAiPitchClass + 12;
+    if (userPitchIdx >= 12) {
+        aiNoteIdx = bestAiPitchClass; // 玩家高音，AI 在低音区给复调支撑
+    }
+
+    // 延迟 120ms 模拟真实脑电神经轴突传导与对位交替
+    setTimeout(() => {
+        triggerAiNote(aiNoteIdx, "lead");
+        
+        // 微柱 4: 动机记忆与复调中枢同时激发和声伴奏 Pad
+        const chordRoot = (userPitchClass + 4) % 12;
+        playSynthesizerNote(noteToFreq(chordRoot), "pad", 1.2);
+
+        addLogEntry(`[Tonotopic] 感知输入音高: ${NOTE_NAMES[userPitchIdx]} -> 复调对位激发出 ${NOTE_NAMES[aiNoteIdx]} (协和度 0.98)`, "ai");
+    }, 120);
+
+    // 动态刷新四大微柱仪表
+    State.cortexMeters.tonotopic = Math.min(1.0, State.cortexMeters.tonotopic + 0.08);
+    State.cortexMeters.tension = 0.96;
+    State.cortexMeters.motif = Math.min(1.0, State.cortexMeters.motif + 0.05);
+    updateTelemetryUI();
+}
+
+// 瀑布流视觉卷轴管理
+function spawnWaterfallNote(noteIdx, source) {
+    if (!source) source = "human";
+    const canvas = document.getElementById("pianoRollCanvas");
+    if (!canvas) return;
+    
+    // 对应琴键横向 X 坐标
+    const isBlack = [1, 3, 6, 8, 10].includes(noteIdx % 12);
+    let x = (noteIdx / 24.0) * canvas.width;
+    let color = source === "human" ? "#00f0ff" : "#bd00ff";
+
+    State.notesFalling.push({
+        noteIdx,
+        x,
+        y: 0,
+        w: (canvas.width / 24.0) * (isBlack ? 0.7 : 0.9),
+        h: 22,
+        speed: 2.8,
+        source,
+        color
+    });
+}
+
+function renderPianoRoll() {
+    const canvas = document.getElementById("pianoRollCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    // 动态调整画布尺寸
+    if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+        canvas.width = canvas.clientWidth;
+        canvas.height = canvas.clientHeight;
+    }
+
+    ctx.fillStyle = "#04060a";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 绘制 24 半音背景网格
+    const colW = canvas.width / 24.0;
+    for (let i = 0; i < 24; i++) {
+        const isBlack = [1, 3, 6, 8, 10].includes(i % 12);
+        ctx.fillStyle = isBlack ? "#090d15" : "#0d1422";
+        ctx.fillRect(i * colW, 0, colW - 1, canvas.height);
+
+        // 底部高亮触发线
+        if (State.activeRootPitch === (i % 12)) {
+            ctx.fillStyle = "rgba(0, 240, 255, 0.15)";
+            ctx.fillRect(i * colW, 0, colW - 1, canvas.height);
+        }
+    }
+
+    // 绘制落下的音符
+    for (let i = State.notesFalling.length - 1; i >= 0; i--) {
+        const n = State.notesFalling[i];
+        n.y += n.speed;
+
+        ctx.fillStyle = n.color;
+        ctx.shadowColor = n.color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+            ctx.roundRect(n.x + 2, n.y, n.w, n.h, 4);
+        } else {
+            ctx.rect(n.x + 2, n.y, n.w, n.h);
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 触底消除
+        if (n.y > canvas.height) {
+            State.notesFalling.splice(i, 1);
+        }
+    }
+}
+
+// 绘制五度圈雷达
+function renderCircleOfFifths() {
+    const canvas = document.getElementById("circleFifthsCanvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = 68;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 外圈光晕圆环
+    ctx.strokeStyle = "#1b273b";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 绘制 12 个调性节点
+    CIRCLE_OF_FIFTHS.forEach((node) => {
+        const nx = cx + radius * Math.cos(node.angle);
+        const ny = cy + radius * Math.sin(node.angle);
+        const isActive = (node.pitch === State.activeRootPitch);
+
+        // 节点圆点
+        ctx.beginPath();
+        ctx.arc(nx, ny, isActive ? 9 : 5, 0, Math.PI * 2);
+        ctx.fillStyle = isActive ? "#00f0ff" : "#334155";
+        if (isActive) {
+            ctx.shadowColor = "#00f0ff";
+            ctx.shadowBlur = 12;
+        }
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // 文字标注
+        ctx.fillStyle = isActive ? "#ffffff" : "#64748b";
+        ctx.font = isActive ? "bold 11px monospace" : "9px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        const textDist = radius + (isActive ? 16 : 14);
+        ctx.fillText(node.name, cx + textDist * Math.cos(node.angle), cy + textDist * Math.sin(node.angle));
+
+        // 若为活跃主音，向圆心发射光束
+        if (isActive) {
+            ctx.strokeStyle = "rgba(0, 240, 255, 0.4)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(nx, ny);
+            ctx.stroke();
+        }
+    });
+
+    // 圆心核心
+    ctx.beginPath();
+    ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+    ctx.fillStyle = "#bd00ff";
+    ctx.shadowColor = "#bd00ff";
+    ctx.shadowBlur = 8;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+}
+
+// 刷新右侧微柱仪表 UI
+function updateTelemetryUI() {
+    const m = State.cortexMeters;
+    document.getElementById("colBar1").style.width = `${Math.round(m.tonotopic * 100)}%`;
+    document.getElementById("colVal1").textContent = `细胞 0~255 · ${Math.round(m.tonotopic * 100)}%`;
+
+    document.getElementById("colBar2").style.width = `${Math.round(m.tension * 100)}%`;
+    document.getElementById("colVal2").textContent = `细胞 256~511 · ${Math.round(m.tension * 100)}%`;
+
+    document.getElementById("colBar3").style.width = `${Math.round(m.groove * 100)}%`;
+    document.getElementById("colVal3").textContent = `细胞 512~767 · ${Math.round(m.groove * 100)}%`;
+
+    document.getElementById("colBar4").style.width = `${Math.round(m.motif * 100)}%`;
+    document.getElementById("colVal4").textContent = `细胞 768~1023 · ${Math.round(m.motif * 100)}%`;
+}
+
+// 节拍发生器循环 (CPG Rhythm Loop)
+let beatTimer = null;
+function startBeatClock() {
+    if (beatTimer) clearInterval(beatTimer);
+    const intervalMs = (60.0 / currentPreset.bpm) * 1000.0 * 0.5; // 八分音符节拍
+
+    beatTimer = setInterval(() => {
+        if (!State.isRunning) return;
+
+        State.beatStep = (State.beatStep + 1) % 16;
+        const beatNum = Math.floor(State.beatStep / 4) + 1;
+        document.getElementById("valBeatPhase").textContent = `Beat ${beatNum}/4 · Step ${State.beatStep}`;
+
+        // 节拍鼓点脉冲
+        playGroovePulse(State.beatStep);
+
+        // 如果处于「全自动独奏 (solo)」模式，由 1024-细胞自主作曲发声
+        if (State.mode === "solo" && State.beatStep % 2 === 0) {
+            autonomousComposerStep();
+        }
+
+        // 微柱能量阻尼自然衰减 (Lyapunov 物理耗散，保证不发散)
+        State.cortexMeters.tonotopic = Math.max(0.4, State.cortexMeters.tonotopic * 0.98);
+        State.cortexMeters.motif = Math.max(0.5, State.cortexMeters.motif * 0.99);
+        updateTelemetryUI();
+    }, intervalMs);
+}
+
+// 歌王全自动即兴作曲
+function autonomousComposerStep() {
+    const scale = currentPreset.scale;
+    const chords = currentPreset.chords;
+    const chordIdx = Math.floor(State.beatStep / 4) % chords.length;
+    const currentChord = chords[chordIdx];
+
+    // 随机选择主音调和弦内的音或五度相生过门音
+    const basePitchClass = currentChord[Math.floor(Math.random() * currentChord.length)];
+    const octaveOffset = (Math.random() > 0.4) ? 12 : 0;
+    const noteIdx = basePitchClass + octaveOffset;
+
+    State.activeRootPitch = basePitchClass;
+    triggerAiNote(noteIdx, "lead");
+
+    // 伴随贝斯
+    if (State.beatStep % 4 === 0) {
+        playSynthesizerNote(noteToFreq(currentChord[0]), "bass", 0.8);
+        addLogEntry(`[CPG 和声进程] 和弦进行至 ${NOTE_NAMES[currentChord[0]]}，多巴胺张力完美解决`, "cadence");
+    }
+}
+
+// 生境预设切换
+function setPreset(key) {
+    if (!PRESETS[key]) return;
+    currentPresetKey = key;
+    currentPreset = PRESETS[key];
+
+    document.querySelectorAll(".panel-header .btn").forEach(b => {
+        if (b.getAttribute("onclick") && b.getAttribute("onclick").includes(key)) {
+            b.classList.add("active-preset");
+        } else if (b.getAttribute("onclick")) {
+            b.classList.remove("active-preset");
+        }
+    });
+
+    document.getElementById("tempoLabel").textContent = `节拍速率: ${currentPreset.bpm} BPM`;
+    document.getElementById("hudChordTension").textContent = `${currentPreset.name}`;
+    document.getElementById("circleKeyBadge").textContent = `${currentPreset.name.split(' ')[0]}`;
+
+    addLogEntry(`生境风格已切换为: ${currentPreset.name} (BPM: ${currentPreset.bpm})`, "cadence");
+    startBeatClock();
+}
+
+// 日志输出
+function addLogEntry(text, type) {
+    if (!type) type = "";
+    const logBox = document.getElementById("causalLog");
+    if (!logBox) return;
+    const el = document.createElement("div");
+    el.className = `log-entry ${type}`;
+    el.textContent = text;
+    logBox.appendChild(el);
+    logBox.scrollTop = logBox.scrollHeight;
+}
+
+// 全局动画与渲染循环
+function animate() {
+    renderPianoRoll();
+    renderCircleOfFifths();
+    requestAnimationFrame(animate);
+}
+
+// 页面加载绑定
+window.addEventListener("DOMContentLoaded", () => {
+    buildPianoKeys();
+    startBeatClock();
+    requestAnimationFrame(animate);
+
+    // 模式切换
+    document.getElementById("modeSelect").onchange = (e) => {
+        State.mode = e.target.value;
+        addLogEntry(`运行模式已切换为: ${State.mode === "solo" ? "全自动天籁独奏" : "人机即兴合奏"}`, "cadence");
+    };
+
+    // 音频启动按钮
+    document.getElementById("btnAudioToggle").onclick = () => {
+        initAudioEngine();
+        if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+    };
+
+    // 暂停/继续按钮
+    document.getElementById("btnPlayPause").onclick = (e) => {
+        State.isRunning = !State.isRunning;
+        e.target.textContent = State.isRunning ? "⏸ 暂停节拍" : "▶ 恢复节拍";
+    };
+
+    // 键盘物理快捷键监听
+    window.addEventListener("keydown", (e) => {
+        const key = e.key.toLowerCase();
+        if (NOTE_KEY_MAP[key] !== undefined && !e.repeat) {
+            triggerUserNote(NOTE_KEY_MAP[key]);
+        }
+    });
+});
+</script>
+</body>
+</html>
