@@ -1573,7 +1573,7 @@ public:
                     c.prev_input = in0;
                     break;
                 case CellType::OP_INTEGRAL:
-                    c.state_val += in0 * c.param1;
+                    c.state_val = std::clamp(c.state_val + in0 * c.param1, -4.0, 4.0);
                     c.output_val = c.state_val;
                     break;
                 case CellType::OP_SUM:
@@ -2102,40 +2102,46 @@ public:
         return true;
     }
 
-    static uint8_t cell_type_to_sdsc_opcode(CellType t) {
-        switch (t) {
-            case CellType::SENSE_RAW_INPUT_0: return 0;
-            case CellType::SENSE_RAW_INPUT_1: return 1;
-            case CellType::SENSE_RAW_INPUT_2: return 2;
-            case CellType::SENSE_RAW_INPUT_3: return 3;
-            case CellType::SENSE_CHANNEL:     return 0;
-            case CellType::OP_EMA:            return 8;
-            case CellType::OP_DIFF:           return 12;
-            case CellType::OP_INTEGRAL:       return 5;
-            case CellType::OP_SUM:            return 4;
-            case CellType::OP_SUB:            return 13;
-            case CellType::OP_MULTIPLY:       return 11;
-            case CellType::OP_RATIO:          return 14;
-            case CellType::OP_ABS:            return 10;
-            case CellType::OP_DELAY_N:        return 8;
-            case CellType::OP_OSCILLATOR:     return 25;
-            case CellType::OP_QUADRATIC:      return 4;
-            case CellType::GATE_THRESHOLD:    return 15;
-            case CellType::GATE_HYSTERESIS:   return 16;
-            case CellType::GATE_AND:          return 19;
-            case CellType::GATE_INHIBIT:      return 18;
-            case CellType::GATE_DEADZONE:     return 17;
-            case CellType::GATE_MIN_MAX:      return 20;
-            case CellType::ACT_PRIMARY_POSITIVE: return 21;
-            case CellType::ACT_PRIMARY_NEGATIVE: return 22;
-            case CellType::ACT_DEFENSIVE_RESET:  return 23;
-            case CellType::ACT_IMMUNE_BLOCK:     return 23;
-            case CellType::ACT_CHANNEL:          return 21;
-            case CellType::PREDICT_SENSE_0:      return 0;
-            case CellType::PREDICT_SENSE_1:      return 1;
-            case CellType::ASSOCIATION_HUB:      return 24;
-            default: return 4;
+    static bool is_valid_cell_type_code(uint8_t op) {
+        switch (static_cast<CellType>(op)) {
+            case CellType::SENSE_RAW_INPUT_0:
+            case CellType::SENSE_RAW_INPUT_1:
+            case CellType::SENSE_RAW_INPUT_2:
+            case CellType::SENSE_RAW_INPUT_3:
+            case CellType::SENSE_CHANNEL:
+            case CellType::OP_EMA:
+            case CellType::OP_DIFF:
+            case CellType::OP_INTEGRAL:
+            case CellType::OP_SUM:
+            case CellType::OP_SUB:
+            case CellType::OP_MULTIPLY:
+            case CellType::OP_RATIO:
+            case CellType::OP_ABS:
+            case CellType::OP_DELAY_N:
+            case CellType::OP_OSCILLATOR:
+            case CellType::OP_QUADRATIC:
+            case CellType::GATE_THRESHOLD:
+            case CellType::GATE_HYSTERESIS:
+            case CellType::GATE_AND:
+            case CellType::GATE_INHIBIT:
+            case CellType::GATE_DEADZONE:
+            case CellType::GATE_MIN_MAX:
+            case CellType::ACT_PRIMARY_POSITIVE:
+            case CellType::ACT_PRIMARY_NEGATIVE:
+            case CellType::ACT_DEFENSIVE_RESET:
+            case CellType::ACT_IMMUNE_BLOCK:
+            case CellType::ACT_CHANNEL:
+            case CellType::PREDICT_SENSE_0:
+            case CellType::PREDICT_SENSE_1:
+            case CellType::ASSOCIATION_HUB:
+                return true;
+            default:
+                return false;
         }
+    }
+
+    static uint8_t cell_type_to_sdsc_opcode(CellType t) {
+        return static_cast<uint8_t>(t);
     }
 
     bool save_checkpoint_bin(const std::string& filepath) const {
@@ -2254,7 +2260,11 @@ public:
         return true;
     }
 
-    static CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags) {
+    static CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags = 0) {
+        if (is_valid_cell_type_code(op)) {
+            return static_cast<CellType>(op);
+        }
+        // Legacy fallback mapping if loading older v1 checkpoints
         if (flags & 0x01) {
             if (op == 0) return CellType::SENSE_RAW_INPUT_0;
             if (op == 1) return CellType::SENSE_RAW_INPUT_1;
@@ -3262,6 +3272,9 @@ public:
 
         // 变异后事务校验：编译完整性、资源上限约束、功能依赖契约
         bool compile_ok = org.compile();
+        if (compile_ok) {
+            org.enforce_lyapunov_stability();
+        }
         bool budget_ok = ((constraint_cfg_.max_cells_limit == 0 ||
                            org.cells.size() <= constraint_cfg_.max_cells_limit) &&
                           (constraint_cfg_.max_synapses_limit == 0 ||
@@ -3355,9 +3368,12 @@ public:
         });
 
         // 3.0 鲍德温可塑性基因跨代固化 (Baldwin Effect Crystallization)
-        if (constraint_cfg_.enable_baldwin_crystallization) {
-            for (auto& org : population_) {
-                org.crystallize_plasticity(constraint_cfg_.crystallization_rate);
+        // 仅对顶层精英个体、且每 10 代周期性固化，保护整体种群塑性隔离
+        uint32_t current_gen = population_.empty() ? 0 : population_[0].generation;
+        if (constraint_cfg_.enable_baldwin_crystallization && current_gen % 10 == 0) {
+            size_t elite_count = std::max<size_t>(1, population_.size() / 10);
+            for (size_t i = 0; i < elite_count && i < population_.size(); ++i) {
+                population_[i].crystallize_plasticity(constraint_cfg_.crystallization_rate);
             }
         }
 
