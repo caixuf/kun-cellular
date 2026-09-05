@@ -22,3 +22,4 @@ bin/
 checkpoints/*_champion.json
 checkpoints/vehicle_cortex_champion.json
 scratch/
+dist/
