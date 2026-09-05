@@ -236,6 +236,23 @@ def main():
     trainer = load_trainer()
 
     fails = []
+    if not os.path.exists(FLOWENGINE):
+        print(f"  [WARN] FlowEngine 源码未在同级目录挂载: {FLOWENGINE}")
+        print("  ↳ 跳过跨仓 C 源码对账，仅执行环境动力学与自洽性门禁")
+        fails += check_curve_speed_limit(trainer)
+        fails += check_train_covers_val(trainer)
+        fails += check_env_trackable(trainer)
+        print("=" * 72)
+        if fails:
+            print(f"  FAIL — {len(fails)} 项自洽性未达标：")
+            for f in fails:
+                print(f"    - {f}")
+            print("=" * 72)
+            return 1
+        print("  PASS — 内部训练环境动力学自洽性通过")
+        print("=" * 72)
+        return 0
+
     fails += check_constants(trainer)
     fails += check_steer_limit(trainer)
     fails += check_curve_speed_limit(trainer)
