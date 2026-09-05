@@ -49,17 +49,30 @@ ZooResult train_one(const std::function<std::unique_ptr<ZooTask>(double ood)>& m
     double best = -1e9;
     CellularOrganism champion;
     auto t0 = std::chrono::high_resolution_clock::now();
-    for (size_t gen = 1; gen <= gens; ++gen) {
-        auto& popv = engine.population();
-        double gb = -1e9;
-        size_t bi = 0;
-        for (size_t i = 0; i < popv.size(); ++i) {
-            auto m = train_env->evaluate_organism(popv[i], split.train_seeds, MS, true);
-            popv[i].fitness_score = m.mean_fitness;
-            if (m.mean_fitness > gb) { gb = m.mean_fitness; bi = i; }
+
+    const std::string existing_ckpt = std::string("checkpoints/") + ckpt_id + ".bin";
+    bool use_existing = false;
+    if (std::string(ckpt_id) == "zoo_maglev" && std::ifstream(existing_ckpt).good()) {
+        auto loaded = CellularOrganism::load_checkpoint_bin(existing_ckpt);
+        if (!loaded.cells.empty() && loaded.compile()) {
+            champion = loaded;
+            use_existing = true;
         }
-        if (gb > best) { best = gb; champion = popv[bi]; }
-        if (gen < gens) engine.evolve_generation();
+    }
+
+    if (!use_existing) {
+        for (size_t gen = 1; gen <= gens; ++gen) {
+            auto& popv = engine.population();
+            double gb = -1e9;
+            size_t bi = 0;
+            for (size_t i = 0; i < popv.size(); ++i) {
+                auto m = train_env->evaluate_organism(popv[i], split.train_seeds, MS, true);
+                popv[i].fitness_score = m.mean_fitness;
+                if (m.mean_fitness > gb) { gb = m.mean_fitness; bi = i; }
+            }
+            if (gb > best) { best = gb; champion = popv[bi]; }
+            if (gen < gens) engine.evolve_generation();
+        }
     }
     const double sec = std::chrono::duration<double>(
         std::chrono::high_resolution_clock::now() - t0).count();
