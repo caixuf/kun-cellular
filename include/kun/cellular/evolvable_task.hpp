@@ -272,21 +272,21 @@ public:
         report.id_generalization_ratio = report.holdout_id_metrics.success_rate / base_train_sr;
         report.ood_generalization_ratio = report.holdout_ood_metrics.success_rate / base_train_sr;
 
-        // 5. 判定 M1 门禁 (留出到达率 >= 70% 训练集表现，且训练到达率 > 0)
-        if (report.train_metrics.success_rate > 0.0) {
-            report.passes_m1_gate = (report.id_generalization_ratio >= gate_threshold);
-        } else {
-            // 若训练集尚未跑通，则以平均距离与探索奖励对比判定
-            report.passes_m1_gate = (report.holdout_id_metrics.mean_min_dist <= report.train_metrics.mean_min_dist * 1.30);
-        }
+        // 5. 严格判定 M1 三隔离门禁 (训练集及格、ID泛化及格、OOD分布外硬性达标)
+        bool train_pass = (report.train_metrics.success_rate >= 0.70);
+        bool id_pass = (report.id_generalization_ratio >= gate_threshold) && (report.holdout_id_metrics.success_rate >= 0.60);
+        bool ood_pass = (report.ood_generalization_ratio >= 0.50) && (report.holdout_ood_metrics.success_rate >= 0.50);
+
+        report.passes_m1_gate = (train_pass && id_pass && ood_pass);
 
         std::ostringstream ss;
-        ss << "M1 OOS Report: Train[SR=" << std::fixed << std::setprecision(1)
+        ss << "M1 Strict 3-Isolation OOS Report: Train[SR=" << std::fixed << std::setprecision(1)
            << (report.train_metrics.success_rate * 100.0) << "%] -> ID-Holdout[SR="
            << (report.holdout_id_metrics.success_rate * 100.0) << "%, Ratio="
            << std::setprecision(2) << report.id_generalization_ratio << "] -> OOD-Holdout[SR="
-           << std::setprecision(1) << (report.holdout_ood_metrics.success_rate * 100.0) << "%]. Gate="
-           << (report.passes_m1_gate ? "PASSED (>= 70%)" : "FAILED (< 70%)");
+           << std::setprecision(1) << (report.holdout_ood_metrics.success_rate * 100.0) << "%, Ratio="
+           << std::setprecision(2) << report.ood_generalization_ratio << "]. Gate="
+           << (report.passes_m1_gate ? "PASSED (Strict All-Green)" : "FAILED (Unqualified)");
         report.verdict = ss.str();
 
         return report;

@@ -2156,7 +2156,8 @@ public:
             auto it_u = id_to_idx.find(syn.from_cell_id);
             auto it_v = id_to_idx.find(syn.to_cell_id);
             if (it_u != id_to_idx.end() && it_v != id_to_idx.end()) {
-                adj[it_u->second].push_back({it_v->second, static_cast<float>(syn.weight)});
+                uint32_t packed_target = (static_cast<uint32_t>(syn.to_port & 0xFF) << 24) | (it_v->second & 0x00FFFFFF);
+                adj[it_u->second].push_back({packed_target, static_cast<float>(syn.weight)});
                 num_synapses++;
             }
         }
@@ -2206,8 +2207,10 @@ public:
 
         for (const auto& c : cells) {
             uint8_t op = cell_type_to_sdsc_opcode(c.type);
-            uint8_t p1_u8 = static_cast<uint8_t>(std::clamp(c.param1 * 64.0, 0.0, 255.0));
-            uint8_t p2_u8 = 0;
+            int8_t p1_i8 = static_cast<int8_t>(std::clamp(std::round(c.param1 * 64.0), -128.0, 127.0));
+            int8_t p2_i8 = static_cast<int8_t>(std::clamp(std::round(c.param2 * 64.0), -128.0, 127.0));
+            uint8_t p1_u8 = static_cast<uint8_t>(p1_i8);
+            uint8_t p2_u8 = static_cast<uint8_t>(p2_i8);
             uint8_t flags = 0;
             if (c.type <= CellType::SENSE_CHANNEL || c.type == CellType::PREDICT_SENSE_0 || c.type == CellType::PREDICT_SENSE_1) flags |= 0x01;
             if (c.type >= CellType::ACT_PRIMARY_POSITIVE && c.type <= CellType::ACT_CHANNEL) flags |= 0x02;
@@ -2251,11 +2254,155 @@ public:
         return true;
     }
 
+    static CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags) {
+        if (flags & 0x01) {
+            if (op == 0) return CellType::SENSE_RAW_INPUT_0;
+            if (op == 1) return CellType::SENSE_RAW_INPUT_1;
+            if (op == 2) return CellType::SENSE_RAW_INPUT_2;
+            if (op == 3) return CellType::SENSE_RAW_INPUT_3;
+            return CellType::SENSE_CHANNEL;
+        }
+        if (flags & 0x02) {
+            if (op == 21) return CellType::ACT_PRIMARY_POSITIVE;
+            if (op == 22) return CellType::ACT_PRIMARY_NEGATIVE;
+            if (op == 23) return CellType::ACT_DEFENSIVE_RESET;
+            return CellType::ACT_CHANNEL;
+        }
+        switch (op) {
+            case 0: return CellType::SENSE_RAW_INPUT_0;
+            case 1: return CellType::SENSE_RAW_INPUT_1;
+            case 2: return CellType::SENSE_RAW_INPUT_2;
+            case 3: return CellType::SENSE_RAW_INPUT_3;
+            case 4: return CellType::OP_SUM;
+            case 5: return CellType::OP_INTEGRAL;
+            case 8: return CellType::OP_EMA;
+            case 10: return CellType::OP_ABS;
+            case 11: return CellType::OP_MULTIPLY;
+            case 12: return CellType::OP_DIFF;
+            case 13: return CellType::OP_SUB;
+            case 14: return CellType::OP_RATIO;
+            case 15: return CellType::GATE_THRESHOLD;
+            case 16: return CellType::GATE_HYSTERESIS;
+            case 17: return CellType::GATE_DEADZONE;
+            case 18: return CellType::GATE_INHIBIT;
+            case 19: return CellType::GATE_AND;
+            case 20: return CellType::GATE_MIN_MAX;
+            case 21: return CellType::ACT_PRIMARY_POSITIVE;
+            case 22: return CellType::ACT_PRIMARY_NEGATIVE;
+            case 23: return CellType::ACT_DEFENSIVE_RESET;
+            case 24: return CellType::ASSOCIATION_HUB;
+            case 25: return CellType::OP_OSCILLATOR;
+            default: return CellType::OP_EMA;
+        }
+    }
+
     static CellularOrganism load_checkpoint_json(const std::string& filepath) {
         std::ifstream ifs(filepath);
         if (!ifs.is_open()) return CellularOrganism();
         std::string str((std::istreambuf_iterator<char>(ifs)), std::istreambuf_iterator<char>());
         return from_json(str);
+    }
+
+    static CellularOrganism load_checkpoint_bin(const std::string& filepath) {
+        CellularOrganism org;
+        std::ifstream ifs(filepath, std::ios::binary);
+        if (!ifs.is_open()) return org;
+
+        struct SDSC_BIN_HDR {
+            uint32_t magic{0};
+            uint32_t version{0};
+            uint32_t n_cells{0};
+            uint32_t n_syns{0};
+            uint32_t in_d{0};
+            uint32_t out_d{0};
+            uint64_t c_off{0};
+            uint64_t rp_off{0};
+            uint64_t ci_off{0};
+            uint64_t w_off{0};
+            uint64_t coords_off{0};
+            uint64_t extra{0};
+        } hdr;
+
+        ifs.read(reinterpret_cast<char*>(&hdr), sizeof(hdr));
+        if (!ifs || hdr.magic != 0x53445343 || hdr.version != 2 || hdr.n_cells == 0) {
+            return org;
+        }
+
+        uint32_t num_cells = hdr.n_cells;
+        uint32_t num_syns = hdr.n_syns;
+
+        // 1. 读取 Cell 特征
+        ifs.seekg(hdr.c_off);
+        std::vector<uint8_t> cell_bytes(num_cells * 4);
+        ifs.read(reinterpret_cast<char*>(cell_bytes.data()), cell_bytes.size());
+
+        org.cells.resize(num_cells);
+        for (uint32_t i = 0; i < num_cells; ++i) {
+            uint8_t op = cell_bytes[i * 4 + 0];
+            uint8_t p1_u8 = cell_bytes[i * 4 + 1];
+            uint8_t p2_u8 = cell_bytes[i * 4 + 2];
+            uint8_t flags = cell_bytes[i * 4 + 3];
+
+            int8_t p1_i8 = static_cast<int8_t>(p1_u8);
+            int8_t p2_i8 = static_cast<int8_t>(p2_u8);
+
+            org.cells[i].id = i;
+            org.cells[i].type = sdsc_opcode_to_cell_type(op, flags);
+            org.cells[i].param1 = static_cast<double>(p1_i8) / 64.0;
+            org.cells[i].param2 = static_cast<double>(p2_i8) / 64.0;
+            org.cells[i].latch_state = false;
+        }
+
+        // 2. 读取坐标 (若存在)
+        if (hdr.coords_off > 0) {
+            ifs.seekg(hdr.coords_off);
+            std::vector<float> coords(num_cells * 3, 0.0f);
+            ifs.read(reinterpret_cast<char*>(coords.data()), coords.size() * sizeof(float));
+            if (ifs) {
+                for (uint32_t i = 0; i < num_cells; ++i) {
+                    org.cells[i].x = coords[i * 3 + 0];
+                    org.cells[i].y = coords[i * 3 + 1];
+                    org.cells[i].z = coords[i * 3 + 2];
+                }
+            }
+        }
+
+        // 3. 读取 CSR 图结构并构建突触
+        ifs.seekg(hdr.rp_off);
+        std::vector<uint32_t> row_ptr(num_cells + 1);
+        ifs.read(reinterpret_cast<char*>(row_ptr.data()), row_ptr.size() * sizeof(uint32_t));
+
+        std::vector<uint32_t> col_idx(num_syns);
+        std::vector<float> weights(num_syns);
+        if (num_syns > 0) {
+            ifs.seekg(hdr.ci_off);
+            ifs.read(reinterpret_cast<char*>(col_idx.data()), num_syns * sizeof(uint32_t));
+            ifs.seekg(hdr.w_off);
+            ifs.read(reinterpret_cast<char*>(weights.data()), num_syns * sizeof(float));
+        }
+
+        for (uint32_t u = 0; u < num_cells; ++u) {
+            uint32_t start_edge = row_ptr[u];
+            uint32_t end_edge = row_ptr[u + 1];
+            for (uint32_t e = start_edge; e < end_edge && e < num_syns; ++e) {
+                uint32_t packed = col_idx[e];
+                uint32_t v = packed & 0x00FFFFFF;
+                uint8_t port = static_cast<uint8_t>((packed >> 24) & 0xFF);
+                if (v < num_cells) {
+                    Synapse s;
+                    s.from_cell_id = org.cells[u].id;
+                    s.to_cell_id = org.cells[v].id;
+                    s.to_port = port;
+                    s.weight = static_cast<double>(weights[e]);
+                    s.initial_weight = s.weight;
+                    s.is_active = true;
+                    org.synapses.push_back(s);
+                }
+            }
+        }
+
+        org.compile();
+        return org;
     }
 
     // ========================================================================
