@@ -136,7 +136,8 @@ def run_parity_audit():
 def test_gpu_cpp_bit_parity():
     """pytest 收集入口"""
     max_diff, max_act, n_syns = run_parity_audit()
-    assert max_diff < 1e-4, f"全脑 1024 细胞绝对误差超标: {max_diff:.8e} >= 1e-4"
+    print(f"\n[BIT-PARITY] max_diff={max_diff:.8e}, max_act={max_act:.6f}, syns={n_syns}")
+    assert max_diff < 1e-6, f"全脑 1024 细胞绝对误差超标: {max_diff:.8e} >= 1e-6"
 
 def main():
     print("=" * 65)
@@ -148,8 +149,8 @@ def main():
     print(f"[*] 全脑 1024 细胞 × 20 步 (共 20480 细胞状态) 最大绝对误差: {max_diff:.8e}")
     print(f"[*] 效应器动作信号活跃峰值: {max_act:.6f}")
 
-    if max_diff < 1e-4:
-        print("🎉 PASS: GPU 与 C 硬件底座实现全脑 1024 细胞无死角等价！(Error < 1e-4)")
+    if max_diff < 1e-6:
+        print(f"🎉 PASS: GPU 与 C 硬件底座实现全脑 1024 细胞无死角等价！(Error {max_diff:.8e} < 1e-6)")
         return 0
     else:
         print(f"❌ FAIL: 全脑状态存在数值偏差: {max_diff:.8e}")

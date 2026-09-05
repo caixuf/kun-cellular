@@ -1562,6 +1562,8 @@ public:
                 }
 
                 case CellType::OP_EMA: {
+                    if (!std::isfinite(in0)) in0 = 0.0;
+                    if (!std::isfinite(c.state_val)) c.state_val = 0.0;
                     double alpha = std::clamp(c.param1, 0.001, 1.0);
                     if (c.activation_count == 0) c.state_val = in0;
                     else c.state_val = alpha * in0 + (1.0 - alpha) * c.state_val;
