@@ -4500,6 +4500,21 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             self.wfile.write(payload)
             return
 
+        # 挂载真实纯二进制检查点流式下载
+        if self.path.startswith("/checkpoints/"):
+            rel_path = self.path.split("?")[0].lstrip("/")
+            ckpt_path = os.path.join(ROOT_DIR, rel_path)
+            if os.path.exists(ckpt_path) and os.path.isfile(ckpt_path):
+                with open(ckpt_path, "rb") as f:
+                    data = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(data)
+                return
+
         # 白垩纪大灭绝算子触发接口
         if self.path.startswith("/api/extinction/trigger"):
             import urllib.parse

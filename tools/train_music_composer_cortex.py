@@ -178,16 +178,15 @@ def evaluate_music_step(state, inputs, weights, op_types, row_ptr, col_idx):
             
     return next_state
 
-def evolve_music_composer_master():
+def evolve_music_composer_master(generations=50, seed=2026):
     print("==================================================================")
     print("  KunCellular: 硅基天籁音乐与复调对位歌王超脑演化训练器")
-    print("  目标规格: 1,024 物理细胞 | 196,608 突触 | 4大认知功能柱")
+    print(f"  目标规格: 1,024 物理细胞 | 196,608 突触 | 4大认知功能柱 | 演化代数: {generations}")
     print("==================================================================")
 
     op_types, row_ptr, col_idx, weights = build_music_composer_topology()
-    rng = np.random.RandomState(2026)
+    rng = np.random.RandomState(seed)
 
-    generations = 30
     best_fitness = -1e9
     
     for gen in range(generations):
@@ -244,7 +243,7 @@ def evolve_music_composer_master():
         # 变异突变突触权重 (强化高愉悦度通路)
         if fitness > best_fitness:
             best_fitness = fitness
-            print(f"  ↳ [Gen {gen+1:02d}/30] 新冠军诞生! 适应度: {fitness:.2f} | 愉悦和声: {total_pleasure_score:.1f} | 终结解决: {total_cadence_score:.1f} | 能量稳态: {lyapunov_energy/128:.3f}")
+            print(f"  ↳ [Gen {gen+1:02d}/{generations:02d}] 新冠军诞生! 适应度: {fitness:.2f} | 愉悦和声: {total_pleasure_score:.1f} | 终结解决: {total_cadence_score:.1f} | 能量稳态: {lyapunov_energy/128:.3f}")
             # 保存最佳权重
             best_weights = weights.copy()
         
@@ -324,4 +323,9 @@ def evolve_music_composer_master():
     print("==================================================================")
 
 if __name__ == "__main__":
-    evolve_music_composer_master()
+    import argparse
+    parser = argparse.ArgumentParser(description="KunCellular 硅基音乐歌王超脑演化训练器")
+    parser.add_argument("--generations", type=int, default=50, help="演化代数 (默认: 50)")
+    parser.add_argument("--seed", type=int, default=2026, help="随机种子 (默认: 2026)")
+    args = parser.parse_args()
+    evolve_music_composer_master(generations=args.generations, seed=args.seed)
