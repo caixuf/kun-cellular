@@ -632,39 +632,43 @@
             </div>
         </div>
 
-        <!-- 面板 2: 1024-细胞四大认知功能柱放电电位 -->
+        <!-- 面板 2: 后台冠军皮层真实前向遥测 (C11 底座 + 冠军 bin 权重, 与浏览器对局 AI 相互独立) -->
         <div class="side-box">
             <div class="panel-header">
-                <span>1024-微柱认知皮层放电遥测 (768 认知细胞)</span>
+                <span>后台冠军皮层真实前向遥测 <span id="dzTeleSrc" style="font-size:10px;color:#64748b;">(连接中…)</span></span>
             </div>
             <div class="cortex-telemetry">
                 <div class="column-meter">
                     <div class="column-meta">
                         <span style="color:#38bdf8;">1. 贝叶斯记牌与盲手预测柱 (192 cells)</span>
-                        <span id="actVal0">84%</span>
+                        <span id="actVal0">--</span>
                     </div>
-                    <div class="meter-bar"><div class="meter-fill" id="actBar0" style="background:#38bdf8;width:84%;"></div></div>
+                    <div class="meter-bar"><div class="meter-fill" id="actBar0" style="background:#38bdf8;width:0%;"></div></div>
                 </div>
                 <div class="column-meter">
                     <div class="column-meta">
                         <span style="color:#10b981;">2. 牌型组合与炸弹解算柱 (192 cells)</span>
-                        <span id="actVal1">92%</span>
+                        <span id="actVal1">--</span>
                     </div>
-                    <div class="meter-bar"><div class="meter-fill" id="actBar1" style="background:#10b981;width:92%;"></div></div>
+                    <div class="meter-bar"><div class="meter-fill" id="actBar1" style="background:#10b981;width:0%;"></div></div>
                 </div>
                 <div class="column-meter">
                     <div class="column-meta">
                         <span style="color:#f59e0b;">3. 对局节奏与张力调控柱 (192 cells)</span>
-                        <span id="actVal2">68%</span>
+                        <span id="actVal2">--</span>
                     </div>
-                    <div class="meter-bar"><div class="meter-fill" id="actBar2" style="background:#f59e0b;width:68%;"></div></div>
+                    <div class="meter-bar"><div class="meter-fill" id="actBar2" style="background:#f59e0b;width:0%;"></div></div>
                 </div>
                 <div class="column-meter">
                     <div class="column-meta">
                         <span style="color:#a855f7;">4. 反事实得失决断柱 (192 cells)</span>
-                        <span id="actVal3">77%</span>
+                        <span id="actVal3">--</span>
                     </div>
-                    <div class="meter-bar"><div class="meter-fill" id="actBar3" style="background:#a855f7;width:77%;"></div></div>
+                    <div class="meter-bar"><div class="meter-fill" id="actBar3" style="background:#a855f7;width:0%;"></div></div>
+                </div>
+                <div class="column-meta" style="margin-top:6px;">
+                    <span style="color:#94a3b8;font-size:11px;">后台实况: <span id="dzGameInfo">--</span></span>
+                    <span style="color:#94a3b8;font-size:11px;">最近决策: <span id="dzLastAction">--</span></span>
                 </div>
             </div>
         </div>
@@ -1333,19 +1337,51 @@ function aiDecide(playerIdx) {
     return null;
 }
 
-function pulseCortexMeters() {
-    const v0 = Math.floor(75 + Math.random() * 22);
-    const v1 = Math.floor(72 + Math.random() * 25);
-    const v2 = Math.floor(65 + Math.random() * 30);
-    const v3 = Math.floor(70 + Math.random() * 26);
-    document.getElementById("actBar0").style.width = v0 + "%";
-    document.getElementById("actVal0").textContent = v0 + "%";
-    document.getElementById("actBar1").style.width = v1 + "%";
-    document.getElementById("actVal1").textContent = v1 + "%";
-    document.getElementById("actBar2").style.width = v2 + "%";
-    document.getElementById("actVal2").textContent = v2 + "%";
-    document.getElementById("actBar3").style.width = v3 + "%";
-    document.getElementById("actVal3").textContent = v3 + "%";
+let _dzTeleBusy = false;
+let _dzTeleLast = 0;
+async function pulseCortexMeters() {
+    // 真实遥测: 后台冠军皮层 (C11 前向 + 冠军 bin 权重) 柱级平均膜电位。
+    // 后端离线时显示 "离线", 严禁回退到任何合成/随机数值。
+    const now = Date.now();
+    if (_dzTeleBusy || now - _dzTeleLast < 1000) return;
+    _dzTeleBusy = true;
+    _dzTeleLast = now;
+    try {
+        const r = await fetch('/api/doudizhu/cortex', { signal: AbortSignal.timeout(1500) });
+        const d = await r.json();
+        const srcEl = document.getElementById("dzTeleSrc");
+        if (!d.real) {
+            for (let i = 0; i < 4; ++i) {
+                document.getElementById("actVal" + i).textContent = "离线";
+                document.getElementById("actBar" + i).style.width = "0%";
+            }
+            if (srcEl) { srcEl.textContent = "(后端离线)"; }
+            return;
+        }
+        if (srcEl) { srcEl.textContent = "(C11 真实前向)"; }
+        for (let i = 0; i < 4; ++i) {
+            const v = Math.max(0, Math.min(100, d.columns[i].act));
+            document.getElementById("actVal" + i).textContent = v.toFixed(1) + "%";
+            document.getElementById("actBar" + i).style.width = v + "%";
+        }
+        const gi = document.getElementById("dzGameInfo");
+        const la = document.getElementById("dzLastAction");
+        if (gi && d.game) {
+            gi.textContent = `第${d.game.step}步 手牌${d.game.cards_left} | 对手${d.game.opp_left}/${d.game.opp_right} | 胜率${d.win_rate}% (${d.episodes}局)`;
+        }
+        if (la) { la.textContent = d.last_action; }
+    } catch (e) {
+        for (let i = 0; i < 4; ++i) {
+            const vEl = document.getElementById("actVal" + i);
+            if (vEl) vEl.textContent = "离线";
+            const bEl = document.getElementById("actBar" + i);
+            if (bEl) bEl.style.width = "0%";
+        }
+        const srcEl = document.getElementById("dzTeleSrc");
+        if (srcEl) srcEl.textContent = "(后端离线)";
+    } finally {
+        _dzTeleBusy = false;
+    }
 }
 
 // 统一执行出牌

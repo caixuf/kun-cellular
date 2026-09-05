@@ -341,8 +341,65 @@ class LiveVehicleSimulator:
         self.champion_trail = []
         self.total_active_cells = 0
         self.total_active_synapses = 0
+        self.shadow_cortex = None
+        self.shadow_in_dim = 6
+        self.shadow_signals = [0.0] * 6
+        self.cortex_real = False
         self.init_vehicle()
         self.load_champion_checkpoint()
+
+    def _init_shadow_cortex(self, bin_data):
+        """
+        真实 210 细胞皮层并行推演内核 (Zero-Mock):
+        C11 稠密动力学引擎 + 冠军 bin 权重原样载入, 每步以真实任务信号驱动,
+        遥测输出 = 真实原语前向结果, 不再使用任何合成正弦。
+        """
+        try:
+            nc = int(bin_data["num_cells"])
+            eng = NativeCellularDynamicsEngine(nc)
+            cells_bytes = bin_data["cells_bytes"]
+            for i in range(nc):
+                # bin 内 opcode/param 即 C11 sdsc_primitives 编码 (u8 增益 = p1 * 4/255)
+                eng.op_types[i] = cells_bytes[i * 4 + 0]
+                eng.gains[i] = cells_bytes[i * 4 + 1] * (4.0 / 255.0)
+            rp, ci, w = bin_data["row_ptr"], bin_data["col_idx"], bin_data["weights"]
+            for u in range(nc):
+                for k in range(int(rp[u]), int(rp[u + 1])):
+                    v = int(ci[k])
+                    if 0 <= v < nc:
+                        eng.W[u, v] = float(w[k])
+                        eng.mask[u, v] = 1.0
+            self.shadow_cortex = eng
+            self.shadow_in_dim = int(bin_data["input_dim"])
+            self.shadow_signals = [0.0] * max(1, self.shadow_in_dim)
+            print(f"[LiveVehicleSimulator] 真实皮层并行推演内核已挂载: {nc} 细胞 / "
+                  f"{int(bin_data['num_synapses'])} 突触 (C11 原语 + 冠军权重, 任务信号真注入)")
+        except Exception as e:
+            self.shadow_cortex = None
+            print(f"[LiveVehicleSimulator] 皮层并行内核挂载失败 (皮层遥测将显示离线): {e}")
+
+    @staticmethod
+    def _c_stimulus(t, i, pressure=1.0):
+        """与 src/sdsc_c_runtime.c sdsc_c_cellular_dynamics_step 激励公式严格一致"""
+        phi = math.acos(1.0 - 2.0 * ((i % 48) + 0.5) / 48.0)
+        return math.sin(t * 2.2 + i * 0.35) * math.cos(t * 0.8 + phi) * pressure
+
+    def step_shadow_cortex(self):
+        """
+        以真实任务信号驱动皮层并行内核一步 (输入精确注入):
+        C 引擎内部 driven = 1.35*stim - 0.35*preds, 逆解 preds 使受体细胞 driven == 真实任务信号。
+        返回 True 表示本步完成了真实前向。
+        """
+        eng = getattr(self, "shadow_cortex", None)
+        if eng is None:
+            return False
+        t = self.step_count * 0.04
+        for i in range(self.shadow_in_dim):
+            x = float(self.shadow_signals[i])
+            stim = self._c_stimulus(t, i)
+            eng.preds[i] = (stim * 1.35 - x) / 0.35
+        eng.step(t, 1.0)
+        return True
 
     def load_champion_checkpoint(self):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -374,6 +431,7 @@ class LiveVehicleSimulator:
                         self.generation = bin_data.get("generation", 60) or 60
                         self.champion_fitness = 99.8
                         self.champion_genome = None
+                        self._init_shadow_cortex(bin_data)
                         loaded = True
                         print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 纯二进制 (SDSC-BIN v2) 210-细胞 ASIL-D 驾驶皮层冠军模型: {bin_path}")
                     else:
@@ -695,25 +753,25 @@ class LiveVehicleSimulator:
                 self.cell_outs = [0.0] * nc
 
             if nc == 210:
-                self.cell_outs[0] = float(min(1.0, max(-1.0, signed_cte / 20.0)))
-                self.cell_outs[1] = float(min(1.0, max(-1.0, heading_err / 1.57)))
-                self.cell_outs[2] = float(min(1.0, curv_b * 50.0))
-                self.cell_outs[3] = float(min(1.0, self.v / 5.5))
-                self.cell_outs[4] = float(min(1.0, max(-1.0, (target_v - self.v) / 3.0)))
-                self.cell_outs[5] = float(min(1.0, max(0.0, 1.0 - best_d / 500.0)))
-                for ri in range(6, 12):
-                    self.cell_outs[ri] = float(math.sin(self.step_count * 0.05 + ri) * 0.5)
-                steer_sig = abs(self.delta) / 0.55
-                for hi in range(12, 204):
-                    decay = 0.88
-                    stim = math.sin(self.step_count * 0.12 + hi * 0.3) * steer_sig
-                    self.cell_outs[hi] = float(round(self.cell_outs[hi] * decay + stim * (1.0 - decay), 3))
-                self.cell_outs[204] = float(round(self.delta / 0.55, 3))
-                self.cell_outs[205] = float(round((self.v - 3.2) / 2.3, 3))
-                self.cell_outs[206] = float(round(abs(steer_target - self.delta), 3))
-                self.cell_outs[207] = float(round(math.cos(self.theta), 3))
-                self.cell_outs[208] = float(round(math.sin(self.theta), 3))
-                self.cell_outs[209] = float(round(1.0 if self.cte < 5.0 else 0.0, 3))
+                # 真实任务信号 (与控制律同源, 归一化)
+                self.shadow_signals[0] = float(min(1.0, max(-1.0, signed_cte / 20.0)))
+                self.shadow_signals[1] = float(min(1.0, max(-1.0, heading_err / 1.57)))
+                self.shadow_signals[2] = float(min(1.0, curv_b * 50.0))
+                self.shadow_signals[3] = float(min(1.0, self.v / 5.5))
+                self.shadow_signals[4] = float(min(1.0, max(-1.0, (target_v - self.v) / 3.0)))
+                self.shadow_signals[5] = float(min(1.0, max(0.0, 1.0 - best_d / 500.0)))
+
+                if self.step_shadow_cortex():
+                    # 皮层遥测 = C11 引擎真实前向输出 (冠军 bin 权重 + 真实任务信号)
+                    outs = self.shadow_cortex.outputs
+                    for i in range(nc):
+                        self.cell_outs[i] = round(float(outs[i]), 3)
+                    self.cortex_real = True
+                else:
+                    # 引擎不可用时显示离线, 严禁回退到合成波形
+                    for i in range(nc):
+                        self.cell_outs[i] = 0.0
+                    self.cortex_real = False
             elif organ is not None and hasattr(organ, "cells") and len(organ.cells) == nc:
                 for i in range(nc):
                     self.cell_outs[i] = float(organ.cells[i].output)
@@ -784,16 +842,160 @@ class LiveVehicleSimulator:
                     "cte_m": round(self.cte * 0.05, 3)
                 },
                 "trail": list(self.trail),
-                "history_cte": list(self.history_cte)
+                "history_cte": list(self.history_cte),
+                "cortex_real": bool(getattr(self, "cortex_real", False)),
+                "cortex_mode": ("REAL_FORWARD" if getattr(self, "cortex_real", False) else "OFFLINE")
             }
 
 live_veh = LiveVehicleSimulator()
+
+
+class DouDiZhuCortexLive:
+    """
+    斗地主冠军皮层真实对局遥测 (Zero-Mock):
+    - 加载真实 doudizhu_game_champion.bin (32 受体 / 768 联络 / 224 效应)
+    - 前向走纯 C11 底座 (NativeOrganExecutor), 环境为训练器原生 DouDiZhuFullDeckEnv
+    - 遥测 = 真实 C 前向的柱级平均膜电位与动作头输出, 浏览器对局 AI 与此独立 (如实标注)
+    """
+    COLUMN_NAMES = ["贝叶斯记牌柱", "牌型炸弹解算柱", "节奏张力调控柱", "反事实决断柱"]
+    ACTION_NAMES = ["Pass 让牌", "Solo 单牌", "Pair 对子", "Trio 三带", "Bomb 炸弹", "Sprint 突袭", "RiskLock 风控锁"]
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.W1 = None
+        self.W2 = None
+        self.n_rec = 32
+        self.n_hid = 768
+        self.n_mot = 224
+        self.H_state = np.zeros(self.n_hid, dtype=np.float32)
+        self.H_out = np.zeros(self.n_hid, dtype=np.float32)
+        self.MOT_out = np.zeros(self.n_mot, dtype=np.float32)
+        self.env = None
+        self.real = False
+        self.episodes = 0
+        self.wins = 0
+        self.last_action = 0
+        self.step_in_episode = 0
+        self.column_act = [0.0] * 4
+        self.head_act = [0.0] * 7
+        self._load()
+
+    def _load(self):
+        try:
+            sys.path.insert(0, os.path.join(ROOT_DIR, "tools"))
+            from train_doudizhu_master_cortex import DouDiZhuFullDeckEnv
+            bin_data = read_sdsc_binary(os.path.join(ROOT_DIR, "checkpoints", "doudizhu_game_champion.bin"))
+            if not bin_data or int(bin_data["num_cells"]) != 1024:
+                print("[DouDiZhuLive] 冠军 bin 缺失或格式不符, 皮层遥测保持离线")
+                return
+            nc = 1024
+            rp, ci, w = bin_data["row_ptr"], bin_data["col_idx"], bin_data["weights"]
+            W1 = np.zeros((self.n_rec, self.n_hid), dtype=np.float32)
+            W2 = np.zeros((self.n_hid, self.n_mot), dtype=np.float32)
+            for r in range(self.n_rec):
+                for idx in range(int(rp[r]), int(rp[r + 1])):
+                    c = int(ci[idx]) - self.n_rec
+                    if 0 <= c < self.n_hid:
+                        W1[r, c] = w[idx]
+            for h in range(self.n_hid):
+                u = self.n_rec + h
+                for idx in range(int(rp[u]), int(rp[u + 1])):
+                    m = int(ci[idx]) - self.n_rec - self.n_hid
+                    if 0 <= m < self.n_mot:
+                        W2[h, m] = w[idx]
+            nz1 = int(np.count_nonzero(W1))
+            nz2 = int(np.count_nonzero(W2))
+            if nz1 < 100 or nz2 < 1000:
+                print(f"[DouDiZhuLive] 权重解析异常 (W1 nz={nz1}, W2 nz={nz2}), 保持离线")
+                return
+            self.W1, self.W2 = W1, W2
+            self.env = DouDiZhuFullDeckEnv()
+            self.env.reset(seed=20260905)
+            self.real = True
+            print(f"[DouDiZhuLive] 真实斗地主冠军皮层已挂载: 1024 细胞 / "
+                  f"{int(bin_data['num_synapses'])} 突触 (C11 前向 + 原生环境, 真实对局遥测)")
+        except Exception as e:
+            self.real = False
+            print(f"[DouDiZhuLive] 挂载失败 (皮层遥测保持离线): {e}")
+
+    def tick(self):
+        """单步: 真实环境 + 真实 C11 皮层前向 + 真实决策"""
+        if not self.real:
+            return
+        with self.lock:
+            obs = self.env.get_observation()
+            steer_out, _ = NativeOrganExecutor.forward(
+                obs.astype(np.float32), self.W1, self.W2,
+                self.H_state, self.H_out, self.MOT_out
+            )
+            # 7 动作头投票 (读出聚合, 非算子)
+            votes = np.zeros(7, dtype=np.float32)
+            for a in range(7):
+                seg = self.MOT_out[a * 32:(a + 1) * 32]
+                votes[a] = float(np.mean(seg) + np.max(seg) * 0.5)
+            action = int(np.argmax(votes))
+            self.last_action = action
+            self.env.step(action)
+            self.step_in_episode += 1
+            for col in range(4):
+                seg = self.H_out[col * 192:(col + 1) * 192]
+                self.column_act[col] = round(float(np.mean(np.abs(seg))) * 100.0, 1)
+            for a in range(7):
+                seg = self.MOT_out[a * 32:(a + 1) * 32]
+                self.head_act[a] = round(float(np.mean(seg)), 3)
+            if self.env.round_step >= self.env.max_rounds or self.env.agent_cards_left <= 0 \
+                    or self.env.opp_left_cards <= 0 or self.env.opp_right_cards <= 0:
+                won = self.env.agent_cards_left <= 0 and self.env.opp_left_cards > 0 and self.env.opp_right_cards > 0
+                self.episodes += 1
+                self.wins += 1 if won else 0
+                self.env.reset()
+                self.step_in_episode = 0
+
+    def snapshot(self):
+        with self.lock:
+            e = self.env
+            game = None
+            if e is not None:
+                game = {
+                    "step": self.step_in_episode,
+                    "cards_left": int(e.agent_cards_left),
+                    "opp_left": int(e.opp_left_cards),
+                    "opp_right": int(e.opp_right_cards),
+                    "hand_strength": round(float(e.agent_hand_strength), 3),
+                    "threat": round(float(e.bomb_threat), 3),
+                    "table": round(float(e.table_trick_strength), 3),
+                }
+            return {
+                "real": self.real,
+                "episodes": self.episodes,
+                "wins": self.wins,
+                "win_rate": round(self.wins / max(1, self.episodes) * 100.0, 1),
+                "last_action": self.ACTION_NAMES[self.last_action] if self.real else "",
+                "columns": [{"name": self.COLUMN_NAMES[i], "act": self.column_act[i]} for i in range(4)],
+                "heads": [{"name": self.ACTION_NAMES[a], "act": self.head_act[a]} for a in range(7)],
+                "game": game
+            }
+
+
+live_dz_cortex = DouDiZhuCortexLive()
+
+
+def doudizhu_cortex_loop():
+    while True:
+        try:
+            live_dz_cortex.tick()
+        except Exception:
+            pass
+        time.sleep(0.2)
 
 def veh_loop():
     while True:
         for _ in range(max(1, getattr(live_veh, "warp_speed", 1))):
             live_veh.step_physics()
         time.sleep(0.04)
+
+
+threading.Thread(target=doudizhu_cortex_loop, daemon=True).start()
 
 threading.Thread(target=veh_loop, daemon=True).start()
 
@@ -5021,6 +5223,15 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
         if self.path == "/favicon.ico":
             self.send_response(204)
             self.end_headers()
+            return
+
+        if self.path == "/api/doudizhu/cortex":
+            body = json.dumps(live_dz_cortex.snapshot()).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
             return
 
         if self.path == "/api/universe":

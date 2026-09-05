@@ -249,11 +249,11 @@
         </div>
 
         <div class="sidebar">
-            <!-- 1. SDSCC 1024-细胞 ADAS 驾驶皮层自然演化生命体 -->
+            <!-- 1. SDSCC 210-细胞 ADAS 皮层 (真实并行前向遥测) + 经典前瞻控制律 -->
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[SDSCC_1024_CELL_NATURAL_CHAMPION]</span>
-                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">GEN: 45 // 1000Hz HARD REAL-TIME</span>
+                    <span>[SDSCC_210_CELL_PARALLEL_CORTEX]</span>
+                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">GEN: 45 // 皮层并行实测</span>
                 </div>
                 
                 <div class="stat-grid">
@@ -279,7 +279,7 @@
                 <div style="padding: 4px 12px 8px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                         <span class="stat-label">ORGAN PULSE (微柱皮层点阵):</span>
-                        <span style="font-size:9px; color:var(--cyan-glow);">[32 REC | 768 INTER | 224 MOT]</span>
+                        <span style="font-size:9px; color:var(--cyan-glow);" id="cortex-mode-badge">[210 CELLS | 真实前向]</span>
                     </div>
                     <canvas id="cortex-canvas" width="340" height="96" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
                 </div>
@@ -462,27 +462,24 @@
                 document.getElementById("stat-cells").innerText = nCells > 0 ? `${nCells.toLocaleString()} 细胞` : "… 细胞";
                 document.getElementById("stat-synapses").innerText = nSyns > 0 ? `${nSyns.toLocaleString()} 突触` : "… 突触";
 
-                // 动态渲染 24 原语链路徽章
+                // 动态渲染 原语链路徽章 (210 细胞真实结构: 6 受体 → 202 联络 → 2 效应)
                 const chainDiv = document.getElementById("primitive-chain");
-                if (chainDiv && vehState.hidden_types) {
-                    const colors = {
-                        "SUM": "rgba(56,189,248,0.2); color:#38bdf8; border:1px solid #38bdf8",
-                        "INTEGRATE": "rgba(16,185,129,0.2); color:#10b981; border:1px solid #10b981",
-                        "AMPLIFY": "rgba(0,240,255,0.2); color:#00f0ff; border:1px solid #00f0ff",
-                        "INVERT": "rgba(244,63,94,0.2); color:#f43f5e; border:1px solid #f43f5e",
-                        "DIFF": "rgba(14,165,233,0.2); color:#0ea5e9; border:1px solid #0ea5e9",
-                        "DEADZONE": "rgba(244,63,94,0.2); color:#f43f5e; border:1px solid #f43f5e",
-                        "HYSTERESIS": "rgba(251,191,36,0.2); color:#fbbf24; border:1px solid #fbbf24",
-                        "INHIBIT": "rgba(239,68,68,0.2); color:#ef4444; border:1px solid #ef4444"
-                    };
-                    let html = `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">32 REC</span>`;
+                if (chainDiv) {
+                    let html = `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">6 REC</span>`;
                     html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                    vehState.hidden_types.forEach(ptype => {
-                        const style = colors[ptype] || "background:#1e293b; color:#94a3b8; border:1px solid #334155";
-                        html += `<span style="background:${style}; padding:1px 5px; border-radius:3px; font-weight:700;">${ptype}</span>`;
-                    });
+                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">202 INTER (tanh×g)</span>`;
                     html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">224 MOT</span>`;
+                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">2 MOT</span>`;
+                    const modeBadge = document.getElementById("cortex-mode-badge");
+                    if (modeBadge) {
+                        if (vehState.cortex_real) {
+                            modeBadge.textContent = "[210 CELLS | C11 真实前向]";
+                            modeBadge.style.color = "#34d399";
+                        } else {
+                            modeBadge.textContent = "[210 CELLS | 皮层离线]";
+                            modeBadge.style.color = "#f87171";
+                        }
+                    }
                     chainDiv.innerHTML = html;
                 }
 
