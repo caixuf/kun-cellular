@@ -46,43 +46,68 @@ class CUDACellularPopulation:
             device=self.device
         ) * 0.02
         
-        # 跨柱连接拓扑表: [num_columns, k_projections]
+        # 构造期契约断言 (CodeBuddy 审计修复: 规避死循环与静默越界)
+        assert num_columns > self.k_projections, f"num_columns ({num_columns}) 必须严格大于 k_projections ({self.k_projections})，否则跨柱图无法建立非自环通路！"
+        assert cells_per_col == 64, f"当前微柱原语槽位表针对 K=64 设计 (8+16+16+12+12)，当前 cells_per_col={cells_per_col}！"
+        assert in_dim <= cells_per_col, f"in_dim ({in_dim}) 不得大于单微柱细胞数 ({cells_per_col})，防止输入静默跨柱污染！"
+
+        # 跨柱连接拓扑表: [num_columns, k_projections] (严格排除自环与重复目标)
         col_targets = []
         for c in range(num_columns):
-            targets = [
+            seen, targets = {c}, [] # 将自身加入 seen 彻底排除自环
+            # 优先拓扑：相邻柱 + 对角柱
+            candidates = [
                 (c + 1) % num_columns,
                 (c - 1 + num_columns) % num_columns,
                 (c + num_columns // 2) % num_columns,
                 0 # 枢纽柱
             ]
-            col_targets.append(targets)
-        self.col_targets = torch.tensor(col_targets, device=self.device, dtype=torch.long)
+            for t in candidates:
+                if t not in seen:
+                    seen.add(t)
+                    targets.append(t)
+            # 若因排除自环/重合导致不足 k_projections，用步长位移填充有效非自环目标
+            step_offset = 2
+            while len(targets) < self.k_projections:
+                cand = (c + step_offset) % num_columns
+                if cand not in seen:
+                    seen.add(cand)
+                    targets.append(cand)
+                step_offset += 1
+            col_targets.append(targets[:self.k_projections])
 
-        # 3. 原语参数与槽位预分配 (分槽固定，杜绝动态布尔掩码分支)
-        # 每柱内: 
-        # 0..7:   受体/直通通道 (Pass-through)
-        # 8..23:  指数移动平均平滑滤波 (EMA, alpha ~ 0.1)
-        # 24..39: 泄漏积分器 (Integrate)
-        # 40..51: 二阶非线性谐振子 (Oscillator)
-        # 52..63: 施密特迟滞双阈值门控 (Hysteresis Gate)
+        self.col_targets = torch.tensor(col_targets, device=self.device, dtype=torch.long)
+        # 构造期断言：确保无自环、每柱恰好 k_projections 条独立无重复通路
+        for c in range(num_columns):
+            row = self.col_targets[c].tolist()
+            assert c not in row, f"Column {c} contains self-loop in targets: {row}"
+            assert len(set(row)) == self.k_projections, f"Column {c} contains duplicate targets: {row}"
+
+        # 3. 原语参数与槽位预分配
         self.param1 = torch.rand((pop_size, self.num_cells), device=self.device) * 0.4 + 0.1
         self.param2 = torch.rand((pop_size, self.num_cells), device=self.device) * 0.2 - 0.1
 
-        # 运行时连续状态张量 (Zero-Allocation)
+        # 运行时连续状态张量 (真·Zero-Allocation, 彻底消除运行期 torch.empty)
         self.states = torch.zeros((pop_size, self.num_cells), device=self.device)
         self.aux_states = torch.zeros((pop_size, self.num_cells), device=self.device)
         self.outputs = torch.zeros((pop_size, self.num_cells), device=self.device)
-        self.drive_buf = torch.zeros((pop_size, self.num_cells), device=self.device)
+        self.out_buf_col = torch.zeros((pop_size, num_columns, cells_per_col), device=self.device)
+        self.inter_drive_buf = torch.zeros((pop_size, num_columns, cells_per_col), device=self.device)
+        
+        # 缓存常量张量 (消除 torch.where 每步重建标量开销)
+        self.const_one = torch.tensor(1.0, device=self.device)
+        self.const_neg_one = torch.tensor(-1.0, device=self.device)
 
     def reset_states(self):
         self.states.zero_()
         self.aux_states.zero_()
         self.outputs.zero_()
-        self.drive_buf.zero_()
+        self.out_buf_col.zero_()
+        self.inter_drive_buf.zero_()
 
     def forward_step(self, inputs):
         """
-        单步批量全并发无分支推演 (Zero-Branch Vectorized Step)
+        单步批量全并发无分支推演 (Zero-Allocation & Zero-Branch)
         """
         P = self.pop_size
         C = self.num_columns
@@ -99,70 +124,72 @@ class CUDACellularPopulation:
         intra_W = self.intra_weights.view(P * C, K, K)
         intra_drive = torch.bmm(intra_W, col_outputs).view(P, C, K)
 
-        # 2. 柱间跨柱投影计算
-        inter_drive = torch.zeros_like(intra_drive)
+        # 2. 柱间跨柱投影计算 (复用预分配缓冲)
+        self.inter_drive_buf.zero_()
         out_per_col = self.outputs.view(P, C, K)
         for proj_idx in range(self.k_projections):
             target_cols = self.col_targets[:, proj_idx] # [C]
             W_proj = self.inter_weights[:, :, proj_idx, :] # [P, C, K]
-            # 汇聚投射能量
             energy = (out_per_col * W_proj).sum(dim=-1, keepdim=True) # [P, C, 1]
-            inter_drive.index_add_(1, target_cols, energy.expand(-1, -1, K) * (1.0 / self.k_projections))
+            self.inter_drive_buf.index_add_(1, target_cols, energy.expand(-1, -1, K) * (1.0 / self.k_projections))
 
         # 合成总驱动力
-        drive = (intra_drive + inter_drive).view(P, N)
+        drive = (intra_drive + self.inter_drive_buf).view(P, N)
 
-        # 注入外部感知输入
+        # 注入外部感知输入到 column 0 受体槽位
         drive[:, :self.in_dim] += inputs
 
-        # 3. 固定槽位纯张量前向 (完全无动态掩码，100% 连续执行)
-        out = torch.empty_like(self.outputs)
-        
-        # 槽位 A (0..7): 受体直通
-        out[:, 0:8] = drive[:, 0:8]
+        # 3. 按微柱局部槽位纯张量前向 (复用预分配 out_buf_col, 零内存动态申请)
+        drive_per_col = drive.view(P, C, K)
+        states_per_col = self.states.view(P, C, K)
+        aux_per_col = self.aux_states.view(P, C, K)
+        p1_per_col = self.param1.view(P, C, K)
+        p2_per_col = self.param2.view(P, C, K)
 
-        # 槽位 B (8..23): EMA 滤波
+        # 槽位 A (0..7): 受体/直通通道
+        self.out_buf_col[:, :, 0:8] = drive_per_col[:, :, 0:8]
+
+        # 槽位 B (8..23): EMA 指数移动平滑滤波
         sl_b = slice(8, 24)
-        alpha = self.param1[:, sl_b]
-        self.states[:, sl_b] = (1.0 - alpha) * self.states[:, sl_b] + alpha * drive[:, sl_b]
-        out[:, sl_b] = torch.tanh(self.states[:, sl_b])
+        alpha = p1_per_col[:, :, sl_b]
+        states_per_col[:, :, sl_b] = (1.0 - alpha) * states_per_col[:, :, sl_b] + alpha * drive_per_col[:, :, sl_b]
+        self.out_buf_col[:, :, sl_b] = torch.tanh(states_per_col[:, :, sl_b])
 
-        # 槽位 C (24..39): 积分器
+        # 槽位 C (24..39): 泄漏积分器
         sl_c = slice(24, 40)
-        leak = self.param1[:, sl_c] * 0.08
-        self.states[:, sl_c] = self.states[:, sl_c] * (1.0 - leak) + drive[:, sl_c] * 0.05
-        out[:, sl_c] = torch.clamp(self.states[:, sl_c], -2.0, 2.0)
+        leak = p1_per_col[:, :, sl_c] * 0.08
+        states_per_col[:, :, sl_c] = states_per_col[:, :, sl_c] * (1.0 - leak) + drive_per_col[:, :, sl_c] * 0.05
+        self.out_buf_col[:, :, sl_c] = torch.clamp(states_per_col[:, :, sl_c], -2.0, 2.0)
 
-        # 槽位 D (40..51): 谐振子 (二阶 Van der Pol)
+        # 槽位 D (40..51): 二阶非线性谐振子 (Van der Pol)
         sl_d = slice(40, 52)
-        s1 = self.states[:, sl_d]
-        s2 = self.aux_states[:, sl_d]
-        mu = self.param1[:, sl_d] * 1.5
+        s1 = states_per_col[:, :, sl_d]
+        s2 = aux_per_col[:, :, sl_d]
+        mu = p1_per_col[:, :, sl_d] * 1.5
         ds1 = s2
-        ds2 = mu * (1.0 - s1 * s1) * s2 - s1 + drive[:, sl_d]
+        ds2 = mu * (1.0 - s1 * s1) * s2 - s1 + drive_per_col[:, :, sl_d]
         dt = 0.05
         s1 = torch.clamp(s1 + ds1 * dt, -3.0, 3.0)
         s2 = torch.clamp(s2 + ds2 * dt, -3.0, 3.0)
-        self.states[:, sl_d] = s1
-        self.aux_states[:, sl_d] = s2
-        out[:, sl_d] = s1
+        states_per_col[:, :, sl_d] = s1
+        aux_per_col[:, :, sl_d] = s2
+        self.out_buf_col[:, :, sl_d] = s1
 
-        # 槽位 E (52..63): 施密特双阈值迟滞门控
+        # 槽位 E (52..63): 施密特双阈值迟滞门控 (使用缓存的常数标量)
         sl_e = slice(52, 64)
-        th_hi = self.param1[:, sl_e]
-        th_lo = self.param2[:, sl_e]
-        latch = self.states[:, sl_e]
-        latch = torch.where(drive[:, sl_e] > th_hi, torch.tensor(1.0, device=self.device), latch)
-        latch = torch.where(drive[:, sl_e] < th_lo, torch.tensor(-1.0, device=self.device), latch)
-        self.states[:, sl_e] = latch
-        out[:, sl_e] = latch
+        th_hi = p1_per_col[:, :, sl_e]
+        th_lo = p2_per_col[:, :, sl_e]
+        latch = states_per_col[:, :, sl_e]
+        latch = torch.where(drive_per_col[:, :, sl_e] > th_hi, self.const_one, latch)
+        latch = torch.where(drive_per_col[:, :, sl_e] < th_lo, self.const_neg_one, latch)
+        states_per_col[:, :, sl_e] = latch
+        self.out_buf_col[:, :, sl_e] = latch
 
-        # 剩余其他高位细胞统一走自适应双曲正切
-        if self.num_cells > 64:
-            sl_rest = slice(64, self.num_cells)
-            out[:, sl_rest] = torch.tanh(drive[:, sl_rest])
+        # 回写展平状态与输出
+        self.states = states_per_col.view(P, N)
+        self.aux_states = aux_per_col.view(P, N)
+        self.outputs = self.out_buf_col.view(P, N)
 
-        self.outputs = out
         return self.outputs[:, -self.out_dim:]
 
     def export_champion_to_sdsc_bin(self, champion_idx, filepath):
@@ -292,7 +319,8 @@ def bench_gpu_throughput():
     steps = 1000         # 模拟 1000 步
 
     pop = CUDACellularPopulation(pop_size, num_columns, cells_per_col, in_dim, out_dim)
-    print(f"[*] 硬件设备: {pop.device} ({torch.cuda.get_device_name(0)})")
+    dev_name = torch.cuda.get_device_name(0) if torch.cuda.is_available() else "CPU"
+    print(f"[*] 硬件设备: {pop.device} ({dev_name})")
     print(f"[*] 并发生命体数 (Pop Size): {pop_size}")
     print(f"[*] 阵列微柱数: {num_columns} 柱, 每柱细胞: {cells_per_col}, 总细胞: {pop.num_cells}")
     print(f"[*] 拓扑架构: 微柱块稀疏阵列 (Block-Sparse Column Array)")

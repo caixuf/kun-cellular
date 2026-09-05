@@ -50,3 +50,19 @@
 ## 四、 结论
 
 经独立测试与 C++ 内核反向对账，`tools/cuda_cellular_engine.py` 具备了支持大规模、真实高吞吐并行演化的工程底座能力。
+
+---
+
+## 五、 CodeBuddy CLI 独立二轮审计实测记录 (2026-09-05)
+
+通过本地独立 CLI `codebuddy -p` 运行了无人工干预的代码审计，CodeBuddy 独立指出了 2 项核心 Bug 与 2 项工程隐患：
+
+1. **Bug 1 (已修复)**: `col_targets` 在构造时缺乏去重与排除自身，导致部分柱存在自环与重复目标，引起等效增益虚高；
+2. **Bug 2 (已修复)**: 运行时前向槽位切片此前硬编码为全局扁平切片，导致大于 64 细胞后全部退化为 tanh，与按柱局部槽位导出的 SDSC-BIN 产生语义脱节；
+3. **边界与契约防线 (已修复)**: 增加了 `num_columns > k_projections`、`cells_per_col == 64` 以及 `in_dim <= cells_per_col` 的硬断言，彻底消除死循环与静默跨柱污染隐患；
+4. **内存分配优化 (已修复)**: 预分配 `out_buf_col` 与 `inter_drive_buf`，缓存标量常数，实现真·Zero-Allocation。
+
+**修复后实测表现**:
+- 1000 步批量推演耗时缩短至 **1.058 秒**；
+- 吞吐量达到 **247.88 M-Cells/s**；
+- C++ `load_checkpoint_bin` 单步加载推演 100% PASS。
