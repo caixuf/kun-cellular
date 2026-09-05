@@ -69,13 +69,24 @@ def check_checkpoint_binary_discipline() -> list[str]:
             errors.append(f"生命体 {l_id} 检查点文件不存在: {ckpt_path}")
             continue
 
-        if not ckpt_path.name.endswith(".bin"):
-            errors.append(f"生命体 {l_id} 检查点不是二进制 .bin 文件: {ckpt_path.name} (违反 SDSC-BIN v2 宪章)")
+        if not (ckpt_path.name.endswith(".bin") or ckpt_path.name.endswith(".pt")):
+            errors.append(f"生命体 {l_id} 检查点不是二进制 (.bin/.pt) 文件: {ckpt_path.name} (违反二进制检查点宪章)")
             continue
             
         checked_files.add(ckpt_path)
 
-        # 检查二进制头
+        if ckpt_path.name.endswith(".pt"):
+            # 检查 GPU 原生张量检查点
+            try:
+                import torch
+                pt_hdr = torch.load(ckpt_path, map_location="cpu", mmap=True)
+                if not ("n_cells" in pt_hdr or "state" in pt_hdr):
+                    errors.append(f"检查点 {ckpt_path.name} 缺少细胞规模张量定义")
+            except Exception as e:
+                errors.append(f"检查点 {ckpt_path.name} 读取异常: {e}")
+            continue
+
+        # 检查二进制头 (SDSC-BIN v2)
         try:
             with open(ckpt_path, "rb") as bf:
                 hdr = bf.read(72)

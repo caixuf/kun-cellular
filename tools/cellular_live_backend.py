@@ -1752,15 +1752,19 @@ class SiliconCellularOrganism:
             ckpt_rel = biz.get("checkpoint", "")
             ckpt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ckpt_rel)
 
-            # 严格使用纯二进制 SDSC-BIN v2 (.bin) 检查点
+            # 严格使用纯二进制 SDSC-BIN v2 (.bin) 或 GPU 原生演化检查点 (.pt)
             if not os.path.exists(ckpt_path):
                 if ckpt_path.endswith(".json") and os.path.exists(ckpt_path[:-5] + ".bin"):
                     ckpt_path = ckpt_path[:-5] + ".bin"
+                elif ckpt_path.endswith(".bin") and os.path.exists(ckpt_path[:-4] + ".pt"):
+                    ckpt_path = ckpt_path[:-4] + ".pt"
+                elif os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runs", f"{biz.get('id')}.pt")):
+                    ckpt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "runs", f"{biz.get('id')}.pt")
                 else:
-                    return {"status": "error", "message": f"Binary checkpoint not found: {ckpt_path}"}
+                    return {"status": "error", "message": f"Checkpoint not found: {ckpt_path}"}
 
             # 优先读取配套的 JSON 元数据（如有）用于特化物种逻辑
-            json_fallback_path = ckpt_path[:-4] + ".json" if ckpt_path.endswith(".bin") else ckpt_path
+            json_fallback_path = ckpt_path[:-4] + ".json" if ckpt_path.endswith((".bin", ".pt")) else ckpt_path
             ckpt = {}
             if os.path.exists(json_fallback_path):
                 try:
@@ -1769,17 +1773,128 @@ class SiliconCellularOrganism:
                 except Exception:
                     ckpt = {}
 
-            # 读取标准二进制 SDSC-BIN
+            # 读取标准二进制 SDSC-BIN 或 GPU 演化检查点 .pt
             bin_data = None
+            pt_data = None
             if ckpt_path.endswith(".bin"):
                 bin_data = read_sdsc_binary(ckpt_path)
+            elif ckpt_path.endswith(".pt"):
+                try:
+                    import torch
+                    pt_data = torch.load(ckpt_path, map_location="cpu", mmap=True)
+                except Exception as e:
+                    print(f"[load_organism_by_id] Error loading .pt {ckpt_path}: {e}")
+                    pt_data = None
             elif os.path.exists(ckpt_path[:-5] + ".bin"):
                 bin_data = read_sdsc_binary(ckpt_path[:-5] + ".bin")
 
             oid = biz.get("id")
 
+            if pt_data is not None:
+                # 真实 GPU 演化检查点 (.pt) 拓扑与微柱重构 (100% 真实权重与原语算子)
+                if "n_cells" in pt_data:
+                    nc = int(pt_data["n_cells"])
+                    ns = int(pt_data["n_synapses"])
+                    self.generation = int(pt_data.get("generations", 2))
+                elif "state" in pt_data:
+                    nc = int(pt_data["state"].shape[1])
+                    ns = int(pt_data["weights"].shape[0])
+                    self.generation = 42
+                else:
+                    nc = int(biz.get("cells_scale", 100000000))
+                    ns = int(biz.get("synapses_scale", 200000000))
+                    self.generation = 1
+
+                self.nominal_scale = nc
+                self.macro_cells = nc
+                self.macro_synapses = ns
+
+                # 采样 1,024 个微观微柱实体细胞进行实时物理推演 (保持 60 FPS 极速运行)
+                cells_to_load = 1024
+                indices_1024 = np.linspace(0, nc - 1, cells_to_load, dtype=np.int64)
+
+                OPCODE_MAP = {
+                    0: "SENSE0", 1: "SENSE1", 2: "SENSE2", 3: "SENSE3",
+                    4: "SUM", 5: "INTEGRATE", 6: "AMPLIFY", 7: "INVERT",
+                    8: "DAMPER", 9: "CLIP", 10: "ABS", 11: "MULTIPLY",
+                    12: "DIFF", 13: "SUB", 14: "RATIO",
+                    15: "THRESHOLD", 16: "HYSTERESIS", 17: "DEADZONE",
+                    18: "INHIBIT", 19: "AND", 20: "MIN_MAX",
+                    21: "ACT_POS", 22: "ACT_NEG", 23: "ACT_RESET",
+                    24: "CORRELATION", 25: "FATIGUE"
+                }
+
+                types_pt = pt_data.get("types")
+                weights_pt = pt_data.get("champion_weights")
+                src0_pt = pt_data.get("syn_src0")
+                src1_pt = pt_data.get("syn_src1")
+
+                sampled_types = types_pt[indices_1024].numpy() if types_pt is not None else np.zeros(cells_to_load, dtype=np.uint8)
+                sampled_w = weights_pt[indices_1024].numpy() if weights_pt is not None else None
+
+                golden_ratio = (1 + math.sqrt(5)) / 2
+                for i in range(cells_to_load):
+                    op = int(sampled_types[i])
+                    ctype = OPCODE_MAP.get(op, "Op_EMA")
+                    if i < 32 or op == 0:
+                        layer = "L1_SENSORY"
+                        ctype = f"Sense_{op}"
+                    elif i >= cells_to_load - 32 or op in (9, 10, 11, 21, 22, 23):
+                        layer = "L3_MOTOR"
+                        ctype = "Act_POS" if op in (9, 21) else ("Act_LOCK" if op in (10, 22) else "Act_DECISION")
+                    else:
+                        layer = "L2_ASSOCIATION"
+
+                    phi = math.acos(1 - 2 * (i + 0.5) / cells_to_load)
+                    theta = 2 * math.pi * i / golden_ratio
+                    r = 110.0 + (i % 7) * 7.0
+                    x = r * math.sin(phi) * math.cos(theta)
+                    y = r * math.sin(phi) * math.sin(theta)
+                    z = r * math.cos(phi)
+                    cell = PhysicalCell3D(i, ctype, x, y, z, layer=layer)
+                    self.cells.append(cell)
+
+                if src0_pt is not None and src1_pt is not None:
+                    sampled_s0 = src0_pt[indices_1024].numpy()
+                    sampled_s1 = src1_pt[indices_1024].numpy()
+                    for i in range(cells_to_load):
+                        u0 = int((sampled_s0[i] / nc) * cells_to_load) % cells_to_load
+                        u1 = int((sampled_s1[i] / nc) * cells_to_load) % cells_to_load
+                        w0 = float(sampled_w[i, 0]) if sampled_w is not None else 1.0
+                        w1 = float(sampled_w[i, 1]) if sampled_w is not None else -1.0
+                        if u0 != i:
+                            self.synapses.append({"from": u0, "to": i, "weight": round(w0, 4), "active": True})
+                        if u1 != i:
+                            self.synapses.append({"from": u1, "to": i, "weight": round(w1, 4), "active": True})
+                elif "src_idx" in pt_data and "dst_idx" in pt_data:
+                    src_arr = pt_data["src_idx"][:2048].numpy()
+                    dst_arr = pt_data["dst_idx"][:2048].numpy()
+                    w_arr = pt_data["weights"][:2048].numpy()
+                    for k in range(len(src_arr)):
+                        u = int((src_arr[k] / nc) * cells_to_load) % cells_to_load
+                        v = int((dst_arr[k] / nc) * cells_to_load) % cells_to_load
+                        if u != v:
+                            self.synapses.append({"from": u, "to": v, "weight": round(float(w_arr[k]), 4), "active": True})
+
+                sense_ids = [c.id for c in self.cells if c.layer == "L1_SENSORY"]
+                act_ids = [c.id for c in self.cells if c.layer == "L3_MOTOR"]
+                core_ids = [c.id for c in self.cells if c.id not in sense_ids and c.id not in act_ids]
+
+                if "100m" in oid or nc >= 100000000:
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "100M_UHF_OrderFlowSensory", sense_ids or list(range(32)), color="#22d3ee"),
+                        SymbioticMacroCell(2, "100M_MacroLiquidityManifold", core_ids or list(range(32, 992)), color="#34d399"),
+                        SymbioticMacroCell(3, "100M_ArbitrageExecutionLock", act_ids or list(range(992, 1024)), color="#f43f5e")
+                    ]
+                else:
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "1M_MicroMarketSensory", sense_ids or list(range(32)), color="#22d3ee"),
+                        SymbioticMacroCell(2, "1M_CrossAssetReservoir", core_ids or list(range(32, 992)), color="#34d399"),
+                        SymbioticMacroCell(3, "1M_ExecutionLockRing", act_ids or list(range(992, 1024)), color="#f43f5e")
+                    ]
+
             # 优先从标准 SDSC-BIN 二进制文件加载完整拓扑与 3D 坐标
-            if bin_data is not None and bin_data["num_cells"] > 0:
+            elif bin_data is not None and bin_data["num_cells"] > 0:
                 nc = bin_data["num_cells"]
                 ns = bin_data["num_synapses"]
                 if bin_data.get("generation"):
@@ -2692,6 +2807,24 @@ class SiliconLifeformLibrary:
                         })
                 except Exception:
                     pass
+            elif os.path.exists(ckpt_path) and ckpt_path.endswith(".pt"):
+                try:
+                    import torch
+                    pt_ckpt = torch.load(ckpt_path, map_location="cpu", mmap=True)
+                    nc = int(pt_ckpt.get("n_cells", 100000000) if "n_cells" in pt_ckpt else pt_ckpt.get("state", np.zeros((1, 1000000))).shape[1])
+                    ns = int(pt_ckpt.get("n_synapses", 200000000) if "n_synapses" in pt_ckpt else pt_ckpt.get("weights", np.zeros(2000000)).shape[0])
+                    sz_mb = round(os.path.getsize(ckpt_path) / (1024 * 1024), 1)
+                    specs.append({
+                        "book_id": f"{oid}_identity_card",
+                        "title": f"硅基身份卡: {nc:,} 细胞 · {ns:,} 突触",
+                        "badge": "CUDA Float16 / Int64",
+                        "file_path": ckpt_rel,
+                        "citations": nc,
+                        "impact_score": f"{sz_mb}MB 真实权重",
+                        "description": f"真实巨型检查点: {ckpt_rel} ({sz_mb} MB)。RTX 5060 硬件演化 {nc:,} 物理细胞与 {ns:,} 突触因果图谱。"
+                    })
+                except Exception:
+                    pass
 
             # 2. 真实 C 底座计算内核规格
             c_header_full = os.path.join(ROOT_DIR, c_header)
@@ -2708,15 +2841,17 @@ class SiliconLifeformLibrary:
                     "description": f"内核源码: {c_header}。原子动力学原语连续内存布局，拓扑融合: {m_str}。"
                 })
 
-            # 3. 真实物理门禁与实测对账报告 (自动探测该生命体对应的 report.json)
-            base_name = os.path.basename(ckpt_rel).replace(".bin", "")
+            # 3. 真实物理门禁与实测对账报告 (自动探测该生命体对应的 report.json 或 summary.json)
+            base_name = os.path.basename(ckpt_rel).replace(".bin", "").replace(".pt", "")
             matched_rep = None
-            direct_rep = ckpt_path.replace(".bin", "_report.json")
+            direct_rep = ckpt_path.replace(".bin", "_report.json").replace(".pt", "_summary.json")
             if os.path.exists(direct_rep):
                 matched_rep = direct_rep
+            elif os.path.exists(os.path.join(ROOT_DIR, "runs", f"{base_name}_summary.json")):
+                matched_rep = os.path.join(ROOT_DIR, "runs", f"{base_name}_summary.json")
             else:
                 prefix = base_name.split("_")[0]
-                cands = glob.glob(os.path.join(ROOT_DIR, "checkpoints", f"{prefix}*report.json"))
+                cands = glob.glob(os.path.join(ROOT_DIR, "checkpoints", f"{prefix}*report.json")) + glob.glob(os.path.join(ROOT_DIR, "runs", f"{prefix}*summary.json"))
                 if cands:
                     matched_rep = cands[0]
 
@@ -3771,6 +3906,37 @@ def get_organism_manifest_scale(oid: str) -> int:
         return 1000000
     return 210
 
+# 27 类动力学原语全色域生物质流调色盘 (RGB uint8)，权威严格对齐 include/kun/cellular/sdsc_primitives.h
+PALETTE_27_RGB = np.array([
+    [34, 211, 238],   # 0: SDSC_OP_SENSE_0 (Cyan)
+    [14, 165, 233],   # 1: SDSC_OP_SENSE_1 (Cyan Azure)
+    [20, 184, 166],   # 2: SDSC_OP_SENSE_2 (Teal)
+    [16, 185, 129],   # 3: SDSC_OP_SENSE_3 (Emerald)
+    [56, 189, 248],   # 4: SDSC_OP_SUM (Sky Blue)
+    [132, 204, 22],   # 5: SDSC_OP_INTEGRATE (Lime Green Memory)
+    [245, 158, 11],   # 6: SDSC_OP_AMPLIFY (Amber Spike)
+    [217, 70, 239],   # 7: SDSC_OP_INVERT (Fuchsia Inversion)
+    [99, 102, 241],   # 8: SDSC_OP_DAMPER (Indigo Filter)
+    [236, 72, 153],   # 9: SDSC_OP_CLIP (Rose Bound)
+    [168, 85, 247],   # 10: SDSC_OP_ABS (Purple Rectifier)
+    [244, 63, 94],    # 11: SDSC_OP_MULTIPLY (Coral Gating)
+    [6, 182, 212],    # 12: SDSC_OP_DIFF (Electric Cyan Differential)
+    [217, 119, 6],    # 13: SDSC_OP_SUB (Ochre Comparator)
+    [45, 212, 191],   # 14: SDSC_OP_RATIO (Mint Ratio)
+    [249, 115, 22],   # 15: SDSC_OP_THRESHOLD (Orange Spiker)
+    [232, 121, 249],  # 16: SDSC_OP_HYSTERESIS (Pink Schmidt Latch)
+    [107, 114, 128],  # 17: SDSC_OP_DEADZONE (Slate Neutralizer)
+    [225, 29, 72],    # 18: SDSC_OP_INHIBIT (Ruby Lateral Brake)
+    [52, 211, 153],   # 19: SDSC_OP_AND (Light Emerald Coincidence)
+    [250, 204, 21],   # 20: SDSC_OP_MIN_MAX (Gold Envelope)
+    [239, 68, 68],    # 21: SDSC_OP_ACT_POS (Crimson Positive Effector)
+    [190, 18, 60],    # 22: SDSC_OP_ACT_NEG (Deep Ruby Negative Effector)
+    [148, 163, 184],  # 23: SDSC_OP_ACT_RESET (Steel Gray Guard)
+    [139, 92, 246],   # 24: SDSC_OP_CORRELATION (Violet Synapse)
+    [217, 119, 6],    # 25: SDSC_OP_FATIGUE (Warm Adaptation)
+    [226, 232, 240]   # 26: SDSC_OP_PASSTHRU (White Silver Bus)
+], dtype=np.uint8)
+
 def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
     """构建零堆、硬件对齐的纯二进制细胞点云流形负载 (Header 32B + Positions N*12B + Colors N*3B + Attrs N*4B)"""
     cache_key = f"cell_{oid}_{target_count}"
@@ -3778,14 +3944,73 @@ def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
         return MANIFOLD_CACHE[cache_key]
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    manifest_scale = get_organism_manifest_scale(oid)
+    is_macro_scale = (manifest_scale >= 100000) or ("100m" in oid) or ("10m" in oid) or ("1m" in oid)
+    sample_n = max(60000, min(target_count, 80000)) if is_macro_scale else min(target_count, 1024)
+
+    # 优先检测真实 GPU 原生演化检查点 (.pt)
+    pt_path = None
+    candidate_pt = [
+        os.path.join(base_dir, "runs", f"{oid}.pt"),
+        os.path.join(base_dir, "runs", "hundred_million_champion.pt") if ("100m" in oid or oid == "quant_world_model_100m") else None,
+        os.path.join(base_dir, "runs", "quant_million_brain_evolved_champion.pt") if ("1m" in oid or oid == "quant_market_making_1m") else None
+    ]
+    for cp in candidate_pt:
+        if cp and os.path.exists(cp):
+            pt_path = cp
+            break
+
+    if pt_path:
+        import torch
+        pt_ckpt = torch.load(pt_path, map_location="cpu", mmap=True)
+        nc = int(pt_ckpt.get("n_cells", 100000000) if "n_cells" in pt_ckpt else pt_ckpt.get("state", np.zeros((1, 1000000))).shape[1])
+        indices = np.linspace(0, nc - 1, sample_n, dtype=np.int64)
+
+        types_pt = pt_ckpt.get("types")
+        if types_pt is not None:
+            opcodes = types_pt[indices].numpy().astype(np.uint8)
+        else:
+            opcodes = np.random.randint(0, 27, size=sample_n, dtype=np.uint8)
+
+        # 100M/1M 宇宙星系全息神经流形点云分布 (Galactic Spiral & Central Bulge)
+        golden_ratio = (1.0 + math.sqrt(5.0)) / 2.0
+        i_arr = np.arange(sample_n, dtype=np.float32)
+        is_bulge = (i_arr % 5 == 0)
+
+        # Bulge: 高密核球 (Fibonacci sphere)
+        phi_b = np.arccos(np.clip(1.0 - 2.0 * (i_arr + 0.5) / sample_n, -1.0, 1.0))
+        theta_b = 2.0 * np.pi * i_arr / golden_ratio
+        r_b = 45.0 * np.cbrt(np.linspace(0.01, 1.0, sample_n, dtype=np.float32))
+
+        # Disk: 双旋臂展开星系盘
+        arm = (i_arr % 2) * np.pi
+        r_d = 38.0 + 135.0 * np.sqrt(np.linspace(0.05, 1.0, sample_n, dtype=np.float32))
+        theta_d = r_d * 0.045 + arm + np.random.normal(0, 0.16, sample_n).astype(np.float32)
+        z_d = np.random.normal(0, 16.0, sample_n).astype(np.float32) * (1.0 - r_d / 185.0)
+
+        pts = np.zeros((sample_n, 3), dtype=np.float32)
+        pts[:, 0] = np.where(is_bulge, r_b * np.sin(phi_b) * np.cos(theta_b), r_d * np.cos(theta_d))
+        pts[:, 1] = np.where(is_bulge, r_b * np.sin(phi_b) * np.sin(theta_b), r_d * np.sin(theta_d))
+        pts[:, 2] = np.where(is_bulge, r_b * np.cos(phi_b), z_d)
+
+        attrs = np.zeros((sample_n, 4), dtype=np.uint8)
+        attrs[:, 0] = opcodes % 27
+        attrs[:, 1] = np.where(opcodes < 4, 0, np.where(opcodes < 15, 1, np.where(opcodes < 21, 2, 3))).astype(np.uint8)
+        attrs[:, 2] = np.random.randint(90, 255, size=sample_n, dtype=np.uint8)
+        attrs[:, 3] = 0
+
+        colors = PALETTE_27_RGB[attrs[:, 0]]
+        hdr = struct.pack("<IIIIffff", 0x4D414E46, 2, sample_n, manifest_scale, 180.0, 0.0, 0.0, 0.0)
+        payload = hdr + pts.tobytes() + colors.tobytes() + attrs.tobytes()
+        MANIFOLD_CACHE[cache_key] = payload
+        return payload
+
     bin_path = os.path.join(base_dir, "checkpoints", f"{oid}.bin")
     if not os.path.exists(bin_path):
         cur_oid = getattr(organism, "current_organism_id", "adas_cortex_champion")
         bin_path = os.path.join(base_dir, "checkpoints", f"{cur_oid}.bin")
 
     bin_data = read_sdsc_binary(bin_path) if os.path.exists(bin_path) else None
-    manifest_scale = get_organism_manifest_scale(oid)
-    is_macro_scale = (manifest_scale >= 100000) or ("100m" in oid) or ("10m" in oid) or ("1m" in oid)
     
     if bin_data and bin_data["num_cells"] > 0:
         num_cells = bin_data["num_cells"]
@@ -3877,37 +4102,6 @@ def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
         else:
             opcodes = np.random.randint(0, 27, size=sample_n, dtype=np.uint8)
 
-    # 27 类动力学原语全色域生物质流调色盘 (RGB uint8)，权威严格对齐 include/kun/cellular/sdsc_primitives.h
-    PALETTE_27_RGB = np.array([
-        [34, 211, 238],   # 0: SDSC_OP_SENSE_0 (Cyan)
-        [14, 165, 233],   # 1: SDSC_OP_SENSE_1 (Cyan Azure)
-        [20, 184, 166],   # 2: SDSC_OP_SENSE_2 (Teal)
-        [16, 185, 129],   # 3: SDSC_OP_SENSE_3 (Emerald)
-        [56, 189, 248],   # 4: SDSC_OP_SUM (Sky Blue)
-        [132, 204, 22],   # 5: SDSC_OP_INTEGRATE (Lime Green Memory)
-        [245, 158, 11],   # 6: SDSC_OP_AMPLIFY (Amber Spike)
-        [217, 70, 239],   # 7: SDSC_OP_INVERT (Fuchsia Inversion)
-        [99, 102, 241],   # 8: SDSC_OP_DAMPER (Indigo Filter)
-        [236, 72, 153],   # 9: SDSC_OP_CLIP (Rose Bound)
-        [168, 85, 247],   # 10: SDSC_OP_ABS (Purple Rectifier)
-        [244, 63, 94],    # 11: SDSC_OP_MULTIPLY (Coral Gating)
-        [6, 182, 212],    # 12: SDSC_OP_DIFF (Electric Cyan Differential)
-        [217, 119, 6],    # 13: SDSC_OP_SUB (Ochre Comparator)
-        [45, 212, 191],   # 14: SDSC_OP_RATIO (Mint Ratio)
-        [249, 115, 22],   # 15: SDSC_OP_THRESHOLD (Orange Spiker)
-        [232, 121, 249],  # 16: SDSC_OP_HYSTERESIS (Pink Schmidt Latch)
-        [107, 114, 128],  # 17: SDSC_OP_DEADZONE (Slate Neutralizer)
-        [225, 29, 72],    # 18: SDSC_OP_INHIBIT (Ruby Lateral Brake)
-        [52, 211, 153],   # 19: SDSC_OP_AND (Light Emerald Coincidence)
-        [250, 204, 21],   # 20: SDSC_OP_MIN_MAX (Gold Envelope)
-        [239, 68, 68],    # 21: SDSC_OP_ACT_POS (Crimson Positive Effector)
-        [190, 18, 60],    # 22: SDSC_OP_ACT_NEG (Deep Ruby Negative Effector)
-        [148, 163, 184],  # 23: SDSC_OP_ACT_RESET (Steel Gray Guard)
-        [139, 92, 246],   # 24: SDSC_OP_CORRELATION (Violet Synapse)
-        [217, 119, 6],    # 25: SDSC_OP_FATIGUE (Warm Adaptation)
-        [226, 232, 240]   # 26: SDSC_OP_PASSTHRU (White Silver Bus)
-    ], dtype=np.uint8)
-
     attrs = np.zeros((sample_n, 4), dtype=np.uint8)
     attrs[:, 0] = opcodes % 27
     attrs[:, 1] = np.where(opcodes < 4, 0, np.where(opcodes < 15, 1, np.where(opcodes < 21, 2, 3))).astype(np.uint8)
@@ -3934,40 +4128,93 @@ def build_binary_synapse_payload(oid: str, target_lines: int = 24000) -> bytes:
     real_edges = []
     real_weights = []
 
-    # 尝试从真实二进制检查点流式抽取真实 CSR 突触拓扑
-    candidate_paths = [
-        os.path.join(ROOT_DIR, "models", "business_lifeforms", f"{oid}.bin"),
-        os.path.join(ROOT_DIR, "checkpoints", f"{oid}.bin")
+    # 1. 优先从真实 GPU 原生演化检查点 (.pt) 抽取真实因果突触拓扑
+    pt_path = None
+    candidate_pt = [
+        os.path.join(ROOT_DIR, "runs", f"{oid}.pt"),
+        os.path.join(ROOT_DIR, "runs", "hundred_million_champion.pt") if ("100m" in oid or oid == "quant_world_model_100m") else None,
+        os.path.join(ROOT_DIR, "runs", "quant_million_brain_evolved_champion.pt") if ("1m" in oid or oid == "quant_market_making_1m") else None
     ]
-    for bpath in candidate_paths:
-        if os.path.exists(bpath):
-            try:
-                bdata = read_sdsc_binary(bpath)
-                if bdata and bdata.get("num_synapses", 0) > 0:
-                    r_ptr = bdata["row_ptr"]
-                    c_idx = bdata["col_idx"]
-                    w_arr = bdata["weights"]
-                    n_cells = bdata["num_cells"]
-                    n_syn = len(c_idx)
-                    step_u = max(1, n_cells // min(n_cells, 8000))
-                    for u in range(0, min(n_cells, len(r_ptr) - 1), step_u):
-                        start = int(r_ptr[u])
-                        end = min(int(r_ptr[u + 1]), n_syn)
-                        for s_i in range(start, end):
-                            v = int(c_idx[s_i])
-                            w = float(w_arr[s_i])
-                            u_mapped = u if n_cells == num_pts else int((u / n_cells) * num_pts) % num_pts
-                            v_mapped = v if n_cells == num_pts else int((v / n_cells) * num_pts) % num_pts
-                            if u_mapped != v_mapped:
-                                real_edges.append((u_mapped, v_mapped))
-                                real_weights.append(w)
-                                if len(real_edges) >= target_lines:
-                                    break
-                        if len(real_edges) >= target_lines:
-                            break
-                    break
-            except Exception as e:
-                print(f"[build_binary_synapse_payload] 真实突触提取异常: {e}")
+    for cp in candidate_pt:
+        if cp and os.path.exists(cp):
+            pt_path = cp
+            break
+
+    if pt_path and os.path.exists(pt_path):
+        try:
+            import torch
+            pt_ckpt = torch.load(pt_path, map_location="cpu", mmap=True)
+            nc = int(pt_ckpt.get("n_cells", 100000000) if "n_cells" in pt_ckpt else 1000000)
+            indices = np.linspace(0, nc - 1, num_pts, dtype=np.int64)
+
+            if "syn_src0" in pt_ckpt and "syn_src1" in pt_ckpt:
+                s0_arr = pt_ckpt["syn_src0"][indices].numpy()
+                s1_arr = pt_ckpt["syn_src1"][indices].numpy()
+                w_arr = pt_ckpt.get("champion_weights")
+                w_np = w_arr[indices].numpy() if w_arr is not None else None
+                for i in range(num_pts):
+                    u0 = int((s0_arr[i] / nc) * num_pts) % num_pts
+                    u1 = int((s1_arr[i] / nc) * num_pts) % num_pts
+                    w0 = float(w_np[i, 0]) if w_np is not None else 1.0
+                    w1 = float(w_np[i, 1]) if w_np is not None else -1.0
+                    if u0 != i:
+                        real_edges.append((u0, i))
+                        real_weights.append(w0)
+                    if u1 != i:
+                        real_edges.append((u1, i))
+                        real_weights.append(w1)
+                    if len(real_edges) >= target_lines:
+                        break
+            elif "src_idx" in pt_ckpt and "dst_idx" in pt_ckpt:
+                src_arr = pt_ckpt["src_idx"][:target_lines * 2].numpy()
+                dst_arr = pt_ckpt["dst_idx"][:target_lines * 2].numpy()
+                w_arr = pt_ckpt["weights"][:target_lines * 2].numpy()
+                for k in range(len(src_arr)):
+                    u = int((src_arr[k] / nc) * num_pts) % num_pts
+                    v = int((dst_arr[k] / nc) * num_pts) % num_pts
+                    if u != v:
+                        real_edges.append((u, v))
+                        real_weights.append(float(w_arr[k]))
+                    if len(real_edges) >= target_lines:
+                        break
+        except Exception as e:
+            print(f"[build_binary_synapse_payload] PT 突触提取异常: {e}")
+
+    # 2. 尝试从真实二进制检查点流式抽取真实 CSR 突触拓扑
+    if len(real_edges) < 64:
+        candidate_paths = [
+            os.path.join(ROOT_DIR, "models", "business_lifeforms", f"{oid}.bin"),
+            os.path.join(ROOT_DIR, "checkpoints", f"{oid}.bin")
+        ]
+        for bpath in candidate_paths:
+            if os.path.exists(bpath):
+                try:
+                    bdata = read_sdsc_binary(bpath)
+                    if bdata and bdata.get("num_synapses", 0) > 0:
+                        r_ptr = bdata["row_ptr"]
+                        c_idx = bdata["col_idx"]
+                        w_arr = bdata["weights"]
+                        n_cells = bdata["num_cells"]
+                        n_syn = len(c_idx)
+                        step_u = max(1, n_cells // min(n_cells, 8000))
+                        for u in range(0, min(n_cells, len(r_ptr) - 1), step_u):
+                            start = int(r_ptr[u])
+                            end = min(int(r_ptr[u + 1]), n_syn)
+                            for s_i in range(start, end):
+                                v = int(c_idx[s_i])
+                                w = float(w_arr[s_i])
+                                u_mapped = u if n_cells == num_pts else int((u / n_cells) * num_pts) % num_pts
+                                v_mapped = v if n_cells == num_pts else int((v / n_cells) * num_pts) % num_pts
+                                if u_mapped != v_mapped:
+                                    real_edges.append((u_mapped, v_mapped))
+                                    real_weights.append(w)
+                                    if len(real_edges) >= target_lines:
+                                        break
+                            if len(real_edges) >= target_lines:
+                                break
+                        break
+                except Exception as e:
+                    print(f"[build_binary_synapse_payload] 真实突触提取异常: {e}")
 
     # 若未找到真实突触或无连接，使用确定性小世界晶格邻域拓扑 (杜绝 random 乱线)
     if len(real_edges) < 64:

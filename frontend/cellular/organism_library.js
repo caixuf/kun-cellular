@@ -645,7 +645,7 @@ export async function pollLibrary() {
         if (presetDeck) {
           presetDeck.innerHTML = j.organisms.map(orgItem => {
             const shortName = (orgItem.name || "").split(' ')[0] || orgItem.name;
-            const cellTxt = orgItem.total_cells >= 10000 ? ((orgItem.total_cells / 10000).toFixed(0) + '万') : orgItem.total_cells;
+            const cellTxt = orgItem.total_cells >= 100000000 ? ((orgItem.total_cells / 100000000).toFixed(0) + '亿') : (orgItem.total_cells >= 10000 ? ((orgItem.total_cells / 10000).toFixed(0) + '万') : orgItem.total_cells);
             const isSel = orgItem.organism_id === currentSelectedOrgId;
             return `<button class="btn-ctrl ${isSel ? 'active' : ''}" style="${isSel ? 'border-color:var(--cyan);color:var(--cyan);font-weight:bold;' : ''}" onclick="selectOrganism('${orgItem.organism_id}', '${orgItem.name}')" title="${orgItem.name} (${orgItem.total_cells} 细胞 / ${orgItem.total_synapses} 突触)">
               ${shortName} (${cellTxt})
