@@ -49,17 +49,17 @@ graph TD
 
 ## 二、 全尺度真实计算生命体实证矩阵 (Zero-Mock Genuine Lifeforms)
 
-所有生命体均为**真实二进制权重 (.bin) 或 GPU 原生张量演化检查点 (.pt)**，坚决执行零虚构、零占位填充、100% 物理实证铁律：
+所有生命体均为**真实 SDSC-BIN v2 紧凑二进制权重 (.bin)**，坚决执行零虚构、零占位填充、100% 物理实证铁律：
 
 | 实体生命体名称 | 真实规模 (细胞 / 突触) | 硬件底座与检查点 | 核心动力学原语 | 样本外严格检验指标 (OOD / 实证表现) | 物理运行耗时与微架构 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **一亿细胞全息世界模型与金融超脑**<br>`quant_world_model_100m` | **100,000,000 细胞**<br>200,000,000 突触 | 单卡 RTX 5060 (8GB)<br>`runs/hundred_million_champion.pt` (2.4GB) | `INTEGRAL`, `DIFF`, `HYSTERESIS`, `CORRELATION`, `EMA`, `ACT_LOCK` | 100M 真实物理参数无填充，单代算力吞吐 61.3 MCells/s，显存驻留 2.45GB，历经 69.4s 演化收敛至适应度 6700.0 | GPU NVRTC 内核 97 μs<br>全图单步 14.8 ms (67.4 Hz) |
-| **百万细胞高频量化与多资产储层脑**<br>`quant_market_making_1m` | **1,000,000 细胞**<br>2,000,000 突触 | CUDA 张量基座<br>`runs/quant_million_brain_evolved_champion.pt` (59MB) | `DIFF`, `HYSTERESIS`, `DEADZONE`, `DAMPER`, `EMA` | 43 大宗商品品种 30 年跨周期样本外累计收益 **+148.83%**，年化 CAGR 8.93%，夏普比率稳健，胜率 49.8% | 显存驻留 59.1MB<br>L2 逐笔订单流穿透 |
+| **宏域感知全息世界模型**<br>`quant_world_model_100m` | **1,280 细胞**<br>1,920 突触 | SDSC-BIN v2 紧凑二进制<br>`checkpoints/quant_world_model_100m.bin` (157KB) | `Sense_MacroRegime`, `INTEGRAL`, `DIFF`, `HYSTERESIS`, `DEADZONE`, `EMA`, `DAMPER`, `AMPLIFY`, `INHIBIT` | 120 代演化收敛；64 维宏域感知输入 → 48 维冲击吸震效应元；L2 联想层 1,168 细胞（8 类动力学算子均布） | 三层 64→1168→48 感知-联想-运动拓扑<br>确定性零堆分配推理 |
+| **订单流高频量化微柱储层**<br>`quant_market_making_1m` | **320 细胞**<br>480 突触 | SDSC-BIN v2 紧凑二进制<br>`checkpoints/quant_market_making_1m.bin` (39KB) | `Sense_OrderFlow`, `EMA`, `DIFF`, `HYSTERESIS`, `DEADZONE`, `INTEGRAL`, `DAMPER`, `AMPLIFY`, `INHIBIT` | 50 代演化收敛；32 维订单流感知输入 → 24 维市场流动性效应元；L2 联想层 264 细胞 | 三层 32→264→24 感知-联想-运动拓扑<br>确定性零堆分配推理 |
 | **三十年商品期货 43 微柱皮层宏阵列**<br>`quant_master_champion` | **1,032 细胞**<br>1,634 突触 (含 258 跨柱长程抑制轴突) | SDSC-BIN v2 紧凑二进制<br>`checkpoints/quant_cortical_array_champion.bin` | `EMA`, `DIFF`, `HYSTERESIS`, `DEADZONE`, `SUM` | 43 大宗商品期货 30 年 5,252 次实证交易，样本外卡玛比率 1.042，累计净收益 **+29.8%**，夏普 0.415，跨越六道门禁 | 43 微柱全息侧向抑制阵列<br>解决单微柱样本外崩溃 |
 | **车规级具身智能驾驶 ASIL-D 皮层**<br>`adas_cortex_champion` | **210 细胞**<br>630 突触 | 纯 C11 自包含单头文件<br>`checkpoints/adas_cortex_champion.bin` | `DIFF`, `INTEGRAL`, `DAMPER`, `HYSTERESIS`, `DEADZONE`, `INHIBIT` | 16 大极限工况（直道/S弯/急弯/暴雨水滑）100% 满分通过，直道稳态 CTE **2.26 cm**，急弯超越 Stanley 基准 **1.2~1.5x** | **19.06 ns / 步**<br>52.47 M-Inf/s (0 malloc / 0 free) |
 | **斗地主国手级高维认知皮层博弈超脑**<br>`doudizhu_game_champion` | **1,024 细胞**<br>196,608 突触 (4大认知功能柱 + 7动作头) | SDSC-BIN v2 紧凑二进制<br>`checkpoints/doudizhu_game_champion.bin` (1.5MB) | `EMA`, `INTEGRATE`, `DIFF`, `HYSTERESIS`, `DEADZONE`, `DAMPER`, `INHIBIT` | 32 维全手牌/桌面/历史/博弈态势感知，四大认知微柱（贝叶斯记牌柱、牌型炸弹解算柱、节奏张力调控柱、反事实决断柱），样本外 OOD 盲测胜率 **82.5%** | 411.8 μs 单步决断<br>确定性 0 堆分配 (Zero-GC) |
-| **空间迷宫自主寻优脱困生命体**<br>`maze_navigation_champion` | **13 细胞**<br>18 突触 | 拓扑图同构防伪二进制<br>`checkpoints/maze_navigation_champion.bin` | `SENSE`, `HYSTERESIS`, `DEADZONE`, `ACT_RESET`, `ACT_POS` | 100 轮随机长程死胡同与封闭迷宫测试，**100% 成功逃逸，全程 0 死锁、0 碰撞** | 感觉-海马记忆-反打三段式动态反射弧 |
-| **连续相多相分子流体自适应阻尼器**<br>`fluid_damper_champion` | **40 细胞**<br>145 突触 | 多相流体力学生物圈<br>`checkpoints/fluid_damper_champion.bin` | `REC_LAT_DRIFT`, `DAMPER`, `HYSTERESIS`, `DIFF`, `ACT_LOCK` | 大气气相 (Aero 300N 湍流)、原始水生物圈 (Hydro 暴雨水滑 μ=0.35)、深空真空 (Vacuum) 3000 步极限动力学扰动 **100% 收敛** | 连续物理阻尼雕刻<br>杜绝高频水滑失稳 |
+| **空间迷宫自主寻优脱困生命体**<br>`maze_navigation_champion` | **20 细胞**<br>28 突触 | 拓扑图同构防伪二进制<br>`checkpoints/maze_navigation_champion.bin` | `SENSE`, `HYSTERESIS`, `DEADZONE`, `ACT_RESET`, `ACT_POS` | 100 轮随机长程死胡同与封闭迷宫测试，**100% 成功逃逸，全程 0 死锁、0 碰撞** | 感觉-海马记忆-反打三段式动态反射弧 |
+| **连续相多相分子流体自适应阻尼器**<br>`fluid_damper_champion` | **40 细胞**<br>86 突触 | 多相流体力学生物圈<br>`checkpoints/fluid_damper_champion.bin` | `REC_LAT_DRIFT`, `DAMPER`, `HYSTERESIS`, `DIFF`, `ACT_LOCK` | 大气气相 (Aero 300N 湍流)、原始水生物圈 (Hydro 暴雨水滑 μ=0.35)、深空真空 (Vacuum) 3000 步极限动力学扰动 **100% 收敛** | 连续物理阻尼雕刻<br>杜绝高频水滑失稳 |
 
 ---
 
@@ -192,14 +192,17 @@ kun-cellular/
 |-- frontend/                      # 3D 全息交互观测台
 |   |-- cellular.html              # 900 流体微粒、3D 放电管、三相流体切换、折叠工业坞
 |   `-- cellular/                  # 模块化渲染引擎 (LOD、流形着色器、通信锁)
-|-- checkpoints/                   # 纯二进制 SDSC-BIN 物理生命体检查点
+|-- checkpoints/                   # 纯二进制 SDSC-BIN v2 物理生命体检查点
 |   |-- adas_cortex_champion.bin   # 210-细胞 ASIL-D 驾驶皮层冠军
-|   |-- doudizhu_game_champion.bin # 9-细胞斗地主非完全信息博弈冠军
-|   |-- maze_navigation_champion.bin # 13-细胞空间迷宫自主脱困冠军
-|   `-- fluid_damper_champion.bin  # 40-细胞多相流体阻尼冠军
-|-- runs/                          # GPU 原生演化超脑张量检查点
-|   |-- hundred_million_champion.pt# 100M 细胞 / 200M 突触全息世界模型超脑 (2.4GB)
-|   `-- quant_million_brain_evolved_champion.pt # 1M 细胞 / 2M 突触期货量化脑 (59MB)
+|   |-- doudizhu_game_champion.bin # 1024-细胞斗地主非完全信息博弈冠军
+|   |-- maze_navigation_champion.bin # 20-细胞空间迷宫自主脱困冠军
+|   |-- fluid_damper_champion.bin  # 40-细胞多相流体阻尼冠军
+|   |-- quant_world_model_100m.bin # 1280-细胞 64 维宏域感知世界模型
+|   |-- quant_market_making_1m.bin # 320-细胞 32 维订单流储层
+|   `-- quant_cortical_array_champion.bin # 1032-细胞 43 微柱皮层宏阵列
+|-- runs/                          # 演化训练过程 JSON 报告与实测数据
+|   |-- adas_champion_vs_stanley_seed7.json # ADAS 冠军 vs Stanley 16 场景对比
+|   `-- adas_champion_vs_stanley_seeds1-10.json # 1~10 种子稳健性汇总
 |-- tools/                         # 演化工具链与验证套件
 |   |-- cellular_live_backend.py   # WebSocket 40Hz 遥测中枢与 RESTful API
 |   |-- train_doudizhu_champion.cpp# 斗地主非完全信息离散博弈原生演化器
