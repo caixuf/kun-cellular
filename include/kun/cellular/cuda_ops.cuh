@@ -308,4 +308,6 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
 }
 )";
 
+#include "cuda_ops_vjp.cuh"
+
 #endif /* KUN_CELLULAR_CUDA_OPS_CUH_ */

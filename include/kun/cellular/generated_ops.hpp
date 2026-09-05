@@ -13,6 +13,8 @@
 #include <string_view>
 #include <array>
 #include <algorithm>
+#include <cmath>
+#include "kun/cellular/sdsc_primitives.h"
 
 namespace kun {
 
@@ -223,7 +225,47 @@ inline bool is_valid_cell_type_code(uint8_t op) {
 }
 
 inline uint8_t cell_type_to_sdsc_opcode(CellType t) {
+    switch (t) {
+        case CellType::SENSE_RAW_INPUT_0: return 0;
+        case CellType::SENSE_RAW_INPUT_1: return 1;
+        case CellType::SENSE_RAW_INPUT_2: return 2;
+        case CellType::SENSE_RAW_INPUT_3: return 3;
+        case CellType::SENSE_CHANNEL:     return 0;
+        case CellType::OP_SUM:            return 4;  // SDSC_OP_SUM
+        case CellType::OP_INTEGRAL:       return 5;  // SDSC_OP_INTEGRAL
+        case CellType::OP_EMA:            return 8;  // SDSC_OP_DAMPER
+        case CellType::OP_ABS:            return 10; // SDSC_OP_ABS
+        case CellType::OP_MULTIPLY:       return 11; // SDSC_OP_MULTIPLY
+        case CellType::OP_DIFF:           return 12; // SDSC_OP_DIFF
+        case CellType::OP_SUB:            return 13; // SDSC_OP_SUB
+        case CellType::OP_RATIO:          return 14; // SDSC_OP_RATIO
+        case CellType::GATE_THRESHOLD:    return 15; // SDSC_OP_THRESHOLD
+        case CellType::GATE_HYSTERESIS:   return 16; // SDSC_OP_HYSTERESIS
+        case CellType::GATE_DEADZONE:     return 17; // SDSC_OP_DEADZONE
+        case CellType::GATE_INHIBIT:      return 18; // SDSC_OP_INHIBIT
+        case CellType::GATE_AND:          return 19; // SDSC_OP_AND
+        case CellType::GATE_MIN_MAX:      return 20; // SDSC_OP_MIN_MAX
+        case CellType::ACT_PRIMARY_POSITIVE: return 21; // SDSC_OP_ACT_POS
+        case CellType::ACT_PRIMARY_NEGATIVE: return 22; // SDSC_OP_ACT_NEG
+        case CellType::ACT_DEFENSIVE_RESET:  return 23; // SDSC_OP_ACT_RESET
+        case CellType::ACT_IMMUNE_BLOCK:     return 23; // SDSC_OP_ACT_RESET
+        case CellType::ACT_CHANNEL:          return 26; // PASSTHRU
+        case CellType::PREDICT_SENSE_0:      return 26; // PASSTHRU
+        case CellType::PREDICT_SENSE_1:      return 26; // PASSTHRU
+        case CellType::ASSOCIATION_HUB:      return 24; // SDSC_OP_CORRELATION
+        case CellType::OP_DELAY_N:           return 26; // PASSTHRU
+        case CellType::OP_OSCILLATOR:        return 26; // PASSTHRU
+        case CellType::OP_QUADRATIC:         return 26; // PASSTHRU
+        default: return 26; // SDSC_OP_PASSTHRU
+    }
+}
+
+inline uint8_t cell_type_to_serialization_code(CellType t) {
     return static_cast<uint8_t>(t);
+}
+
+inline CellType serialization_code_to_cell_type(uint8_t code) {
+    return static_cast<CellType>(code);
 }
 
 inline CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags = 0, uint32_t version = 3) {
@@ -232,7 +274,6 @@ inline CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags = 0, uint32_t
             return static_cast<CellType>(op);
         }
     }
-    // 兼容历史 v1/v2 检查点反序列化解码
     if (flags & 0x01) {
         if (op == 0) return CellType::SENSE_RAW_INPUT_0;
         if (op == 1) return CellType::SENSE_RAW_INPUT_1;
@@ -274,7 +315,21 @@ inline CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags = 0, uint32_t
     }
 }
 
-// 硬件原语静态反射元数据
+inline uint8_t cell_type_to_sdsc_eval_op(CellType t) {
+    return cell_type_to_sdsc_opcode(t);
+}
+
+// 硬件原语数值界与形式化证书约束
+struct PrimitiveBounds {
+    float state_min;
+    float state_max;
+    float out_min;
+    float out_max;
+    float param_g_min;
+    float param_g_max;
+};
+
+// 硬件原语静态反射元数据 (含可微性与直通梯度模式)
 struct PrimitiveMeta {
     uint8_t id;
     const char* name;
@@ -284,37 +339,180 @@ struct PrimitiveMeta {
     float default_p1;
     float default_p2;
     const char* lyapunov_bound;
+    bool differentiable;
+    const char* ste_gradient;
+    PrimitiveBounds bounds;
 };
 
 inline constexpr std::array<PrimitiveMeta, 27> SDSC_PRIMITIVES_META = {{
-    {0, "SDSC_OP_SENSE_0", "RECEPTOR", false, false, 1.0f, 0.0f, "[-inf, +inf]"},
-    {1, "SDSC_OP_SENSE_1", "RECEPTOR", false, false, 1.0f, 1.0f, "[-inf, +inf]"},
-    {2, "SDSC_OP_SENSE_2", "RECEPTOR", false, false, 1.0f, 2.0f, "[-inf, +inf]"},
-    {3, "SDSC_OP_SENSE_3", "RECEPTOR", false, false, 1.0f, 3.0f, "[-inf, +inf]"},
-    {4, "SDSC_OP_SUM", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {5, "SDSC_OP_INTEGRATE", "METABOLIC", true, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {6, "SDSC_OP_AMPLIFY", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {7, "SDSC_OP_INVERT", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {8, "SDSC_OP_DAMPER", "METABOLIC", true, false, 1.0f, 0.0f, "[-inf, +inf] (asymptotically bounded)"},
-    {9, "SDSC_OP_CLIP", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {10, "SDSC_OP_ABS", "METABOLIC", false, false, 1.0f, 0.0f, "[0.0, 1.0]"},
-    {11, "SDSC_OP_MULTIPLY", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {12, "SDSC_OP_DIFF", "METABOLIC", true, false, 1.0f, 0.0f, "[-inf, +inf]"},
-    {13, "SDSC_OP_SUB", "METABOLIC", true, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {14, "SDSC_OP_RATIO", "METABOLIC", true, false, 1.0f, 0.0f, "[-2.0, 2.0]"},
-    {15, "SDSC_OP_THRESHOLD", "GATING", false, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {16, "SDSC_OP_HYSTERESIS", "GATING", true, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {17, "SDSC_OP_DEADZONE", "GATING", false, false, 1.0f, 0.0f, "[-inf, +inf]"},
-    {18, "SDSC_OP_INHIBIT", "GATING", true, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {19, "SDSC_OP_AND", "GATING", true, false, 1.0f, 0.0f, "[0.0, 1.0]"},
-    {20, "SDSC_OP_MIN_MAX", "GATING", true, false, 1.0f, 0.0f, "[-inf, +inf]"},
-    {21, "SDSC_OP_ACT_POS", "EFFECTOR", false, false, 1.0f, 0.0f, "[0.0, 1.0]"},
-    {22, "SDSC_OP_ACT_NEG", "EFFECTOR", false, false, 1.0f, 0.0f, "[0.0, 1.0]"},
-    {23, "SDSC_OP_ACT_RESET", "EFFECTOR", false, false, 1.0f, 0.0f, "[-inf, +inf]"},
-    {24, "SDSC_OP_CORRELATION", "COGNITIVE", true, true, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {25, "SDSC_OP_FATIGUE", "COGNITIVE", true, false, 1.0f, 0.0f, "[-1.0, 1.0]"},
-    {26, "SDSC_OP_PASSTHRU", "PASSTHRU", false, false, 1.0f, 0.0f, "[-inf, +inf]"},
+    {0, "SDSC_OP_SENSE_0", "RECEPTOR", false, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {1, "SDSC_OP_SENSE_1", "RECEPTOR", false, false, 1.0f, 1.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {2, "SDSC_OP_SENSE_2", "RECEPTOR", false, false, 1.0f, 2.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {3, "SDSC_OP_SENSE_3", "RECEPTOR", false, false, 1.0f, 3.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {4, "SDSC_OP_SUM", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {5, "SDSC_OP_INTEGRATE", "METABOLIC", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-4.0f, 4.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {6, "SDSC_OP_AMPLIFY", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {7, "SDSC_OP_INVERT", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {8, "SDSC_OP_DAMPER", "METABOLIC", true, false, 1.0f, 0.0f, "[-inf, +inf] (asymptotically bounded)", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {9, "SDSC_OP_CLIP", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {10, "SDSC_OP_ABS", "METABOLIC", false, false, 1.0f, 0.0f, "[0.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, 0.0f, 1.0f, 0.0f, 4.0f}},
+    {11, "SDSC_OP_MULTIPLY", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {12, "SDSC_OP_DIFF", "METABOLIC", true, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {13, "SDSC_OP_SUB", "METABOLIC", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {14, "SDSC_OP_RATIO", "METABOLIC", true, false, 1.0f, 0.0f, "[-2.0, 2.0]", true, "none", {0.0f, 1000000000.0f, -2.0f, 2.0f, 0.0f, 4.0f}},
+    {15, "SDSC_OP_THRESHOLD", "GATING", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", false, "straight_through", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {16, "SDSC_OP_HYSTERESIS", "GATING", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", false, "straight_through", {-1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {17, "SDSC_OP_DEADZONE", "GATING", false, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {18, "SDSC_OP_INHIBIT", "GATING", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {0.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {19, "SDSC_OP_AND", "GATING", true, false, 1.0f, 0.0f, "[0.0, 1.0]", false, "straight_through", {-1000000000.0f, 1000000000.0f, 0.0f, 1.0f, 0.0f, 4.0f}},
+    {20, "SDSC_OP_MIN_MAX", "GATING", true, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {21, "SDSC_OP_ACT_POS", "EFFECTOR", false, false, 1.0f, 0.0f, "[0.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, 0.0f, 1.0f, 0.0f, 4.0f}},
+    {22, "SDSC_OP_ACT_NEG", "EFFECTOR", false, false, 1.0f, 0.0f, "[0.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, 0.0f, 1.0f, 0.0f, 4.0f}},
+    {23, "SDSC_OP_ACT_RESET", "EFFECTOR", false, false, 1.0f, 0.0f, "[-inf, +inf]", false, "identity", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {24, "SDSC_OP_CORRELATION", "COGNITIVE", true, true, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {25, "SDSC_OP_FATIGUE", "COGNITIVE", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {0.0f, 2.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {26, "SDSC_OP_PASSTHRU", "PASSTHRU", false, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
 }};
+
+inline constexpr bool is_primitive_differentiable(uint8_t op) {
+    if (op < SDSC_PRIMITIVES_META.size()) {
+        return SDSC_PRIMITIVES_META[op].differentiable;
+    }
+    return true;
+}
+
+inline constexpr const char* get_primitive_ste(uint8_t op) {
+    if (op < SDSC_PRIMITIVES_META.size()) {
+        return SDSC_PRIMITIVES_META[op].ste_gradient;
+    }
+    return "none";
+}
+
+inline constexpr PrimitiveBounds get_primitive_bounds(uint8_t op) {
+    if (op < SDSC_PRIMITIVES_META.size()) {
+        return SDSC_PRIMITIVES_META[op].bounds;
+    }
+    return {-1e9f, 1e9f, -1e9f, 1e9f, 0.0f, 4.0f};
+}
+
+// SSOT 单一真相源前向原语激发调度器 (全图计算细胞统一由此派发)
+template<typename CellT>
+inline void dispatch_cell_forward(
+    CellT& c, double in0, double in1, size_t in_dim, const double* inputs)
+{
+    if (c.type == CellType::SENSE_RAW_INPUT_0 ||
+        c.type == CellType::SENSE_RAW_INPUT_1 ||
+        c.type == CellType::SENSE_RAW_INPUT_2 ||
+        c.type == CellType::SENSE_RAW_INPUT_3 ||
+        c.type == CellType::SENSE_CHANNEL) {
+        size_t ch = 0;
+        if (c.type == CellType::SENSE_RAW_INPUT_0) ch = 0;
+        else if (c.type == CellType::SENSE_RAW_INPUT_1) ch = 1;
+        else if (c.type == CellType::SENSE_RAW_INPUT_2) ch = 2;
+        else if (c.type == CellType::SENSE_RAW_INPUT_3) ch = 3;
+        else ch = (c.param2 >= 0.0) ? static_cast<size_t>(c.param2) : 0;
+        c.output_val = (ch < in_dim && inputs) ? inputs[ch] * c.param1 : 0.0;
+        return;
+    }
+    if (c.type == CellType::OP_DELAY_N) {
+        int k = std::clamp(static_cast<int>(std::floor(c.param1 * 16.0)), 1, 16);
+        size_t read_idx = (static_cast<size_t>(c.delay_idx) + 16 - static_cast<size_t>(k)) & 15;
+        c.output_val = c.delay_buffer[read_idx];
+        c.delay_buffer[c.delay_idx & 15] = in0;
+        c.delay_idx = static_cast<uint8_t>((c.delay_idx + 1) & 15);
+        return;
+    }
+    if (c.type == CellType::ACT_PRIMARY_POSITIVE ||
+        c.type == CellType::ACT_PRIMARY_NEGATIVE ||
+        c.type == CellType::ACT_DEFENSIVE_RESET ||
+        c.type == CellType::ACT_IMMUNE_BLOCK ||
+        c.type == CellType::ACT_CHANNEL ||
+        c.type == CellType::PREDICT_SENSE_0 ||
+        c.type == CellType::PREDICT_SENSE_1) {
+        c.output_val = in0;
+        return;
+    }
+    if (c.type == CellType::OP_QUADRATIC) {
+        c.output_val = c.param1 * in0 * in0 + c.param2 * in0 * in1;
+        return;
+    }
+    if (c.type == CellType::GATE_HYSTERESIS) {
+        if (in0 > c.param1) c.latch_state = true;
+        else if (in0 < c.param2) c.latch_state = false;
+        c.output_val = c.latch_state ? 1.0 : -1.0;
+        c.state_val = c.output_val;
+        return;
+    }
+    if (c.type == CellType::GATE_THRESHOLD) {
+        c.output_val = (in0 > c.param1) ? 1.0 : 0.0;
+        return;
+    }
+    if (c.type == CellType::GATE_DEADZONE) {
+        c.output_val = (std::abs(in0) > std::abs(c.param1)) ? in0 : 0.0;
+        return;
+    }
+    if (c.type == CellType::GATE_MIN_MAX) {
+        c.output_val = (c.param1 > 0.5) ? std::max(in0, in1) : std::min(in0, in1);
+        return;
+    }
+    if (c.type == CellType::OP_OSCILLATOR) {
+        if (c.activation_count == 0 && std::abs(c.state_val) < 1e-6 && std::abs(c.aux_state) < 1e-6) {
+            c.state_val = 0.1;
+        }
+        double mu = (std::abs(c.param1) > 1e-4) ? std::clamp(std::abs(c.param1), 0.01, 5.0) : 1.0;
+        double dt = (std::abs(c.param2) > 1e-4) ? std::clamp(std::abs(c.param2), 0.001, 0.2) : 0.05;
+        double s1 = c.state_val;
+        double s2 = c.aux_state;
+        double ds1 = s2;
+        double ds2 = mu * (1.0 - s1 * s1) * s2 - s1 + in0;
+        s1 += ds1 * dt;
+        s2 += ds2 * dt;
+        c.state_val = std::clamp(s1, -10.0, 10.0);
+        c.aux_state = std::clamp(s2, -10.0, 10.0);
+        c.output_val = c.state_val;
+        return;
+    }
+    if (c.type == CellType::OP_EMA) {
+        if (!std::isfinite(in0)) in0 = 0.0;
+        if (!std::isfinite(c.state_val)) c.state_val = 0.0;
+        double alpha = std::clamp(c.param1, 0.001, 1.0);
+        if (c.activation_count == 0) c.state_val = in0;
+        else c.state_val = alpha * in0 + (1.0 - alpha) * c.state_val;
+        c.output_val = c.state_val;
+        return;
+    }
+    if (c.type == CellType::OP_DIFF) {
+        c.output_val = in0 - c.prev_input;
+        c.prev_input = in0;
+        return;
+    }
+    uint8_t op = cell_type_to_sdsc_eval_op(c.type);
+    float s = static_cast<float>(c.state_val);
+    float a = static_cast<float>(c.aux_state);
+    float g = static_cast<float>(c.param1);
+    float x = static_cast<float>(in0);
+    if (!std::isfinite(s)) s = 0.0f;
+    if (!std::isfinite(a)) a = 0.0f;
+    if (!std::isfinite(g)) g = 1.0f;
+    if (!std::isfinite(x)) x = 0.0f;
+    if (c.type == CellType::OP_SUB) {
+        x = static_cast<float>(in0 - in1);
+    } else if (c.type == CellType::OP_SUM) {
+        x = static_cast<float>(in0 + in1);
+    } else if (c.type == CellType::OP_MULTIPLY) {
+        x = static_cast<float>(in0 * in1);
+    }
+    if (!std::isfinite(x)) x = 0.0f;
+    float out = sdsc_primitive_eval(op, g, x, &s, &a);
+    if (!std::isfinite(s)) s = 0.0f;
+    if (!std::isfinite(out)) out = 0.0f;
+    PrimitiveBounds b = get_primitive_bounds(op);
+    s = std::clamp(s, b.state_min, b.state_max);
+    out = std::clamp(out, b.out_min, b.out_max);
+    c.state_val = static_cast<double>(s);
+    c.aux_state = static_cast<double>(a);
+    c.output_val = static_cast<double>(out);
+}
 
 } // namespace kun
 

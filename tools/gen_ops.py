@@ -4,10 +4,12 @@
 KunCellular Unified Primitive Code Generator (tools/gen_ops.py)
 Single Source of Truth: include/kun/cellular/ops.yaml
 Generates:
-  1. include/kun/cellular/sdsc_primitives.h   (Pure C11 inline execution)
-  2. include/kun/cellular/cuda_ops.cuh        (CUDA device inline function & NVRTC JIT string)
-  3. include/kun/cellular/generated_ops.hpp   (C++20 enums, stringifiers, validators, metadata)
-  4. tools/kun_cellular_ops.py                (Python runtime dictionary and parity tables)
+  1. include/kun/cellular/sdsc_primitives.h       (Pure C11 inline execution)
+  2. include/kun/cellular/sdsc_primitives_vjp.h   (Pure C11 inline VJP backward & STE)
+  3. include/kun/cellular/cuda_ops.cuh            (CUDA device inline function & NVRTC JIT string)
+  4. include/kun/cellular/cuda_ops_vjp.cuh        (CUDA device inline VJP & NVRTC JIT string)
+  5. include/kun/cellular/generated_ops.hpp       (C++20 enums, bounds, differentiability, reflection)
+  6. tools/kun_cellular_ops.py                    (Python runtime dictionary, VJP & parity tables)
 """
 
 import sys
@@ -18,7 +20,9 @@ import yaml
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 OPS_YAML_PATH = os.path.join(REPO_ROOT, "include", "kun", "cellular", "ops.yaml")
 C11_OUT_PATH = os.path.join(REPO_ROOT, "include", "kun", "cellular", "sdsc_primitives.h")
+C11_VJP_OUT_PATH = os.path.join(REPO_ROOT, "include", "kun", "cellular", "sdsc_primitives_vjp.h")
 CUDA_OUT_PATH = os.path.join(REPO_ROOT, "include", "kun", "cellular", "cuda_ops.cuh")
+CUDA_VJP_OUT_PATH = os.path.join(REPO_ROOT, "include", "kun", "cellular", "cuda_ops_vjp.cuh")
 CPP_OUT_PATH = os.path.join(REPO_ROOT, "include", "kun", "cellular", "generated_ops.hpp")
 PY_OUT_PATH = os.path.join(REPO_ROOT, "tools", "kun_cellular_ops.py")
 
@@ -51,7 +55,7 @@ def generate_c11_header(spec):
         "#define SDSC_INLINE static inline",
         "#endif",
         "",
-        "/* 26 大完备原子计算原语类型枚举 (5-bit 紧凑硬件操作码) */",
+        "/* 27 大完备原子计算原语类型枚举 (5-bit 紧凑硬件操作码) */",
         "typedef enum {"
     ]
 
@@ -88,7 +92,7 @@ def generate_c11_header(spec):
 
     for p in prims:
         lines.append(f"        case {p['name']}: {{ // opcode {p['id']}")
-        eval_body = p['eval_code'].strip()
+        eval_body = str(p['eval_code']).strip()
         for b_line in eval_body.splitlines():
             lines.append(f"            {b_line}")
         lines.append("            break;")
@@ -105,15 +109,106 @@ def generate_c11_header(spec):
         "    return out;",
         "}",
         "",
+        "/* 包含全图反向伴随方程与直通梯度 (VJP) 算子头文件 */",
+        '#include "sdsc_primitives_vjp.h"',
+        "",
         "#endif /* KUN_CELLULAR_SDSC_PRIMITIVES_H_ */",
+        ""
+    ])
+    return "\n".join(lines)
+
+def generate_c11_vjp_header(spec):
+    prims = spec["sdsc_primitives"]
+    lines = [
+        AUTO_GEN_BANNER,
+        "#ifndef KUN_CELLULAR_SDSC_PRIMITIVES_VJP_H_",
+        "#define KUN_CELLULAR_SDSC_PRIMITIVES_VJP_H_",
+        "",
+        "#include <math.h>",
+        "#include <stdint.h>",
+        "#include <stdbool.h>",
+        "",
+        "#if defined(__GNUC__) || defined(__clang__)",
+        "#define SDSC_INLINE static inline __attribute__((always_inline))",
+        "#else",
+        "#define SDSC_INLINE static inline",
+        "#endif",
+        "",
+        "/* 反向向量-雅可比积 (Vector-Jacobian Product) 偏导返回包 (纯寄存器传递) */",
+        "typedef struct {",
+        "    float dx;       /* 突触输入梯度 dL/dx */",
+        "    float ds_prev;  /* 前向输入状态偏导 dL/ds(t-1) */",
+        "    float da_prev;  /* 前向输入辅助状态偏导 dL/da(t-1) */",
+        "    float dg;       /* 算子增益参数偏导 dL/dg */",
+        "} SdscOpVJP;",
+        "",
+        "/**",
+        " * 核心原语反向向量-雅可比积 (VJP) 计算",
+        " * 用于全图 BPTT 伴随反向回传与非可微原语直通门控 (STE)",
+        " * ",
+        " * @param op_type  原语算子枚举",
+        " * @param g        算子增益参数",
+        " * @param x        当前步输入",
+        " * @param s        当前步前向初态",
+        " * @param a        当前步前向初辅助态",
+        " * @param out      当前步前向输出",
+        " * @param s_next   当前步前向终态",
+        " * @param a_next   当前步前向终辅助态",
+        " * @param dy       上游传回的输出梯度 dL/dout",
+        " * @param ds_next  沿时间反传的状态梯度 dL/ds_next",
+        " * @param da_next  沿时间反传的辅助状态梯度 dL/da_next",
+        " * @return SdscOpVJP 输入、状态与参数梯度",
+        " */",
+        "SDSC_INLINE SdscOpVJP sdsc_primitive_vjp(",
+        "    uint8_t op_type,",
+        "    float g,",
+        "    float x,",
+        "    float s,",
+        "    float a,",
+        "    float out,",
+        "    float s_next,",
+        "    float a_next,",
+        "    float dy,",
+        "    float ds_next,",
+        "    float da_next",
+        ") {",
+        "    SdscOpVJP ret;",
+        "    float dx = 0.0f;",
+        "    float ds_prev = 0.0f;",
+        "    float da_prev = 0.0f;",
+        "    float dg = 0.0f;",
+        "",
+        "    switch (op_type) {"
+    ]
+
+    for p in prims:
+        vjp_code = p.get("vjp_code", "").strip()
+        lines.append(f"        case {p['id']}: {{ // {p['name']}")
+        for b_line in vjp_code.splitlines():
+            lines.append(f"            {b_line}")
+        lines.append("            break;")
+        lines.append("        }")
+
+    lines.extend([
+        "        default:",
+        "            dx = dy;",
+        "            break;",
+        "    }",
+        "",
+        "    ret.dx = dx;",
+        "    ret.ds_prev = ds_prev;",
+        "    ret.da_prev = da_prev;",
+        "    ret.dg = dg;",
+        "    return ret;",
+        "}",
+        "",
+        "#endif /* KUN_CELLULAR_SDSC_PRIMITIVES_VJP_H_ */",
         ""
     ])
     return "\n".join(lines)
 
 def generate_cuda_header(spec):
     prims = spec["sdsc_primitives"]
-    
-    # 构造核心 __device__ 内联函数源码
     device_func_lines = [
         "__device__ __forceinline__ float sdsc_cuda_eval_primitive(",
         "    uint8_t op,",
@@ -132,7 +227,7 @@ def generate_cuda_header(spec):
 
     for p in prims:
         device_func_lines.append(f"        case {p['id']}: {{ // {p['name']}")
-        eval_body = p['eval_code'].strip()
+        eval_body = str(p['eval_code']).strip()
         for b_line in eval_body.splitlines():
             device_func_lines.append(f"            {b_line}")
         device_func_lines.append("            break;")
@@ -182,7 +277,7 @@ def generate_cuda_header(spec):
 
     for p in prims:
         lines.append(f"        case {p['id']}: {{ // {p['name']}")
-        eval_body = p['eval_code'].strip()
+        eval_body = str(p['eval_code']).strip()
         for b_line in eval_body.splitlines():
             lines.append(f"            {b_line}")
         lines.append("            break;")
@@ -204,9 +299,92 @@ def generate_cuda_header(spec):
         device_func_lines_str,
         ")\";",
         "",
+        '#include "cuda_ops_vjp.cuh"',
+        "",
         "#endif /* KUN_CELLULAR_CUDA_OPS_CUH_ */",
         ""
     ])
+    return "\n".join(lines)
+
+def generate_cuda_vjp_header(spec):
+    prims = spec["sdsc_primitives"]
+    device_vjp_lines = [
+        "typedef struct {",
+        "    float dx;",
+        "    float ds_prev;",
+        "    float da_prev;",
+        "    float dg;",
+        "} SdscCUDAVJP;",
+        "",
+        "SDSC_CUDA_DEVICE SdscCUDAVJP sdsc_cuda_vjp_primitive(",
+        "    uint8_t op,",
+        "    float g,",
+        "    float x,",
+        "    float s,",
+        "    float a,",
+        "    float out,",
+        "    float s_next,",
+        "    float a_next,",
+        "    float dy,",
+        "    float ds_next,",
+        "    float da_next",
+        ") {",
+        "    SdscCUDAVJP ret;",
+        "    float dx = 0.0f;",
+        "    float ds_prev = 0.0f;",
+        "    float da_prev = 0.0f;",
+        "    float dg = 0.0f;",
+        "",
+        "    switch (op) {"
+    ]
+
+    for p in prims:
+        device_vjp_lines.append(f"        case {p['id']}: {{ // {p['name']}")
+        vjp_code = p.get("vjp_code", "").strip()
+        for b_line in vjp_code.splitlines():
+            device_vjp_lines.append(f"            {b_line}")
+        device_vjp_lines.append("            break;")
+        device_vjp_lines.append("        }")
+
+    device_vjp_lines.extend([
+        "        default:",
+        "            dx = dy;",
+        "            break;",
+        "    }",
+        "",
+        "    ret.dx = dx;",
+        "    ret.ds_prev = ds_prev;",
+        "    ret.da_prev = da_prev;",
+        "    ret.dg = dg;",
+        "    return ret;",
+        "}"
+    ])
+    device_vjp_lines_str = "\n".join(device_vjp_lines)
+
+    lines = [
+        AUTO_GEN_BANNER,
+        "#ifndef KUN_CELLULAR_CUDA_OPS_VJP_CUH_",
+        "#define KUN_CELLULAR_CUDA_OPS_VJP_CUH_",
+        "",
+        "#include <stdint.h>",
+        "#include <math.h>",
+        "",
+        "#if defined(__CUDACC__) || defined(__CUDA_ARCH__)",
+        "#define SDSC_CUDA_DEVICE __device__ __forceinline__",
+        "#else",
+        "#define SDSC_CUDA_DEVICE inline",
+        "#endif",
+        "",
+        device_vjp_lines_str,
+        "",
+        "// NVRTC JIT 反向伴随 VJP 动态内核代码模板字符串",
+        "static const char* const SDSC_CUDA_DEVICE_VJP_OPS_SRC = R\"(",
+        device_vjp_lines_str,
+        ")\";",
+        "",
+        "#endif /* KUN_CELLULAR_CUDA_OPS_VJP_CUH_ */",
+        ""
+    ]
     return "\n".join(lines)
 
 def generate_cpp_header(spec):
@@ -223,6 +401,8 @@ def generate_cpp_header(spec):
         "#include <string_view>",
         "#include <array>",
         "#include <algorithm>",
+        "#include <cmath>",
+        "#include \"kun/cellular/sdsc_primitives.h\"",
         "",
         "namespace kun {",
         "",
@@ -320,9 +500,61 @@ def generate_cpp_header(spec):
         "            return false;",
         "    }",
         "}",
-        "",
+        ""
+    ])
+
+    legacy_map = {
+        0: "SENSE_RAW_INPUT_0", 1: "SENSE_RAW_INPUT_1", 2: "SENSE_RAW_INPUT_2", 3: "SENSE_RAW_INPUT_3",
+        4: "OP_SUM", 5: "OP_INTEGRAL", 8: "OP_EMA", 10: "OP_ABS", 11: "OP_MULTIPLY", 12: "OP_DIFF",
+        13: "OP_SUB", 14: "OP_RATIO", 15: "GATE_THRESHOLD", 16: "GATE_HYSTERESIS", 17: "GATE_DEADZONE",
+        18: "GATE_INHIBIT", 19: "GATE_AND", 20: "GATE_MIN_MAX",
+        21: "ACT_PRIMARY_POSITIVE", 22: "ACT_PRIMARY_NEGATIVE", 23: "ACT_DEFENSIVE_RESET",
+        24: "ASSOCIATION_HUB", 25: "OP_OSCILLATOR"
+    }
+
+    lines.extend([
         "inline uint8_t cell_type_to_sdsc_opcode(CellType t) {",
+        "    switch (t) {",
+        "        case CellType::SENSE_RAW_INPUT_0: return 0;",
+        "        case CellType::SENSE_RAW_INPUT_1: return 1;",
+        "        case CellType::SENSE_RAW_INPUT_2: return 2;",
+        "        case CellType::SENSE_RAW_INPUT_3: return 3;",
+        "        case CellType::SENSE_CHANNEL:     return 0;",
+        "        case CellType::OP_SUM:            return 4;  // SDSC_OP_SUM",
+        "        case CellType::OP_INTEGRAL:       return 5;  // SDSC_OP_INTEGRAL",
+        "        case CellType::OP_EMA:            return 8;  // SDSC_OP_DAMPER",
+        "        case CellType::OP_ABS:            return 10; // SDSC_OP_ABS",
+        "        case CellType::OP_MULTIPLY:       return 11; // SDSC_OP_MULTIPLY",
+        "        case CellType::OP_DIFF:           return 12; // SDSC_OP_DIFF",
+        "        case CellType::OP_SUB:            return 13; // SDSC_OP_SUB",
+        "        case CellType::OP_RATIO:          return 14; // SDSC_OP_RATIO",
+        "        case CellType::GATE_THRESHOLD:    return 15; // SDSC_OP_THRESHOLD",
+        "        case CellType::GATE_HYSTERESIS:   return 16; // SDSC_OP_HYSTERESIS",
+        "        case CellType::GATE_DEADZONE:     return 17; // SDSC_OP_DEADZONE",
+        "        case CellType::GATE_INHIBIT:      return 18; // SDSC_OP_INHIBIT",
+        "        case CellType::GATE_AND:          return 19; // SDSC_OP_AND",
+        "        case CellType::GATE_MIN_MAX:      return 20; // SDSC_OP_MIN_MAX",
+        "        case CellType::ACT_PRIMARY_POSITIVE: return 21; // SDSC_OP_ACT_POS",
+        "        case CellType::ACT_PRIMARY_NEGATIVE: return 22; // SDSC_OP_ACT_NEG",
+        "        case CellType::ACT_DEFENSIVE_RESET:  return 23; // SDSC_OP_ACT_RESET",
+        "        case CellType::ACT_IMMUNE_BLOCK:     return 23; // SDSC_OP_ACT_RESET",
+        "        case CellType::ACT_CHANNEL:          return 26; // PASSTHRU",
+        "        case CellType::PREDICT_SENSE_0:      return 26; // PASSTHRU",
+        "        case CellType::PREDICT_SENSE_1:      return 26; // PASSTHRU",
+        "        case CellType::ASSOCIATION_HUB:      return 24; // SDSC_OP_CORRELATION",
+        "        case CellType::OP_DELAY_N:           return 26; // PASSTHRU",
+        "        case CellType::OP_OSCILLATOR:        return 26; // PASSTHRU",
+        "        case CellType::OP_QUADRATIC:         return 26; // PASSTHRU",
+        "        default: return 26; // SDSC_OP_PASSTHRU",
+        "    }",
+        "}",
+        "",
+        "inline uint8_t cell_type_to_serialization_code(CellType t) {",
         "    return static_cast<uint8_t>(t);",
+        "}",
+        "",
+        "inline CellType serialization_code_to_cell_type(uint8_t code) {",
+        "    return static_cast<CellType>(code);",
         "}",
         "",
         "inline CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags = 0, uint32_t version = 3) {",
@@ -331,7 +563,6 @@ def generate_cpp_header(spec):
         "            return static_cast<CellType>(op);",
         "        }",
         "    }",
-        "    // 兼容历史 v1/v2 检查点反序列化解码",
         "    if (flags & 0x01) {",
         "        if (op == 0) return CellType::SENSE_RAW_INPUT_0;",
         "        if (op == 1) return CellType::SENSE_RAW_INPUT_1;",
@@ -347,25 +578,28 @@ def generate_cpp_header(spec):
         "    }",
         "    switch (op) {"
     ])
-
-    # 历史遗留 opcode 映射
-    legacy_map = {
-        0: "SENSE_RAW_INPUT_0", 1: "SENSE_RAW_INPUT_1", 2: "SENSE_RAW_INPUT_2", 3: "SENSE_RAW_INPUT_3",
-        4: "OP_SUM", 5: "OP_INTEGRAL", 8: "OP_EMA", 10: "OP_ABS", 11: "OP_MULTIPLY", 12: "OP_DIFF",
-        13: "OP_SUB", 14: "OP_RATIO", 15: "GATE_THRESHOLD", 16: "GATE_HYSTERESIS", 17: "GATE_DEADZONE",
-        18: "GATE_INHIBIT", 19: "GATE_AND", 20: "GATE_MIN_MAX",
-        21: "ACT_PRIMARY_POSITIVE", 22: "ACT_PRIMARY_NEGATIVE", 23: "ACT_DEFENSIVE_RESET",
-        24: "ASSOCIATION_HUB", 25: "OP_OSCILLATOR"
-    }
     for op_val, cell_name in legacy_map.items():
         lines.append(f"        case {op_val}: return CellType::{cell_name};")
-
     lines.extend([
         "        default: return CellType::OP_EMA;",
         "    }",
         "}",
         "",
-        "// 硬件原语静态反射元数据",
+        "inline uint8_t cell_type_to_sdsc_eval_op(CellType t) {",
+        "    return cell_type_to_sdsc_opcode(t);",
+        "}",
+        "",
+        "// 硬件原语数值界与形式化证书约束",
+        "struct PrimitiveBounds {",
+        "    float state_min;",
+        "    float state_max;",
+        "    float out_min;",
+        "    float out_max;",
+        "    float param_g_min;",
+        "    float param_g_max;",
+        "};",
+        "",
+        "// 硬件原语静态反射元数据 (含可微性与直通梯度模式)",
         "struct PrimitiveMeta {",
         "    uint8_t id;",
         "    const char* name;",
@@ -375,6 +609,9 @@ def generate_cpp_header(spec):
         "    float default_p1;",
         "    float default_p2;",
         "    const char* lyapunov_bound;",
+        "    bool differentiable;",
+        "    const char* ste_gradient;",
+        "    PrimitiveBounds bounds;",
         "};",
         "",
         f"inline constexpr std::array<PrimitiveMeta, {len(prims)}> SDSC_PRIMITIVES_META = {{{{",
@@ -383,10 +620,157 @@ def generate_cpp_header(spec):
     for p in prims:
         has_s = "true" if p['has_state'] else "false"
         has_a = "true" if p['has_aux'] else "false"
-        lines.append(f'    {{{p["id"]}, "{p["name"]}", "{p["category"]}", {has_s}, {has_a}, {p["default_p1"]}f, {p["default_p2"]}f, "{p["lyapunov_bound"]}"}},')
+        diff = "true" if p.get('differentiable', True) else "false"
+        ste = p.get('ste_gradient', 'none')
+        bounds = p.get('bounds', {})
+        s_b = bounds.get('state', [-1e9, 1e9])
+        o_b = bounds.get('out', [-1e9, 1e9])
+        g_b = bounds.get('params', {}).get('g', [0.0, 4.0])
+        b_str = f"{{{s_b[0]}f, {s_b[1]}f, {o_b[0]}f, {o_b[1]}f, {g_b[0]}f, {g_b[1]}f}}"
+        lines.append(f'    {{{p["id"]}, "{p["name"]}", "{p["category"]}", {has_s}, {has_a}, {p["default_p1"]}f, {p["default_p2"]}f, "{p["lyapunov_bound"]}", {diff}, "{ste}", {b_str}}},')
 
     lines.extend([
         "}};",
+        "",
+        "inline constexpr bool is_primitive_differentiable(uint8_t op) {",
+        "    if (op < SDSC_PRIMITIVES_META.size()) {",
+        "        return SDSC_PRIMITIVES_META[op].differentiable;",
+        "    }",
+        "    return true;",
+        "}",
+        "",
+        "inline constexpr const char* get_primitive_ste(uint8_t op) {",
+        "    if (op < SDSC_PRIMITIVES_META.size()) {",
+        "        return SDSC_PRIMITIVES_META[op].ste_gradient;",
+        "    }",
+        "    return \"none\";",
+        "}",
+        "",
+        "inline constexpr PrimitiveBounds get_primitive_bounds(uint8_t op) {",
+        "    if (op < SDSC_PRIMITIVES_META.size()) {",
+        "        return SDSC_PRIMITIVES_META[op].bounds;",
+        "    }",
+        "    return {-1e9f, 1e9f, -1e9f, 1e9f, 0.0f, 4.0f};",
+        "}",
+        "",
+        "// SSOT 单一真相源前向原语激发调度器 (全图计算细胞统一由此派发)",
+        "template<typename CellT>",
+        "inline void dispatch_cell_forward(",
+        "    CellT& c, double in0, double in1, size_t in_dim, const double* inputs)",
+        "{",
+        "    if (c.type == CellType::SENSE_RAW_INPUT_0 ||",
+        "        c.type == CellType::SENSE_RAW_INPUT_1 ||",
+        "        c.type == CellType::SENSE_RAW_INPUT_2 ||",
+        "        c.type == CellType::SENSE_RAW_INPUT_3 ||",
+        "        c.type == CellType::SENSE_CHANNEL) {",
+        "        size_t ch = 0;",
+        "        if (c.type == CellType::SENSE_RAW_INPUT_0) ch = 0;",
+        "        else if (c.type == CellType::SENSE_RAW_INPUT_1) ch = 1;",
+        "        else if (c.type == CellType::SENSE_RAW_INPUT_2) ch = 2;",
+        "        else if (c.type == CellType::SENSE_RAW_INPUT_3) ch = 3;",
+        "        else ch = (c.param2 >= 0.0) ? static_cast<size_t>(c.param2) : 0;",
+        "        c.output_val = (ch < in_dim && inputs) ? inputs[ch] * c.param1 : 0.0;",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::OP_DELAY_N) {",
+        "        int k = std::clamp(static_cast<int>(std::floor(c.param1 * 16.0)), 1, 16);",
+        "        size_t read_idx = (static_cast<size_t>(c.delay_idx) + 16 - static_cast<size_t>(k)) & 15;",
+        "        c.output_val = c.delay_buffer[read_idx];",
+        "        c.delay_buffer[c.delay_idx & 15] = in0;",
+        "        c.delay_idx = static_cast<uint8_t>((c.delay_idx + 1) & 15);",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::ACT_PRIMARY_POSITIVE ||",
+        "        c.type == CellType::ACT_PRIMARY_NEGATIVE ||",
+        "        c.type == CellType::ACT_DEFENSIVE_RESET ||",
+        "        c.type == CellType::ACT_IMMUNE_BLOCK ||",
+        "        c.type == CellType::ACT_CHANNEL ||",
+        "        c.type == CellType::PREDICT_SENSE_0 ||",
+        "        c.type == CellType::PREDICT_SENSE_1) {",
+        "        c.output_val = in0;",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::OP_QUADRATIC) {",
+        "        c.output_val = c.param1 * in0 * in0 + c.param2 * in0 * in1;",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::GATE_HYSTERESIS) {",
+        "        if (in0 > c.param1) c.latch_state = true;",
+        "        else if (in0 < c.param2) c.latch_state = false;",
+        "        c.output_val = c.latch_state ? 1.0 : -1.0;",
+        "        c.state_val = c.output_val;",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::GATE_THRESHOLD) {",
+        "        c.output_val = (in0 > c.param1) ? 1.0 : 0.0;",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::GATE_DEADZONE) {",
+        "        c.output_val = (std::abs(in0) > std::abs(c.param1)) ? in0 : 0.0;",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::GATE_MIN_MAX) {",
+        "        c.output_val = (c.param1 > 0.5) ? std::max(in0, in1) : std::min(in0, in1);",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::OP_OSCILLATOR) {",
+        "        if (c.activation_count == 0 && std::abs(c.state_val) < 1e-6 && std::abs(c.aux_state) < 1e-6) {",
+        "            c.state_val = 0.1;",
+        "        }",
+        "        double mu = (std::abs(c.param1) > 1e-4) ? std::clamp(std::abs(c.param1), 0.01, 5.0) : 1.0;",
+        "        double dt = (std::abs(c.param2) > 1e-4) ? std::clamp(std::abs(c.param2), 0.001, 0.2) : 0.05;",
+        "        double s1 = c.state_val;",
+        "        double s2 = c.aux_state;",
+        "        double ds1 = s2;",
+        "        double ds2 = mu * (1.0 - s1 * s1) * s2 - s1 + in0;",
+        "        s1 += ds1 * dt;",
+        "        s2 += ds2 * dt;",
+        "        c.state_val = std::clamp(s1, -10.0, 10.0);",
+        "        c.aux_state = std::clamp(s2, -10.0, 10.0);",
+        "        c.output_val = c.state_val;",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::OP_EMA) {",
+        "        if (!std::isfinite(in0)) in0 = 0.0;",
+        "        if (!std::isfinite(c.state_val)) c.state_val = 0.0;",
+        "        double alpha = std::clamp(c.param1, 0.001, 1.0);",
+        "        if (c.activation_count == 0) c.state_val = in0;",
+        "        else c.state_val = alpha * in0 + (1.0 - alpha) * c.state_val;",
+        "        c.output_val = c.state_val;",
+        "        return;",
+        "    }",
+        "    if (c.type == CellType::OP_DIFF) {",
+        "        c.output_val = in0 - c.prev_input;",
+        "        c.prev_input = in0;",
+        "        return;",
+        "    }",
+        "    uint8_t op = cell_type_to_sdsc_eval_op(c.type);",
+        "    float s = static_cast<float>(c.state_val);",
+        "    float a = static_cast<float>(c.aux_state);",
+        "    float g = static_cast<float>(c.param1);",
+        "    float x = static_cast<float>(in0);",
+        "    if (!std::isfinite(s)) s = 0.0f;",
+        "    if (!std::isfinite(a)) a = 0.0f;",
+        "    if (!std::isfinite(g)) g = 1.0f;",
+        "    if (!std::isfinite(x)) x = 0.0f;",
+        "    if (c.type == CellType::OP_SUB) {",
+        "        x = static_cast<float>(in0 - in1);",
+        "    } else if (c.type == CellType::OP_SUM) {",
+        "        x = static_cast<float>(in0 + in1);",
+        "    } else if (c.type == CellType::OP_MULTIPLY) {",
+        "        x = static_cast<float>(in0 * in1);",
+        "    }",
+        "    if (!std::isfinite(x)) x = 0.0f;",
+        "    float out = sdsc_primitive_eval(op, g, x, &s, &a);",
+        "    if (!std::isfinite(s)) s = 0.0f;",
+        "    if (!std::isfinite(out)) out = 0.0f;",
+        "    PrimitiveBounds b = get_primitive_bounds(op);",
+        "    s = std::clamp(s, b.state_min, b.state_max);",
+        "    out = std::clamp(out, b.out_min, b.out_max);",
+        "    c.state_val = static_cast<double>(s);",
+        "    c.aux_state = static_cast<double>(a);",
+        "    c.output_val = static_cast<double>(out);",
+        "}",
         "",
         "} // namespace kun",
         "",
@@ -410,8 +794,10 @@ def generate_python_module(spec):
         '# -*- coding: utf-8 -*-',
         AUTO_GEN_BANNER_PY.strip(),
         '"""',
-        'SDSCC Operator and Cell Type Definitions for Python',
+        'SDSCC Operator and Cell Type Definitions for Python (Forward & VJP)',
         '"""',
+        'import math',
+        'import numpy as np',
         '',
         'class SdscOp:',
     ]
@@ -442,7 +828,10 @@ def generate_python_module(spec):
         lines.append(f"    {{'id': {p['id']}, 'name': '{p['name']}', 'category': '{p['category']}', "
                      f"'has_state': {p['has_state']}, 'has_aux': {p['has_aux']}, "
                      f"'default_p1': {p['default_p1']}, 'default_p2': {p['default_p2']}, "
-                     f"'lyapunov_bound': '{p['lyapunov_bound']}'}},")
+                     f"'lyapunov_bound': '{p['lyapunov_bound']}', "
+                     f"'differentiable': {p.get('differentiable', True)}, "
+                     f"'ste_gradient': '{p.get('ste_gradient', 'none')}', "
+                     f"'bounds': {p.get('bounds', {})}}},")
     lines.append(']')
     lines.append('')
     return "\n".join(lines)
@@ -454,13 +843,17 @@ def main():
 
     spec = load_ops_spec()
     c11_code = generate_c11_header(spec)
+    c11_vjp_code = generate_c11_vjp_header(spec)
     cuda_code = generate_cuda_header(spec)
+    cuda_vjp_code = generate_cuda_vjp_header(spec)
     cpp_code = generate_cpp_header(spec)
     py_code = generate_python_module(spec)
 
     targets = [
         (C11_OUT_PATH, c11_code),
+        (C11_VJP_OUT_PATH, c11_vjp_code),
         (CUDA_OUT_PATH, cuda_code),
+        (CUDA_VJP_OUT_PATH, cuda_vjp_code),
         (CPP_OUT_PATH, cpp_code),
         (PY_OUT_PATH, py_code),
     ]
@@ -493,7 +886,7 @@ def main():
             f.write(code)
         print(f"[gen_ops] Generated: {os.path.relpath(path, REPO_ROOT)}")
 
-    print("[gen_ops] Successfully generated all single-source-of-truth operator headers!")
+    print("[gen_ops] Successfully generated all single-source-of-truth operator headers (Forward + VJP + Bounds)!")
 
 if __name__ == "__main__":
     main()

@@ -35,7 +35,9 @@ void test_strain_tensor_accumulation() {
     (void)has_phys_stress;
     assert(has_phys_stress);
 
-    // 注入预测误差，累积信息惊奇度应变
+    // 前向传导激发神经元活跃度，再注入预测误差累积信息惊奇度应变
+    double inps[4] = {1.0, 1.0, 0.0, 0.0};
+    org.forward(inps);
     org.update_informational_strain(1.5);
     bool has_info_strain = false;
     for (size_t i = 4; i < org.cells.size(); ++i) {

@@ -403,9 +403,10 @@ class LiveVehicleSimulator:
 
     def load_champion_checkpoint(self):
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        v3_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion_v3.bin")
         cortex_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion.bin")
         track_path = os.path.join(base_dir, "checkpoints", "adas_track_champion.bin")
-        bin_path = cortex_path if os.path.exists(cortex_path) else track_path
+        bin_path = v3_path if os.path.exists(v3_path) else (cortex_path if os.path.exists(cortex_path) else track_path)
         loaded = False
 
         if os.path.exists(bin_path):
@@ -413,7 +414,30 @@ class LiveVehicleSimulator:
                 bin_data = read_sdsc_binary(bin_path)
                 if bin_data and bin_data["num_cells"] > 0:
                     num_cells = bin_data["num_cells"]
-                    if num_cells == 210:
+                    if num_cells == 1024 and os.path.exists(v3_path) and bin_path == v3_path:
+                        self.total_active_cells = 1024
+                        self.total_active_synapses = bin_data["num_synapses"]
+                        self.num_columns = 16
+                        self.cells_per_column = 64
+                        self.dominant_hidden_types = ["DIFF", "DAMPER", "INTEGRATE", "HYSTERESIS", "DEADZONE", "FATIGUE", "MULTIPLY", "CLIP"]
+                        
+                        cells_bytes = bin_data["cells_bytes"]
+                        self.cell_types = []
+                        for i in range(1024):
+                            op = cells_bytes[i * 4 + 0]
+                            op_name = SDSC_PRIMITIVES_26[op] if op < len(SDSC_PRIMITIVES_26) else f"Op_{op}"
+                            self.cell_types.append(op_name)
+                            
+                        self.cell_outs = [0.0] * 1024
+                        self.column_waves = [0.0] * 16
+                        self.column_peaks = [0.0] * 16
+                        self.generation = 40
+                        self.champion_fitness = 99.9
+                        self.champion_genome = None
+                        self._init_shadow_cortex(bin_data)
+                        loaded = True
+                        print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 1,024-细胞 16-微柱 ADAS 皮层冠军模型 (Phase B): {bin_path}")
+                    elif num_cells == 210:
                         meta = bin_data.get("meta", {})
                         cells_meta = meta.get("cells_meta", [])
                         organ_meta = meta.get("organ", {})
@@ -752,7 +776,43 @@ class LiveVehicleSimulator:
             if not hasattr(self, "cell_outs") or len(self.cell_outs) != nc:
                 self.cell_outs = [0.0] * nc
 
-            if nc == 210:
+            if nc == 1024 and getattr(self, "shadow_cortex", None) is not None:
+                # 真实 32 维任务信号注入 1024 细胞微柱皮层 (与 C11 底座直连)
+                if len(self.shadow_signals) < self.shadow_in_dim:
+                    self.shadow_signals = [0.0] * self.shadow_in_dim
+                cte_norm = signed_cte / road_half_w
+                self.shadow_signals[0] = float(min(1.5, max(0.0, -cte_norm)))
+                self.shadow_signals[1] = float(min(1.5, max(0.0,  cte_norm)))
+                self.shadow_signals[2] = float(min(1.5, max(0.0, -signed_cte * 0.5 - 0.2)))
+                self.shadow_signals[3] = float(min(1.5, max(0.0,  signed_cte * 0.5 - 0.2)))
+                self.shadow_signals[4] = float(min(1.0, max(-1.0, heading_err / 0.5)))
+                self.shadow_signals[5] = float(min(1.0, max(-1.0, heading_far_err / 0.8)))
+                self.shadow_signals[6] = float(min(1.5, max(0.0, curv_b * 25.0)))
+                self.shadow_signals[7] = float(min(1.5, max(0.0, curv_b * self.v * 0.35)))
+                self.shadow_signals[8] = float(min(1.5, max(0.0, self.v / 6.0)))
+                self.shadow_signals[9] = float(min(1.0, max(-1.0, (target_v - self.v) / 3.0)))
+                self.shadow_signals[10] = float(min(1.0, max(0.0, abs(heading_err) * 1.5)))
+                self.shadow_signals[11] = float(min(1.0, max(0.0, self.cte / 0.5)))
+
+                if self.step_shadow_cortex():
+                    outs = self.shadow_cortex.outputs
+                    for i in range(nc):
+                        self.cell_outs[i] = round(float(outs[i]), 3)
+                    self.cortex_real = True
+
+                    # 计算 16 根功能微柱的实时激活平均波形与峰值
+                    col_w = []
+                    col_p = []
+                    for c in range(16):
+                        c_slice = self.cell_outs[c * 64 : (c + 1) * 64]
+                        col_w.append(round(float(np.mean(np.abs(c_slice))), 3))
+                        col_p.append(round(float(np.max(np.abs(c_slice))), 3))
+                    self.column_waves = col_w
+                    self.column_peaks = col_p
+                else:
+                    for i in range(nc): self.cell_outs[i] = 0.0
+                    self.cortex_real = False
+            elif nc == 210:
                 # 真实任务信号 (与控制律同源, 归一化)
                 self.shadow_signals[0] = float(min(1.0, max(-1.0, signed_cte / 20.0)))
                 self.shadow_signals[1] = float(min(1.0, max(-1.0, heading_err / 1.57)))
@@ -800,6 +860,10 @@ class LiveVehicleSimulator:
                 if nc == 210:
                     layer = 0 if i < 12 else (3 if i >= 204 else (1 if i % 2 == 0 else 2))
                     ctype = ctypes[i] if i < len(ctypes) else "Op_DIFF"
+                elif nc == 1024:
+                    col = i // 64
+                    layer = 0 if col == 0 else (3 if col == 15 else (1 if col < 8 else 2))
+                    ctype = ctypes[i] if i < len(ctypes) else "Op_DIFF"
                 else:
                     if i < 32:
                         layer = 0
@@ -827,6 +891,16 @@ class LiveVehicleSimulator:
                 "n_synapses": ns,
                 "hidden_types": htypes[:12],
                 "cell_activities": activities,
+                "num_columns": 16 if nc == 1024 else 1,
+                "column_waves": getattr(self, "column_waves", []),
+                "column_peaks": getattr(self, "column_peaks", []),
+                "column_roles": [
+                    "C0: REC", "C1: DIFF-1", "C2: DIFF-2", "C3: SUB",
+                    "C4: INT-1", "C5: INT-2", "C6: DAMP",
+                    "C7: HYST-1", "C8: HYST-2", "C9: DEADZONE",
+                    "C10: FATIGUE", "C11: MULT", "C12: CLIP",
+                    "C13: PRE-1", "C14: PRE-2", "C15: MOT"
+                ] if nc == 1024 else [],
                 "step_count": self.step_count,
                 "total_dist_m": round(self.total_dist, 1),
                 "road_width": self.road_width,

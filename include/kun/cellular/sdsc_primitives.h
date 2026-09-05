@@ -17,7 +17,7 @@
 #define SDSC_INLINE static inline
 #endif
 
-/* 26 大完备原子计算原语类型枚举 (5-bit 紧凑硬件操作码) */
+/* 27 大完备原子计算原语类型枚举 (5-bit 紧凑硬件操作码) */
 typedef enum {
     SDSC_OP_SENSE_0          = 0,   /* 原始输入通道 0 (透传直连) */
     SDSC_OP_SENSE_1          = 1,   /* 原始输入通道 1 (透传直连) */
@@ -200,5 +200,8 @@ SDSC_INLINE float sdsc_primitive_eval(
     *aux   = a;
     return out;
 }
+
+/* 包含全图反向伴随方程与直通梯度 (VJP) 算子头文件 */
+#include "sdsc_primitives_vjp.h"
 
 #endif /* KUN_CELLULAR_SDSC_PRIMITIVES_H_ */

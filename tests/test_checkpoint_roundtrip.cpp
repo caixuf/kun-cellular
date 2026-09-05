@@ -81,17 +81,19 @@ void test_all_cell_types_roundtrip_fidelity() {
         CellType::ASSOCIATION_HUB
     };
 
-    // 1. 验证 opcode 单射可逆性
+    // 1. 验证序列化编码双射可逆性 (v3 checkpoint 序列化编码与运行时算子语义解耦，消灭类型坍缩)
     for (CellType t : all_types) {
-        uint8_t op = CellularOrganism::cell_type_to_sdsc_opcode(t);
-        CellType restored = CellularOrganism::sdsc_opcode_to_cell_type(op, 0);
+        uint8_t code = CellularOrganism::cell_type_to_serialization_code(t);
+        CellType restored = CellularOrganism::serialization_code_to_cell_type(code);
         if (restored != t) {
             std::cerr << "❌ TYPE COLLAPSE DETECTED: " << to_string(t)
-                      << " -> opcode " << (int)op << " -> " << to_string(restored) << std::endl;
+                      << " -> code " << (int)code << " -> " << to_string(restored) << std::endl;
             assert(false && "Every CellType must roundtrip losslessly!");
         }
+        uint8_t op = CellularOrganism::cell_type_to_sdsc_opcode(t);
+        assert(op <= 26 && "Execution opcode must be within [0, 26]");
     }
-    std::cout << "  ✓ 纯 opcode 映射表 1:1 双射校验通过 (30/30 类型无一坍缩)" << std::endl;
+    std::cout << "  ✓ 纯序列化编码表 1:1 双射校验通过 (30/30 类型无一坍缩)" << std::endl;
 
     // 2. 构造包含全部 30 种细胞的复杂全息生物体
     CellularOrganism org;

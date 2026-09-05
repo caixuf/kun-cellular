@@ -252,7 +252,7 @@
             <!-- 1. SDSCC 210-细胞 ADAS 皮层 (真实并行前向遥测) + 经典前瞻控制律 -->
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[SDSCC_210_CELL_PARALLEL_CORTEX]</span>
+                    <span id="cortex-panel-title">[SDSCC_CORTEX]</span>
                     <span style="color:var(--emerald-glow);" id="stat-gen-badge">GEN: 45 // 皮层并行实测</span>
                 </div>
                 
@@ -276,12 +276,21 @@
                 </div>
 
                 <!-- 后端真实细胞规模的宏观高频采样脉冲网格 (密集微观全息投影) -->
-                <div style="padding: 4px 12px 8px;">
+                <div style="padding: 4px 12px 6px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                         <span class="stat-label">ORGAN PULSE (微柱皮层点阵):</span>
-                        <span style="font-size:9px; color:var(--cyan-glow);" id="cortex-mode-badge">[210 CELLS | 真实前向]</span>
+                        <span style="font-size:9px; color:var(--cyan-glow);" id="cortex-mode-badge">[真实前向]</span>
                     </div>
                     <canvas id="cortex-canvas" width="340" height="96" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
+                </div>
+
+                <!-- 16 微柱皮层实时动态波谱 (16 Columns Dynamics Spectrum) -->
+                <div style="padding: 0px 12px 6px;" id="column-spectrum-container">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:2px;">
+                        <span class="stat-label">16-COLUMN DYNAMICS (功能微柱波谱):</span>
+                        <span style="font-size:9px; color:#a78bfa;" id="cortex-col-badge">16 COL × 64 C</span>
+                    </div>
+                    <canvas id="column-canvas" width="340" height="42" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
                 </div>
 
                 <!-- 实时活跃原语链路 -->
@@ -462,31 +471,103 @@
                 document.getElementById("stat-cells").innerText = nCells > 0 ? `${nCells.toLocaleString()} 细胞` : "… 细胞";
                 document.getElementById("stat-synapses").innerText = nSyns > 0 ? `${nSyns.toLocaleString()} 突触` : "… 突触";
 
-                // 动态渲染 原语链路徽章 (210 细胞真实结构: 6 受体 → 202 联络 → 2 效应)
+                // 动态渲染 原语链路徽章与微柱皮层标识
+                const titleEl = document.getElementById("cortex-panel-title");
+                if (titleEl) {
+                    titleEl.innerText = (nCells === 1024) ? "[SDSCC_1024_MULTI_COLUMN_CORTEX]" : `[SDSCC_${nCells}_CELL_PARALLEL_CORTEX]`;
+                }
+
+                const modeBadge = document.getElementById("cortex-mode-badge");
+                if (modeBadge) {
+                    if (nCells === 1024) {
+                        modeBadge.textContent = vehState.cortex_real ? "[1,024 CELLS | 16-微柱 C11 直连]" : "[1,024 CELLS | 皮层离线]";
+                    } else {
+                        modeBadge.textContent = vehState.cortex_real ? `[${nCells} CELLS | C11 真实前向]` : `[${nCells} CELLS | 皮层离线]`;
+                    }
+                    modeBadge.style.color = vehState.cortex_real ? "#34d399" : "#f87171";
+                }
+
                 const chainDiv = document.getElementById("primitive-chain");
                 if (chainDiv) {
-                    let html = `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">6 REC</span>`;
-                    html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">202 INTER (tanh×g)</span>`;
-                    html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                    html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">2 MOT</span>`;
-                    const modeBadge = document.getElementById("cortex-mode-badge");
-                    if (modeBadge) {
-                        if (vehState.cortex_real) {
-                            modeBadge.textContent = "[210 CELLS | C11 真实前向]";
-                            modeBadge.style.color = "#34d399";
-                        } else {
-                            modeBadge.textContent = "[210 CELLS | 皮层离线]";
-                            modeBadge.style.color = "#f87171";
-                        }
+                    let html = "";
+                    if (nCells === 1024) {
+                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">32 REC</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
+                        html += `<span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">DIFF+DAMP</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
+                        html += `<span style="background:rgba(251,191,36,0.2); color:#fbbf24; padding:1px 5px; border-radius:3px; border:1px solid #fbbf24;">INT+DAMP</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
+                        html += `<span style="background:rgba(168,85,247,0.2); color:#c084fc; padding:1px 5px; border-radius:3px; border:1px solid #a855f7;">HYST+DEAD</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
+                        html += `<span style="background:rgba(234,179,8,0.2); color:#facc15; padding:1px 5px; border-radius:3px; border:1px solid #eab308;">FAT+MULT</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
+                        html += `<span style="background:#1e293b; color:#f43f5e; padding:1px 5px; border-radius:3px; border:1px solid #f43f5e;">8 MOT</span>`;
+                    } else {
+                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">6 REC</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
+                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">202 INTER (tanh×g)</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
+                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">2 MOT</span>`;
                     }
                     chainDiv.innerHTML = html;
                 }
 
                 drawCortexMatrix(vehState.cell_activities);
+                drawColumnSpectrum(vehState.column_waves, vehState.column_peaks, vehState.column_roles);
             }
 
             drawChart();
+        }
+
+        function drawColumnSpectrum(waves, peaks, roles) {
+            const colCanvas = document.getElementById("column-canvas");
+            if (!colCanvas) return;
+            const ctx = colCanvas.getContext("2d");
+            const w = colCanvas.width;
+            const h = colCanvas.height;
+            ctx.fillStyle = "#020617";
+            ctx.fillRect(0, 0, w, h);
+
+            if (!waves || waves.length === 0) {
+                ctx.fillStyle = "#475569";
+                ctx.font = "9px monospace";
+                ctx.fillText("单列皮层无微柱分层波谱", 90, 24);
+                return;
+            }
+
+            const nCols = waves.length;
+            const barW = (w - (nCols - 1) * 3) / nCols;
+            const maxVal = Math.max(0.6, ...peaks);
+
+            for (let i = 0; i < nCols; ++i) {
+                const wave = waves[i] || 0.0;
+                const peak = peaks[i] || 0.0;
+                const normH = Math.min(1.0, wave / maxVal) * (h - 14);
+                const peakY = h - 12 - Math.min(1.0, peak / maxVal) * (h - 14);
+                const x = i * (barW + 3);
+                const y = h - 12 - normH;
+
+                let fillStyle = "#38bdf8"; // C0: REC
+                if (i >= 1 && i <= 3) fillStyle = "#10b981"; // C1-3: DIFF/DAMP
+                else if (i >= 4 && i <= 6) fillStyle = "#fbbf24"; // C4-6: INT
+                else if (i >= 7 && i <= 9) fillStyle = "#a855f7"; // C7-9: HYST/DEAD
+                else if (i >= 10 && i <= 12) fillStyle = "#eab308"; // C10-12: FAT/MULT
+                else if (i >= 13 && i <= 14) fillStyle = "#60a5fa"; // C13-14: PRE
+                else if (i === 15) fillStyle = "#f43f5e"; // C15: MOT
+
+                ctx.fillStyle = fillStyle;
+                ctx.globalAlpha = 0.35 + Math.min(0.65, wave * 1.5);
+                ctx.fillRect(x, y, barW, normH);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.globalAlpha = 0.9;
+                ctx.fillRect(x, peakY, barW, 1.5);
+
+                ctx.fillStyle = "#64748b";
+                ctx.font = "7.5px monospace";
+                ctx.fillText(`C${i}`, x + 1, h - 3);
+            }
+            ctx.globalAlpha = 1.0;
         }
 
         function drawCortexMatrix(cells) {

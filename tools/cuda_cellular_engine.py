@@ -139,22 +139,42 @@ class CUDACellularPopulation:
         self.idx_sense = torch.tensor(np.where(self.op_types == 0)[0], device=self.device, dtype=torch.long)
         self.idx_sum = torch.tensor(np.where(self.op_types == 4)[0], device=self.device, dtype=torch.long)
         self.idx_integral = torch.tensor(np.where(self.op_types == 5)[0], device=self.device, dtype=torch.long)
+        self.idx_amplify = torch.tensor(np.where(self.op_types == 6)[0], device=self.device, dtype=torch.long)
+        self.idx_invert = torch.tensor(np.where(self.op_types == 7)[0], device=self.device, dtype=torch.long)
         self.idx_damper = torch.tensor(np.where(self.op_types == 8)[0], device=self.device, dtype=torch.long)
+        self.idx_clip = torch.tensor(np.where(self.op_types == 9)[0], device=self.device, dtype=torch.long)
+        self.idx_abs = torch.tensor(np.where(self.op_types == 10)[0], device=self.device, dtype=torch.long)
+        self.idx_multiply = torch.tensor(np.where(self.op_types == 11)[0], device=self.device, dtype=torch.long)
+        self.idx_diff = torch.tensor(np.where(self.op_types == 12)[0], device=self.device, dtype=torch.long)
+        self.idx_sub = torch.tensor(np.where(self.op_types == 13)[0], device=self.device, dtype=torch.long)
+        self.idx_ratio = torch.tensor(np.where(self.op_types == 14)[0], device=self.device, dtype=torch.long)
         self.idx_hyst = torch.tensor(np.where(self.op_types == 16)[0], device=self.device, dtype=torch.long)
+        self.idx_deadzone = torch.tensor(np.where(self.op_types == 17)[0], device=self.device, dtype=torch.long)
         self.idx_act_pos = torch.tensor(np.where(self.op_types == 21)[0], device=self.device, dtype=torch.long)
         self.idx_act_neg = torch.tensor(np.where(self.op_types == 22)[0], device=self.device, dtype=torch.long)
         self.idx_act_reset = torch.tensor(np.where(self.op_types == 23)[0], device=self.device, dtype=torch.long)
         self.idx_fatigue = torch.tensor(np.where(self.op_types == 25)[0], device=self.device, dtype=torch.long)
+        self.idx_passthru = torch.tensor(np.where(self.op_types == 26)[0], device=self.device, dtype=torch.long)
 
         self.has_sense = len(self.idx_sense) > 0
         self.has_sum = len(self.idx_sum) > 0
         self.has_integral = len(self.idx_integral) > 0
+        self.has_amplify = len(self.idx_amplify) > 0
+        self.has_invert = len(self.idx_invert) > 0
         self.has_damper = len(self.idx_damper) > 0
+        self.has_clip = len(self.idx_clip) > 0
+        self.has_abs = len(self.idx_abs) > 0
+        self.has_multiply = len(self.idx_multiply) > 0
+        self.has_diff = len(self.idx_diff) > 0
+        self.has_sub = len(self.idx_sub) > 0
+        self.has_ratio = len(self.idx_ratio) > 0
         self.has_hyst = len(self.idx_hyst) > 0
+        self.has_deadzone = len(self.idx_deadzone) > 0
         self.has_act_pos = len(self.idx_act_pos) > 0
         self.has_act_neg = len(self.idx_act_neg) > 0
         self.has_act_reset = len(self.idx_act_reset) > 0
         self.has_fatigue = len(self.idx_fatigue) > 0
+        self.has_passthru = len(self.idx_passthru) > 0
 
     def reset_states(self):
         self.states.zero_()
@@ -190,15 +210,51 @@ class CUDACellularPopulation:
         if self.has_sum:
             self.outputs[:, self.idx_sum] = torch.tanh(x[:, self.idx_sum] * g[:, self.idx_sum])
 
+        # OP 5: INTEGRATE (s = s * 0.85 + x * 0.15; out = tanh(s * g))
+        if self.has_integral:
+            self.states[:, self.idx_integral] = self.states[:, self.idx_integral] * 0.85 + x[:, self.idx_integral] * 0.15
+            self.outputs[:, self.idx_integral] = torch.tanh(self.states[:, self.idx_integral] * g[:, self.idx_integral])
+
+        # OP 6: AMPLIFY (out = tanh(x * g * 2.5))
+        if self.has_amplify:
+            self.outputs[:, self.idx_amplify] = torch.tanh(x[:, self.idx_amplify] * g[:, self.idx_amplify] * 2.5)
+
+        # OP 7: INVERT (out = -tanh(x * g))
+        if self.has_invert:
+            self.outputs[:, self.idx_invert] = -torch.tanh(x[:, self.idx_invert] * g[:, self.idx_invert])
+
         # OP 8: DAMPER (s = s * 0.70 + x * 0.30; out = s)
         if self.has_damper:
             self.states[:, self.idx_damper] = self.states[:, self.idx_damper] * 0.70 + x[:, self.idx_damper] * 0.30
             self.outputs[:, self.idx_damper] = self.states[:, self.idx_damper]
 
-        # OP 5: INTEGRATE (s = s * 0.85 + x * 0.15; out = tanh(s * g))
-        if self.has_integral:
-            self.states[:, self.idx_integral] = self.states[:, self.idx_integral] * 0.85 + x[:, self.idx_integral] * 0.15
-            self.outputs[:, self.idx_integral] = torch.tanh(self.states[:, self.idx_integral] * g[:, self.idx_integral])
+        # OP 9: CLIP (out = clamp(x * g, -1.0, 1.0))
+        if self.has_clip:
+            self.outputs[:, self.idx_clip] = torch.clamp(x[:, self.idx_clip] * g[:, self.idx_clip], -1.0, 1.0)
+
+        # OP 10: ABS (out = |tanh(x * g)|)
+        if self.has_abs:
+            self.outputs[:, self.idx_abs] = torch.abs(torch.tanh(x[:, self.idx_abs] * g[:, self.idx_abs]))
+
+        # OP 11: MULTIPLY (out = tanh(x * g * 1.5))
+        if self.has_multiply:
+            self.outputs[:, self.idx_multiply] = torch.tanh(x[:, self.idx_multiply] * g[:, self.idx_multiply] * 1.5)
+
+        # OP 12: DIFF (out = x - s; s = x)
+        if self.has_diff:
+            cur_x = x[:, self.idx_diff]
+            self.outputs[:, self.idx_diff] = cur_x - self.states[:, self.idx_diff]
+            self.states[:, self.idx_diff] = cur_x
+
+        # OP 13: SUB (s = s * 0.60 + x * 0.40; out = tanh((x - s) * g))
+        if self.has_sub:
+            self.states[:, self.idx_sub] = self.states[:, self.idx_sub] * 0.60 + x[:, self.idx_sub] * 0.40
+            self.outputs[:, self.idx_sub] = torch.tanh((x[:, self.idx_sub] - self.states[:, self.idx_sub]) * g[:, self.idx_sub])
+
+        # OP 14: RATIO (s = s * 0.85 + |x| * 0.15; out = clamp(x / (s + 0.1), -2.0, 2.0))
+        if self.has_ratio:
+            self.states[:, self.idx_ratio] = self.states[:, self.idx_ratio] * 0.85 + torch.abs(x[:, self.idx_ratio]) * 0.15
+            self.outputs[:, self.idx_ratio] = torch.clamp(x[:, self.idx_ratio] / (self.states[:, self.idx_ratio] + 0.1), -2.0, 2.0)
 
         # OP 16: HYSTERESIS (if x > 0.15 s=1; elif x < -0.15 s=-1; out = s)
         if self.has_hyst:
@@ -209,11 +265,20 @@ class CUDACellularPopulation:
             self.states[:, self.idx_hyst] = cur_s
             self.outputs[:, self.idx_hyst] = cur_s
 
+        # OP 17: DEADZONE (|x| > 0.08 ? x * g : 0.0)
+        if self.has_deadzone:
+            cur_x = x[:, self.idx_deadzone]
+            self.outputs[:, self.idx_deadzone] = torch.where(torch.abs(cur_x) > 0.08, cur_x * g[:, self.idx_deadzone], self.const_zero)
+
         # OP 25: FATIGUE (s = min(2.0, s + |x|*0.15)*0.96; out = tanh(x*g)/(1+s))
         if self.has_fatigue:
             cur_s = torch.clamp(self.states[:, self.idx_fatigue] + torch.abs(x[:, self.idx_fatigue]) * 0.15, max=2.0) * 0.96
             self.states[:, self.idx_fatigue] = cur_s
             self.outputs[:, self.idx_fatigue] = torch.tanh(x[:, self.idx_fatigue] * g[:, self.idx_fatigue]) / (1.0 + cur_s)
+
+        # OP 26: PASSTHRU (out = x)
+        if self.has_passthru:
+            self.outputs[:, self.idx_passthru] = x[:, self.idx_passthru]
 
         # OP 21: ACT_POS (out = clamp(x * g, 0.0, 1.0))
         if self.has_act_pos:

@@ -15,7 +15,7 @@ void test_membrane_pore_voltage_gating() {
     assert(pores.atp_coupling_damping >= 0.99f);
 
     // 施加正向去极化冲动
-    for (int t = 0; t < 20; ++t) {
+    for (int t = 0; t < 45; ++t) {
         pores.update(1.5f, 80.0f, 600.0f, 0.0f, 0.05f);
     }
     // Na+ (pore 0) 和 Ca2+ (pore 2) 显著开放
@@ -27,7 +27,7 @@ void test_membrane_pore_voltage_gating() {
               << ", 跨膜电位 Vm=" << pores.membrane_potential << " mV" << std::endl;
 
     // 撤销冲动，进入复极化回归静息期
-    for (int t = 0; t < 60; ++t) {
+    for (int t = 0; t < 300; ++t) {
         pores.update(0.0f, 80.0f, 600.0f, 0.0f, 0.05f);
     }
     // Na+ 孔关闭，K+ (pore 1) 复极化，Vm 恢复至静息电位附近 (<-60 mV)

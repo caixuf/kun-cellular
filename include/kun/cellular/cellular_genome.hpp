@@ -347,6 +347,9 @@ public:
             c.output_val = 0.0;
             c.prev_output_val = 0.0;
             c.aux_state = 0.0;
+            c.activation_count = 0;
+            c.glow_charge = 0.0f;
+            c.membrane_potential = -70.0f;
             std::fill(std::begin(c.delay_buffer), std::end(c.delay_buffer), 0.0);
             c.delay_idx = 0;
         }
@@ -1421,119 +1424,7 @@ public:
             double in0 = port_ptr[idx * 2 + 0];
             double in1 = port_ptr[idx * 2 + 1];
 
-            switch (c.type) {
-                case CellType::SENSE_RAW_INPUT_0:
-                case CellType::SENSE_RAW_INPUT_1:
-                case CellType::SENSE_RAW_INPUT_2:
-                case CellType::SENSE_RAW_INPUT_3:
-                case CellType::SENSE_CHANNEL: {
-                    const size_t ch = receptor_channel_index(c.type, c.param2);
-                    c.output_val = (ch < in_dim) ? inputs[ch] * c.param1 : 0.0;
-                    break;
-                }
-
-                case CellType::OP_EMA: {
-                    if (!std::isfinite(in0)) in0 = 0.0;
-                    if (!std::isfinite(c.state_val)) c.state_val = 0.0;
-                    double alpha = std::clamp(c.param1, 0.001, 1.0);
-                    if (c.activation_count == 0) c.state_val = in0;
-                    else c.state_val = alpha * in0 + (1.0 - alpha) * c.state_val;
-                    c.output_val = c.state_val;
-                    break;
-                }
-                case CellType::OP_DIFF:
-                    c.output_val = in0 - c.prev_input;
-                    c.prev_input = in0;
-                    break;
-                case CellType::OP_INTEGRAL:
-                    if (!std::isfinite(in0)) in0 = 0.0;
-                    if (!std::isfinite(c.state_val)) c.state_val = 0.0;
-                    c.state_val = std::clamp(c.state_val + in0 * c.param1, -4.0, 4.0);
-                    c.output_val = c.state_val;
-                    break;
-                case CellType::OP_SUM:
-                    c.output_val = in0 + in1;
-                    break;
-                case CellType::OP_SUB:
-                    c.output_val = in0 - in1;
-                    break;
-                case CellType::OP_MULTIPLY:
-                    c.output_val = in0 * in1;
-                    break;
-                case CellType::OP_RATIO:
-                    c.output_val = in0 / (std::abs(in1) > 1e-6 ? in1 : 1e-6);
-                    break;
-                case CellType::OP_ABS:
-                    c.output_val = std::abs(in0);
-                    break;
-                case CellType::OP_DELAY_N: {
-                    int k = std::clamp(static_cast<int>(std::floor(c.param1 * 16.0)), 1, 16);
-                    size_t read_idx = (static_cast<size_t>(c.delay_idx) + 16 - static_cast<size_t>(k)) & 15;
-                    c.output_val = c.delay_buffer[read_idx];
-                    c.delay_buffer[c.delay_idx & 15] = in0;
-                    c.delay_idx = static_cast<uint8_t>((c.delay_idx + 1) & 15);
-                    break;
-                }
-                case CellType::OP_OSCILLATOR: {
-                    if (c.activation_count == 0 && std::abs(c.state_val) < 1e-6 && std::abs(c.aux_state) < 1e-6) {
-                        c.state_val = 0.1;
-                    }
-                    double mu = (std::abs(c.param1) > 1e-4) ? std::clamp(std::abs(c.param1), 0.01, 5.0) : 1.0;
-                    double dt = (std::abs(c.param2) > 1e-4) ? std::clamp(std::abs(c.param2), 0.001, 0.2) : 0.05;
-
-                    double s1 = c.state_val;
-                    double s2 = c.aux_state;
-
-                    double ds1 = s2;
-                    double ds2 = mu * (1.0 - s1 * s1) * s2 - s1 + in0;
-
-                    s1 += ds1 * dt;
-                    s2 += ds2 * dt;
-
-                    c.state_val = std::clamp(s1, -10.0, 10.0);
-                    c.aux_state = std::clamp(s2, -10.0, 10.0);
-                    c.output_val = c.state_val;
-                    break;
-                }
-                case CellType::OP_QUADRATIC:
-                    c.output_val = c.param1 * in0 * in0 + c.param2 * in0 * in1;
-                    break;
-
-                case CellType::GATE_THRESHOLD:
-                    c.output_val = (in0 > c.param1) ? 1.0 : 0.0;
-                    break;
-                case CellType::GATE_HYSTERESIS:
-                    if (in0 > c.param1) c.latch_state = true;
-                    else if (in0 < c.param2) c.latch_state = false;
-                    c.output_val = c.latch_state ? 1.0 : -1.0;
-                    break;
-                case CellType::GATE_AND:
-                    c.output_val = (in0 > 0.0 && in1 > 0.0) ? 1.0 : 0.0;
-                    break;
-                case CellType::GATE_INHIBIT:
-                    c.output_val = in0 * std::max(0.0, 1.0 - in1);
-                    break;
-                case CellType::GATE_DEADZONE:
-                    c.output_val = (std::abs(in0) > std::abs(c.param1)) ? in0 : 0.0;
-                    break;
-                case CellType::GATE_MIN_MAX:
-                    c.output_val = (c.param1 > 0.5) ? std::max(in0, in1) : std::min(in0, in1);
-                    break;
-
-                case CellType::ACT_PRIMARY_POSITIVE:
-                case CellType::ACT_PRIMARY_NEGATIVE:
-                case CellType::ACT_DEFENSIVE_RESET:
-                case CellType::ACT_IMMUNE_BLOCK:
-                case CellType::ACT_CHANNEL:
-                case CellType::PREDICT_SENSE_0:
-                case CellType::PREDICT_SENSE_1:
-                    c.output_val = in0;
-                    break;
-
-                case CellType::ASSOCIATION_HUB:
-                    c.output_val = std::tanh(in0 + in1 * c.param1);
-                    break;
-            }
+            dispatch_cell_forward(c, in0, in1, in_dim, inputs);
 
             if (std::abs(c.output_val) > 1e-6) {
                 c.activation_count++;
@@ -2061,7 +1952,7 @@ public:
         ofs.write(reinterpret_cast<const char*>(&hdr), sizeof(hdr));
 
         for (const auto& c : cells) {
-            uint8_t op = cell_type_to_sdsc_opcode(c.type);
+            uint8_t op = cell_type_to_serialization_code(c.type);
             int8_t p1_i8 = static_cast<int8_t>(std::clamp(std::round(c.param1 * 64.0), -128.0, 127.0));
             int8_t p2_i8 = static_cast<int8_t>(std::clamp(std::round(c.param2 * 64.0), -128.0, 127.0));
             uint8_t p1_u8 = static_cast<uint8_t>(p1_i8);
@@ -2120,6 +2011,14 @@ public:
         return kun::sdsc_opcode_to_cell_type(op, flags, version);
     }
 
+    static uint8_t cell_type_to_serialization_code(CellType t) {
+        return kun::cell_type_to_serialization_code(t);
+    }
+
+    static CellType serialization_code_to_cell_type(uint8_t code) {
+        return kun::serialization_code_to_cell_type(code);
+    }
+
     static CellularOrganism load_checkpoint_json(const std::string& filepath) {
         std::ifstream ifs(filepath);
         if (!ifs.is_open()) return CellularOrganism();
@@ -2171,7 +2070,9 @@ public:
             int8_t p2_i8 = static_cast<int8_t>(p2_u8);
 
             org.cells[i].id = i;
-            org.cells[i].type = sdsc_opcode_to_cell_type(op, flags, hdr.version);
+            org.cells[i].type = (hdr.version >= 3)
+                ? serialization_code_to_cell_type(op)
+                : sdsc_opcode_to_cell_type(op, flags, hdr.version);
             org.cells[i].param1 = static_cast<double>(p1_i8) / 64.0;
             org.cells[i].param2 = static_cast<double>(p2_i8) / 64.0;
             org.cells[i].latch_state = false;
