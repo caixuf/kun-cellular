@@ -1,0 +1,28 @@
+{
+  "schema": "SDSC-Formal-Cert-v1.0",
+  "organism_bin": "checkpoints/quant_tripartite_champion.bin",
+  "wl_canonical_hash": "0x19d96370ecc11200",
+  "topology": {
+    "num_cells": 9,
+    "num_synapses": 11,
+    "core_nodes": 7,
+    "core_edges": 11
+  },
+  "lyapunov_certificate": {
+    "status": "CERTIFIED_BIBO_STABLE",
+    "max_loop_gain": 0,
+    "stability_margin": 1,
+    "has_unstable_cycles": false
+  },
+  "bit_exact_regression": {
+    "status": "BIT_EXACT_ZERO_DRIFT",
+    "steps": 50000,
+    "fnv1a_checksum": "0x72213fc86ad82753",
+    "max_action_peak": 0.536633
+  },
+  "operator_safety_proof": {
+    "bounds_check": "ALL_CELLS_BOUNDED",
+    "source_of_truth": "ops.yaml-v2.0.0"
+  },
+  "certified_at": "Sat Sep  5 21:00:08 2026"
+}

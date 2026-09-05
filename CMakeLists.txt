@@ -132,6 +132,12 @@ target_link_libraries(train_domain_zoo PRIVATE kun_cellular Threads::Threads m)
 add_executable(kun_certify "${CMAKE_CURRENT_SOURCE_DIR}/tools/kun_certify.cpp")
 target_link_libraries(kun_certify PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_cart_pole_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_cart_pole_tripartite.cpp")
+target_link_libraries(train_cart_pole_tripartite PRIVATE kun_cellular Threads::Threads m)
+
+add_executable(train_quant_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_tripartite.cpp")
+target_link_libraries(train_quant_tripartite PRIVATE kun_cellular Threads::Threads m)
+
 if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
     add_executable(bench_adas_scales "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_adas_scales.cpp")
     target_include_directories(bench_adas_scales PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_HEADER_PATH})

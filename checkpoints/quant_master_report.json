@@ -10,14 +10,14 @@
   "val_end": "2015-12-31",
   "test_start": "2016-01-04",
   "test_end": "2026-09-01",
-  "train_fitness": 3.615122,
-  "oos_sharpe": 0.414854,
-  "oos_pnl": 0.298388,
-  "oos_max_drawdown": 0.286359,
-  "oos_calmar": 1.042005,
-  "oos_trades": 5252,
-  "final_capital": 1298387.847749,
+  "train_fitness": 2.180744,
+  "oos_sharpe": -0.572901,
+  "oos_pnl": -0.119926,
+  "oos_max_drawdown": 0.130707,
+  "oos_calmar": -0.917519,
+  "oos_trades": 202,
+  "final_capital": 880073.704360,
   "adas_untouched": true,
   "base_untouched": true,
-  "checkpoint": "checkpoints/quant_master_champion.json"
+  "checkpoint": "checkpoints/quant_master_champion.bin"
 }

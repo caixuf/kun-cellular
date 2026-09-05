@@ -1,0 +1,28 @@
+{
+  "schema": "SDSC-Formal-Cert-v1.0",
+  "organism_bin": "checkpoints/cartpole_tripartite_champion.bin",
+  "wl_canonical_hash": "0x3cf1147c3c6d14ee",
+  "topology": {
+    "num_cells": 8,
+    "num_synapses": 14,
+    "core_nodes": 8,
+    "core_edges": 14
+  },
+  "lyapunov_certificate": {
+    "status": "CERTIFIED_BIBO_STABLE",
+    "max_loop_gain": 0,
+    "stability_margin": 1,
+    "has_unstable_cycles": false
+  },
+  "bit_exact_regression": {
+    "status": "BIT_EXACT_ZERO_DRIFT",
+    "steps": 50000,
+    "fnv1a_checksum": "0x55502561463f945f",
+    "max_action_peak": 5.03618
+  },
+  "operator_safety_proof": {
+    "bounds_check": "ALL_CELLS_BOUNDED",
+    "source_of_truth": "ops.yaml-v2.0.0"
+  },
+  "certified_at": "Sat Sep  5 20:52:56 2026"
+}
