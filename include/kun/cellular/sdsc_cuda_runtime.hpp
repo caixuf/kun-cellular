@@ -14,6 +14,7 @@
  */
 
 #include "kun/cellular/sdsc_compact_genome.hpp"
+#include "kun/cellular/cuda_ops.cuh"
 #include <cuda.h>
 #include <nvrtc.h>
 #include <iostream>
@@ -142,77 +143,10 @@ private:
     }
 
     void compile_cuda_kernel() {
-        const char* cuda_source = R"(
+        std::string cuda_source = std::string(R"(
         typedef unsigned char uint8_t;
         typedef unsigned int uint32_t;
-
-        __device__ __forceinline__ float sdsc_cuda_eval_primitive(
-            uint8_t op, float gain, float x, float* s, float* a
-        ) {
-            float out = 0.0f;
-            switch (op) {
-                case 0: case 1: case 2: case 3: // SDSC_OP_SENSE
-                    out = x; break;
-                case 4: // SDSC_OP_SUM
-                    out = tanhf(x * gain); break;
-                case 5: // SDSC_OP_INTEGRATE
-                    *s = 0.85f * (*s) + 0.15f * x;
-                    out = tanhf(*s * gain); break;
-                case 6: // SDSC_OP_AMPLIFY
-                    out = tanhf(x * gain * 2.5f); break;
-                case 7: // SDSC_OP_INVERT
-                    out = -tanhf(x * gain); break;
-                case 8: // SDSC_OP_DAMPER
-                    *s = 0.70f * (*s) + 0.30f * x;
-                    out = *s; break;
-                case 9: // SDSC_OP_CLIP
-                    out = fminf(fmaxf(x * gain, -1.0f), 1.0f); break;
-                case 10: // SDSC_OP_ABS
-                    out = fabsf(tanhf(x * gain)); break;
-                case 11: // SDSC_OP_MULTIPLY
-                    out = tanhf(x * gain * 1.5f); break;
-                case 12: // SDSC_OP_DIFF
-                    out = x - (*s);
-                    *s = x; break;
-                case 13: // SDSC_OP_SUB
-                    *s = 0.90f * (*s) + 0.10f * x;
-                    out = tanhf((x - *s) * gain); break;
-                case 14: // SDSC_OP_RATIO
-                    out = fminf(fmaxf(x / (fabsf(*s) + 0.1f), -2.0f), 2.0f); break;
-                case 15: // SDSC_OP_THRESHOLD
-                    out = (x > 0.25f) ? 1.0f : ((x < -0.25f) ? -1.0f : 0.0f); break;
-                case 16: // SDSC_OP_HYSTERESIS
-                    if (x > 0.15f) *s = 1.0f;
-                    else if (x < -0.15f) *s = -1.0f;
-                    out = *s; break;
-                case 17: // SDSC_OP_DEADZONE
-                    out = (fabsf(x) > 0.08f) ? (x * gain) : 0.0f; break;
-                case 18: // SDSC_OP_INHIBIT
-                    out = tanhf(x * gain) * fmaxf(0.0f, 1.0f - fabsf(*s)); break;
-                case 19: // SDSC_OP_AND
-                    out = (x > 0.0f && *s > 0.0f) ? 1.0f : 0.0f; break;
-                case 20: // SDSC_OP_MIN_MAX
-                    out = fmaxf(x, *s); break;
-                case 21: // SDSC_OP_ACT_POS
-                    out = fminf(fmaxf(x * gain, 0.0f), 1.0f); break;
-                case 22: // SDSC_OP_ACT_NEG
-                    out = fminf(fmaxf(-x * gain, 0.0f), 1.0f); break;
-                case 23: // SDSC_OP_ACT_RESET
-                    out = (fabsf(x) < 0.1f) ? 0.0f : x; break;
-                case 24: // SDSC_OP_CORRELATION
-                    *s = 0.90f * (*s) + 0.10f * (x * (*a));
-                    *a = x;
-                    out = tanhf(*s * gain); break;
-                case 25: // SDSC_OP_FATIGUE
-                    *s += fabsf(x) * 0.05f;
-                    *s *= 0.98f;
-                    out = tanhf(x * gain) / (1.0f + *s); break;
-                default:
-                    out = x; break;
-            }
-            return out;
-        }
-
+)") + SDSC_CUDA_DEVICE_OPS_SRC + R"(
         extern "C" __global__ void kernel_input_inject(
             uint32_t in_dim,
             const float* __restrict__ in_tensor,
@@ -271,7 +205,7 @@ private:
         )";
 
         nvrtcProgram prog;
-        nvrtcCreateProgram(&prog, cuda_source, "sdsc_cuda_kernels.cu", 0, NULL, NULL);
+        nvrtcCreateProgram(&prog, cuda_source.c_str(), "sdsc_cuda_kernels.cu", 0, NULL, NULL);
         const char* opts[] = {"--gpu-architecture=compute_89"};
         nvrtcResult res = nvrtcCompileProgram(prog, 1, opts);
         if (res != NVRTC_SUCCESS) {

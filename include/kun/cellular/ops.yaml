@@ -1,0 +1,559 @@
+# ============================================================================
+# 软件定义硅基细胞计算机 (SDSCC) 原子计算动力学原语与形态学细胞统一规范 (ops.yaml)
+# ============================================================================
+# 【最高准则 / Single Source of Truth】
+# 本文件为 SDSCC 动力学原语、形态学细胞类型、李雅普诺夫有界性契约的唯一权威定义。
+# 严禁手动修改生成的代码文件；所有原语算子扩展必须在此统一定义，并由 tools/gen_ops.py 生成：
+#   - include/kun/cellular/sdsc_primitives.h     (纯 C11 硬件级内联执行)
+#   - include/kun/cellular/cuda_ops.cuh          (CUDA __device__ 内联执行与 JIT 源码)
+#   - include/kun/cellular/generated_ops.hpp     (C++20 类型系统、枚举、反射映射与门禁检查)
+#   - tools/kun_cellular_ops.py                  (Python / PyTorch 向量化等价算子与对账模型)
+# ============================================================================
+
+version: "1.0.0"
+
+# 27 大完备原子计算原语 (5-bit 紧凑硬件操作码 0..26)
+sdsc_primitives:
+  # ── 一、感知受体族 (Receptors) ──────────────────────────────────────────
+  - id: 0
+    name: SDSC_OP_SENSE_0
+    category: RECEPTOR
+    description: "原始输入通道 0 (透传直连)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-inf, +inf]"
+    eval_code: "out = x;"
+
+  - id: 1
+    name: SDSC_OP_SENSE_1
+    category: RECEPTOR
+    description: "原始输入通道 1 (透传直连)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 1.0
+    lyapunov_bound: "[-inf, +inf]"
+    eval_code: "out = x;"
+
+  - id: 2
+    name: SDSC_OP_SENSE_2
+    category: RECEPTOR
+    description: "原始输入通道 2 (透传直连)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 2.0
+    lyapunov_bound: "[-inf, +inf]"
+    eval_code: "out = x;"
+
+  - id: 3
+    name: SDSC_OP_SENSE_3
+    category: RECEPTOR
+    description: "原始输入通道 3 (透传直连)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 3.0
+    lyapunov_bound: "[-inf, +inf]"
+    eval_code: "out = x;"
+
+  # ── 二、代谢运算族 (Metabolic Operators) ───────────────────────────────
+  - id: 4
+    name: SDSC_OP_SUM
+    category: METABOLIC
+    description: "非线性饱和加权叠加: tanh(x * g)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: "out = tanhf(x * g);"
+
+  - id: 5
+    name: SDSC_OP_INTEGRATE
+    category: METABOLIC
+    description: "稳态误差积分累加器 (Leaky Integrator): s = 0.85*s + 0.15*x, out = tanh(s * g)"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: |
+      s = s * 0.85f + x * 0.15f;
+      out = tanhf(s * g);
+
+  - id: 6
+    name: SDSC_OP_AMPLIFY
+    category: METABOLIC
+    description: "敏捷高增益兴奋门: tanh(x * g * 2.5)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: "out = tanhf(x * g * 2.5f);"
+
+  - id: 7
+    name: SDSC_OP_INVERT
+    category: METABOLIC
+    description: "反相负反馈抑制门: -tanh(x * g)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: "out = -tanhf(x * g);"
+
+  - id: 8
+    name: SDSC_OP_DAMPER
+    category: METABOLIC
+    description: "惯性一阶低通阻尼滤波: s = 0.70*s + 0.30*x, out = s"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-inf, +inf] (asymptotically bounded)"
+    eval_code: |
+      s = s * 0.70f + x * 0.30f;
+      out = s;
+
+  - id: 9
+    name: SDSC_OP_CLIP
+    category: METABOLIC
+    description: "区间硬饱和截断: clamp(x * g, -1.0, 1.0)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: "out = fminf(fmaxf(x * g, -1.0f), 1.0f);"
+
+  - id: 10
+    name: SDSC_OP_ABS
+    category: METABOLIC
+    description: "绝对值全波整流能量提取: |tanh(x * g)|"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[0.0, 1.0]"
+    eval_code: "out = fabsf(tanhf(x * g));"
+
+  - id: 11
+    name: SDSC_OP_MULTIPLY
+    category: METABOLIC
+    description: "二阶非线性增益调制: tanh(x * g * 1.5)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: "out = tanhf(x * g * 1.5f);"
+
+  - id: 12
+    name: SDSC_OP_DIFF
+    category: METABOLIC
+    description: "一阶时间差分/微分 (PD阻尼基石): out = x - s, s = x"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-inf, +inf]"
+    eval_code: |
+      out = x - s;
+      s = x;
+
+  - id: 13
+    name: SDSC_OP_SUB
+    category: METABOLIC
+    description: "双均线差分剪刀差对比器: s = 0.60*s + 0.40*x, out = tanh((x - s) * g)"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: |
+      s = s * 0.60f + x * 0.40f;
+      out = tanhf((x - s) * g);
+
+  - id: 14
+    name: SDSC_OP_RATIO
+    category: METABOLIC
+    description: "相对比率有界归一化: s = 0.85*s + 0.15*|x|, out = clamp(x / (s + 0.1), -2.0, 2.0)"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-2.0, 2.0]"
+    eval_code: |
+      s = s * 0.85f + fabsf(x) * 0.15f;
+      out = fminf(fmaxf(x / (s + 0.1f), -2.0f), 2.0f);
+
+  # ── 三、门控逻辑族 (Gating Neurons) ────────────────────────────────────
+  - id: 15
+    name: SDSC_OP_THRESHOLD
+    category: GATING
+    description: "三态阶跃硬门控: x > 0.25 -> 1.0; x < -0.25 -> -1.0; else 0.0"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: "out = (x > 0.25f) ? 1.0f : ((x < -0.25f) ? -1.0f : 0.0f);"
+
+  - id: 16
+    name: SDSC_OP_HYSTERESIS
+    category: GATING
+    description: "施密特双阈值迟滞抗抖门: x > 0.15 -> s=1; x < -0.15 -> s=-1; out = s"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: |
+      if (x > 0.15f) s = 1.0f;
+      else if (x < -0.15f) s = -1.0f;
+      out = s;
+
+  - id: 17
+    name: SDSC_OP_DEADZONE
+    category: GATING
+    description: "中心死区微噪滤除门: |x| > 0.08 ? x*g : 0.0"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-inf, +inf]"
+    eval_code: "out = (fabsf(x) > 0.08f) ? (x * g) : 0.0f;"
+
+  - id: 18
+    name: SDSC_OP_INHIBIT
+    category: GATING
+    description: "侧向抑制与能量闭锁: s = 0.80*s + 0.20*|x|, out = tanh(x*g) * max(0.0, 1.0 - s)"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: |
+      s = s * 0.80f + fabsf(x) * 0.20f;
+      out = tanhf(x * g) * fmaxf(0.0f, 1.0f - s);
+
+  - id: 19
+    name: SDSC_OP_AND
+    category: GATING
+    description: "时空协同兴奋与门: (x > 0 && s > 0) ? 1.0 : 0.0, s = x"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[0.0, 1.0]"
+    eval_code: |
+      out = (x > 0.0f && s > 0.0f) ? 1.0f : 0.0f;
+      s = x;
+
+  - id: 20
+    name: SDSC_OP_MIN_MAX
+    category: GATING
+    description: "时序极值包络提取门: out = max(x, s), s = x"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-inf, +inf]"
+    eval_code: |
+      out = fmaxf(x, s);
+      s = x;
+
+  # ── 四、效应动作族 (Effectors) ─────────────────────────────────────────
+  - id: 21
+    name: SDSC_OP_ACT_POS
+    category: EFFECTOR
+    description: "正向单极性执行器: clamp(x * g, 0.0, 1.0)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[0.0, 1.0]"
+    eval_code: "out = fminf(fmaxf(x * g, 0.0f), 1.0f);"
+
+  - id: 22
+    name: SDSC_OP_ACT_NEG
+    category: EFFECTOR
+    description: "负向单极性执行器: clamp(-x * g, 0.0, 1.0)"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[0.0, 1.0]"
+    eval_code: "out = fminf(fmaxf(-x * g, 0.0f), 1.0f);"
+
+  - id: 23
+    name: SDSC_OP_ACT_RESET
+    category: EFFECTOR
+    description: "防御性归零复位门: |x| < 0.10 ? 0.0 : x"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-inf, +inf]"
+    eval_code: "out = (fabsf(x) < 0.10f) ? 0.0f : x;"
+
+  # ── 五、高阶认知与自适应扩展 ───────────────────────────────────────────
+  - id: 24
+    name: SDSC_OP_CORRELATION
+    category: COGNITIVE
+    description: "时空自相关注意力核: s = 0.90*s + (x*a)*0.10, a = x, out = tanh(s * g)"
+    has_state: true
+    has_aux: true
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: |
+      s = s * 0.90f + (x * a) * 0.10f;
+      a = x;
+      out = tanhf(s * g);
+
+  - id: 25
+    name: SDSC_OP_FATIGUE
+    category: COGNITIVE
+    description: "神经元代谢适应疲劳门: s = min(2.0, s + |x|*0.15)*0.96, out = tanh(x*g) / (1.0 + s)"
+    has_state: true
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-1.0, 1.0]"
+    eval_code: |
+      s = fminf(2.0f, s + fabsf(x) * 0.15f) * 0.96f;
+      out = tanhf(x * g) / (1.0f + s);
+
+  # ── 直通透传通道 ───────────────────────────────────────────────────────
+  - id: 26
+    name: SDSC_OP_PASSTHRU
+    category: PASSTHRU
+    description: "直通透传通道: out = x"
+    has_state: false
+    has_aux: false
+    default_p1: 1.0
+    default_p2: 0.0
+    lyapunov_bound: "[-inf, +inf]"
+    eval_code: "out = x;"
+
+# 形态学细胞类型 (CellType) 完整定义表 (与二进制版本契约对齐)
+cell_types:
+  # 感知受体
+  - code: 0
+    name: SENSE_RAW_INPUT_0
+    str_name: Sense_Input0
+    category: RECEPTOR
+    description: "输入通道 0 (基础空间观测通道 0)"
+    sdsc_op: SDSC_OP_SENSE_0
+
+  - code: 1
+    name: SENSE_RAW_INPUT_1
+    str_name: Sense_Input1
+    category: RECEPTOR
+    description: "输入通道 1 (基础空间观测通道 1)"
+    sdsc_op: SDSC_OP_SENSE_1
+
+  - code: 2
+    name: SENSE_RAW_INPUT_2
+    str_name: Sense_Input2
+    category: RECEPTOR
+    description: "输入通道 2 (基础空间观测通道 2)"
+    sdsc_op: SDSC_OP_SENSE_2
+
+  - code: 3
+    name: SENSE_RAW_INPUT_3
+    str_name: Sense_Input3
+    category: RECEPTOR
+    description: "输入通道 3 (基础空间观测通道 3)"
+    sdsc_op: SDSC_OP_SENSE_3
+
+  - code: 4
+    name: SENSE_CHANNEL
+    str_name: Sense_Channel
+    category: RECEPTOR
+    description: "任意维受体: output = inputs[floor(param2)] * param1"
+    sdsc_op: SDSC_OP_PASSTHRU
+
+  # 代谢中间运算
+  - code: 10
+    name: OP_EMA
+    str_name: Op_EMA
+    category: METABOLIC
+    description: "指数平滑滤波 (具备衰减记忆)"
+    sdsc_op: SDSC_OP_DAMPER
+
+  - code: 11
+    name: OP_DIFF
+    str_name: Op_Diff
+    category: METABOLIC
+    description: "微分/变化率 (感知加速度与斜率)"
+    sdsc_op: SDSC_OP_DIFF
+
+  - code: 12
+    name: OP_INTEGRAL
+    str_name: Op_Integral
+    category: METABOLIC
+    description: "积分累加 (能量积聚与趋势持久度)"
+    sdsc_op: SDSC_OP_INTEGRATE
+
+  - code: 13
+    name: OP_SUM
+    str_name: Op_Sum
+    category: METABOLIC
+    description: "突触信号线性叠加 (Input A + Input B)"
+    sdsc_op: SDSC_OP_SUM
+
+  - code: 14
+    name: OP_SUB
+    str_name: Op_Sub
+    category: METABOLIC
+    description: "突触信号差分对比 (Input A - Input B)"
+    sdsc_op: SDSC_OP_SUB
+
+  - code: 15
+    name: OP_MULTIPLY
+    str_name: Op_Multiply
+    category: METABOLIC
+    description: "增益调节与调制 (Input A * Input B)"
+    sdsc_op: SDSC_OP_MULTIPLY
+
+  - code: 16
+    name: OP_RATIO
+    str_name: Op_Ratio
+    category: METABOLIC
+    description: "相对比率 (Input A / (Input B + eps))"
+    sdsc_op: SDSC_OP_RATIO
+
+  - code: 17
+    name: OP_ABS
+    str_name: Op_Abs
+    category: METABOLIC
+    description: "绝对值幅度 (|Input A|)"
+    sdsc_op: SDSC_OP_ABS
+
+  - code: 18
+    name: OP_DELAY_N
+    str_name: Op_DelayN
+    category: METABOLIC
+    description: "延迟管道 (Sliding FIFO delay u(t) = x(t-k))"
+    sdsc_op: SDSC_OP_PASSTHRU
+
+  - code: 19
+    name: OP_OSCILLATOR
+    str_name: Op_Oscillator
+    category: METABOLIC
+    description: "范德波尔相弛豫振荡器 (Van der Pol Oscillator)"
+    sdsc_op: SDSC_OP_PASSTHRU
+
+  - code: 20
+    name: OP_QUADRATIC
+    str_name: Op_Quadratic
+    category: METABOLIC
+    description: "二次能量型 (Quadratic Lyapunov energy form)"
+    sdsc_op: SDSC_OP_PASSTHRU
+
+  # 门控逻辑神经元
+  - code: 24
+    name: GATE_THRESHOLD
+    str_name: Gate_Threshold
+    category: GATING
+    description: "阶跃阈值激活 (Input > param ? 1 : 0)"
+    sdsc_op: SDSC_OP_THRESHOLD
+
+  - code: 25
+    name: GATE_HYSTERESIS
+    str_name: Gate_Hysteresis
+    category: GATING
+    description: "迟滞比较器 (Schmitt Trigger，防震荡高频抖动)"
+    sdsc_op: SDSC_OP_HYSTERESIS
+
+  - code: 26
+    name: GATE_AND
+    str_name: Gate_And
+    category: GATING
+    description: "协同兴奋门 (Input A > 0 && Input B > 0)"
+    sdsc_op: SDSC_OP_AND
+
+  - code: 27
+    name: GATE_INHIBIT
+    str_name: Gate_Inhibit
+    category: GATING
+    description: "抑制性突触 (Input A * (1.0 - Input B))"
+    sdsc_op: SDSC_OP_INHIBIT
+
+  - code: 28
+    name: GATE_DEADZONE
+    str_name: Gate_Deadzone
+    category: GATING
+    description: "中心死区噪声门 (Central deadband noise gate)"
+    sdsc_op: SDSC_OP_DEADZONE
+
+  - code: 29
+    name: GATE_MIN_MAX
+    str_name: Gate_MinMax
+    category: GATING
+    description: "极值包络门 (Extremum envelope gate)"
+    sdsc_op: SDSC_OP_MIN_MAX
+
+  # 效应/动作细胞
+  - code: 30
+    name: ACT_PRIMARY_POSITIVE
+    str_name: Act_PosAction
+    category: EFFECTOR
+    description: "正向激发效应器 (Primary Positive Actuator)"
+    sdsc_op: SDSC_OP_ACT_POS
+
+  - code: 31
+    name: ACT_PRIMARY_NEGATIVE
+    str_name: Act_NegAction
+    category: EFFECTOR
+    description: "反向激发效应器 (Primary Negative Actuator)"
+    sdsc_op: SDSC_OP_ACT_NEG
+
+  - code: 32
+    name: ACT_DEFENSIVE_RESET
+    str_name: Act_DefReset
+    category: EFFECTOR
+    description: "防御性复位/阻尼归零效应器 (Defensive Reset / Damping Effector)"
+    sdsc_op: SDSC_OP_ACT_RESET
+
+  - code: 33
+    name: ACT_IMMUNE_BLOCK
+    str_name: Act_ImmuneLock
+    category: EFFECTOR
+    description: "免疫阻断效应器 (Immune Inhibit / Safety Cutoff Effector)"
+    sdsc_op: SDSC_OP_ACT_RESET
+
+  - code: 34
+    name: ACT_CHANNEL
+    str_name: Act_Channel
+    category: EFFECTOR
+    description: "任意维效应器: 写入动作张量槽 floor(param2)"
+    sdsc_op: SDSC_OP_ACT_POS
+
+  # 认知联络与预测受体
+  - code: 40
+    name: PREDICT_SENSE_0
+    str_name: Pred_Sense0
+    category: COGNITIVE
+    description: "内部前瞻预测受体 0 (预测下一时刻输入0, 内部世界模型输出)"
+    sdsc_op: SDSC_OP_SENSE_0
+
+  - code: 41
+    name: PREDICT_SENSE_1
+    str_name: Pred_Sense1
+    category: COGNITIVE
+    description: "内部前瞻预测受体 1 (预测下一时刻输入1)"
+    sdsc_op: SDSC_OP_SENSE_1
+
+  - code: 42
+    name: ASSOCIATION_HUB
+    str_name: Assoc_Hub
+    category: COGNITIVE
+    description: "联络皮层中枢细胞 (皮层柱联想聚类, 概念吸引子表征)"
+    sdsc_op: SDSC_OP_PASSTHRU

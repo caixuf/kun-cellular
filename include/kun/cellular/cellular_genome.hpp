@@ -27,138 +27,9 @@
 #include <atomic>
 #include <thread>
 
+#include "kun/cellular/generated_ops.hpp"
+
 namespace kun {
-
-// ============================================================================
-// 1. 细胞类型 (CellType): 生物计算原语
-// ============================================================================
-enum class CellType : uint8_t {
-    // 【感知受体细胞 (Receptor / Sensory)】
-    SENSE_RAW_INPUT_0 = 0,   // 输入通道 0 (基础空间观测通道 0)
-    SENSE_RAW_INPUT_1 = 1,   // 输入通道 1 (基础空间观测通道 1)
-    SENSE_RAW_INPUT_2 = 2,   // 输入通道 2 (基础空间观测通道 2)
-    SENSE_RAW_INPUT_3 = 3,   // 输入通道 3 (基础空间观测通道 3)
-    SENSE_CHANNEL     = 4,   // 任意维受体: output = inputs[floor(param2)] * param1
-    
-    // 【代谢运算细胞 (Metabolic Math Operators)】
-    OP_EMA = 10,             // 指数平滑滤波 (具备衰减记忆)
-    OP_DIFF = 11,            // 微分/变化率 (感知加速度与斜率)
-    OP_INTEGRAL = 12,        // 积分累加 (能量积聚与趋势持久度)
-    OP_SUM = 13,             // 突触信号线性叠加 (Input A + Input B)
-    OP_SUB = 14,             // 突触信号差分对比 (Input A - Input B)
-    OP_MULTIPLY = 15,        // 增益调节与调制 (Input A * Input B)
-    OP_RATIO = 16,           // 相对比率 (Input A / (Input B + eps))
-    OP_ABS = 17,             // 绝对值幅度 (|Input A|)
-    OP_DELAY_N = 18,         // 延迟管道 (Sliding FIFO delay u(t) = x(t-k))
-    OP_OSCILLATOR = 19,      // 范德波尔相弛豫振荡器 (Van der Pol Oscillator)
-    OP_QUADRATIC = 20,       // 二次能量型 (Quadratic Lyapunov energy form)
-    
-    // 【门控逻辑神经元 (Gating / Threshold Neurons)】
-    GATE_THRESHOLD = 24,     // 阶跃阈值激活 (Input > param ? 1 : 0)
-    GATE_HYSTERESIS = 25,    // 迟滞比较器 (Schmitt Trigger，防震荡高频抖动)
-    GATE_AND = 26,           // 协同兴奋门 (Input A > 0 && Input B > 0)
-    GATE_INHIBIT = 27,       // 抑制性突触 (Input A * (1.0 - Input B))
-    GATE_DEADZONE = 28,      // 中心死区噪声门 (Central deadband noise gate)
-    GATE_MIN_MAX = 29,       // 极值包络门 (Extremum envelope gate)
-    
-    // 【效应/动作细胞 (Effector / Action)】
-    ACT_PRIMARY_POSITIVE = 30, // 正向激发效应器 (Primary Positive Actuator)
-    ACT_PRIMARY_NEGATIVE = 31, // 反向激发效应器 (Primary Negative Actuator)
-    ACT_DEFENSIVE_RESET  = 32, // 防御性复位/阻尼归零效应器 (Defensive Reset / Damping Effector)
-    ACT_IMMUNE_BLOCK     = 33, // 免疫阻断效应器 (Immune Inhibit / Safety Cutoff Effector)
-    ACT_CHANNEL          = 34, // 任意维效应器: 写入动作张量槽 floor(param2)
-
-    // 【认知联络与预测受体 (Cognitive & Predictive World Model)】
-    PREDICT_SENSE_0      = 40, // 内部前瞻预测受体 0 (预测下一时刻输入0, 内部世界模型输出)
-    PREDICT_SENSE_1      = 41, // 内部前瞻预测受体 1 (预测下一时刻输入1)
-    ASSOCIATION_HUB      = 42  // 联络皮层中枢细胞 (皮层柱联想聚类, 概念吸引子表征)
-};
-
-inline const char* to_string(CellType t) {
-    switch (t) {
-        case CellType::SENSE_RAW_INPUT_0: return "Sense_Input0";
-        case CellType::SENSE_RAW_INPUT_1: return "Sense_Input1";
-        case CellType::SENSE_RAW_INPUT_2: return "Sense_Input2";
-        case CellType::SENSE_RAW_INPUT_3: return "Sense_Input3";
-        case CellType::SENSE_CHANNEL: return "Sense_Channel";
-        case CellType::OP_EMA: return "Op_EMA";
-        case CellType::OP_DIFF: return "Op_Diff";
-        case CellType::OP_INTEGRAL: return "Op_Integral";
-        case CellType::OP_SUM: return "Op_Sum";
-        case CellType::OP_SUB: return "Op_Sub";
-        case CellType::OP_MULTIPLY: return "Op_Multiply";
-        case CellType::OP_RATIO: return "Op_Ratio";
-        case CellType::OP_ABS: return "Op_Abs";
-        case CellType::OP_DELAY_N: return "Op_DelayN";
-        case CellType::OP_OSCILLATOR: return "Op_Oscillator";
-        case CellType::OP_QUADRATIC: return "Op_Quadratic";
-        case CellType::GATE_THRESHOLD: return "Gate_Threshold";
-        case CellType::GATE_HYSTERESIS: return "Gate_Hysteresis";
-        case CellType::GATE_AND: return "Gate_And";
-        case CellType::GATE_INHIBIT: return "Gate_Inhibit";
-        case CellType::GATE_DEADZONE: return "Gate_Deadzone";
-        case CellType::GATE_MIN_MAX: return "Gate_MinMax";
-        case CellType::ACT_PRIMARY_POSITIVE: return "Act_PosAction";
-        case CellType::ACT_PRIMARY_NEGATIVE: return "Act_NegAction";
-        case CellType::ACT_DEFENSIVE_RESET: return "Act_DefReset";
-        case CellType::ACT_IMMUNE_BLOCK: return "Act_ImmuneLock";
-        case CellType::ACT_CHANNEL: return "Act_Channel";
-        case CellType::PREDICT_SENSE_0: return "Pred_Sense0";
-        case CellType::PREDICT_SENSE_1: return "Pred_Sense1";
-        case CellType::ASSOCIATION_HUB: return "Assoc_Hub";
-        default: return "Cell_Unknown";
-    }
-}
-
-inline CellType cell_type_from_string(const std::string& name) {
-    if (name == "Sense_Input0") return CellType::SENSE_RAW_INPUT_0;
-    if (name == "Sense_Input1") return CellType::SENSE_RAW_INPUT_1;
-    if (name == "Sense_Input2") return CellType::SENSE_RAW_INPUT_2;
-    if (name == "Sense_Input3") return CellType::SENSE_RAW_INPUT_3;
-    if (name == "Sense_Channel") return CellType::SENSE_CHANNEL;
-    if (name == "Op_EMA") return CellType::OP_EMA;
-    if (name == "Op_Diff") return CellType::OP_DIFF;
-    if (name == "Op_Integral") return CellType::OP_INTEGRAL;
-    if (name == "Op_Sum") return CellType::OP_SUM;
-    if (name == "Op_Sub") return CellType::OP_SUB;
-    if (name == "Op_Multiply") return CellType::OP_MULTIPLY;
-    if (name == "Op_Ratio") return CellType::OP_RATIO;
-    if (name == "Op_Abs") return CellType::OP_ABS;
-    if (name == "Op_DelayN") return CellType::OP_DELAY_N;
-    if (name == "Op_Oscillator") return CellType::OP_OSCILLATOR;
-    if (name == "Op_Quadratic") return CellType::OP_QUADRATIC;
-    if (name == "Gate_Threshold") return CellType::GATE_THRESHOLD;
-    if (name == "Gate_Hysteresis") return CellType::GATE_HYSTERESIS;
-    if (name == "Gate_And") return CellType::GATE_AND;
-    if (name == "Gate_Inhibit") return CellType::GATE_INHIBIT;
-    if (name == "Gate_Deadzone") return CellType::GATE_DEADZONE;
-    if (name == "Gate_MinMax") return CellType::GATE_MIN_MAX;
-    if (name == "Act_PosAction") return CellType::ACT_PRIMARY_POSITIVE;
-    if (name == "Act_NegAction") return CellType::ACT_PRIMARY_NEGATIVE;
-    if (name == "Act_DefReset") return CellType::ACT_DEFENSIVE_RESET;
-    if (name == "Act_ImmuneLock") return CellType::ACT_IMMUNE_BLOCK;
-    if (name == "Act_Channel") return CellType::ACT_CHANNEL;
-    if (name == "Pred_Sense0") return CellType::PREDICT_SENSE_0;
-    if (name == "Pred_Sense1") return CellType::PREDICT_SENSE_1;
-    if (name == "Assoc_Hub") return CellType::ASSOCIATION_HUB;
-    return CellType::OP_EMA;
-}
-
-inline bool is_receptor_cell(CellType t) {
-    return t == CellType::SENSE_RAW_INPUT_0 ||
-           t == CellType::SENSE_RAW_INPUT_1 ||
-           t == CellType::SENSE_RAW_INPUT_2 ||
-           t == CellType::SENSE_RAW_INPUT_3 ||
-           t == CellType::SENSE_CHANNEL;
-}
-
-inline bool is_effector_cell(CellType t) {
-    return t == CellType::ACT_PRIMARY_POSITIVE ||
-           t == CellType::ACT_PRIMARY_NEGATIVE ||
-           t == CellType::ACT_DEFENSIVE_RESET ||
-           t == CellType::ACT_IMMUNE_BLOCK ||
-           t == CellType::ACT_CHANNEL;
-}
 
 inline size_t receptor_channel_index(CellType t, double param2) {
     switch (t) {
@@ -2107,45 +1978,11 @@ public:
     }
 
     static bool is_valid_cell_type_code(uint8_t op) {
-        switch (static_cast<CellType>(op)) {
-            case CellType::SENSE_RAW_INPUT_0:
-            case CellType::SENSE_RAW_INPUT_1:
-            case CellType::SENSE_RAW_INPUT_2:
-            case CellType::SENSE_RAW_INPUT_3:
-            case CellType::SENSE_CHANNEL:
-            case CellType::OP_EMA:
-            case CellType::OP_DIFF:
-            case CellType::OP_INTEGRAL:
-            case CellType::OP_SUM:
-            case CellType::OP_SUB:
-            case CellType::OP_MULTIPLY:
-            case CellType::OP_RATIO:
-            case CellType::OP_ABS:
-            case CellType::OP_DELAY_N:
-            case CellType::OP_OSCILLATOR:
-            case CellType::OP_QUADRATIC:
-            case CellType::GATE_THRESHOLD:
-            case CellType::GATE_HYSTERESIS:
-            case CellType::GATE_AND:
-            case CellType::GATE_INHIBIT:
-            case CellType::GATE_DEADZONE:
-            case CellType::GATE_MIN_MAX:
-            case CellType::ACT_PRIMARY_POSITIVE:
-            case CellType::ACT_PRIMARY_NEGATIVE:
-            case CellType::ACT_DEFENSIVE_RESET:
-            case CellType::ACT_IMMUNE_BLOCK:
-            case CellType::ACT_CHANNEL:
-            case CellType::PREDICT_SENSE_0:
-            case CellType::PREDICT_SENSE_1:
-            case CellType::ASSOCIATION_HUB:
-                return true;
-            default:
-                return false;
-        }
+        return kun::is_valid_cell_type_code(op);
     }
 
     static uint8_t cell_type_to_sdsc_opcode(CellType t) {
-        return static_cast<uint8_t>(t);
+        return kun::cell_type_to_sdsc_opcode(t);
     }
 
     bool save_checkpoint_bin(const std::string& filepath) const {
@@ -2280,51 +2117,7 @@ public:
     }
 
     static CellType sdsc_opcode_to_cell_type(uint8_t op, uint8_t flags = 0, uint32_t version = 3) {
-        if (version >= 3) {
-            if (is_valid_cell_type_code(op)) {
-                return static_cast<CellType>(op);
-            }
-        }
-        // Legacy fallback mapping if loading older v2 or v1 checkpoints
-        if (flags & 0x01) {
-            if (op == 0) return CellType::SENSE_RAW_INPUT_0;
-            if (op == 1) return CellType::SENSE_RAW_INPUT_1;
-            if (op == 2) return CellType::SENSE_RAW_INPUT_2;
-            if (op == 3) return CellType::SENSE_RAW_INPUT_3;
-            return CellType::SENSE_CHANNEL;
-        }
-        if (flags & 0x02) {
-            if (op == 21) return CellType::ACT_PRIMARY_POSITIVE;
-            if (op == 22) return CellType::ACT_PRIMARY_NEGATIVE;
-            if (op == 23) return CellType::ACT_DEFENSIVE_RESET;
-            return CellType::ACT_CHANNEL;
-        }
-        switch (op) {
-            case 0: return CellType::SENSE_RAW_INPUT_0;
-            case 1: return CellType::SENSE_RAW_INPUT_1;
-            case 2: return CellType::SENSE_RAW_INPUT_2;
-            case 3: return CellType::SENSE_RAW_INPUT_3;
-            case 4: return CellType::OP_SUM;
-            case 5: return CellType::OP_INTEGRAL;
-            case 8: return CellType::OP_EMA;
-            case 10: return CellType::OP_ABS;
-            case 11: return CellType::OP_MULTIPLY;
-            case 12: return CellType::OP_DIFF;
-            case 13: return CellType::OP_SUB;
-            case 14: return CellType::OP_RATIO;
-            case 15: return CellType::GATE_THRESHOLD;
-            case 16: return CellType::GATE_HYSTERESIS;
-            case 17: return CellType::GATE_DEADZONE;
-            case 18: return CellType::GATE_INHIBIT;
-            case 19: return CellType::GATE_AND;
-            case 20: return CellType::GATE_MIN_MAX;
-            case 21: return CellType::ACT_PRIMARY_POSITIVE;
-            case 22: return CellType::ACT_PRIMARY_NEGATIVE;
-            case 23: return CellType::ACT_DEFENSIVE_RESET;
-            case 24: return CellType::ASSOCIATION_HUB;
-            case 25: return CellType::OP_OSCILLATOR;
-            default: return CellType::OP_EMA;
-        }
+        return kun::sdsc_opcode_to_cell_type(op, flags, version);
     }
 
     static CellularOrganism load_checkpoint_json(const std::string& filepath) {

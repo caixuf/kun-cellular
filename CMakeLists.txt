@@ -140,9 +140,12 @@ set_target_properties(kun_cellular_runtime PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
-# 5. GPU vs C++ 硬件底座逐细胞全量数值保真对账测试
+# 5. GPU vs C++ 硬件底座逐细胞全量数值保真对账测试与三方原语单一真相源门禁
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
     add_test(NAME test_gpu_cpp_bit_parity COMMAND ${Python3_EXECUTABLE} -m pytest ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_gpu_cpp_bit_parity.py)
     set_tests_properties(test_gpu_cpp_bit_parity PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}:$ENV{PYTHONPATH}")
+
+    add_test(NAME test_op_parity_codegen COMMAND ${Python3_EXECUTABLE} -m pytest ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_op_parity_codegen.py)
+    set_tests_properties(test_op_parity_codegen PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}:$ENV{PYTHONPATH}")
 endif()
