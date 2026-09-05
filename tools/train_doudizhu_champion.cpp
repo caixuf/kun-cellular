@@ -73,12 +73,25 @@ int main() {
               << global_champion.synapses.size() << " 突触, WL 拓扑哈希: " 
               << TaskEvaluator::compute_topology_hash(global_champion) << "\n";
 
-    std::string out_path = "checkpoints/doudizhu_game_champion.bin";
+    // 门禁 3: 严格 M1 样本外盲测 (50 组独立新种子)
+    int ood_wins = 0;
+    const int OOD_EPISODES = 50;
+    for (int s = 0; s < OOD_EPISODES; ++s) {
+        uint32_t unseen_seed = 90000 + s * 19;
+        DouDiZhuCardGameTask ood_eval(MAX_ROUNDS, unseen_seed);
+        auto m = ood_eval.evaluate_organism(global_champion, {unseen_seed}, MAX_ROUNDS, false);
+        if (m.success_rate >= 0.99) ood_wins++;
+    }
+    double ood_win_rate = static_cast<double>(ood_wins) / OOD_EPISODES;
+    std::cout << "🛡️ 门禁 3 (50 组独立随机发牌 OOD 盲测): 胜率 = " 
+              << (ood_win_rate * 100.0) << "% (" << ood_wins << "/" << OOD_EPISODES << ")\n";
+
+    std::string out_path = "checkpoints/doudizhu_evolved_champion.bin";
     bool saved = global_champion.save_checkpoint_bin(out_path);
     if (saved) {
-        std::cout << "  [SUCCESS] 真实斗地主生命体已成功存盘至: " << out_path << "\n";
+        std::cout << "📦 [SUCCESS] 真实斗地主生命体已成功存盘至: " << out_path << "\n";
     } else {
-        std::cerr << "  [ERROR] 保存失败: " << out_path << "\n";
+        std::cerr << "❌ [ERROR] 保存失败: " << out_path << "\n";
         return 1;
     }
 

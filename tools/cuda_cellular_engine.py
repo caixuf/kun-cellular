@@ -8,6 +8,8 @@ KunCellular GPU 批量元胞动力学演化底座 (Mathematically Equivalent to 
 - 双向保真: GPU 前向推演与 C11 sdsc_binary_runtime.h 单步误差 < 1e-6
 """
 
+import sys
+import math
 import time
 import struct
 import numpy as np
@@ -55,11 +57,19 @@ class CUDACellularPopulation:
                 src_list.append(u)
                 dst_list.append(v)
 
+        # (3) 感觉-运动单步硬实时反射束 (Sensory-Motor Reflex Tract: Column 0 -> Column C-1)
+        # 为微柱皮层提供单步硬实时闭环反射通路 (Direct Reflex Bypass)
+        motor_start = (C - 1) * K + (K - out_dim)
+        for s in range(min(in_dim, 8)):
+            for a in range(out_dim):
+                src_list.append(s)
+                dst_list.append(motor_start + a)
+
         self.num_inter = len(src_list)
         self.inter_src = torch.tensor(src_list, device=self.device, dtype=torch.long)
         self.inter_dst = torch.tensor(dst_list, device=self.device, dtype=torch.long)
         self.inter_dst_expanded = self.inter_dst.unsqueeze(0).expand(P, -1)
-        self.inter_weights = torch.randn((P, self.num_inter), device=self.device, dtype=torch.float32) * 0.03
+        self.inter_weights = torch.randn((P, self.num_inter), device=self.device, dtype=torch.float32) * 0.40
 
         # 2. 细胞原语类型 opcode 与参数完全对齐 C11 sdsc_primitives.h
         self.op_types = np.zeros(N, dtype=np.uint8)
@@ -100,6 +110,9 @@ class CUDACellularPopulation:
             elif self.op_types[i] == 0:
                 self.param1[:, i] = 1.0
                 self.param2[:, i] = float(i)
+            elif self.op_types[i] in (21, 22, 23):
+                self.param1[:, i] = 2.0
+                self.param2[:, i] = 0.0
 
         # 8-bit 量化对齐 (0~255 映射至 0.0~4.0，对齐 sdsc_binary_runtime.h:181)
         p1_u8 = torch.clamp(torch.round(self.param1 * (255.0 / 4.0)), 0, 255)
@@ -328,10 +341,229 @@ class CUDACellularPopulation:
                 f.write(struct.pack(f"<{len(col_idx)}I", *col_idx))
                 f.write(struct.pack(f"<{len(weights)}f", *weights))
 
+
             coords = [0.0] * (N * 3)
             f.write(struct.pack(f"<{len(coords)}f", *coords))
 
         return num_synapses
+
+    def mutate(self, mutation_rate=0.08, mutation_power=0.12, num_elites=25):
+        """
+        全 GPU 向量化突变算子 (仅变异非精英个体)
+        """
+        P = self.pop_size
+        if num_elites >= P:
+            return
+
+        non_elite_idx = torch.arange(num_elites, P, device=self.device)
+
+        # 1. 柱内突触权值变异
+        intra_target = self.intra_weights[non_elite_idx]
+        intra_mask = torch.rand_like(intra_target) < mutation_rate
+        intra_noise = torch.randn_like(intra_target) * mutation_power
+        intra_target.add_(intra_noise * intra_mask)
+        intra_target.clamp_(-2.0, 2.0)
+
+        # 2. 柱间长程突触权值变异
+        inter_target = self.inter_weights[non_elite_idx]
+        inter_mask = torch.rand_like(inter_target) < mutation_rate
+        inter_noise = torch.randn_like(inter_target) * mutation_power
+        inter_target.add_(inter_noise * inter_mask)
+        inter_target.clamp_(-2.0, 2.0)
+
+        # 3. 动力学参数 param1 变异
+        p1_target = self.param1[non_elite_idx]
+        p1_mask = torch.rand_like(p1_target) < mutation_rate
+        p1_noise = torch.randn_like(p1_target) * mutation_power
+        p1_target.add_(p1_noise * p1_mask)
+        p1_target.clamp_(0.0, 4.0)
+
+    def selection(self, fitness_scores, elite_ratio=0.10, tournament_k=4):
+        """
+        全 GPU 向量化锦标赛选择与精英保留 (Zero CPU Bottleneck)
+        """
+        P = self.pop_size
+        num_elites = max(1, int(P * elite_ratio))
+
+        # 1. 精英排序
+        sorted_indices = torch.argsort(fitness_scores, descending=True)
+        elite_indices = sorted_indices[:num_elites]
+
+        # 2. 锦标赛选择非精英后代
+        num_offspring = P - num_elites
+        cand_indices = torch.randint(0, P, (num_offspring, tournament_k), device=self.device)
+        cand_fitness = fitness_scores[cand_indices]
+        winner_pos = torch.argmax(cand_fitness, dim=1, keepdim=True)
+        selected_offspring = cand_indices.gather(1, winner_pos).squeeze(1)
+
+        # 3. 拼接生成新种群索引
+        next_gen_indices = torch.cat([elite_indices, selected_offspring])
+
+        # 4. 原位更新种群参数与权值
+        self.intra_weights.copy_(self.intra_weights[next_gen_indices])
+        self.inter_weights.copy_(self.inter_weights[next_gen_indices])
+        self.param1.copy_(self.param1[next_gen_indices])
+        self.param2.copy_(self.param2[next_gen_indices])
+
+        return num_elites
+
+
+class BatchedCartPoleTask:
+    """
+    全 GPU 矢量化 CartPole 动力学环境 (256 具身个体毫秒级并发模拟)
+    物理方程与 tasks/control/cart_pole_task.hpp 严格对齐
+    """
+    def __init__(self, pop_size=256, device="cuda", ood_mode=False):
+        self.pop_size = pop_size
+        self.device = torch.device(device if torch.cuda.is_available() else "cpu")
+        self.ood_mode = ood_mode
+
+        # 物理常量
+        self.gravity = 9.8
+        self.masscart = 1.0
+        self.masspole = 0.2 if ood_mode else 0.1  # OOD 加倍摆锤质量
+        self.length = 0.6 if ood_mode else 0.5    # OOD 增加摆杆长度
+        self.total_mass = self.masscart + self.masspole
+        self.polemass_length = self.masspole * self.length
+        self.force_mag = 10.0
+        self.tau = 0.02
+        self.theta_threshold = 12.0 * math.pi / 180.0
+        self.x_threshold = 2.4
+
+        # 状态张量 [P]
+        self.x = torch.zeros(pop_size, device=self.device, dtype=torch.float32)
+        self.x_dot = torch.zeros(pop_size, device=self.device, dtype=torch.float32)
+        self.theta = torch.zeros(pop_size, device=self.device, dtype=torch.float32)
+        self.theta_dot = torch.zeros(pop_size, device=self.device, dtype=torch.float32)
+        self.alive = torch.ones(pop_size, device=self.device, dtype=torch.bool)
+        self.steps = torch.zeros(pop_size, device=self.device, dtype=torch.long)
+        self.sum_abs_theta = torch.zeros(pop_size, device=self.device, dtype=torch.float32)
+
+        # 观测缓冲区 [P, 32]
+        self.obs_buf = torch.zeros((pop_size, 32), device=self.device, dtype=torch.float32)
+
+    def reset(self, seed=None):
+        if seed is not None:
+            torch.manual_seed(seed)
+
+        self.x.uniform_(-0.10, 0.10)
+        self.theta.uniform_(-0.12, 0.12)
+        self.x_dot.zero_()
+        self.theta_dot.zero_()
+        self.alive.fill_(True)
+        self.steps.zero_()
+        self.sum_abs_theta.zero_()
+        self.obs_buf.zero_()
+
+    def get_observations(self):
+        # 通道 0/1: 摆角与角速度 (直视摆杆受体)
+        # 通道 2/3: 小车位置与速度
+        self.obs_buf[:, 0] = self.theta / 0.35
+        self.obs_buf[:, 1] = self.theta_dot / 3.0
+        self.obs_buf[:, 2] = self.x / self.x_threshold
+        self.obs_buf[:, 3] = self.x_dot / 3.0
+        return self.obs_buf
+
+    def step(self, action_outputs):
+        # action_outputs: [P, out_dim], 0: ACT_POS, 1: ACT_NEG
+        force = (action_outputs[:, 0] - action_outputs[:, 1]).clamp(-1.0, 1.0) * self.force_mag
+
+        costheta = torch.cos(self.theta)
+        sintheta = torch.sin(self.theta)
+        temp = (force + self.polemass_length * (self.theta_dot ** 2) * sintheta) / self.total_mass
+        thetaacc = (self.gravity * sintheta - costheta * temp) / (self.length * (4.0 / 3.0 - self.masspole * (costheta ** 2) / self.total_mass))
+        xacc = temp - self.polemass_length * thetaacc * costheta / self.total_mass
+
+        # 仅对存活个体更新
+        alive_mask = self.alive
+        self.x[alive_mask] += self.tau * self.x_dot[alive_mask]
+        self.x_dot[alive_mask] += self.tau * xacc[alive_mask]
+        self.theta[alive_mask] += self.tau * self.theta_dot[alive_mask]
+        self.theta_dot[alive_mask] += self.tau * thetaacc[alive_mask]
+
+        self.steps[alive_mask] += 1
+        self.sum_abs_theta[alive_mask] += torch.abs(self.theta[alive_mask])
+
+        failed = (
+            (self.x < -self.x_threshold) | (self.x > self.x_threshold) |
+            (self.theta < -self.theta_threshold) | (self.theta > self.theta_threshold) |
+            ~torch.isfinite(self.x) | ~torch.isfinite(self.theta)
+        )
+        self.alive.masked_fill_(failed, False)
+
+    def evaluate_population(self, pop, max_steps=500):
+        self.reset()
+        pop.reset_states()
+
+        for _ in range(max_steps):
+            if not self.alive.any():
+                break
+            obs = self.get_observations()
+            acts = pop.forward_step(obs)
+            self.step(acts)
+
+        survival = self.steps.float()
+        centering = (1.0 - (self.sum_abs_theta / (self.steps.float() + 1e-4) / self.theta_threshold)).clamp(min=0.0) * 100.0
+        x_centering = (1.0 - (torch.abs(self.x) / self.x_threshold)).clamp(min=0.0) * 50.0
+        fitness = survival + centering + x_centering
+
+        success_rate = (self.steps >= max_steps).float().mean().item()
+        mean_steps = self.steps.float().mean().item()
+        max_steps_survived = self.steps.max().item()
+
+        return fitness, success_rate, mean_steps, max_steps_survived
+
+
+def run_gpu_evolution(generations=40, pop_size=256, max_steps=500):
+    print("=" * 65)
+    print("🧬 KunCellular GPU 端原生代际演化引擎 (256 并发个体 × CartPole)")
+    print("=" * 65)
+
+    pop = CUDACellularPopulation(pop_size=pop_size, num_columns=16, cells_per_col=64, in_dim=32, out_dim=8)
+    task = BatchedCartPoleTask(pop_size=pop_size, device=pop.device, ood_mode=False)
+    ood_task = BatchedCartPoleTask(pop_size=pop_size, device=pop.device, ood_mode=True)
+
+    t0 = time.perf_counter()
+    best_overall_sr = 0.0
+
+    for gen in range(generations):
+        fitness, sr, mean_s, max_s = task.evaluate_population(pop, max_steps=max_steps)
+        best_fit = fitness.max().item()
+
+        if sr > best_overall_sr:
+            best_overall_sr = sr
+
+        num_elites = pop.selection(fitness, elite_ratio=0.10, tournament_k=4)
+        pop.mutate(mutation_rate=0.08, mutation_power=0.12, num_elites=num_elites)
+
+        if gen % 5 == 0 or gen == generations - 1:
+            print(f"  Gen {gen:02d} | 最佳适应度: {best_fit:6.1f} | 种群平均存活: {mean_s:5.1f} 步 (最大: {max_s:3d}) | 成功率: {sr*100.0:5.1f}%")
+
+        if sr >= 0.90:
+            print(f"🎉 Gen {gen} 达成训练成功率门禁: {sr*100.0:.1f}% >= 90%！提前收敛！")
+            break
+
+    total_time = time.perf_counter() - t0
+    print("-" * 65)
+    print(f"⚡ GPU 演化总耗时: {total_time:.2f} 秒 ({gen+1} 代 × {pop_size} 体 × {max_steps} 步)")
+
+    # 门禁 3: 对演化出的冠军个体在 100 个全新随机种子下执行严苛 OOD 盲测
+    champion_idx = 0
+    champ_pop = CUDACellularPopulation(pop_size=100, num_columns=16, cells_per_col=64, in_dim=32, out_dim=8)
+    champ_pop.intra_weights.copy_(pop.intra_weights[0:1].expand(100, -1, -1, -1))
+    champ_pop.inter_weights.copy_(pop.inter_weights[0:1].expand(100, -1))
+    champ_pop.param1.copy_(pop.param1[0:1].expand(100, -1))
+    champ_pop.param2.copy_(pop.param2[0:1].expand(100, -1))
+
+    champ_ood_task = BatchedCartPoleTask(pop_size=100, device=pop.device, ood_mode=True)
+    _, champ_ood_sr, champ_ood_mean, _ = champ_ood_task.evaluate_population(champ_pop, max_steps=max_steps)
+    print(f"🛡️ 门禁 3 (冠军 100 种子 OOD 盲测): 成功率 = {champ_ood_sr*100.0:.1f}% | 平均存活 = {champ_ood_mean:.1f} 步")
+
+    out_path = "checkpoints/gpu_cartpole_champion.bin"
+    n_syns = pop.export_champion_to_sdsc_bin(champion_idx, out_path)
+    print(f"📦 导出 GPU 演化冠军检查点: {out_path} ({pop.num_cells} 细胞, {n_syns} 突触)")
+    print("=" * 65)
+    return pop, champion_idx, best_overall_sr, champ_ood_sr
 
 
 def bench_gpu_throughput():
@@ -387,4 +619,8 @@ def bench_gpu_throughput():
     print("=" * 65)
 
 if __name__ == "__main__":
-    bench_gpu_throughput()
+    if len(sys.argv) > 1 and sys.argv[1] == "evolve":
+        run_gpu_evolution(generations=40, pop_size=256, max_steps=500)
+    else:
+        bench_gpu_throughput()
+
