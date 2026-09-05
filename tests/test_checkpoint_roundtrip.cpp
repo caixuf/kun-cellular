@@ -277,11 +277,41 @@ void test_legacy_v2_checkpoint_backward_compatibility() {
     std::cout << "[PASS] test_legacy_v2_checkpoint_backward_compatibility 完美通过！" << std::endl;
 }
 
+void test_checkpoint_census_reasonableness() {
+    std::cout << "\n[Test 5] 加载 census 合理性全量普查 (防僵尸解码：act > 0 且 sense 占比 < 50%)..." << std::endl;
+    std::vector<std::string> adas_ckpts = {
+        "checkpoints/adas_cortex_champion.bin",
+        "checkpoints/adas_track_champion.bin",
+        "checkpoints/adas_occupancy_10m.bin",
+        "checkpoints/adas_transient_1m.bin",
+        "checkpoints/adas_world_model_100m.bin"
+    };
+
+    for (const auto& rel : adas_ckpts) {
+        std::string path = find_ckpt_path(rel);
+        if (!std::ifstream(path).good()) continue;
+        CellularOrganism org = CellularOrganism::load_checkpoint_bin(path);
+        assert(org.cells.size() > 0);
+        size_t sense = 0, act = 0;
+        for (const auto& c : org.cells) {
+            if (is_receptor_cell(c.type)) sense++;
+            else if (is_effector_cell(c.type)) act++;
+        }
+        double sense_ratio = static_cast<double>(sense) / org.cells.size();
+        std::cout << "  ✓ " << rel << ": total=" << org.cells.size() << ", sense=" << sense 
+                  << " (" << (sense_ratio * 100.0) << "%), act=" << act << std::endl;
+        assert(act > 0 && "效应器数必须 > 0，杜绝动作静默全零/僵尸网络！");
+        assert(sense_ratio < 0.50 && "受体占比必须严格 < 50%，杜绝全脑坍缩为受体！");
+    }
+    std::cout << "[PASS] test_checkpoint_census_reasonableness 完美通过！" << std::endl;
+}
+
 int main() {
     test_binary_checkpoint_roundtrip_fidelity();
     test_all_cell_types_roundtrip_fidelity();
     test_integral_feedback_loop_boundedness();
     test_legacy_v2_checkpoint_backward_compatibility();
-    std::cout << "\n✅ ALL CHECKPOINT ROUNDTRIP & COMPATIBILITY TESTS PASSED!" << std::endl;
+    test_checkpoint_census_reasonableness();
+    std::cout << "\n✅ ALL CHECKPOINT ROUNDTRIP, COMPATIBILITY & CENSUS TESTS PASSED!" << std::endl;
     return 0;
 }
