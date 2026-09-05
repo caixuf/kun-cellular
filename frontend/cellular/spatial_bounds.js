@@ -111,6 +111,8 @@ export function updateOrganismBounds(arg1 = null, arg2 = null, cellViewsMap = nu
     currentOrganismBounds.macroDist = Math.max(480, targetVisRadius * 2.5);
     currentOrganismBounds.microDist = Math.max(140, targetVisRadius * 0.7);
   }
+  const oid = (targetData && (targetData.organism_id || targetData.id)) || currentSelectedOrgId || (targetOrg && targetOrg.lastOrganismId);
+  if (oid) currentOrganismBounds.organismId = oid;
   currentOrganismBounds.cellScale = cellScale;
   currentOrganismBounds.volumeRatio = V_ratio;
   currentOrganismBounds.trueRadius = R_true;

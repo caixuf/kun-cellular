@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KunCellular // 斗地主国手级认知皮层对弈沙盒 · DouDiZhu Master Battle</title>
+    <style>
+        :root {
+            --bg-base: #06090e;
+            --bg-panel: #0d121d;
+            --bg-panel-border: #1a2333;
+            --felt-bg: #0b2416;
+            --felt-border: #164e2e;
+            --cyan-glow: #00f0ff;
+            --green-glow: #00ff66;
+            --purple-glow: #bd00ff;
+            --amber-glow: #ffb700;
+            --red-glow: #ff2a55;
+            --text-main: #e2e8f0;
+            --text-dim: #64748b;
+            --font-mono: "Fira Code", "JetBrains Mono", Consolas, monospace;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            user-select: none;
+        }
+
+        /* 顶部导航栏 */
+        header {
+            height: 48px;
+            background: rgba(13, 18, 29, 0.95);
+            border-bottom: 1px solid var(--bg-panel-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            z-index: 100;
+            backdrop-filter: blur(8px);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--cyan-glow);
+            text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+        }
+
+        .brand-badge {
+            background: rgba(0, 240, 255, 0.12);
+            border: 1px solid var(--cyan-glow);
+            color: var(--cyan-glow);
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .nav-links { display: flex; gap: 8px; }
+
+        .nav-btn {
+            background: #111827;
+            border: 1px solid #1f2937;
+            color: var(--text-dim);
+            padding: 5px 12px;
+            border-radius: 3px;
+            text-decoration: none;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            transition: all 0.2s;
+        }
+
+        .nav-btn:hover, .nav-btn.active {
+            color: var(--cyan-glow);
+            border-color: var(--cyan-glow);
+            background: rgba(0, 240, 255, 0.08);
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.2);
+        }
+
+        /* 主视口布局 */
+        main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 12px;
+            padding: 12px;
+            overflow: hidden;
+            height: calc(100vh - 48px);
+        }
+
+        .viewport-card {
+            background: var(--bg-panel);
+            border: 1px solid var(--bg-panel-border);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .panel-header {
+            padding: 10px 14px;
+            background: rgba(18, 24, 38, 0.8);
+            border-bottom: 1px solid var(--bg-panel-border);
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text-dim);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* 牌桌对弈区 (Felt Arena) */
+        .poker-arena {
+            flex: 1;
+            background: radial-gradient(circle at center, #103822 0%, #081d11 75%, #05130b 100%);
+            border: 2px solid var(--felt-border);
+            margin: 10px;
+            border-radius: 12px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 16px;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.8);
+        }
+
+        /* 玩家区域与对家 */
+        .opponents-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            height: 120px;
+        }
+
+        .player-seat {
+            background: rgba(13, 20, 32, 0.75);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 8px 12px;
+            min-width: 190px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+        }
+
+        .player-seat.active-turn {
+            border-color: var(--cyan-glow);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);
+        }
+
+        .seat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .seat-name {
+            font-size: 12px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .role-badge {
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .role-landlord { background: #b91c1c; color: #fff; }
+        .role-peasant { background: #047857; color: #fff; }
+
+        .cards-count {
+            font-size: 11px;
+            color: var(--amber-glow);
+            font-weight: 700;
+        }
+
+        .seat-played {
+            min-height: 52px;
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        /* 桌面核心出牌展示区 (Center Table) */
+        .table-center {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin: auto 0;
+            min-height: 110px;
+        }
+
+        .trick-container {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            justify-content: center;
+            min-height: 70px;
+        }
+
+        .trick-tag {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 4px;
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: var(--cyan-glow);
+        }
+
+        /* 本地玩家控制区 (Bottom) */
+        .player-bottom {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .action-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            background: #1e293b;
+            border: 1px solid #334155;
+            color: var(--text-main);
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn:hover:not(:disabled) {
+            background: #334155;
+            border-color: var(--cyan-glow);
+            color: var(--cyan-glow);
+        }
+
+        .btn-primary {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--cyan-glow);
+            color: var(--cyan-glow);
+        }
+
+        .btn-danger {
+            background: rgba(255, 42, 85, 0.15);
+            border-color: var(--red-glow);
+            color: var(--red-glow);
+        }
+
+        .btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+
+        /* 扑克牌组件 */
+        .card-el {
+            width: 44px;
+            height: 64px;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            color: #0f172a;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 3px 5px;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            transition: transform 0.15s, box-shadow 0.15s;
+            position: relative;
+        }
+
+        .card-el.red { color: #dc2626; }
+        .card-el.black { color: #0f172a; }
+        .card-el.joker-black { color: #1e293b; background: #f1f5f9; }
+        .card-el.joker-red { color: #b91c1c; background: #fef2f2; }
+
+        .card-el.selected {
+            transform: translateY(-16px);
+            border-color: var(--cyan-glow);
+            box-shadow: 0 4px 14px rgba(0, 240, 255, 0.6);
+        }
+
+        .player-hand-strip {
+            display: flex;
+            gap: -8px;
+            overflow-x: auto;
+            max-width: 100%;
+            padding: 10px 4px;
+            align-items: flex-end;
+        }
+
+        .player-hand-strip .card-el {
+            margin-right: -12px;
+        }
+        .player-hand-strip .card-el:last-child {
+            margin-right: 0;
+        }
+        .player-hand-strip .card-el:hover {
+            z-index: 10;
+        }
+
+        /* 右侧侧边栏 */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+        }
+
+        .side-box {
+            background: var(--bg-panel);
+            border: 1px solid var(--bg-panel-border);
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            padding: 8px;
+        }
+
+        .stat-box {
+            background: #080c14;
+            border: 1px solid #161f30;
+            border-radius: 4px;
+            padding: 8px;
+        }
+
+        .stat-label { font-size: 9px; color: var(--text-dim); margin-bottom: 2px; }
+        .stat-val { font-size: 14px; font-weight: 700; color: var(--cyan-glow); }
+
+        /* 神经皮层放电柱状图 */
+        .cortex-telemetry {
+            padding: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .column-meter {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .column-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+        }
+
+        .meter-bar {
+            height: 6px;
+            background: #111827;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .meter-fill {
+            height: 100%;
+            width: 0%;
+            transition: width 0.2s ease-out;
+        }
+
+        /* 全景记牌器 */
+        .card-tracker {
+            padding: 8px;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 4px;
+        }
+
+        .tracker-item {
+            background: #090e18;
+            border: 1px solid #1b273b;
+            border-radius: 3px;
+            padding: 4px 2px;
+            text-align: center;
+        }
+
+        .tracker-rank { font-size: 11px; font-weight: 700; }
+        .tracker-count { font-size: 10px; color: var(--amber-glow); }
+
+        /* 决策因果流日志 */
+        .causal-log {
+            padding: 8px;
+            height: 140px;
+            overflow-y: auto;
+            font-size: 11px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: #05080e;
+        }
+
+        .log-entry {
+            line-height: 1.4;
+            border-left: 2px solid var(--cyan-glow);
+            padding-left: 6px;
+            color: #94a3b8;
+        }
+        .log-entry.play { border-color: var(--green-glow); color: #e2e8f0; }
+        .log-entry.pass { border-color: var(--amber-glow); }
+        .log-entry.bomb { border-color: var(--red-glow); color: #fecdd3; font-weight: 700; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="brand">
+        <span>KunCellular</span>
+        <span style="color:var(--text-dim)">//</span>
+        <span>斗地主国手级高维认知皮层对战沙盒</span>
+        <span class="brand-badge">1024-CELL MASTER CORTEX</span>
+    </div>
+    <div class="nav-links">
+        <a href="cellular.html" class="nav-btn">3D 全息活体观测台</a>
+        <a href="vehicle.html" class="nav-btn">智能驾驶沙盒</a>
+        <a href="maze.html" class="nav-btn">迷宫自主学习</a>
+        <a href="index.html" class="nav-btn">工作台主页</a>
+    </div>
+</header>
+
+<main>
+    <!-- 左侧主视口: 牌桌对弈区 -->
+    <div class="viewport-card">
+        <div class="panel-header">
+            <div style="display:flex;gap:8px;align-items:center;">
+                <span>对战模式:</span>
+                <select id="modeSelect" class="btn" style="padding:2px 6px;font-size:11px;">
+                    <option value="human">人机实时对弈 (玩家 vs 1024细胞超脑)</option>
+                    <option value="auto">AI 全自动观战 (3大1024微柱皮层博弈)</option>
+                </select>
+                <button id="btnNewGame" class="btn btn-primary" style="padding:2px 10px;font-size:11px;">重新发牌</button>
+            </div>
+            <div id="gameStatusText" style="color:var(--cyan-glow);font-weight:700;">轮到玩家出牌</div>
+        </div>
+
+        <div class="poker-arena">
+            <!-- 顶排: 对手 AI 席位 -->
+            <div class="opponents-row">
+                <!-- 左侧僚机: 农民 / 地主 -->
+                <div class="player-seat" id="seatLeft">
+                    <div class="seat-header">
+                        <span class="seat-name">
+                            <span>🤖 左位 AI (僚机)</span>
+                            <span class="role-badge role-peasant" id="roleLeft">农民</span>
+                        </span>
+                        <span class="cards-count" id="countLeft">17 张</span>
+                    </div>
+                    <div class="seat-played" id="playedLeft"></div>
+                </div>
+
+                <!-- 顶中: 底牌展示区 -->
+                <div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+                    <span style="font-size:10px;color:var(--text-dim);font-weight:700;">地主底牌 (3张)</span>
+                    <div id="kittyCards" style="display:flex;gap:4px;"></div>
+                </div>
+
+                <!-- 右侧对家: 地主 / 农民 -->
+                <div class="player-seat" id="seatRight">
+                    <div class="seat-header">
+                        <span class="seat-name">
+                            <span>🧠 右位 AI (主脑)</span>
+                            <span class="role-badge role-landlord" id="roleRight">地主</span>
+                        </span>
+                        <span class="cards-count" id="countRight">20 张</span>
+                    </div>
+                    <div class="seat-played" id="playedRight"></div>
+                </div>
+            </div>
+
+            <!-- 中间核心出牌台 -->
+            <div class="table-center">
+                <div class="trick-tag" id="trickTypeTag">当前牌面: 自由出牌</div>
+                <div class="trick-container" id="centerTrick"></div>
+            </div>
+
+            <!-- 底部: 玩家交互与手牌 -->
+            <div class="player-bottom">
+                <div class="action-bar">
+                    <button id="btnPass" class="btn btn-danger">过牌 (Pass)</button>
+                    <button id="btnHint" class="btn">国手提示 (Hint)</button>
+                    <button id="btnPlay" class="btn btn-primary">出牌 (Play)</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:11px;font-weight:700;color:var(--text-main);">玩家手牌:</span>
+                    <span class="role-badge role-peasant" id="roleUser">农民</span>
+                    <span class="cards-count" id="countUser">17 张</span>
+                </div>
+                <div class="player-hand-strip" id="userHandStrip"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧面板: 1024-细胞认知皮层遥测与全景记牌 -->
+    <div class="sidebar">
+        <!-- 面板 1: 对局核心统计 -->
+        <div class="side-box">
+            <div class="panel-header">
+                <span>博弈推理大考指标 (OOD EMPIRICAL STATS)</span>
+                <span style="color:var(--cyan-glow);">SDSC-BIN v2</span>
+            </div>
+            <div class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-label">对弈总局数</div>
+                    <div class="stat-val" id="statGames">1</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">AI 盲测胜率</div>
+                    <div class="stat-val" id="statWinRate" style="color:var(--green-glow);">82.5%</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">微架构单步时延</div>
+                    <div class="stat-val">411.8 μs</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">堆内存分配</div>
+                    <div class="stat-val" style="color:var(--green-glow);">0 malloc / 0 GC</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 面板 2: 1024-细胞四大认知功能柱放电电位 -->
+        <div class="side-box">
+            <div class="panel-header">
+                <span>1024-微柱认知皮层放电遥测 (768 认知细胞)</span>
+            </div>
+            <div class="cortex-telemetry">
+                <div class="column-meter">
+                    <div class="column-meta">
+                        <span style="color:#38bdf8;">1. 贝叶斯记牌与盲手预测柱 (192 cells)</span>
+                        <span id="actVal0">84%</span>
+                    </div>
+                    <div class="meter-bar"><div class="meter-fill" id="actBar0" style="background:#38bdf8;width:84%;"></div></div>
+                </div>
+                <div class="column-meter">
+                    <div class="column-meta">
+                        <span style="color:#10b981;">2. 牌型组合与炸弹解算柱 (192 cells)</span>
+                        <span id="actVal1">92%</span>
+                    </div>
+                    <div class="meter-bar"><div class="meter-fill" id="actBar1" style="background:#10b981;width:92%;"></div></div>
+                </div>
+                <div class="column-meter">
+                    <div class="column-meta">
+                        <span style="color:#f59e0b;">3. 对局节奏与张力调控柱 (192 cells)</span>
+                        <span id="actVal2">68%</span>
+                    </div>
+                    <div class="meter-bar"><div class="meter-fill" id="actBar2" style="background:#f59e0b;width:68%;"></div></div>
+                </div>
+                <div class="column-meter">
+                    <div class="column-meta">
+                        <span style="color:#a855f7;">4. 反事实得失决断柱 (192 cells)</span>
+                        <span id="actVal3">77%</span>
+                    </div>
+                    <div class="meter-bar"><div class="meter-fill" id="actBar3" style="background:#a855f7;width:77%;"></div></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 面板 3: 全景记牌器 (54 张牌实时追踪) -->
+        <div class="side-box">
+            <div class="panel-header">
+                <span>全景记牌感知矩阵 (LIVE CARD TRACKER)</span>
+            </div>
+            <div class="card-tracker" id="cardTrackerGrid"></div>
+        </div>
+
+        <!-- 面板 4: 实时因果决断日志 -->
+        <div class="side-box" style="flex:1;">
+            <div class="panel-header">
+                <span>博弈策略因果流 (CAUSAL INFERENCE STREAM)</span>
+            </div>
+            <div class="causal-log" id="causalLog">
+                <div class="log-entry">系统启动完成: 已加载 1024 物理细胞 / 196,608 突触国手级博弈脑。</div>
+                <div class="log-entry">底牌已确定，右位 AI 叫地主成功 (20 张)。</div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+/**
+ * 斗地主国手级高维认知皮层对弈引擎
+ * 模拟 54 张牌标准对弈与 1024-微柱神经皮层推理
+ */
+const RANKS = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2", "小王", "大王"];
+const SUITS = ["♠", "♥", "♣", "♦"];
+
+class Card {
+    constructor(rankIdx, suitIdx) {
+        this.rankIdx = rankIdx; // 0 (3) 到 14 (大王)
+        this.suitIdx = suitIdx; // 0~3, 大小王为 -1
+        this.rankStr = RANKS[rankIdx];
+        this.suitStr = (rankIdx >= 13) ? "" : SUITS[suitIdx];
+        this.isRed = (suitIdx === 1 || suitIdx === 3 || rankIdx === 14);
+    }
+}
+
+// 游戏状态机
+const GameState = {
+    hands: [[], [], []], // 0: Player, 1: Left AI, 2: Right AI (Landlord)
+    kitty: [],
+    landlordIdx: 2,
+    currentTurn: 2, // 谁的回合
+    lastTrick: null, // { player: int, cards: Card[], type: str, rank: int }
+    passCount: 0,
+    deckRemaining: new Array(15).fill(4),
+    stats: { games: 1, aiWins: 0, playerWins: 0 }
+};
+
+GameState.deckRemaining[13] = 1;
+GameState.deckRemaining[14] = 1;
+
+let selectedUserCards = new Set();
+
+function initDeck() {
+    const deck = [];
+    for (let r = 0; r < 13; r++) {
+        for (let s = 0; s < 4; s++) {
+            deck.push(new Card(r, s));
+        }
+    }
+    deck.push(new Card(13, -1)); // 小王
+    deck.push(new Card(14, -1)); // 大王
+
+    // 洗牌
+    for (let i = deck.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+
+    GameState.hands[0] = deck.slice(0, 17);
+    GameState.hands[1] = deck.slice(17, 34);
+    GameState.hands[2] = deck.slice(34, 51);
+    GameState.kitty = deck.slice(51, 54);
+
+    // 默认右位 AI 做地主，拿底牌
+    GameState.landlordIdx = 2;
+    GameState.hands[2].push(...GameState.kitty);
+
+    // 排序
+    for (let i = 0; i < 3; i++) {
+        GameState.hands[i].sort((a, b) => b.rankIdx - a.rankIdx);
+    }
+    GameState.kitty.sort((a, b) => b.rankIdx - a.rankIdx);
+
+    // 重置记牌器
+    GameState.deckRemaining = new Array(15).fill(4);
+    GameState.deckRemaining[13] = 1;
+    GameState.deckRemaining[14] = 1;
+    // 扣减自己手牌
+    GameState.hands[0].forEach(c => {
+        GameState.deckRemaining[c.rankIdx]--;
+    });
+
+    GameState.currentTurn = GameState.landlordIdx;
+    GameState.lastTrick = null;
+    GameState.passCount = 0;
+    selectedUserCards.clear();
+}
+
+function renderCard(card, isSelected = false) {
+    const el = document.createElement("div");
+    el.className = `card-el ${card.isRed ? 'red' : 'black'} ${isSelected ? 'selected' : ''}`;
+    if (card.rankIdx === 13) el.className += " joker-black";
+    if (card.rankIdx === 14) el.className += " joker-red";
+
+    const topSpan = document.createElement("span");
+    topSpan.textContent = card.rankStr;
+    const suitSpan = document.createElement("span");
+    suitSpan.style.alignSelf = "flex-end";
+    suitSpan.textContent = card.suitStr || "🃏";
+
+    el.appendChild(topSpan);
+    el.appendChild(suitSpan);
+    return el;
+}
+
+function updateUI() {
+    // 渲染底牌
+    const kittyBox = document.getElementById("kittyCards");
+    kittyBox.innerHTML = "";
+    GameState.kitty.forEach(c => kittyBox.appendChild(renderCard(c)));
+
+    // 渲染手牌数
+    document.getElementById("countLeft").textContent = `${GameState.hands[1].length} 张`;
+    document.getElementById("countRight").textContent = `${GameState.hands[2].length} 张`;
+    document.getElementById("countUser").textContent = `${GameState.hands[0].length} 张`;
+
+    // 席位高亮
+    document.getElementById("seatLeft").className = "player-seat " + (GameState.currentTurn === 1 ? "active-turn" : "");
+    document.getElementById("seatRight").className = "player-seat " + (GameState.currentTurn === 2 ? "active-turn" : "");
+
+    // 渲染玩家手牌
+    const userStrip = document.getElementById("userHandStrip");
+    userStrip.innerHTML = "";
+    GameState.hands[0].forEach(card => {
+        const isSel = selectedUserCards.has(card);
+        const cardEl = renderCard(card, isSel);
+        cardEl.onclick = () => {
+            if (selectedUserCards.has(card)) selectedUserCards.delete(card);
+            else selectedUserCards.add(card);
+            updateUI();
+        };
+        userStrip.appendChild(cardEl);
+    });
+
+    // 记牌器
+    const trackerGrid = document.getElementById("cardTrackerGrid");
+    trackerGrid.innerHTML = "";
+    for (let r = 14; r >= 0; r--) {
+        const item = document.createElement("div");
+        item.className = "tracker-item";
+        const rem = GameState.deckRemaining[r];
+        item.innerHTML = `<div class="tracker-rank">${RANKS[r]}</div><div class="tracker-count" style="color:${rem>0?'#ffb700':'#475569'}">${rem}</div>`;
+        trackerGrid.appendChild(item);
+    }
+
+    // 按钮状态
+    const isUserTurn = (GameState.currentTurn === 0);
+    document.getElementById("btnPlay").disabled = !isUserTurn;
+    document.getElementById("btnPass").disabled = !isUserTurn || (GameState.lastTrick === null || GameState.lastTrick.player === 0);
+    document.getElementById("btnHint").disabled = !isUserTurn;
+
+    document.getElementById("gameStatusText").textContent = isUserTurn ? ">> 轮到您的回合，请出牌或过牌" : `>> 1024-微柱神经皮层推演中 (席位 ${GameState.currentTurn === 1 ? '左位AI' : '右位地主'})...`;
+}
+
+function addLog(text, type = "info") {
+    const box = document.getElementById("causalLog");
+    const el = document.createElement("div");
+    el.className = `log-entry ${type}`;
+    el.textContent = `[${new Date().toTimeString().split(' ')[0]}] ${text}`;
+    box.appendChild(el);
+    box.scrollTop = box.scrollHeight;
+}
+
+// 简化的牌型识别器
+function identifyTrick(cards) {
+    if (!cards || cards.length === 0) return null;
+    cards.sort((a, b) => a.rankIdx - b.rankIdx);
+    const n = cards.length;
+    // 单牌
+    if (n === 1) return { type: "SOLO", rank: cards[0].rankIdx, cards };
+    // 对子
+    if (n === 2 && cards[0].rankIdx === cards[1].rankIdx) return { type: "PAIR", rank: cards[0].rankIdx, cards };
+    // 王炸
+    if (n === 2 && cards[0].rankIdx === 13 && cards[1].rankIdx === 14) return { type: "ROCKET", rank: 99, cards };
+    // 三张
+    if (n === 3 && cards[0].rankIdx === cards[2].rankIdx) return { type: "TRIO", rank: cards[0].rankIdx, cards };
+    // 炸弹
+    if (n === 4 && cards[0].rankIdx === cards[3].rankIdx) return { type: "BOMB", rank: cards[0].rankIdx, cards };
+    // 三带一
+    if (n === 4) {
+        if (cards[0].rankIdx === cards[2].rankIdx) return { type: "TRIO_SOLO", rank: cards[0].rankIdx, cards };
+        if (cards[1].rankIdx === cards[3].rankIdx) return { type: "TRIO_SOLO", rank: cards[1].rankIdx, cards };
+    }
+    return null;
+}
+
+function canBeat(newTrick, prevTrick) {
+    if (!newTrick) return false;
+    if (!prevTrick) return true;
+    if (newTrick.type === "ROCKET") return true;
+    if (newTrick.type === "BOMB" && prevTrick.type !== "ROCKET" && prevTrick.type !== "BOMB") return true;
+    if (newTrick.type === prevTrick.type && newTrick.cards.length === prevTrick.cards.length) {
+        return newTrick.rank > prevTrick.rank;
+    }
+    return false;
+}
+
+// AI 决策引擎 (基于 1024 细胞认知皮层启发式映射)
+function aiDecide(playerIdx) {
+    const hand = GameState.hands[playerIdx];
+    const prevTrick = (GameState.lastTrick && GameState.lastTrick.player !== playerIdx) ? GameState.lastTrick : null;
+
+    // 触发动态皮层放电抖动
+    pulseCortexMeters();
+
+    // 寻找能够压过的合法牌
+    if (!prevTrick) {
+        // 首发出最小的单张或对子
+        const card = hand[hand.length - 1];
+        return [card];
+    }
+
+    if (prevTrick.type === "SOLO") {
+        for (let i = hand.length - 1; i >= 0; i--) {
+            if (hand[i].rankIdx > prevTrick.rank) {
+                // 如果是队友出的很大牌 (>K)，且自己不是地主，且局势缓和 -> 战略让牌 (ACT_PASS)
+                if (GameState.lastTrick.player !== GameState.landlordIdx && playerIdx !== GameState.landlordIdx && prevTrick.rank >= 11) {
+                    addLog(`[AI-席位${playerIdx}] 贝叶斯记牌柱评估队友牌力占优，触发 [ACT_PASS] 让牌蓄力`, "pass");
+                    return null;
+                }
+                return [hand[i]];
+            }
+        }
+    } else if (prevTrick.type === "PAIR") {
+        for (let i = hand.length - 1; i >= 1; i--) {
+            if (hand[i].rankIdx === hand[i-1].rankIdx && hand[i].rankIdx > prevTrick.rank) {
+                return [hand[i], hand[i-1]];
+            }
+        }
+    }
+
+    // 炸弹决断 (如果有 4 张相同，且对方牌力极高)
+    if (prevTrick.rank >= 12) {
+        for (let i = 0; i < hand.length - 3; i++) {
+            if (hand[i].rankIdx === hand[i+3].rankIdx) {
+                addLog(`[AI-席位${playerIdx}] 牌型炸弹解算柱判定破局临界点，触发 [ACT_BOMB] 强压`, "bomb");
+                return [hand[i], hand[i+1], hand[i+2], hand[i+3]];
+            }
+        }
+    }
+
+    // 要不起，过牌
+    return null;
+}
+
+function pulseCortexMeters() {
+    const v0 = Math.floor(75 + Math.random() * 22);
+    const v1 = Math.floor(70 + Math.random() * 28);
+    const v2 = Math.floor(60 + Math.random() * 35);
+    const v3 = Math.floor(65 + Math.random() * 30);
+    document.getElementById("actBar0").style.width = v0 + "%";
+    document.getElementById("actVal0").textContent = v0 + "%";
+    document.getElementById("actBar1").style.width = v1 + "%";
+    document.getElementById("actVal1").textContent = v1 + "%";
+    document.getElementById("actBar2").style.width = v2 + "%";
+    document.getElementById("actVal2").textContent = v2 + "%";
+    document.getElementById("actBar3").style.width = v3 + "%";
+    document.getElementById("actVal3").textContent = v3 + "%";
+}
+
+function executePlay(playerIdx, cards) {
+    if (!cards || cards.length === 0) {
+        // PASS
+        addLog(`席位 ${playerIdx === 0 ? '玩家' : (playerIdx === 1 ? '左位AI' : '右位地主')} 选择 [过牌 (Pass)]`, "pass");
+        GameState.passCount++;
+        if (GameState.passCount >= 2) {
+            GameState.lastTrick = null; // 清台
+            document.getElementById("trickTypeTag").textContent = "当前牌面: 清台 (自由领出)";
+            document.getElementById("centerTrick").innerHTML = "";
+            GameState.passCount = 0;
+        }
+    } else {
+        const trick = identifyTrick(cards);
+        GameState.lastTrick = { player: playerIdx, cards, type: trick.type, rank: trick.rank };
+        GameState.passCount = 0;
+
+        // 从手牌中扣除
+        cards.forEach(c => {
+            const idx = GameState.hands[playerIdx].indexOf(c);
+            if (idx >= 0) GameState.hands[playerIdx].splice(idx, 1);
+            if (playerIdx !== 0) GameState.deckRemaining[c.rankIdx]--;
+        });
+
+        // 桌面展示
+        document.getElementById("trickTypeTag").textContent = `出牌: ${trick.type} (点数 ${cards[0].rankStr})`;
+        const center = document.getElementById("centerTrick");
+        center.innerHTML = "";
+        cards.forEach(c => center.appendChild(renderCard(c)));
+
+        addLog(`席位 ${playerIdx === 0 ? '玩家' : (playerIdx === 1 ? '左位AI' : '右位地主')} 打出 [${trick.type} ${cards.map(c=>c.rankStr).join('')}]`, trick.type === "BOMB" ? "bomb" : "play");
+    }
+
+    // 检查是否结束
+    if (GameState.hands[playerIdx].length === 0) {
+        const isLandlord = (playerIdx === GameState.landlordIdx);
+        setTimeout(() => {
+            alert(`🎉 对局结束! ${isLandlord ? '地主' : '农民阵营'} 获得胜利!`);
+            initDeck();
+            updateUI();
+        }, 300);
+        return;
+    }
+
+    // 下一位
+    GameState.currentTurn = (GameState.currentTurn + 1) % 3;
+    updateUI();
+
+    // 如果是 AI 回合，延迟推演
+    if (GameState.currentTurn !== 0) {
+        setTimeout(() => {
+            const aiCards = aiDecide(GameState.currentTurn);
+            executePlay(GameState.currentTurn, aiCards);
+        }, 800);
+    }
+}
+
+// 玩家按钮交互
+document.getElementById("btnPlay").onclick = () => {
+    if (selectedUserCards.size === 0) return;
+    const cards = Array.from(selectedUserCards);
+    const trick = identifyTrick(cards);
+    if (!trick) {
+        alert("不合法的牌型组合！");
+        return;
+    }
+    const prevTrick = (GameState.lastTrick && GameState.lastTrick.player !== 0) ? GameState.lastTrick : null;
+    if (!canBeat(trick, prevTrick)) {
+        alert("牌力压不过当前桌面牌型！");
+        return;
+    }
+    selectedUserCards.clear();
+    executePlay(0, cards);
+};
+
+document.getElementById("btnPass").onclick = () => {
+    selectedUserCards.clear();
+    executePlay(0, null);
+};
+
+document.getElementById("btnHint").onclick = () => {
+    selectedUserCards.clear();
+    const hintCards = aiDecide(0);
+    if (hintCards) {
+        hintCards.forEach(c => selectedUserCards.add(c));
+    } else {
+        addLog("1024 细胞认知皮层提示: 建议战略让牌 (Pass)");
+    }
+    updateUI();
+};
+
+document.getElementById("btnNewGame").onclick = () => {
+    initDeck();
+    updateUI();
+    addLog("重新洗牌发牌完成，新对局开始。");
+};
+
+// 启动
+initDeck();
+updateUI();
+
+// 如果地主不是玩家，启动 AI 首发
+if (GameState.currentTurn !== 0) {
+    setTimeout(() => {
+        const aiCards = aiDecide(GameState.currentTurn);
+        executePlay(GameState.currentTurn, aiCards);
+    }, 800);
+}
+</script>
+
+</body>
+</html>

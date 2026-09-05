@@ -36,9 +36,31 @@ void test_doudizhu_step_and_fitness() {
     assert(task.current_fitness() >= 0.0);
 }
 
+void test_doudizhu_1024_master_checkpoint() {
+    std::ifstream f("checkpoints/doudizhu_game_champion.bin", std::ios::binary);
+    if (!f.is_open()) {
+        f.open("../checkpoints/doudizhu_game_champion.bin", std::ios::binary);
+    }
+    assert(f.is_open());
+    uint32_t magic = 0, version = 0, num_cells = 0, num_synapses = 0, in_dim = 0, out_dim = 0;
+    f.read(reinterpret_cast<char*>(&magic), 4);
+    f.read(reinterpret_cast<char*>(&version), 4);
+    f.read(reinterpret_cast<char*>(&num_cells), 4);
+    f.read(reinterpret_cast<char*>(&num_synapses), 4);
+    f.read(reinterpret_cast<char*>(&in_dim), 4);
+    f.read(reinterpret_cast<char*>(&out_dim), 4);
+    assert(magic == 0x53445343);
+    assert(version == 2);
+    assert(num_cells == 1024);
+    assert(num_synapses == 196608);
+    assert(in_dim == 32);
+    assert(out_dim == 7);
+}
+
 int main() {
     test_doudizhu_initialization();
     test_doudizhu_step_and_fitness();
+    test_doudizhu_1024_master_checkpoint();
     std::cout << "[PASS] test_flow_doudizhu_card_game all assertions passed!" << std::endl;
     return 0;
 }

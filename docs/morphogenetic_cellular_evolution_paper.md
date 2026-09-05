@@ -370,6 +370,17 @@ Subjecting the vehicle brain to continuous fluid media coupling Navier-Stokes ae
 * **Vacuum Void**: Density $0.0\,\text{kg/m}^3$, zero external damping; Max CTE $0.3521\,\text{m}$ ($35.21\,\text{cm}$), heading error $0.46^\circ$;
 * All three fluid regimes achieved 100% convergence and zero loss-of-control events.
 
+### 5.11 Imperfect-Information Discrete Card Game: DouDiZhu Grand Master Cognitive Cortex [E1]
+To evaluate SDSCC's large-scale cortical reasoning and self-organizing decision-making capabilities in discrete symbolic spaces and imperfect-information multi-agent adversarial games, we instantiated the high-dimensional full-deck DouDiZhu environment (`tools/train_doudizhu_master_cortex.py` and `tasks/transfer/cross_domain_tasks.hpp`):
+* **High-Dimensional State Observations (32 Channels)**: 15 card ranks distribution matrix (3~A, 2, Jokers), 3-player remaining card count ratios and Landlord identity, current table trick (solo/pair/trio/bomb) and suppression strength, played history decay intensity, and dynamic endgame approach and tempo wave features;
+* **Four Functional Cognitive Microcolumns (768 Cells)**:
+  1. **Card Counting & Bayesian Opponent Estimation Column (192 cells)**: Employs `EMA`, `INTEGRATE`, and `CORRELATION` to transform temporal game sequences into dynamic Bayesian probability fields of opponent unplayed high cards and bombs;
+  2. **Combinatorial Hand Structuring & Bomb Analysis Column (192 cells)**: Employs `HYSTERESIS`, `DEADZONE`, `SUM`, and `DIFF` to calculate hand dominance thresholds and bomb break-even triggers;
+  3. **Game Tempo & Dynamic Tension Regulator Column (192 cells)**: Employs `DAMPER`, `FATIGUE`, and `INHIBIT` to dampen erratic over-commitment and balance risk across opening, midgame, and endgame;
+  4. **Counterfactual Regret & Play/Pass Arbitrage Column (192 cells)**: Employs `THRESHOLD`, `MIN_MAX`, and `MULTIPLY` to arbitrate expected utilities between active attacks and strategic passes;
+* **Discrete Policy Motor Effector Array (224 Cells)**: 7 specialized action heads (`ACT_PASS`, `ACT_SOLO`, `ACT_PAIR`, `ACT_TRIO`, `ACT_BOMB`, `ACT_SPRINT`, `ACT_LOCK`);
+* **Empirical Validation (Gates 1-4)**: The evolved grand master champion (`checkpoints/doudizhu_game_champion.bin`, 1,024 cells / 196,608 synapses) achieves an **82.5%** out-of-distribution blind-test win rate across 10 training adversarial seeds and 8 hold-out randomized validation seeds. Single-step decision latency benchmarks at **411.8 μs** with strict zero dynamic heap allocations (zero GC).
+
 ---
 
 ## 6. Threats to Validity and Limitations

@@ -31,6 +31,11 @@ export class TractographySystem {
     }
 
     this.clear();
+    const cellScale = (bounds && bounds.cellScale) || (org && org.cellScale) || 1024;
+    if (cellScale >= 100000 || org.cells.length > 3000) {
+      // 100M / 1M 超大规模流形：100% 由 GPU 真实突触张量流线 (manifoldSynapsesMesh) 承载，杜绝离散样条线干扰
+      return;
+    }
     const cells = org.cells;
     const syns = org.syns || [];
     const n = cells.length;

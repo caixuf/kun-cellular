@@ -17,9 +17,23 @@ export let lastPrice = 3620;
 export let realPrice = null;
 export let totalActs = 0;
 export let currentSelectedOrgId = null;
+export let pendingSwitchTargetId = null;
+let switchTimestamp = 0;
 
 export function setCurrentSelectedOrgId(id) {
   currentSelectedOrgId = id;
+}
+
+export function setPendingSwitchOrganism(orgId) {
+  pendingSwitchTargetId = orgId;
+  switchTimestamp = Date.now();
+  currentSelectedOrgId = orgId;
+}
+
+export function clearPendingSwitchOrganism(orgId) {
+  if (!orgId || pendingSwitchTargetId === orgId) {
+    pendingSwitchTargetId = null;
+  }
 }
 
 let ws = null;
@@ -532,6 +546,20 @@ export async function syncBackendState() {
 
 export function updateFromBackendState(data) {
   if (!data || !data.cells) return;
+
+  // 防在途遥测帧回退保护：若用户刚发起了生命体切换，过滤在途到达的旧生命体帧，杜绝双击回退
+  if (pendingSwitchTargetId) {
+    if (data.organism_id && data.organism_id !== pendingSwitchTargetId) {
+      if (Date.now() - switchTimestamp < 4000) {
+        return; // 丢弃在途的旧状态帧，保持用户选择
+      } else {
+        pendingSwitchTargetId = null;
+      }
+    } else if (data.organism_id === pendingSwitchTargetId) {
+      pendingSwitchTargetId = null; // 后端已成功就绪并广播新生命体
+    }
+  }
+
   if (data.organism_id) {
     currentSelectedOrgId = data.organism_id;
   }

@@ -10,18 +10,18 @@ let manifoldSynapsesMesh = null;
 let currentManifoldId = null;
 let isLoadingManifold = false;
 
-// 1. 26 类动力学原语专用 GLSL 细胞点云着色器
+// 1. 26 类动力学原语专用 GLSL 细胞点云着色器 (全脑多频行波、自发动作电位激惹与生物荧光核-晕渲染)
 export function createCellCloudMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
       u_time: { value: 0.0 },
-      u_size: { value: 2.8 },
+      u_size: { value: 3.6 },
       u_scale: { value: window.innerHeight / 2.0 },
-      u_opacity: { value: 0.95 }
+      u_opacity: { value: 0.88 }
     },
     transparent: true,
     depthWrite: false,
-    blending: THREE.NormalBlending,
+    blending: THREE.AdditiveBlending,
     vertexShader: `
       uniform float u_time;
       uniform float u_size;
@@ -32,50 +32,78 @@ export function createCellCloudMaterial() {
       attribute float aActivity;
       varying vec3 vColor;
       varying float vActivity;
+      varying float vBurst;
+      varying float vWave;
 
       void main() {
         vColor = color;
         vActivity = aActivity;
+
+        // 1. 全脑皮层跨区域多频带神经振荡行波 (Anterior-Posterior & Longitudinal Traveling Waves)
+        float waveAP = sin(position.x * 0.024 + position.z * 0.016 - u_time * 2.8);
+        float waveHemi = cos(position.y * 0.030 + u_time * 1.9 + aPrimitive * 0.65);
+        vWave = (waveAP + waveHemi) * 0.5;
+
+        // 2. 局部神经元自发突发放电激惹孤子 (Poisson-like Spike Burst)
+        float burst = pow(max(0.0, sin(u_time * 5.5 + aPrimitive * 2.718 + position.x * 0.04 + position.y * 0.03)), 14.0);
+        vBurst = burst;
+
+        // 3. 有机代谢节律微呼吸
+        float breath = 0.92 + 0.14 * sin(u_time * 1.6 + aLayer * 1.2 + position.z * 0.02);
+        float actBoost = 1.0 + aActivity * 0.45 + burst * 1.5;
+
         vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
 
-        // 微代谢时钟呼吸：微弱的脉冲律动
-        float pulse = 0.92 + 0.16 * sin(u_time * 2.4 + aPrimitive * 0.75 + position.x * 0.02);
-        float actBoost = 1.0 + aActivity * 0.40;
-
-        // 高清晰度生物点云：最小 2.0px 杜绝亚像素湮灭，微观放大至 6.5px
-        gl_PointSize = u_size * pulse * actBoost * (u_scale / -mvPosition.z);
-        gl_PointSize = clamp(gl_PointSize, 2.0, 6.5);
+        // 动态视锥点径：宏观保持 2.4~4.2px 晶莹星芒，近距微观放大至 11px
+        float dynamicSize = u_size * breath * actBoost * (u_scale / -mvPosition.z);
+        gl_PointSize = clamp(dynamicSize, 2.4, 11.0);
 
         gl_Position = projectionMatrix * mvPosition;
       }
     `,
     fragmentShader: `
+      uniform float u_time;
       uniform float u_opacity;
       varying vec3 vColor;
       varying float vActivity;
+      varying float vBurst;
+      varying float vWave;
 
       void main() {
         vec2 coord = gl_PointCoord - vec2(0.5);
-        float d = length(coord);
-        if (d > 0.5) discard;
+        float dist = length(coord);
+        if (dist > 0.5) discard;
 
-        // 高保真生物发光点云：中心纯真高亮，外缘自然通透色晕
-        float falloff = exp(-d * d * 6.5);
-        vec3 col = vColor * (1.28 + vActivity * 0.45);
-        float alpha = falloff * u_opacity;
+        // 1. 生物荧光三层核-质-晕光学剖面 (Core-Cytoplasm-Halo Optical Profile):
+        // 中心高能发光核仁 (0.0 - 0.15)
+        float core = exp(-dist * dist * 38.0);
+        // 细胞质代谢发光层 (0.15 - 0.35)
+        float body = exp(-dist * dist * 9.5);
+        // 外围生物质透射光晕 (0.35 - 0.50)
+        float halo = exp(-dist * dist * 2.8);
 
-        gl_FragColor = vec4(col, alpha);
+        // 2. 动态去极化放电色彩演化 (Bioluminescent Spike Flash)
+        float fireSurge = 1.0 + vWave * 0.32 + vBurst * 2.4 + vActivity * 0.45;
+        vec3 baseCol = vColor * fireSurge;
+
+        // 放电时核仁激发出纯白-超亮青光核心
+        vec3 hotNucleus = mix(baseCol, vec3(1.0, 1.0, 1.0), core * clamp(vBurst * 1.8 + 0.35, 0.0, 0.95));
+
+        // 3. 有机光学透明度衰减
+        float alpha = (core * 0.98 + body * 0.72 + halo * 0.28) * u_opacity;
+
+        gl_FragColor = vec4(hotNucleus, alpha);
       }
     `
   });
 }
 
-// 2. GPU 突触纤维束与去极化动作电位脉冲流着色器
+// 2. GPU 突触纤维束与去极化动作电位高速孤子脉冲流着色器
 export function createSynapseCloudMaterial() {
   return new THREE.ShaderMaterial({
     uniforms: {
       u_time: { value: 0.0 },
-      u_opacity: { value: 0.45 }
+      u_opacity: { value: 0.65 }
     },
     transparent: true,
     depthWrite: false,
@@ -84,12 +112,15 @@ export function createSynapseCloudMaterial() {
       uniform float u_time;
       attribute vec3 color;
       attribute float aLineProgress;
+      attribute float aEdgePhase;
       varying vec3 vColor;
       varying float vProgress;
+      varying float vPhase;
 
       void main() {
         vColor = color;
         vProgress = aLineProgress;
+        vPhase = aEdgePhase;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
@@ -98,30 +129,50 @@ export function createSynapseCloudMaterial() {
       uniform float u_opacity;
       varying vec3 vColor;
       varying float vProgress;
+      varying float vPhase;
 
       void main() {
-        // 沿轴突高速传导的动作电位去极化孤子光斑
-        float wave = sin(vProgress * 18.0 - u_time * 5.5);
-        float pulse = pow(max(0.0, wave), 6.0) * 1.6;
-        vec3 col = vColor * (0.6 + pulse * 1.8);
-        float alpha = (0.22 + pulse * 0.75) * u_opacity;
-        gl_FragColor = vec4(col, alpha);
+        // 高速穿梭于突触轴突的高能动作电位去极化孤子光脉冲
+        float speed = 7.5;
+        float pulse1 = pow(max(0.0, sin(vProgress * 3.14159 * 2.0 - u_time * speed + vPhase)), 16.0);
+        float pulse2 = pow(max(0.0, sin(vProgress * 3.14159 * 2.0 - u_time * speed * 0.6 + vPhase + 2.094)), 16.0);
+        float totalPulse = pulse1 * 1.2 + pulse2 * 0.8;
+
+        // 神经突触静息电位柔和辉光底色 + 动作电位爆发高能耀斑
+        float resting = 0.22;
+        vec3 axonColor = mix(vColor, vec3(0.92, 0.98, 1.0), totalPulse * 0.70);
+        axonColor *= (resting + totalPulse * 2.8);
+
+        float alpha = (resting * 0.45 + totalPulse * 0.85) * u_opacity;
+        gl_FragColor = vec4(axonColor, alpha);
       }
     `
   });
 }
 
-// 3. 异步流式加载纯二进制流形 (ArrayBuffer 零解析损耗)
+let activeManifoldAbortController = null;
+let currentLoadingOid = null;
+
+// 3. 异步流式加载纯二进制流形 (ArrayBuffer 零解析损耗，支持快速切换瞬时 Abort)
 export async function loadBinaryManifold(organismId, scn = scene, bnds = null) {
   const targetScn = scn || scene;
-  const oid = organismId || (bnds && bnds.organismId) || 'sdsc_mega_1million';
+  const oid = organismId || (bnds && bnds.organismId) || (typeof window !== 'undefined' && window.currentSelectedOrgId) || 'quant_world_model_100m';
 
-  if (isLoadingManifold || currentManifoldId === oid) return;
-  isLoadingManifold = true;
+  if (currentManifoldId === oid && manifoldPointsMesh) return;
+  if (currentLoadingOid === oid) return;
+
+  if (activeManifoldAbortController) {
+    activeManifoldAbortController.abort();
+    activeManifoldAbortController = null;
+  }
+
+  const abortCtrl = new AbortController();
+  activeManifoldAbortController = abortCtrl;
+  currentLoadingOid = oid;
 
   try {
     // 3.1 载入细胞流形点云
-    const respCells = await fetch(`/api/manifold?id=${encodeURIComponent(oid)}&count=50000`, { cache: 'no-cache' });
+    const respCells = await fetch(`/api/manifold?id=${encodeURIComponent(oid)}&count=50000`, { cache: 'no-cache', signal: abortCtrl.signal });
     if (!respCells.ok) throw new Error(`HTTP ${respCells.status}`);
     const bufCells = await respCells.arrayBuffer();
 
@@ -177,7 +228,7 @@ export async function loadBinaryManifold(organismId, scn = scene, bnds = null) {
 
     // 3.2 载入突触光纤脉冲流线段
     try {
-      const respSyn = await fetch(`/api/manifold?id=${encodeURIComponent(oid)}&type=synapses&count=24000`, { cache: 'no-cache' });
+      const respSyn = await fetch(`/api/manifold?id=${encodeURIComponent(oid)}&type=synapses&count=24000`, { cache: 'no-cache', signal: abortCtrl.signal });
       if (respSyn.ok) {
         const bufSyn = await respSyn.arrayBuffer();
         const synHdr = new DataView(bufSyn, 0, 32);
@@ -190,17 +241,20 @@ export async function loadBinaryManifold(organismId, scn = scene, bnds = null) {
 
           const synColFloat = new Float32Array(totalPts * 3);
           const synProgress = new Float32Array(totalPts);
+          const synPhase = new Float32Array(totalPts);
           for (let i = 0; i < totalPts; i++) {
             synColFloat[i * 3]     = synColBytes[i * 3] / 255.0;
             synColFloat[i * 3 + 1] = synColBytes[i * 3 + 1] / 255.0;
             synColFloat[i * 3 + 2] = synColBytes[i * 3 + 2] / 255.0;
             synProgress[i] = (i % 2 === 0) ? 0.0 : 1.0;
+            synPhase[i] = ((Math.floor(i / 2) * 1.6180339) % 1.0) * 6.2831853;
           }
 
           const geoSyn = new THREE.BufferGeometry();
           geoSyn.setAttribute('position', new THREE.BufferAttribute(synPosArray, 3));
           geoSyn.setAttribute('color', new THREE.BufferAttribute(synColFloat, 3));
           geoSyn.setAttribute('aLineProgress', new THREE.BufferAttribute(synProgress, 1));
+          geoSyn.setAttribute('aEdgePhase', new THREE.BufferAttribute(synPhase, 1));
 
           if (manifoldSynapsesMesh) {
             targetScn.remove(manifoldSynapsesMesh);
@@ -215,14 +269,20 @@ export async function loadBinaryManifold(organismId, scn = scene, bnds = null) {
         }
       }
     } catch (eSyn) {
-      console.warn('[Manifold] Synapse fiber stream optional fail:', eSyn);
+      if (eSyn.name !== 'AbortError') {
+        console.warn('[Manifold] Synapse fiber stream optional fail:', eSyn);
+      }
     }
 
     currentManifoldId = oid;
   } catch (err) {
-    console.error('[Manifold] Failed to load binary manifold:', err);
+    if (err.name !== 'AbortError') {
+      console.error('[Manifold] Failed to load binary manifold:', err);
+    }
   } finally {
-    isLoadingManifold = false;
+    if (currentLoadingOid === oid) {
+      currentLoadingOid = null;
+    }
   }
 }
 
@@ -233,13 +293,16 @@ export function updateManifoldSystem(timeSec, opacity = 0.85, visible = true) {
     if (manifoldPointsMesh.material && manifoldPointsMesh.material.uniforms) {
       manifoldPointsMesh.material.uniforms.u_time.value = timeSec;
       manifoldPointsMesh.material.uniforms.u_opacity.value = opacity;
+      if (manifoldPointsMesh.material.uniforms.u_scale) {
+        manifoldPointsMesh.material.uniforms.u_scale.value = window.innerHeight / 2.0;
+      }
     }
   }
   if (manifoldSynapsesMesh) {
     manifoldSynapsesMesh.visible = visible;
     if (manifoldSynapsesMesh.material && manifoldSynapsesMesh.material.uniforms) {
       manifoldSynapsesMesh.material.uniforms.u_time.value = timeSec;
-      manifoldSynapsesMesh.material.uniforms.u_opacity.value = opacity * 0.65;
+      manifoldSynapsesMesh.material.uniforms.u_opacity.value = opacity * 0.85;
     }
   }
 }

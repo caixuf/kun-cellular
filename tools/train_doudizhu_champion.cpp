@@ -12,13 +12,13 @@ int main() {
     std::cout << "  SDSCC 斗地主非完全信息离散博弈演化训练器 (C++20 Native) \n";
     std::cout << "=========================================================\n";
 
-    const int POPULATION_SIZE = 24;
-    const int GENERATIONS = 25;
-    const uint32_t SEED = 20260903;
-    const int MAX_ROUNDS = 40;
+    const int POPULATION_SIZE = 48;
+    const int GENERATIONS = 50;
+    const uint32_t SEED = 20260905;
+    const int MAX_ROUNDS = 50;
 
-    std::vector<uint32_t> train_seeds = {301, 302, 303, 304, 305};
-    std::vector<uint32_t> val_seeds   = {401, 402, 403};
+    std::vector<uint32_t> train_seeds = {301, 302, 303, 304, 305, 306, 307, 308, 309, 310};
+    std::vector<uint32_t> val_seeds   = {401, 402, 403, 404, 405, 406, 407, 408};
 
     DouDiZhuCardGameTask train_task(MAX_ROUNDS, 42);
     DouDiZhuCardGameTask val_task(MAX_ROUNDS, 99);
@@ -44,13 +44,15 @@ int main() {
             }
         }
 
-        // 验证集留出评估
+        // 验证集留出评估 (OOD 样本外盲测)
         auto val_metrics = val_task.evaluate_organism(pop[best_idx], val_seeds, MAX_ROUNDS, false);
-        std::cout << "  Gen " << gen << "/" << GENERATIONS 
-                  << " | 训练胜率与进度适应度: " << gen_best_train
-                  << " | 留出测试适应度: " << val_metrics.mean_fitness
-                  << " | 细胞数: " << pop[best_idx].cells.size()
-                  << " | 突触数: " << pop[best_idx].synapses.size() << "\n";
+        if (gen % 5 == 0 || gen == 1 || gen == GENERATIONS) {
+            std::cout << "  Gen " << gen << "/" << GENERATIONS 
+                      << " | 训练适应度: " << gen_best_train
+                      << " | 盲测胜率适应度: " << val_metrics.mean_fitness
+                      << " | 细胞数: " << pop[best_idx].cells.size()
+                      << " | 突触数: " << pop[best_idx].synapses.size() << "\n";
+        }
 
         if (val_metrics.mean_fitness > best_val_fitness || gen == 1) {
             best_val_fitness = val_metrics.mean_fitness;

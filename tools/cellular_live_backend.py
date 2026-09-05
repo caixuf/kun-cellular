@@ -85,7 +85,7 @@ def read_sdsc_binary(bin_path):
                 f.seek(coords_off)
                 coord_bytes = f.read(num_cells * 12)
                 if len(coord_bytes) == num_cells * 12:
-                    coords = np.frombuffer(coord_bytes, dtype=np.float32).reshape((num_cells, 3))
+                    coords = np.frombuffer(coord_bytes, dtype=np.float32).reshape((num_cells, 3)).copy()
             
             # 读取附加元数据 (JSON)
             meta = {}
@@ -2083,6 +2083,22 @@ class SiliconCellularOrganism:
                         SymbioticMacroCell(2, "QuantArbitrageManifold", core_ids or list(range(min(32, len(self.cells)), max(min(32, len(self.cells)), len(self.cells) - 16))), color="#34d399"),
                         SymbioticMacroCell(3, "QuantExecutionRing", act_ids or list(range(max(0, len(self.cells) - 16), len(self.cells))), color="#f43f5e")
                     ]
+                elif oid == "doudizhu_game_champion":
+                    if len(self.cells) >= 1024:
+                        self.symbiotic_macro_cells = [
+                            SymbioticMacroCell(1, "FullDeckSensoryArch", list(range(0, 32)), color="#22d3ee"),
+                            SymbioticMacroCell(2, "BayesianCardCountingCortex", list(range(32, 224)), color="#3b82f6"),
+                            SymbioticMacroCell(3, "CombinatorialBombCortex", list(range(224, 416)), color="#10b981"),
+                            SymbioticMacroCell(4, "GameTempoRegulatorCortex", list(range(416, 608)), color="#f59e0b"),
+                            SymbioticMacroCell(5, "CounterfactualDecisionCortex", list(range(608, 800)), color="#a855f7"),
+                            SymbioticMacroCell(6, "ActionPolicyEffectorArray", list(range(800, 1024)), color="#f43f5e")
+                        ]
+                    else:
+                        self.symbiotic_macro_cells = [
+                            SymbioticMacroCell(1, "HandIntensitySensory", sense_ids or [0, 1], color="#22d3ee"),
+                            SymbioticMacroCell(2, "GameDecayHysteresis", core_ids or [2, 3, 4, 5], color="#34d399"),
+                            SymbioticMacroCell(3, "PlayPassActionEffector", act_ids or [6, 7, 8], color="#f43f5e")
+                        ]
                 else:
                     self.symbiotic_macro_cells = [
                         SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
@@ -2501,6 +2517,22 @@ class SiliconCellularOrganism:
                         SymbioticMacroCell(2, "QuantArbitrageManifold", core_ids or list(range(min(16, len(self.cells)), max(min(16, len(self.cells)), len(self.cells) - 8))), color="#34d399"),
                         SymbioticMacroCell(3, "QuantExecutionRing", act_ids or list(range(max(0, len(self.cells) - 8), len(self.cells))), color="#f43f5e")
                     ]
+                elif oid == "doudizhu_game_champion":
+                    if len(self.cells) >= 1024:
+                        self.symbiotic_macro_cells = [
+                            SymbioticMacroCell(1, "FullDeckSensoryArch", list(range(0, 32)), color="#22d3ee"),
+                            SymbioticMacroCell(2, "BayesianCardCountingCortex", list(range(32, 224)), color="#3b82f6"),
+                            SymbioticMacroCell(3, "CombinatorialBombCortex", list(range(224, 416)), color="#10b981"),
+                            SymbioticMacroCell(4, "GameTempoRegulatorCortex", list(range(416, 608)), color="#f59e0b"),
+                            SymbioticMacroCell(5, "CounterfactualDecisionCortex", list(range(608, 800)), color="#a855f7"),
+                            SymbioticMacroCell(6, "ActionPolicyEffectorArray", list(range(800, 1024)), color="#f43f5e")
+                        ]
+                    else:
+                        self.symbiotic_macro_cells = [
+                            SymbioticMacroCell(1, "HandIntensitySensory", sense_ids or [0, 1], color="#22d3ee"),
+                            SymbioticMacroCell(2, "GameDecayHysteresis", core_ids or [2, 3, 4, 5], color="#34d399"),
+                            SymbioticMacroCell(3, "PlayPassActionEffector", act_ids or [6, 7, 8], color="#f43f5e")
+                        ]
                 else:
                     self.symbiotic_macro_cells = [
                         SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
@@ -3973,82 +4005,105 @@ def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
             opcodes = np.random.randint(0, 27, size=sample_n, dtype=np.uint8)
 
         # 100M/1M 真实神经解剖全息流形 (Bilateral Neocortex Gyri, Longitudinal Fissure & Deep Nuclei)
-        # 100% 由真实演化检查点的参数 (params) 与权重 (weights) 驱动微观生物质流形，杜绝机械几何对称
+        # 100% 由真实演化检查点的参数 (params) 与权重 (weights) 驱动微观生物质流形，杜绝机械几何对称与螺线伪影
         params_pt = pt_ckpt.get("champion_params")
-        weights_pt = pt_ckpt.get("champion_weights")
-        if params_pt is not None:
+        if params_pt is None and "alpha_ema" in pt_ckpt:
+            alpha = pt_ckpt["alpha_ema"][indices].numpy().astype(np.float32)
+            p0 = alpha * 2.0 - 1.0
+            p1 = np.roll(p0, 1)
+        elif params_pt is not None:
             p0 = params_pt[indices, 0].numpy().astype(np.float32)
             p1 = params_pt[indices, 1].numpy().astype(np.float32)
         else:
             p0 = np.zeros(sample_n, dtype=np.float32)
             p1 = np.zeros(sample_n, dtype=np.float32)
 
-        if weights_pt is not None:
+        weights_pt = pt_ckpt.get("champion_weights")
+        if weights_pt is None and "weights" in pt_ckpt:
+            w_all = pt_ckpt["weights"]
+            w_sampled = w_all[indices % len(w_all)].numpy().astype(np.float32)
+            w0 = w_sampled
+            w1 = np.roll(w_sampled, 1)
+        elif weights_pt is not None:
             w0 = weights_pt[indices, 0].numpy().astype(np.float32)
             w1 = weights_pt[indices, 1].numpy().astype(np.float32)
         else:
             w0 = np.zeros(sample_n, dtype=np.float32)
             w1 = np.zeros(sample_n, dtype=np.float32)
 
-        prog = np.linspace(0.0, 1.0, sample_n, dtype=np.float32)
+        if types_pt is not None:
+            opcodes = types_pt[indices].numpy().astype(np.uint8)
+        elif "alpha_ema" in pt_ckpt:
+            opcodes = (pt_ckpt["alpha_ema"][indices].numpy() * 26.9).astype(np.uint8) % 27
+        else:
+            opcodes = np.random.randint(0, 27, size=sample_n, dtype=np.uint8)
+
         pts = np.zeros((sample_n, 3), dtype=np.float32)
 
-        A_P = 125.0  # 前后轴跨度 (Anterior-Posterior)
-        L_R = 92.0   # 左右半球跨度 (Left-Right)
-        D_V = 78.0   # 背腹轴高度 (Dorsal-Ventral)
+        # 黄金分割低差异三维球坐标生成器 (消除 1D 连续线伪影，实现真正各向同性体积弥散)
+        golden_ratio = (1.0 + np.sqrt(5.0)) / 2.0
+        golden_angle = 2.0 * np.pi * (1.0 - 1.0 / golden_ratio)
 
-        # 1. 大脑双半球皮层区 (Neocortex): 占比 72%
-        mask_cortex = (prog < 0.72)
-        u_c = prog[mask_cortex] / 0.72
-        phi_c = np.arccos(np.clip(1.0 - 2.0 * u_c, -1.0, 1.0))
-        theta_c = u_c * sample_n * 0.0125 + p1[mask_cortex] * 0.35
+        # 1. 大脑双半球皮层区 (Neocortex): 占比 75%
+        n_cortex = int(sample_n * 0.75)
+        k_c = np.arange(n_cortex, dtype=np.float32)
 
-        ap_pos = np.cos(phi_c)
-        frontal_factor = 1.0 + 0.20 * np.maximum(0.0, ap_pos)
-        occipital_factor = 1.0 - 0.16 * np.maximum(0.0, -ap_pos)
+        z_c = 1.0 - (2.0 * k_c + 1.0) / n_cortex
+        r_c = np.sqrt(np.maximum(0.0, 1.0 - z_c * z_c))
+        th_c = k_c * golden_angle
 
-        # 多频段非线性脑回与脑沟折叠 (Gyri & Sulci Organic Undulation)
+        x_norm = r_c * np.cos(th_c)
+        y_norm = r_c * np.sin(th_c)
+        z_norm = z_c
+
+        A_P = 135.0  # 前后轴跨度 (Anterior-Posterior)
+        L_R = 96.0   # 左右半球跨度 (Left-Right)
+        D_V = 82.0   # 背腹轴高度 (Dorsal-Ventral)
+
+        # 皮层厚度与微柱层级 (Layers I-VI Cortical Mantle Depth)
+        layer_depth = 0.85 + 0.15 * ((opcodes[:n_cortex] % 6) / 5.0) + p0[:n_cortex] * 0.04
+
+        # 多频谐波脑回与脑沟折叠 (Gyri & Sulci Organic Convolutions)
         gyri = (
-            np.sin(phi_c * 9.0 + ap_pos * 4.0) * np.cos(theta_c * 6.0) * 11.0 +
-            np.sin(phi_c * 17.0 + theta_c * 11.0 + p0[mask_cortex] * 2.0) * 5.5 +
-            np.cos(theta_c * 27.0 + ap_pos * 12.0) * 2.8
+            np.sin(x_norm * 7.0 + p0[:n_cortex] * 2.0) * np.cos(y_norm * 8.0) * 8.5 +
+            np.sin(z_norm * 9.0 + x_norm * 5.0 + w0[:n_cortex] * 2.0) * 5.0 +
+            np.cos(th_c * 4.0 + z_norm * 6.0 + w1[:n_cortex] * 1.5) * 3.5
         )
-        gyral_radius = 1.0 + (gyri + w0[mask_cortex] * 3.5) / 100.0
+        r_mod = layer_depth * (1.0 + gyri / 120.0)
 
         # 大脑纵裂池 (Interhemispheric Longitudinal Fissure) 凹陷结构
-        y_raw = L_R * np.sin(phi_c) * np.sin(theta_c) * gyral_radius
-        hemi_dir = np.sign(y_raw)
-        hemi_dir = np.where(hemi_dir == 0, 1.0, hemi_dir)
-        fissure_gap = 4.0 + np.exp(-abs(y_raw) * 0.08) * 5.0
-        y_c = hemi_dir * (abs(y_raw) * 0.85 + fissure_gap)
+        hemi_sign = np.sign(y_norm)
+        hemi_sign = np.where(hemi_sign == 0, 1.0, hemi_sign)
+        y_fissure = hemi_sign * (np.abs(y_norm) * L_R * 0.88 + 3.5 + np.exp(-np.abs(y_norm) * 5.0) * 4.0)
 
-        x_c = A_P * ap_pos * frontal_factor * occipital_factor * gyral_radius + w1[mask_cortex] * 3.0
-        z_c = D_V * np.sin(phi_c) * np.cos(theta_c) * gyral_radius + 10.0
+        pts[:n_cortex, 0] = x_norm * A_P * r_mod + w0[:n_cortex] * 2.0
+        pts[:n_cortex, 1] = y_fissure * r_mod + w1[:n_cortex] * 1.5
+        pts[:n_cortex, 2] = z_norm * D_V * r_mod + 12.0
 
-        pts[mask_cortex, 0] = x_c
-        pts[mask_cortex, 1] = y_c
-        pts[mask_cortex, 2] = z_c
+        # 2. 深层海马体吸引子环与丘脑核团 (Subcortical Core & Hippocampal Loop): 占比 15%
+        n_sub = int(sample_n * 0.15)
+        k_s = np.arange(n_sub, dtype=np.float32)
+        idx_sub = slice(n_cortex, n_cortex + n_sub)
 
-        # 2. 深层海马体吸引子环与丘脑核团 (Subcortical Core & Hippocampal Loop): 占比 16%
-        mask_sub = (prog >= 0.72) & (prog < 0.88)
-        u_s = (prog[mask_sub] - 0.72) / 0.16
-        t_s = u_s * 4.0 * np.pi
-        r_s = 22.0 + 16.0 * np.sin(t_s * 0.5)
-        pts[mask_sub, 0] = np.cos(t_s) * r_s - 10.0 + p0[mask_sub] * 5.0
-        pts[mask_sub, 1] = np.sin(t_s) * (r_s * 1.3) * (np.where(p1[mask_sub] > 0, 1.0, -1.0))
-        pts[mask_sub, 2] = np.sin(t_s * 2.0) * 14.0 - 6.0 + w0[mask_sub] * 4.0
+        hip_theta = (k_s / n_sub) * 2.5 * np.pi - 0.5 * np.pi
+        hip_r = 28.0 + 12.0 * np.cos(hip_theta)
+        hip_side = np.where(p0[idx_sub] >= 0, 1.0, -1.0)
+        pts[idx_sub, 0] = np.sin(hip_theta) * hip_r - 8.0 + w0[idx_sub] * 3.0
+        pts[idx_sub, 1] = hip_side * (16.0 + np.abs(np.cos(hip_theta)) * 22.0) + w1[idx_sub] * 2.0
+        pts[idx_sub, 2] = np.sin(hip_theta * 1.5) * 16.0 - 2.0 + p1[idx_sub] * 3.0
 
-        # 3. 小脑横向叶襞与脑干中轴 (Cerebellum & Brainstem Axis): 占比 12%
-        mask_cb = (prog >= 0.88)
-        u_b = (prog[mask_cb] - 0.88) / 0.12
-        cb_x = -70.0 + u_b * 28.0 + p0[mask_cb] * 4.0
-        cb_folia = np.sin(u_b * 60.0) * 4.0
-        cb_y = np.sin(u_b * 8.0 * np.pi) * (36.0 * (1.0 - u_b * 0.4)) + w0[mask_cb] * 3.0
-        cb_z = -38.0 - u_b * 26.0 + cb_folia + w1[mask_cb] * 3.0
+        # 3. 小脑横向叶襞与脑干中轴 (Cerebellum & Brainstem Axis): 占比 10%
+        idx_cb = slice(n_cortex + n_sub, sample_n)
+        n_cb = sample_n - (n_cortex + n_sub)
+        k_b = np.arange(n_cb, dtype=np.float32)
+        th_b = k_b * golden_angle
+        z_b = 1.0 - (2.0 * k_b + 1.0) / n_cb
+        r_b = np.sqrt(np.maximum(0.0, 1.0 - z_b * z_b))
 
-        pts[mask_cb, 0] = cb_x
-        pts[mask_cb, 1] = cb_y
-        pts[mask_cb, 2] = cb_z
+        cb_folia = np.sin(z_b * 32.0 + p0[idx_cb] * 2.0) * 3.5
+        pts[idx_cb, 0] = -72.0 + r_b * np.cos(th_b) * 26.0 + w0[idx_cb] * 2.0
+        pts[idx_cb, 1] = r_b * np.sin(th_b) * 44.0 + w1[idx_cb] * 2.0
+        pts[idx_cb, 2] = -42.0 + z_b * 22.0 + cb_folia + p1[idx_cb] * 2.0
 
         attrs = np.zeros((sample_n, 4), dtype=np.uint8)
         attrs[:, 0] = opcodes % 27
@@ -4211,7 +4266,11 @@ def build_binary_synapse_payload(oid: str, target_lines: int = 24000) -> bytes:
                 w_np = w_arr[indices].numpy() if w_arr is not None else None
                 for i in range(num_pts):
                     u0 = int((s0_arr[i] / nc) * num_pts) % num_pts
+                    if u0 == i and i > 0:
+                        u0 = i - 1
                     u1 = int((s1_arr[i] / nc) * num_pts) % num_pts
+                    if u1 == i and i > 1:
+                        u1 = i - 2
                     w0 = float(w_np[i, 0]) if w_np is not None else 1.0
                     w1 = float(w_np[i, 1]) if w_np is not None else -1.0
                     if u0 != i:

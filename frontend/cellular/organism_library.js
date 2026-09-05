@@ -7,12 +7,13 @@ import { currentOrganismBounds, updateOrganismBounds } from './spatial_bounds.js
 import { camState } from './camera_controller.js';
 import { views, lodPointsMesh, rebuildViews } from './lod_system.js';
 import { FAMILY, FAMILY_COLOR } from './config.js';
-import { log, syncBackendState, setCurrentSelectedOrgId } from './network_sync.js';
+import { log, syncBackendState, setCurrentSelectedOrgId, setPendingSwitchOrganism, clearPendingSwitchOrganism } from './network_sync.js';
 import { cellPointLight } from './scene_setup.js';
 
 export let currentSelectedOrgId = null;
 export let currentHighlightedBookId = null;
 let libraryInitialRenderDone = false;
+let activeSwitchAbortController = null;
 
 export let currentRenderMode = "symbiosis"; // "symbiosis" | "puremesh" | "lod"
 export let currentLOD = "1m";
@@ -189,11 +190,16 @@ export function renderActiveOrganismProfile(meta) {
 window.renderActiveOrganismProfile = renderActiveOrganismProfile;
 
 export async function selectOrganism(organismId, organismName) {
+  setPendingSwitchOrganism(organismId);
   currentSelectedOrgId = organismId;
   setCurrentSelectedOrgId(organismId);
+  org.lastOrganismId = organismId;
+  if (currentOrganismBounds) {
+    currentOrganismBounds.organismId = organismId;
+  }
   log(`[生命体切换] 正在向后端下达指令，切换至【${organismName}】的全息 3D 拓扑结构...`, true);
 
-  // 自动展开目标生命体树节点，折叠其他生命体节点
+  // 1. 同步即刻激活 UI 状态反馈 (0 延迟即时变色与展开)
   document.querySelectorAll('.win-tree > .tree-node[data-org-id]').forEach(n => {
     const isCurrent = n.dataset.orgId === organismId;
     n.classList.toggle('selected', isCurrent);
@@ -211,8 +217,15 @@ export async function selectOrganism(organismId, organismName) {
     b.style.fontWeight = isCurrent ? 'bold' : '';
   });
 
+  if (activeSwitchAbortController) {
+    activeSwitchAbortController.abort();
+    activeSwitchAbortController = null;
+  }
+  const abortCtrl = new AbortController();
+  activeSwitchAbortController = abortCtrl;
+
   try {
-    const res = await fetch('/api/organism/switch?id=' + encodeURIComponent(organismId));
+    const res = await fetch('/api/organism/switch?id=' + encodeURIComponent(organismId), { signal: abortCtrl.signal });
     const data = await res.json();
     if (data.status === 'ok') {
       log(`[形态重构成功] 后端已切换至【${data.result.name}】！物理细胞: ${data.result.cells_count} 个，突触: ${data.result.synapses_count} 条，宏观: ${data.result.macro_cells.toLocaleString()} 细胞`, true);
@@ -224,27 +237,24 @@ export async function selectOrganism(organismId, organismName) {
         chatMsgs.scrollTop = chatMsgs.scrollHeight;
       }
 
+      org.lastOrganismId = organismId;
+      currentOrganismBounds.organismId = organismId;
       updateOrganismBounds(data.result);
       const targetScale = data.result.cells_scale || data.result.macro_cells || data.result.cells_count || 1024;
+      currentOrganismBounds.cellScale = targetScale;
       const isTargetLarge = (targetScale >= 100000) || (data.result.cells_count > 3000);
-      if (isTargetLarge) {
-        // 超大规模生命体：立即清理上一生命体残留的实体网格，直接将镜头闪切到宏观全景视距，开局 100% 纯点云流形
-        rebuildViews();
-        camState.targetLookAt.copy(currentOrganismBounds.center);
-        camState.targetCamR = currentOrganismBounds.macroDist;
-        camState.camR = currentOrganismBounds.macroDist;
-        camState.camTheta = 0;
-        camState.camPhi = Math.PI / 2;
-        camState.isCamTransitioning = false;
-      } else {
-        camState.targetLookAt.copy(currentOrganismBounds.center);
-        camState.targetCamR = currentOrganismBounds.macroDist;
-        camState.isCamTransitioning = true;
-      }
+      rebuildViews();
+      camState.targetLookAt.copy(currentOrganismBounds.center);
+      camState.targetCamR = currentOrganismBounds.macroDist;
+      camState.isCamTransitioning = true;
+      clearPendingSwitchOrganism(organismId);
       syncBackendState().catch(() => {});
     }
   } catch (e) {
-    console.error("切换生命体失败:", e);
+    if (e.name !== 'AbortError') {
+      console.error("切换生命体失败:", e);
+      clearPendingSwitchOrganism(organismId);
+    }
   }
 
   if (views && views.syns) {
@@ -619,7 +629,7 @@ export async function pollLibrary() {
 
           return `<div class="tree-node ${isOpen} ${isSelected}" id="org-node-${orgItem.organism_id}" data-org-id="${orgItem.organism_id}">
             <div class="tree-row" onclick="onRowClick('${orgItem.organism_id}', '${orgItem.name}')">
-              <div class="tree-expander" onclick="event.stopPropagation(); toggleTreeNode('${orgItem.organism_id}')">
+              <div class="tree-expander" onclick="event.stopPropagation(); toggleTreeNode('${orgItem.organism_id}'); selectOrganism('${orgItem.organism_id}', '${orgItem.name}');">
                 ${isOpen ? "−" : "+"}
               </div>
               <div class="tree-label">
