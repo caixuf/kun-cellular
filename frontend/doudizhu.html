@@ -524,6 +524,20 @@
                 <button id="btnAutoSpeed" class="btn" style="display:none;padding:2px 6px;font-size:10px;">⚡ 正常 0.8s</button>
                 <div id="gameStatusText" style="color:var(--cyan-glow);font-weight:700;">轮到玩家出牌</div>
             </div>
+
+            <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap;">
+                <div style="display:flex;align-items:center;gap:4px;background:rgba(255,183,0,0.12);border:1px solid rgba(255,183,0,0.35);padding:2px 8px;border-radius:4px;font-size:11px;">
+                    <span style="color:#ffb700;font-weight:700;">💰 资产:</span>
+                    <span id="chipBalance" style="color:#fde047;font-weight:800;">10,000</span>
+                    <span id="chipProfit" style="font-size:10px;color:#94a3b8;">(+0)</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.35);padding:2px 8px;border-radius:4px;font-size:11px;">
+                    <span style="color:#38bdf8;font-weight:700;">⚡ 底分:</span>
+                    <span id="chipStake" style="color:#bae6fd;font-weight:700;">100</span>
+                    <span style="color:#64748b;">×</span>
+                    <span id="chipMultiplier" style="color:#f43f5e;font-weight:800;">1x</span>
+                </div>
+            </div>
         </div>
 
         <div class="poker-arena">
@@ -594,6 +608,15 @@
                 <div class="modal-card">
                     <h2 id="modalTitle" style="color:var(--gold-glow);">🎉 对局结束</h2>
                     <p id="modalDesc" style="color:#cbd5e1;font-size:12px;"></p>
+
+                    <!-- 筹码与强化学习奖励结算卡 -->
+                    <div style="margin:10px 0;padding:10px;background:rgba(255,215,0,0.06);border:1px solid rgba(255,215,0,0.25);border-radius:6px;text-align:center;">
+                        <div style="font-size:11px;color:var(--gold-glow);font-weight:700;">💰 现成强化学习奖励结算 (REWARD LEDGER)</div>
+                        <div id="modalScoreDetail" style="font-size:11px;color:#cbd5e1;margin-top:4px;">底分 100 × 倍数 1x = 获胜 +200 豆</div>
+                        <div id="modalDeltaDisplay" style="font-size:20px;font-weight:900;color:var(--gold-glow);margin:4px 0;">+200 豆</div>
+                        <div style="font-size:11px;color:#94a3b8;">最新钱包余额: <strong id="modalBalance" style="color:#fde047;">10,200 豆</strong></div>
+                    </div>
+
                     <div style="display:flex;justify-content:space-around;font-size:11px;background:#06090e;padding:8px;border-radius:4px;">
                         <div>总局数: <strong id="modalGames">1</strong></div>
                         <div>胜率: <strong id="modalWinRate" style="color:var(--green-glow);">100%</strong></div>
@@ -620,6 +643,14 @@
                 <div class="stat-box">
                     <div class="stat-label">玩家实战胜率</div>
                     <div class="stat-val" id="statWinRate" style="color:var(--green-glow);">100%</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">💰 玩家钱包筹码</div>
+                    <div class="stat-val" id="sideStatBalance" style="color:var(--gold-glow);">10,000</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">⚡ 累积奖惩收益</div>
+                    <div class="stat-val" id="sideStatProfit" style="color:var(--green-glow);">+0</div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-label">微架构单步时延</div>
@@ -722,6 +753,14 @@ const GameState = {
     passCount: 0,
     deckRemaining: new Array(15).fill(4),
     stats: { games: 0, playerWins: 0 },
+    chips: {
+        balance: 10000,
+        baseStake: 100,
+        multiplier: 1,
+        bombCount: 0,
+        totalProfit: 0,
+        tricksPlayed: [0, 0, 0]
+    },
     mode: "human", // "human" or "auto"
     autoSpeed: 800,
     autoTimer: null
@@ -798,6 +837,36 @@ function initDeck() {
     const userWantsLandlord = (document.getElementById("roleSelect").value === "landlord");
     GameState.landlordIdx = userWantsLandlord ? 0 : 2;
 
+    // 牌力评估器 (基于真实斗地主叫牌门槛: 大王4分, 小王3分, 2为2分, A为1分, 王炸额外4分, 炸弹额外3分)
+    function calcHandStrength(h) {
+        let s = 0;
+        const c = {};
+        h.forEach(x => {
+            c[x.rankIdx] = (c[x.rankIdx] || 0) + 1;
+            if (x.rankIdx === 14) s += 4;
+            else if (x.rankIdx === 13) s += 3;
+            else if (x.rankIdx === 12) s += 2;
+            else if (x.rankIdx === 11) s += 1;
+        });
+        if (c[13] && c[14]) s += 4;
+        for (let r = 0; r <= 12; r++) {
+            if (c[r] === 4) s += 3;
+        }
+        return s;
+    }
+
+    // 洗牌与发牌 (保证地主手牌牌力 >= 5，模拟真实斗地主叫牌底线，杜绝必输死局)
+    let attempts = 0;
+    while (attempts < 50) {
+        attempts++;
+        for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+        const candidateHand = deck.slice(GameState.landlordIdx * 17, (GameState.landlordIdx + 1) * 17);
+        if (calcHandStrength(candidateHand) >= 5) break;
+    }
+
     GameState.hands[0] = deck.slice(0, 17);
     GameState.hands[1] = deck.slice(17, 34);
     GameState.hands[2] = deck.slice(34, 51);
@@ -824,6 +893,11 @@ function initDeck() {
     GameState.lastTrick = null;
     GameState.passCount = 0;
     selectedUserCards.clear();
+
+    // 重置本局倍数与出牌统计
+    GameState.chips.multiplier = 1;
+    GameState.chips.bombCount = 0;
+    GameState.chips.tricksPlayed = [0, 0, 0];
 
     // 清空出牌区
     document.getElementById("playedLeft").innerHTML = "";
@@ -938,6 +1012,29 @@ function updateUI() {
     document.getElementById("statGames").textContent = GameState.stats.games;
     const wr = GameState.stats.games > 0 ? Math.round((GameState.stats.playerWins / GameState.stats.games) * 100) : 100;
     document.getElementById("statWinRate").textContent = `${wr}%`;
+
+    // 筹码与倍数面板更新
+    const cBal = document.getElementById("chipBalance");
+    if (cBal) cBal.textContent = GameState.chips.balance.toLocaleString();
+    const cProf = document.getElementById("chipProfit");
+    if (cProf) {
+        const p = GameState.chips.totalProfit || 0;
+        cProf.textContent = (p >= 0 ? `(+${p.toLocaleString()})` : `(${p.toLocaleString()})`);
+        cProf.style.color = p >= 0 ? "var(--green-glow)" : "var(--red-glow)";
+    }
+    const cStake = document.getElementById("chipStake");
+    if (cStake) cStake.textContent = GameState.chips.baseStake;
+    const cMult = document.getElementById("chipMultiplier");
+    if (cMult) cMult.textContent = `${GameState.chips.multiplier}x`;
+
+    const sideBal = document.getElementById("sideStatBalance");
+    if (sideBal) sideBal.textContent = GameState.chips.balance.toLocaleString();
+    const sideProf = document.getElementById("sideStatProfit");
+    if (sideProf) {
+        const p = GameState.chips.totalProfit || 0;
+        sideProf.textContent = (p >= 0 ? `+${p.toLocaleString()}` : `${p.toLocaleString()}`);
+        sideProf.style.color = p >= 0 ? "var(--green-glow)" : "var(--red-glow)";
+    }
 }
 
 function addLog(text, type = "info") {
@@ -1132,6 +1229,11 @@ function aiDecide(playerIdx) {
 
     pulseCortexMeters();
 
+    // 局势与手牌剩余态势感知
+    const landlordLeft = GameState.hands[GameState.landlordIdx].length;
+    const myLeft = hand.length;
+    const urgent = (landlordLeft <= 4 || myLeft <= 4); // 终局冲刺/防守紧急态
+
     // 统计当前手牌各点数频次
     const counts = {};
     hand.forEach(c => { counts[c.rankIdx] = (counts[c.rankIdx] || 0) + 1; });
@@ -1158,12 +1260,12 @@ function aiDecide(playerIdx) {
             }
         }
 
-        // 先尝试出连续小单牌组成的顺子 (5张起，从小到大选最短)
+        // 先尝试出连续小单牌组成的顺子 (5张起，从小到大选最短，不拆4张炸弹)
         for (let len = 5; len <= 8; len++) {
             for (let start = 0; start <= 11 - len; start++) {
                 let ok = true;
                 for (let r = start; r < start + len; r++) {
-                    if (!counts[r]) { ok = false; break; }
+                    if (!counts[r] || counts[r] === 4) { ok = false; break; }
                 }
                 if (ok) {
                     const straightCards = [];
@@ -1175,11 +1277,11 @@ function aiDecide(playerIdx) {
             }
         }
 
-        // 连对 (从小选 3 对)
+        // 连对 (从小选 3 对，不拆炸弹)
         for (let start = 0; start <= 9; start++) {
             let ok = true;
             for (let r = start; r < start + 3; r++) {
-                if ((counts[r] || 0) < 2) { ok = false; break; }
+                if ((counts[r] || 0) < 2 || counts[r] === 4) { ok = false; break; }
             }
             if (ok) {
                 const pairsCards = [];
@@ -1190,19 +1292,24 @@ function aiDecide(playerIdx) {
             }
         }
 
-        // 三带一 / 三带对 (从小的三张开始)
+        // 三带一 / 三带对 (从小的三张开始，不拆炸弹，带牌优先小单/小对且不带2和王)
         for (let r = 0; r <= 12; r++) {
             if (counts[r] === 3) {
                 const trio = hand.filter(c => c.rankIdx === r);
-                // 找最小的对子带
+                // 找最小的对子带 (不拆炸弹)
                 for (let pr = 0; pr <= 14; pr++) {
-                    if (pr !== r && (counts[pr] || 0) >= 2) {
+                    if (pr !== r && counts[pr] >= 2 && counts[pr] < 4) {
                         return [...trio, ...hand.filter(c => c.rankIdx === pr).slice(0, 2)];
                     }
                 }
-                // 找最小的单牌带
-                for (let sr = 0; sr <= 14; sr++) {
+                // 找最小的单牌带 (优先 < 12 的散牌，避免浪费 2 和王)
+                for (let sr = 0; sr < 12; sr++) {
                     if (sr !== r && counts[sr] === 1) {
+                        return [...trio, hand.find(c => c.rankIdx === sr)];
+                    }
+                }
+                for (let sr = 12; sr <= 14; sr++) {
+                    if (sr !== r && counts[sr] === 1 && urgent) {
                         return [...trio, hand.find(c => c.rankIdx === sr)];
                     }
                 }
@@ -1218,7 +1325,6 @@ function aiDecide(playerIdx) {
         }
 
         // 最小的单牌 (出最小单，保留大牌和炸弹)
-        // 跳过炸弹 rank，出最小非炸单牌
         const nonBombSingles = hand.filter(c => (counts[c.rankIdx] || 0) < 4 && c.rankIdx < 13);
         if (nonBombSingles.length > 0) {
             nonBombSingles.sort((a, b) => a.rankIdx - b.rankIdx);
@@ -1228,11 +1334,6 @@ function aiDecide(playerIdx) {
     }
 
     // ─── 有上家出牌: 尝试压制 ──────────────────────────────────────────────
-
-    // 地主手牌剩余数 (用于紧急判断)
-    const landlordLeft = GameState.hands[GameState.landlordIdx].length;
-    const myLeft = hand.length;
-    const urgent = landlordLeft <= 4 || myLeft <= 4; // 紧急情况: 有人快出完了
 
     // 单牌压制: 从最小能压的牌开始 (优先出非炸弹单牌，保留炸弹结构)
     if (prevTrick.type === "SOLO") {
@@ -1268,13 +1369,16 @@ function aiDecide(playerIdx) {
                 const trio = hand.filter(c => c.rankIdx === r).slice(0, 3);
                 if (prevTrick.type === "TRIO") return trio;
                 if (prevTrick.type === "TRIO_SOLO") {
-                    const solo = hand.find(c => c.rankIdx !== r && (counts[c.rankIdx] || 0) < 4);
-                    if (solo) return [...trio, solo];
+                    // 找最小非炸单牌带，优先不带 2 和王
+                    const solos = hand.filter(c => c.rankIdx !== r && (counts[c.rankIdx] || 0) < 4);
+                    solos.sort((a, b) => a.rankIdx - b.rankIdx);
+                    const smallSolo = solos.find(c => c.rankIdx < 12) || solos[0];
+                    if (smallSolo) return [...trio, smallSolo];
                     return trio;
                 }
                 if (prevTrick.type === "TRIO_PAIR") {
                     for (let pr = 0; pr < 13; pr++) {
-                        if (pr !== r && (counts[pr] || 0) >= 2) {
+                        if (pr !== r && counts[pr] >= 2 && counts[pr] < 4) {
                             return [...trio, ...hand.filter(c => c.rankIdx === pr).slice(0, 2)];
                         }
                     }
@@ -1283,7 +1387,7 @@ function aiDecide(playerIdx) {
         }
     }
 
-    // 顺子压制
+    // 顺子压制 (不拆炸弹)
     if (prevTrick.type === "STRAIGHT") {
         const len = prevTrick.len || prevTrick.cards.length;
         for (let end = prevTrick.rank + 1; end <= 11; end++) {
@@ -1291,7 +1395,7 @@ function aiDecide(playerIdx) {
             if (start < 0) continue;
             let ok = true;
             for (let r = start; r <= end; r++) {
-                if (!counts[r]) { ok = false; break; }
+                if (!counts[r] || counts[r] === 4) { ok = false; break; }
             }
             if (ok) {
                 const sc = [];
@@ -1301,7 +1405,7 @@ function aiDecide(playerIdx) {
         }
     }
 
-    // 连对压制
+    // 连对压制 (不拆炸弹)
     if (prevTrick.type === "CONSEC_PAIRS") {
         const numPairs = prevTrick.len || Math.floor(prevTrick.cards.length / 2);
         for (let end = prevTrick.rank + 1; end <= 11; end++) {
@@ -1309,7 +1413,7 @@ function aiDecide(playerIdx) {
             if (start < 0) continue;
             let ok = true;
             for (let r = start; r <= end; r++) {
-                if ((counts[r] || 0) < 2) { ok = false; break; }
+                if ((counts[r] || 0) < 2 || counts[r] === 4) { ok = false; break; }
             }
             if (ok) {
                 const pc = [];
@@ -1321,9 +1425,14 @@ function aiDecide(playerIdx) {
         }
     }
 
-    // ─── 炸弹拦截: 紧急情况 or 对方是2/王级别大牌 ───────────────────────
-    const isEmergency = urgent || prevTrick.rank >= 11 || prevTrick.type === "BOMB";
-    if (isEmergency || (!isLandlord && lastPlayer === GameState.landlordIdx)) {
+    // ─── 炸弹拦截: 合理触发 (台面有炸/压大王小王2/残局冲刺) ─────────────
+    // 杜绝开局对小单/小对 (rank < 12) 乱扔炸弹压制地主导致失衡
+    const isBombOrRocket = (prevTrick.type === "BOMB" || prevTrick.type === "ROCKET");
+    const isTopCard = (prevTrick.rank >= 12); // 2, 小王, 大王
+    const canInterceptLandlord = (!isLandlord && lastPlayer === GameState.landlordIdx && (isTopCard || urgent || isBombOrRocket));
+    const canInterceptPeasant = (isLandlord && (isTopCard || urgent || isBombOrRocket));
+
+    if (isBombOrRocket || canInterceptLandlord || canInterceptPeasant) {
         // 普通炸弹 (从最小炸开始，不浪费大炸)
         for (let r = 0; r <= 12; r++) {
             if ((counts[r] || 0) === 4) {
@@ -1425,6 +1534,14 @@ function executePlay(playerIdx, cards) {
         GameState.lastTrick = { player: playerIdx, cards, type: trick.type, rank: trick.rank, len: trick.len };
         GameState.passCount = 0;
 
+        // 记录出牌手数与炸弹翻倍
+        GameState.chips.tricksPlayed[playerIdx]++;
+        if (trick.type === "BOMB" || trick.type === "ROCKET") {
+            GameState.chips.bombCount++;
+            GameState.chips.multiplier *= 2;
+            addLog(`[倍数翻倍] ${trick.name || trick.type} 触发! 当前倍数飙升至 ${GameState.chips.multiplier}x (当前底分 ${GameState.chips.baseStake * GameState.chips.multiplier} 豆)`, "bomb");
+        }
+
         playFx(trick.type === "BOMB" || trick.type === "ROCKET" ? "bomb" : "card");
 
         // 从手牌移除
@@ -1503,6 +1620,47 @@ function handleGameOver(winnerIdx) {
 
     if (userWon) GameState.stats.playerWins++;
 
+    // 判定春天与反春
+    let isSpring = false;
+    let isReverseSpring = false;
+    if (isLandlordWinner) {
+        // 地主获胜: 两个农民都一手牌未出 -> 春天 (Spring)
+        if (GameState.chips.tricksPlayed[1] === 0 && GameState.chips.tricksPlayed[2] === 0) {
+            isSpring = true;
+            GameState.chips.multiplier *= 2;
+            addLog("🌸 触发【春天】! 农民未出一手牌，倍数再翻倍!", "bomb");
+        }
+    } else {
+        // 农民获胜: 地主仅出了一手牌(首发出牌) -> 反春 (Reverse Spring)
+        if (GameState.chips.tricksPlayed[GameState.landlordIdx] <= 1) {
+            isReverseSpring = true;
+            GameState.chips.multiplier *= 2;
+            addLog("🌸 触发【反春】! 地主仅出一手牌，倍数再翻倍!", "bomb");
+        }
+    }
+
+    const mult = GameState.chips.multiplier;
+    const base = GameState.chips.baseStake;
+    const isUserLandlord = (GameState.landlordIdx === 0);
+
+    // 地主输赢 2 * base * mult, 农民输赢 base * mult
+    let userDelta = 0;
+    if (isUserLandlord) {
+        userDelta = userWon ? (2 * base * mult) : (-2 * base * mult);
+    } else {
+        userDelta = userWon ? (base * mult) : (-base * mult);
+    }
+
+    GameState.chips.balance += userDelta;
+    GameState.chips.totalProfit = (GameState.chips.totalProfit || 0) + userDelta;
+
+    // 破产保护救济金
+    let bailout = false;
+    if (GameState.chips.balance < 100) {
+        GameState.chips.balance += 2000;
+        bailout = true;
+    }
+
     const modal = document.getElementById("victoryModal");
     const title = document.getElementById("modalTitle");
     const desc = document.getElementById("modalDesc");
@@ -1514,13 +1672,35 @@ function handleGameOver(winnerIdx) {
     const winnerName = (winnerIdx === 0) ? "玩家" : (winnerIdx === 1 ? "左位AI" : "右位AI");
     desc.textContent = `[${winnerName}] 率先出完手牌，${winnerRole} 获得本局胜利！`;
 
+    // 强化学习筹码结算卡更新
+    const detailEl = document.getElementById("modalScoreDetail");
+    if (detailEl) {
+        const tags = [];
+        if (GameState.chips.bombCount > 0) tags.push(`${GameState.chips.bombCount}炸`);
+        if (isSpring) tags.push("春天x2");
+        if (isReverseSpring) tags.push("反春x2");
+        const tagStr = tags.length > 0 ? ` (${tags.join('·')})` : '';
+        detailEl.textContent = `底分 ${base} × 倍数 ${mult}x${tagStr} | 身份: ${isUserLandlord ? '👑地主(输赢2倍)' : '🤝农民(输赢1倍)'}`;
+    }
+    const deltaEl = document.getElementById("modalDeltaDisplay");
+    if (deltaEl) {
+        deltaEl.textContent = `${userDelta >= 0 ? '+' : ''}${userDelta.toLocaleString()} 豆`;
+        deltaEl.style.color = userDelta >= 0 ? "var(--gold-glow)" : "var(--red-glow)";
+    }
+    const balEl = document.getElementById("modalBalance");
+    if (balEl) {
+        balEl.textContent = `${GameState.chips.balance.toLocaleString()} 豆${bailout ? ' (已发放 2,000 破产救济金)' : ''}`;
+    }
+
     document.getElementById("modalGames").textContent = GameState.stats.games;
     const wr = Math.round((GameState.stats.playerWins / GameState.stats.games) * 100);
     document.getElementById("modalWinRate").textContent = `${wr}%`;
 
     modal.style.display = "flex";
     updateUI();
-    addLog(`对局结算: ${winnerRole} (${winnerName}) 获胜!`, "play");
+
+    const rlReward = (userDelta / 100).toFixed(1);
+    addLog(`[强化学习回报机制] 终局回报 R = ${userDelta >= 0 ? '+' : ''}${rlReward} (底分${base} × 倍数${mult}x | 结算 ${userDelta >= 0 ? '+' : ''}${userDelta} 豆), 驱动皮层突触Hebbian强化权重更新`, userDelta >= 0 ? "bomb" : "info");
 }
 
 // 事件绑定
