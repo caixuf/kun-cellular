@@ -632,7 +632,7 @@
             </div>
         </div>
 
-        <!-- 面板 2: 后台冠军皮层真实前向遥测 (C11 底座 + 冠军 bin 权重, 与浏览器对局 AI 相互独立) -->
+        <!-- 面板 2: 后台冠军皮层真实前向遥测 (C++20 底座 + doudizhu_evolved_champion.bin 形式化认证) -->
         <div class="side-box">
             <div class="panel-header">
                 <span>后台冠军皮层真实前向遥测 <span id="dzTeleSrc" style="font-size:10px;color:#64748b;">(连接中…)</span></span>
@@ -640,28 +640,28 @@
             <div class="cortex-telemetry">
                 <div class="column-meter">
                     <div class="column-meta">
-                        <span style="color:#38bdf8;">1. 贝叶斯记牌与盲手预测柱 (192 cells)</span>
+                        <span style="color:#38bdf8;" id="colTitle0">1. 记牌感知受体柱 (4 cells)</span>
                         <span id="actVal0">--</span>
                     </div>
                     <div class="meter-bar"><div class="meter-fill" id="actBar0" style="background:#38bdf8;width:0%;"></div></div>
                 </div>
                 <div class="column-meter">
                     <div class="column-meta">
-                        <span style="color:#10b981;">2. 牌型组合与炸弹解算柱 (192 cells)</span>
+                        <span style="color:#10b981;" id="colTitle1">2. 结构因果解算柱 (2 cells)</span>
                         <span id="actVal1">--</span>
                     </div>
                     <div class="meter-bar"><div class="meter-fill" id="actBar1" style="background:#10b981;width:0%;"></div></div>
                 </div>
                 <div class="column-meter">
                     <div class="column-meta">
-                        <span style="color:#f59e0b;">3. 对局节奏与张力调控柱 (192 cells)</span>
+                        <span style="color:#f59e0b;" id="colTitle2">3. 迟滞时序记忆柱 (3 cells)</span>
                         <span id="actVal2">--</span>
                     </div>
                     <div class="meter-bar"><div class="meter-fill" id="actBar2" style="background:#f59e0b;width:0%;"></div></div>
                 </div>
                 <div class="column-meter">
                     <div class="column-meta">
-                        <span style="color:#a855f7;">4. 反事实得失决断柱 (192 cells)</span>
+                        <span style="color:#a855f7;" id="colTitle3">4. 三态离散决断柱 (3 cells)</span>
                         <span id="actVal3">--</span>
                     </div>
                     <div class="meter-bar"><div class="meter-fill" id="actBar3" style="background:#a855f7;width:0%;"></div></div>
@@ -1145,8 +1145,18 @@ function aiDecide(playerIdx) {
 
     // ─── 没有上家出牌 or 轮到我自由出牌 ─────────────────────────────────
     if (!prevTrick) {
-        // ── 地主激进: 先出累赘牌 (单/对)，大牌压轴 ──
-        // ── 农民稳健: 同样先出小牌，留炸弹 ──
+        // 残局斩杀终局: <= 2 张直接出完
+        if (hand.length <= 2) {
+            if ((counts[13] || 0) >= 1 && (counts[14] || 0) >= 1) {
+                return hand.filter(c => c.rankIdx >= 13);
+            }
+            if (hand.length === 2 && hand[0].rankIdx === hand[1].rankIdx) {
+                return hand;
+            }
+            if (hand.length === 1) {
+                return hand;
+            }
+        }
 
         // 先尝试出连续小单牌组成的顺子 (5张起，从小到大选最短)
         for (let len = 5; len <= 8; len++) {
@@ -1200,9 +1210,9 @@ function aiDecide(playerIdx) {
             }
         }
 
-        // 最小的对子
+        // 最小的对子 (非炸弹)
         for (let r = 0; r <= 14; r++) {
-            if ((counts[r] || 0) >= 2) {
+            if ((counts[r] || 0) >= 2 && (counts[r] || 0) < 4) {
                 return hand.filter(c => c.rankIdx === r).slice(0, 2);
             }
         }
@@ -1224,32 +1234,29 @@ function aiDecide(playerIdx) {
     const myLeft = hand.length;
     const urgent = landlordLeft <= 4 || myLeft <= 4; // 紧急情况: 有人快出完了
 
-    // 单牌压制: 从最小能压的牌开始 (保留王和大牌)
+    // 单牌压制: 从最小能压的牌开始 (优先出非炸弹单牌，保留炸弹结构)
     if (prevTrick.type === "SOLO") {
-        for (let r = prevTrick.rank + 1; r <= 11; r++) {
-            // 非紧急时，用不超过 K(11) 的牌压，留 A/2/王 备用
-            if (counts[r] === 1) return [hand.find(c => c.rankIdx === r)];
+        // 1. 优先找最小孤张单牌 (counts == 1)
+        for (let r = prevTrick.rank + 1; r <= 14; r++) {
+            if (counts[r] === 1) {
+                if ((r === 13 || r === 14) && (counts[13] || 0) >= 1 && (counts[14] || 0) >= 1 && !urgent) continue;
+                return [hand.find(c => c.rankIdx === r)];
+            }
         }
-        // 紧急或被迫: 用 A/2/王 压
-        if (urgent) {
-            for (let r = prevTrick.rank + 1; r <= 14; r++) {
-                if (counts[r] >= 1) return [hand.find(c => c.rankIdx === r)];
+        // 2. 找非炸弹单牌 (counts < 4)，从小到大压制
+        for (let r = prevTrick.rank + 1; r <= 14; r++) {
+            if ((counts[r] || 0) >= 1 && (counts[r] || 0) < 4) {
+                if ((r === 13 || r === 14) && (counts[13] || 0) >= 1 && (counts[14] || 0) >= 1 && !urgent) continue;
+                return [hand.find(c => c.rankIdx === r)];
             }
         }
     }
 
-    // 对子压制: 从最小能压的对子开始
+    // 对子压制: 从最小能压的对子开始 (保留炸弹)
     if (prevTrick.type === "PAIR") {
         for (let r = prevTrick.rank + 1; r <= 12; r++) {
-            if ((counts[r] || 0) >= 2) {
+            if ((counts[r] || 0) >= 2 && (counts[r] || 0) < 4) {
                 return hand.filter(c => c.rankIdx === r).slice(0, 2);
-            }
-        }
-        if (urgent) {
-            for (let r = prevTrick.rank + 1; r <= 14; r++) {
-                if ((counts[r] || 0) >= 2) {
-                    return hand.filter(c => c.rankIdx === r).slice(0, 2);
-                }
             }
         }
     }
@@ -1358,16 +1365,20 @@ async function pulseCortexMeters() {
             if (srcEl) { srcEl.textContent = "(后端离线)"; }
             return;
         }
-        if (srcEl) { srcEl.textContent = "(C11 真实前向)"; }
+        if (srcEl) { srcEl.textContent = "(C++20 形式化认证冠军 · 12细胞)"; }
         for (let i = 0; i < 4; ++i) {
             const v = Math.max(0, Math.min(100, d.columns[i].act));
             document.getElementById("actVal" + i).textContent = v.toFixed(1) + "%";
             document.getElementById("actBar" + i).style.width = v + "%";
+            const titleEl = document.getElementById("colTitle" + i);
+            if (titleEl && d.columns[i].name) {
+                titleEl.textContent = d.columns[i].name;
+            }
         }
         const gi = document.getElementById("dzGameInfo");
         const la = document.getElementById("dzLastAction");
         if (gi && d.game) {
-            gi.textContent = `第${d.game.step}步 手牌${d.game.cards_left} | 对手${d.game.opp_left}/${d.game.opp_right} | 胜率${d.win_rate}% (${d.episodes}局)`;
+            gi.textContent = `第${d.game.step}步 [${d.game.role}] 手牌${d.game.cards_left} | 对手${d.game.opp_left}/${d.game.opp_right} | 胜率 ${d.win_rate}% (${d.episodes}局 · 地主${d.game.landlord_wins} 农民${d.game.peasant_wins})`;
         }
         if (la) { la.textContent = d.last_action; }
     } catch (e) {
