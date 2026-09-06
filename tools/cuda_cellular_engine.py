@@ -19,7 +19,7 @@ class CUDACellularPopulation:
     """
     与 C11 硬件运行时 sdsc_binary_runtime.h / sdsc_primitives.h 100% 绝对数值对齐的 GPU 批量元胞种群
     """
-    def __init__(self, pop_size=256, num_columns=16, cells_per_col=64, in_dim=32, out_dim=8, device="cuda"):
+    def __init__(self, pop_size=256, num_columns=16, cells_per_col=64, in_dim=32, out_dim=8, device="cuda", propagation_passes=1):
         self.pop_size = pop_size
         self.num_columns = num_columns
         self.cells_per_col = cells_per_col
@@ -124,6 +124,10 @@ class CUDACellularPopulation:
         self.outputs = torch.zeros((P, N), device=self.device, dtype=torch.float32)
         self.inputs_accum = torch.zeros((P, N), device=self.device, dtype=torch.float32)
         self.activation_count = 0
+        # 多通传播: R=1 保持经典同步一阶延迟语义; R>1 模拟 C++ Kahn 拓扑同拍传播
+        # (DAG 深度 d 链在 R >= d+1 通内逐层收敛, 与 forward_nd 前馈同拍语义一致)
+        self.propagation_passes = propagation_passes
+        self._state_commit = True
 
         # 传导加速缓冲 (实现 100% 真正 Zero-Allocation)
         self.col_out_buf = torch.zeros((P, C, K, 1), device=self.device, dtype=torch.float32)
@@ -135,6 +139,18 @@ class CUDACellularPopulation:
         self.const_one = torch.tensor(1.0, device=self.device)
         self.const_neg_one = torch.tensor(-1.0, device=self.device)
 
+        self.rebuild_indices()
+
+    def reset_states(self):
+        self.states.zero_()
+        self.aux_states.zero_()
+        self.outputs.zero_()
+        self.inputs_accum.zero_()
+        self.activation_count = 0
+
+
+    def rebuild_indices(self):
+        """从 op_types 重建 per-op 索引组 (移植/演化修改 op_types 后必须调用)"""
         # 预先提取索引向量与布尔标志 (彻底消灭运行时 GPU-CPU 同步开销)
         self.idx_sense = torch.tensor(np.where(self.op_types == 0)[0], device=self.device, dtype=torch.long)
         self.idx_sum = torch.tensor(np.where(self.op_types == 4)[0], device=self.device, dtype=torch.long)
@@ -175,30 +191,11 @@ class CUDACellularPopulation:
         self.has_act_reset = len(self.idx_act_reset) > 0
         self.has_fatigue = len(self.idx_fatigue) > 0
         self.has_passthru = len(self.idx_passthru) > 0
+        # 重算 has_* 标志
 
-    def reset_states(self):
-        self.states.zero_()
-        self.aux_states.zero_()
-        self.outputs.zero_()
-        self.inputs_accum.zero_()
-        self.activation_count = 0
 
-    def forward_step(self, inputs):
-        """
-        单步批量推演: 与 C11 硬件运行时 sdsc_binary_runtime.h / sdsc_primitives.h 100% 绝对数值对齐
-        """
-        P = self.pop_size
-        N = self.num_cells
-        C = self.num_columns
-        K = self.cells_per_col
-
-        if inputs.ndim == 1:
-            inputs = inputs.unsqueeze(0).expand(P, -1)
-
-        # 1. 注入感知受体输入到 inputs_accum 槽位 (C11: g->inputs_accum[i] = inputs[i])
-        self.inputs_accum[:, :self.in_dim] = inputs[:, :self.in_dim]
-
-        # 2. 拓扑细胞激发计算 (sdsc_primitive_eval)
+    def _eval_cells(self):
+        """拓扑细胞激发 (sdsc_primitive_eval); 状态型 op 的状态提交受 _state_commit 门控"""
         x = self.inputs_accum
         g = self.param1
 
@@ -206,13 +203,13 @@ class CUDACellularPopulation:
         if self.has_sense:
             self.outputs[:, self.idx_sense] = x[:, self.idx_sense]
 
-        # OP 4: SUM (out = tanh(x * g))
+        # OP 4: SUM (out = x, 纯直通, SSOT 语义统一)
         if self.has_sum:
-            self.outputs[:, self.idx_sum] = torch.tanh(x[:, self.idx_sum] * g[:, self.idx_sum])
+            self.outputs[:, self.idx_sum] = x[:, self.idx_sum]
 
         # OP 5: INTEGRATE (s = s * 0.85 + x * 0.15; out = tanh(s * g))
         if self.has_integral:
-            self.states[:, self.idx_integral] = self.states[:, self.idx_integral] * 0.85 + x[:, self.idx_integral] * 0.15
+            if self._state_commit: self.states[:, self.idx_integral] = self.states[:, self.idx_integral] * 0.85 + x[:, self.idx_integral] * 0.15
             self.outputs[:, self.idx_integral] = torch.tanh(self.states[:, self.idx_integral] * g[:, self.idx_integral])
 
         # OP 6: AMPLIFY (out = tanh(x * g * 2.5))
@@ -225,7 +222,7 @@ class CUDACellularPopulation:
 
         # OP 8: DAMPER (s = s * 0.70 + x * 0.30; out = s)
         if self.has_damper:
-            self.states[:, self.idx_damper] = self.states[:, self.idx_damper] * 0.70 + x[:, self.idx_damper] * 0.30
+            if self._state_commit: self.states[:, self.idx_damper] = self.states[:, self.idx_damper] * 0.70 + x[:, self.idx_damper] * 0.30
             self.outputs[:, self.idx_damper] = self.states[:, self.idx_damper]
 
         # OP 9: CLIP (out = clamp(x * g, -1.0, 1.0))
@@ -236,44 +233,48 @@ class CUDACellularPopulation:
         if self.has_abs:
             self.outputs[:, self.idx_abs] = torch.abs(torch.tanh(x[:, self.idx_abs] * g[:, self.idx_abs]))
 
-        # OP 11: MULTIPLY (out = tanh(x * g * 1.5))
+        # OP 11: MULTIPLY (out = x, 纯直通, SSOT 语义统一)
         if self.has_multiply:
-            self.outputs[:, self.idx_multiply] = torch.tanh(x[:, self.idx_multiply] * g[:, self.idx_multiply] * 1.5)
+            self.outputs[:, self.idx_multiply] = x[:, self.idx_multiply]
 
         # OP 12: DIFF (out = x - s; s = x)
         if self.has_diff:
             cur_x = x[:, self.idx_diff]
             self.outputs[:, self.idx_diff] = cur_x - self.states[:, self.idx_diff]
-            self.states[:, self.idx_diff] = cur_x
+            if self._state_commit:
+                self.states[:, self.idx_diff] = cur_x
 
-        # OP 13: SUB (s = s * 0.60 + x * 0.40; out = tanh((x - s) * g))
+        # OP 13: SUB (out = x, 纯直通, SSOT 语义统一)
         if self.has_sub:
-            self.states[:, self.idx_sub] = self.states[:, self.idx_sub] * 0.60 + x[:, self.idx_sub] * 0.40
-            self.outputs[:, self.idx_sub] = torch.tanh((x[:, self.idx_sub] - self.states[:, self.idx_sub]) * g[:, self.idx_sub])
+            self.outputs[:, self.idx_sub] = x[:, self.idx_sub]
 
         # OP 14: RATIO (s = s * 0.85 + |x| * 0.15; out = clamp(x / (s + 0.1), -2.0, 2.0))
         if self.has_ratio:
-            self.states[:, self.idx_ratio] = self.states[:, self.idx_ratio] * 0.85 + torch.abs(x[:, self.idx_ratio]) * 0.15
+            if self._state_commit:
+                self.states[:, self.idx_ratio] = self.states[:, self.idx_ratio] * 0.85 + torch.abs(x[:, self.idx_ratio]) * 0.15
             self.outputs[:, self.idx_ratio] = torch.clamp(x[:, self.idx_ratio] / (self.states[:, self.idx_ratio] + 0.1), -2.0, 2.0)
 
-        # OP 16: HYSTERESIS (if x > 0.15 s=1; elif x < -0.15 s=-1; out = s)
+        # OP 16: HYSTERESIS (参数化对称双阈值: x>g=>1, x<-g=>-1)
         if self.has_hyst:
             cur_s = self.states[:, self.idx_hyst]
             cur_x = x[:, self.idx_hyst]
-            cur_s = torch.where(cur_x > 0.15, self.const_one, cur_s)
-            cur_s = torch.where(cur_x < -0.15, self.const_neg_one, cur_s)
-            self.states[:, self.idx_hyst] = cur_s
+            cur_g = g[:, self.idx_hyst]
+            cur_s = torch.where(cur_x > cur_g, self.const_one, cur_s)
+            cur_s = torch.where(cur_x < -cur_g, self.const_neg_one, cur_s)
+            if self._state_commit:
+                self.states[:, self.idx_hyst] = cur_s
             self.outputs[:, self.idx_hyst] = cur_s
 
-        # OP 17: DEADZONE (|x| > 0.08 ? x * g : 0.0)
+        # OP 17: DEADZONE (参数化: |x| > |g| ? x : 0)
         if self.has_deadzone:
             cur_x = x[:, self.idx_deadzone]
-            self.outputs[:, self.idx_deadzone] = torch.where(torch.abs(cur_x) > 0.08, cur_x * g[:, self.idx_deadzone], self.const_zero)
+            self.outputs[:, self.idx_deadzone] = torch.where(torch.abs(cur_x) > torch.abs(g[:, self.idx_deadzone]), cur_x, self.const_zero)
 
         # OP 25: FATIGUE (s = min(2.0, s + |x|*0.15)*0.96; out = tanh(x*g)/(1+s))
         if self.has_fatigue:
             cur_s = torch.clamp(self.states[:, self.idx_fatigue] + torch.abs(x[:, self.idx_fatigue]) * 0.15, max=2.0) * 0.96
-            self.states[:, self.idx_fatigue] = cur_s
+            if self._state_commit:
+                self.states[:, self.idx_fatigue] = cur_s
             self.outputs[:, self.idx_fatigue] = torch.tanh(x[:, self.idx_fatigue] * g[:, self.idx_fatigue]) / (1.0 + cur_s)
 
         # OP 26: PASSTHRU (out = x)
@@ -293,6 +294,12 @@ class CUDACellularPopulation:
             cur_x = x[:, self.idx_act_reset]
             self.outputs[:, self.idx_act_reset] = torch.where(torch.abs(cur_x) < 0.10, self.const_zero, cur_x)
 
+    def _propagate(self, inputs):
+        """突触加权传导 (Block-Sparse Intra + Inter) + 感觉辐射, 替换语义写入 inputs_accum"""
+        P = self.pop_size
+        C = self.num_columns
+        K = self.cells_per_col
+        N = self.num_cells
         # 3. 突触加权传导 (Block-Sparse Intra + Long-range Inter Axon Projections)
         # 柱内密集传导: P*C 个 64x64 矩阵批量乘 (Tensor Core 极限加速，原位写出)
         self.col_out_buf.copy_(self.outputs.view(P, C, K, 1))
@@ -306,13 +313,43 @@ class CUDACellularPopulation:
 
         self.inputs_accum.copy_(intra_drive)
         self.inputs_accum.add_(self.inter_drive)
+        # 感觉辐射 (Thalamocortical Radiance): 外部观测广播至全部微柱的局部前 4 驱动槽,
+        # 消除"观测仅入第 0 柱、跨柱标量广播独木桥"的信息瓶颈
+        if inputs.ndim == 2 and inputs.shape[1] >= 4:
+            self.inputs_accum.view(P, C, K)[:, :, :4] += inputs[:, :4].view(P, 1, 4)
+
+    def forward_step(self, inputs):
+        """
+        单步批量推演: 与 C11 硬件运行时 sdsc_binary_runtime.h / sdsc_primitives.h 100% 绝对数值对齐
+        propagation_passes=1: 经典同步一阶延迟语义 (默认, 保持既有对账)
+        propagation_passes=R>1: C++ forward_nd Kahn 拓扑同拍传播仿真
+          (每通驱动替换重算, DAG 逐层收敛; 状态型 op 仅末通提交状态)
+        """
+        P = self.pop_size
+        N = self.num_cells
+
+        if inputs.ndim == 1:
+            inputs = inputs.unsqueeze(0).expand(P, -1)
+
+        R = self.propagation_passes
+        if R <= 1:
+            # 经典路径: 注入感知受体输入 (C11: g->inputs_accum[i] = inputs[i])
+            self.inputs_accum[:, :self.in_dim] = inputs[:, :self.in_dim]
+            self._state_commit = True
+            self._eval_cells()
+            self._propagate(inputs)
+            self.activation_count += 1
+            return self.outputs[:, N - self.out_dim:]
+
+        # 多通同拍传播
+        self.inputs_accum.zero_()
+        self._propagate(inputs)                 # 基座驱动 (递归记忆: 上一时刻输出)
+        for r in range(R):
+            self._state_commit = (r == R - 1)
+            self._eval_cells()
+            self._propagate(inputs)             # 同拍传播: 每通以最新输出重算驱动
         self.activation_count += 1
-
-        # 收集末尾效应器输出
-        motor_offset = N - self.out_dim
-        action_outputs = self.outputs[:, motor_offset:]
-        return action_outputs
-
+        return self.outputs[:, N - self.out_dim:]
     def export_champion_to_sdsc_bin(self, champion_idx, filepath):
         """
         导出为严格标准的 SDSC-BIN v2 检查点
@@ -363,6 +400,12 @@ class CUDACellularPopulation:
                 for v, w in inter_by_src[u]:
                     if abs(w) > 1e-5:
                         edges.append((v, w))
+
+            # 3. 感觉辐射出边 (拓扑固化): 受体细胞 0..3 直连每柱前 4 细胞 w=1.0
+            #    使 C11 CSR 图复现 GPU 侧 thalamocortical radiance (位级对账必需)
+            if u < 4:
+                for c in range(C):
+                    edges.append((c * K + u, 1.0))
 
             # 按目标细胞排序保证拓扑确定性
             edges.sort(key=lambda x: x[0])

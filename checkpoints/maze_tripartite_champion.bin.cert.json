@@ -1,0 +1,28 @@
+{
+  "schema": "SDSC-Formal-Cert-v1.0",
+  "organism_bin": "checkpoints/maze_tripartite_champion.bin",
+  "wl_canonical_hash": "0x66fdcfbee74acb13",
+  "topology": {
+    "num_cells": 11,
+    "num_synapses": 14,
+    "core_nodes": 11,
+    "core_edges": 14
+  },
+  "lyapunov_certificate": {
+    "status": "CERTIFIED_BIBO_STABLE",
+    "max_loop_gain": 0,
+    "stability_margin": 1,
+    "has_unstable_cycles": false
+  },
+  "bit_exact_regression": {
+    "status": "BIT_EXACT_ZERO_DRIFT",
+    "steps": 50000,
+    "fnv1a_checksum": "0x5ba379b0a5d53a78",
+    "max_action_peak": 5.69573
+  },
+  "operator_safety_proof": {
+    "bounds_check": "ALL_CELLS_BOUNDED",
+    "source_of_truth": "ops.yaml-v2.0.0"
+  },
+  "certified_at": "Sat Sep  5 22:43:08 2026"
+}
