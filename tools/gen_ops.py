@@ -521,7 +521,7 @@ def generate_cpp_header(spec):
         "        case CellType::SENSE_RAW_INPUT_3: return 3;",
         "        case CellType::SENSE_CHANNEL:     return 0;",
         "        case CellType::OP_SUM:            return 4;  // SDSC_OP_SUM",
-        "        case CellType::OP_INTEGRAL:       return 5;  // SDSC_OP_INTEGRAL",
+        "        case CellType::OP_INTEGRAL:       return 27; // SDSC_OP_ACCUMULATOR (真积分器, 时序工作记忆)",
         "        case CellType::OP_EMA:            return 8;  // SDSC_OP_DAMPER",
         "        case CellType::OP_ABS:            return 10; // SDSC_OP_ABS",
         "        case CellType::OP_MULTIPLY:       return 11; // SDSC_OP_MULTIPLY",

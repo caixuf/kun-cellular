@@ -123,7 +123,7 @@ def test_differentiable_ops_finite_difference(vjp_lib):
 
     # 跳过不可微/分段边界点的原语或采用 STE 的原语
     smooth_ops = [
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 18, 24, 25, 26
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 18, 24, 25, 26, 27
     ]
 
     for meta in kops.PRIMITIVES_META:
@@ -170,7 +170,7 @@ def test_differentiable_ops_finite_difference(vjp_lib):
                 assert err_dg < 1e-3, f"op={op} ({meta['name']}) dg err={err_dg:.2e} vjp={v.dg} fd={fd_dg}"
 
             # 3. 验证关于 s 的时序偏导 (对有状态原语): dy=0.0, ds_next=1.0 -> d(s_next)/ds
-            if meta["has_state"] and op in [5, 8, 13, 14, 18, 24]:
+            if meta["has_state"] and op in [5, 8, 13, 14, 18, 24, 27]:
                 v_s = vjp_lib.eval_vjp_c(op, g, x, s, a, out, s_next, a_next, 0.0, 1.0, 0.0)
 
                 s_sp = ctypes.c_float(s + eps)

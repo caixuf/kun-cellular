@@ -48,7 +48,8 @@ enum class SdscOpType : uint8_t {
     SDSC_OP_ACT_RESET = 23,
     SDSC_OP_CORRELATION = 24,
     SDSC_OP_FATIGUE = 25,
-    SDSC_OP_PASSTHRU = 26
+    SDSC_OP_PASSTHRU = 26,
+    SDSC_OP_ACCUMULATOR = 27
 };
 
 // ============================================================================
@@ -232,7 +233,7 @@ inline uint8_t cell_type_to_sdsc_opcode(CellType t) {
         case CellType::SENSE_RAW_INPUT_3: return 3;
         case CellType::SENSE_CHANNEL:     return 0;
         case CellType::OP_SUM:            return 4;  // SDSC_OP_SUM
-        case CellType::OP_INTEGRAL:       return 5;  // SDSC_OP_INTEGRAL
+        case CellType::OP_INTEGRAL:       return 27; // SDSC_OP_ACCUMULATOR (真积分器, 时序工作记忆)
         case CellType::OP_EMA:            return 8;  // SDSC_OP_DAMPER
         case CellType::OP_ABS:            return 10; // SDSC_OP_ABS
         case CellType::OP_MULTIPLY:       return 11; // SDSC_OP_MULTIPLY
@@ -344,25 +345,25 @@ struct PrimitiveMeta {
     PrimitiveBounds bounds;
 };
 
-inline constexpr std::array<PrimitiveMeta, 27> SDSC_PRIMITIVES_META = {{
+inline constexpr std::array<PrimitiveMeta, 28> SDSC_PRIMITIVES_META = {{
     {0, "SDSC_OP_SENSE_0", "RECEPTOR", false, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
     {1, "SDSC_OP_SENSE_1", "RECEPTOR", false, false, 1.0f, 1.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
     {2, "SDSC_OP_SENSE_2", "RECEPTOR", false, false, 1.0f, 2.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
     {3, "SDSC_OP_SENSE_3", "RECEPTOR", false, false, 1.0f, 3.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
-    {4, "SDSC_OP_SUM", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {4, "SDSC_OP_SUM", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {0.0f, 0.0f, -16.0f, 16.0f, 0.0f, 4.0f}},
     {5, "SDSC_OP_INTEGRATE", "METABOLIC", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-4.0f, 4.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
     {6, "SDSC_OP_AMPLIFY", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
     {7, "SDSC_OP_INVERT", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
     {8, "SDSC_OP_DAMPER", "METABOLIC", true, false, 1.0f, 0.0f, "[-inf, +inf] (asymptotically bounded)", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
     {9, "SDSC_OP_CLIP", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
     {10, "SDSC_OP_ABS", "METABOLIC", false, false, 1.0f, 0.0f, "[0.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, 0.0f, 1.0f, 0.0f, 4.0f}},
-    {11, "SDSC_OP_MULTIPLY", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {11, "SDSC_OP_MULTIPLY", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {0.0f, 0.0f, -16.0f, 16.0f, 0.0f, 4.0f}},
     {12, "SDSC_OP_DIFF", "METABOLIC", true, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
-    {13, "SDSC_OP_SUB", "METABOLIC", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
+    {13, "SDSC_OP_SUB", "METABOLIC", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {0.0f, 0.0f, -16.0f, 16.0f, 0.0f, 4.0f}},
     {14, "SDSC_OP_RATIO", "METABOLIC", true, false, 1.0f, 0.0f, "[-2.0, 2.0]", true, "none", {0.0f, 1000000000.0f, -2.0f, 2.0f, 0.0f, 4.0f}},
     {15, "SDSC_OP_THRESHOLD", "GATING", false, false, 1.0f, 0.0f, "[-1.0, 1.0]", false, "straight_through", {-1000000000.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
     {16, "SDSC_OP_HYSTERESIS", "GATING", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", false, "straight_through", {-1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
-    {17, "SDSC_OP_DEADZONE", "GATING", false, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {17, "SDSC_OP_DEADZONE", "GATING", false, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {0.0f, 0.0f, -16.0f, 16.0f, 0.0f, 4.0f}},
     {18, "SDSC_OP_INHIBIT", "GATING", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {0.0f, 1000000000.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
     {19, "SDSC_OP_AND", "GATING", true, false, 1.0f, 0.0f, "[0.0, 1.0]", false, "straight_through", {-1000000000.0f, 1000000000.0f, 0.0f, 1.0f, 0.0f, 4.0f}},
     {20, "SDSC_OP_MIN_MAX", "GATING", true, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
@@ -372,6 +373,7 @@ inline constexpr std::array<PrimitiveMeta, 27> SDSC_PRIMITIVES_META = {{
     {24, "SDSC_OP_CORRELATION", "COGNITIVE", true, true, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {-1.0f, 1.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
     {25, "SDSC_OP_FATIGUE", "COGNITIVE", true, false, 1.0f, 0.0f, "[-1.0, 1.0]", true, "none", {0.0f, 2.0f, -1.0f, 1.0f, 0.0f, 4.0f}},
     {26, "SDSC_OP_PASSTHRU", "PASSTHRU", false, false, 1.0f, 0.0f, "[-inf, +inf]", true, "none", {-1000000000.0f, 1000000000.0f, -1000000000.0f, 1000000000.0f, 0.0f, 4.0f}},
+    {27, "SDSC_OP_ACCUMULATOR", "METABOLIC", true, false, 0.05f, 0.0f, "[-16.0, 16.0]", true, "none", {-16.0f, 16.0f, -16.0f, 16.0f, -4.0f, 4.0f}},
 }};
 
 inline constexpr bool is_primitive_differentiable(uint8_t op) {

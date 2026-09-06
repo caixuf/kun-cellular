@@ -47,7 +47,7 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 4: { // SDSC_OP_SUM
-            out = tanhf(x * g);
+            out = x;
             break;
         }
         case 5: { // SDSC_OP_INTEGRATE
@@ -77,7 +77,7 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 11: { // SDSC_OP_MULTIPLY
-            out = tanhf(x * g * 1.5f);
+            out = x;
             break;
         }
         case 12: { // SDSC_OP_DIFF
@@ -86,8 +86,7 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 13: { // SDSC_OP_SUB
-            s = s * 0.60f + x * 0.40f;
-            out = tanhf((x - s) * g);
+            out = x;
             break;
         }
         case 14: { // SDSC_OP_RATIO
@@ -96,17 +95,17 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 15: { // SDSC_OP_THRESHOLD
-            out = (x > 0.25f) ? 1.0f : ((x < -0.25f) ? -1.0f : 0.0f);
+            out = (x > g) ? 1.0f : 0.0f;
             break;
         }
         case 16: { // SDSC_OP_HYSTERESIS
-            if (x > 0.15f) s = 1.0f;
-            else if (x < -0.15f) s = -1.0f;
+            if (x > g) s = 1.0f;
+            else if (x < -g) s = -1.0f;
             out = s;
             break;
         }
         case 17: { // SDSC_OP_DEADZONE
-            out = (fabsf(x) > 0.08f) ? (x * g) : 0.0f;
+            out = (fabsf(x) > fabsf(g)) ? x : 0.0f;
             break;
         }
         case 18: { // SDSC_OP_INHIBIT
@@ -149,6 +148,11 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
         }
         case 26: { // SDSC_OP_PASSTHRU
             out = x;
+            break;
+        }
+        case 27: { // SDSC_OP_ACCUMULATOR
+            s = fminf(fmaxf(s + x * g, -16.0f), 16.0f);
+            out = s;
             break;
         }
         default:
@@ -193,7 +197,7 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 4: { // SDSC_OP_SUM
-            out = tanhf(x * g);
+            out = x;
             break;
         }
         case 5: { // SDSC_OP_INTEGRATE
@@ -223,7 +227,7 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 11: { // SDSC_OP_MULTIPLY
-            out = tanhf(x * g * 1.5f);
+            out = x;
             break;
         }
         case 12: { // SDSC_OP_DIFF
@@ -232,8 +236,7 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 13: { // SDSC_OP_SUB
-            s = s * 0.60f + x * 0.40f;
-            out = tanhf((x - s) * g);
+            out = x;
             break;
         }
         case 14: { // SDSC_OP_RATIO
@@ -242,17 +245,17 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 15: { // SDSC_OP_THRESHOLD
-            out = (x > 0.25f) ? 1.0f : ((x < -0.25f) ? -1.0f : 0.0f);
+            out = (x > g) ? 1.0f : 0.0f;
             break;
         }
         case 16: { // SDSC_OP_HYSTERESIS
-            if (x > 0.15f) s = 1.0f;
-            else if (x < -0.15f) s = -1.0f;
+            if (x > g) s = 1.0f;
+            else if (x < -g) s = -1.0f;
             out = s;
             break;
         }
         case 17: { // SDSC_OP_DEADZONE
-            out = (fabsf(x) > 0.08f) ? (x * g) : 0.0f;
+            out = (fabsf(x) > fabsf(g)) ? x : 0.0f;
             break;
         }
         case 18: { // SDSC_OP_INHIBIT
@@ -295,6 +298,11 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
         }
         case 26: { // SDSC_OP_PASSTHRU
             out = x;
+            break;
+        }
+        case 27: { // SDSC_OP_ACCUMULATOR
+            s = fminf(fmaxf(s + x * g, -16.0f), 16.0f);
+            out = s;
             break;
         }
         default:

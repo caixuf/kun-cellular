@@ -151,7 +151,7 @@ int main(int argc, char** argv) {
         std::cerr << "  ❌ [CERT REJECT] 存在非确定性位级漂移! ck1 != ck2\n";
         return 4;
     }
-    std::cout << "  ✅ 10^6 步位级完全无歧义自复现 (Bit-Exact 0-Drift Certified)!\n";
+    std::cout << "  ✅ " << regression_steps << " 步位级完全无歧义自复现 (Bit-Exact 0-Drift Certified)!\n";
 
     // 5. 产出认证证书 JSON
     std::cout << "[Step 5/5] 生成生产级形式化认证证书: " << cert_out_path << "...\n";

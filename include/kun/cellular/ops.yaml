@@ -123,35 +123,37 @@ sdsc_primitives:
 - id: 4
   name: SDSC_OP_SUM
   category: METABOLIC
-  description: '非线性饱和加权叠加: tanh(x * g)'
+  description: '线性叠加直通 (Pure Sum): out = x (双端口折叠由调用方完成, 增益无关)'
   has_state: false
   has_aux: false
   default_p1: 1.0
   default_p2: 0.0
   lyapunov_bound: '[-1.0, 1.0]'
-  eval_code: out = tanhf(x * g);
+  eval_code: 'out = x;
+
+    '
   differentiable: true
   ste_gradient: none
   bounds:
     state:
-    - -1000000000.0
-    - 1000000000.0
+    - 0.0
+    - 0.0
     out:
-    - -1.0
-    - 1.0
+    - -16.0
+    - 16.0
     params:
       g:
       - 0.0
       - 4.0
-  vjp_code: 'float dtanh = 1.0f - out * out;
-
-    dx = dy * dtanh * g;
+  vjp_code: 'dx = dy;
 
     ds_prev = 0.0f;
 
     da_prev = 0.0f;
 
-    dg = dy * dtanh * x;'
+    dg = 0.0f;
+
+    '
 - id: 5
   name: SDSC_OP_INTEGRATE
   category: METABOLIC
@@ -365,35 +367,37 @@ sdsc_primitives:
 - id: 11
   name: SDSC_OP_MULTIPLY
   category: METABOLIC
-  description: '二阶非线性增益调制: tanh(x * g * 1.5)'
+  description: '乘法直通 (Pure Multiply): out = x (in0*in1 折叠由调用方完成)'
   has_state: false
   has_aux: false
   default_p1: 1.0
   default_p2: 0.0
   lyapunov_bound: '[-1.0, 1.0]'
-  eval_code: out = tanhf(x * g * 1.5f);
+  eval_code: 'out = x;
+
+    '
   differentiable: true
   ste_gradient: none
   bounds:
     state:
-    - -1000000000.0
-    - 1000000000.0
+    - 0.0
+    - 0.0
     out:
-    - -1.0
-    - 1.0
+    - -16.0
+    - 16.0
     params:
       g:
       - 0.0
       - 4.0
-  vjp_code: 'float dtanh = 1.0f - out * out;
-
-    dx = dy * dtanh * g * 1.5f;
+  vjp_code: 'dx = dy;
 
     ds_prev = 0.0f;
 
     da_prev = 0.0f;
 
-    dg = dy * dtanh * x * 1.5f;'
+    dg = 0.0f;
+
+    '
 - id: 12
   name: SDSC_OP_DIFF
   category: METABOLIC
@@ -431,45 +435,37 @@ sdsc_primitives:
 - id: 13
   name: SDSC_OP_SUB
   category: METABOLIC
-  description: '双均线差分剪刀差对比器: s = 0.60*s + 0.40*x, out = tanh((x - s) * g)'
-  has_state: true
+  description: '差分直通 (Pure Sub): out = x (in0-in1 折叠由调用方完成)'
+  has_state: false
   has_aux: false
   default_p1: 1.0
   default_p2: 0.0
   lyapunov_bound: '[-1.0, 1.0]'
-  eval_code: 's = s * 0.60f + x * 0.40f;
-
-    out = tanhf((x - s) * g);
+  eval_code: 'out = x;
 
     '
   differentiable: true
   ste_gradient: none
   bounds:
     state:
-    - -1000000000.0
-    - 1000000000.0
+    - 0.0
+    - 0.0
     out:
-    - -1.0
-    - 1.0
+    - -16.0
+    - 16.0
     params:
       g:
       - 0.0
       - 4.0
-  vjp_code: 'float dtanh = 1.0f - out * out;
+  vjp_code: 'dx = dy;
 
-    float du = dy * dtanh;
-
-    float ds_local = -du * g;
-
-    float ds_tot = ds_local + ds_next;
-
-    dx = du * g + ds_tot * 0.40f;
-
-    ds_prev = ds_tot * 0.60f;
+    ds_prev = 0.0f;
 
     da_prev = 0.0f;
 
-    dg = du * (x - s_next);'
+    dg = 0.0f;
+
+    '
 - id: 14
   name: SDSC_OP_RATIO
   category: METABOLIC
@@ -521,13 +517,15 @@ sdsc_primitives:
 - id: 15
   name: SDSC_OP_THRESHOLD
   category: GATING
-  description: '三态阶跃硬门控: x > 0.25 -> 1.0; x < -0.25 -> -1.0; else 0.0'
+  description: '阶跃决策硬门 (参数化): x > g ? 1 : 0 (g=阈值)'
   has_state: false
   has_aux: false
   default_p1: 1.0
   default_p2: 0.0
   lyapunov_bound: '[-1.0, 1.0]'
-  eval_code: 'out = (x > 0.25f) ? 1.0f : ((x < -0.25f) ? -1.0f : 0.0f);'
+  eval_code: 'out = (x > g) ? 1.0f : 0.0f;
+
+    '
   differentiable: false
   ste_gradient: straight_through
   bounds:
@@ -551,15 +549,15 @@ sdsc_primitives:
 - id: 16
   name: SDSC_OP_HYSTERESIS
   category: GATING
-  description: '施密特双阈值迟滞抗抖门: x > 0.15 -> s=1; x < -0.15 -> s=-1; out = s'
+  description: '施密特对称双阈值迟滞 (参数化): x>g=>1, x<-g=>-1 (g=半窗宽)'
   has_state: true
   has_aux: false
   default_p1: 1.0
   default_p2: 0.0
   lyapunov_bound: '[-1.0, 1.0]'
-  eval_code: 'if (x > 0.15f) s = 1.0f;
+  eval_code: 'if (x > g) s = 1.0f;
 
-    else if (x < -0.15f) s = -1.0f;
+    else if (x < -g) s = -1.0f;
 
     out = s;
 
@@ -587,35 +585,37 @@ sdsc_primitives:
 - id: 17
   name: SDSC_OP_DEADZONE
   category: GATING
-  description: '中心死区微噪滤除门: |x| > 0.08 ? x*g : 0.0'
+  description: '中心死区噪声门 (参数化): |x|>|g| ? x : 0 (g=死区半宽)'
   has_state: false
   has_aux: false
   default_p1: 1.0
   default_p2: 0.0
   lyapunov_bound: '[-inf, +inf]'
-  eval_code: 'out = (fabsf(x) > 0.08f) ? (x * g) : 0.0f;'
+  eval_code: 'out = (fabsf(x) > fabsf(g)) ? x : 0.0f;
+
+    '
   differentiable: true
   ste_gradient: none
   bounds:
     state:
-    - -1000000000.0
-    - 1000000000.0
+    - 0.0
+    - 0.0
     out:
-    - -1000000000.0
-    - 1000000000.0
+    - -16.0
+    - 16.0
     params:
       g:
       - 0.0
       - 4.0
-  vjp_code: 'bool active = (fabsf(x) > 0.08f);
-
-    dx = active ? (dy * g) : 0.0f;
+  vjp_code: 'dx = (fabsf(x) > fabsf(g)) ? dy : 0.0f;
 
     ds_prev = 0.0f;
 
     da_prev = 0.0f;
 
-    dg = active ? (dy * x) : 0.0f;'
+    dg = 0.0f;
+
+    '
 - id: 18
   name: SDSC_OP_INHIBIT
   category: GATING
@@ -952,6 +952,42 @@ sdsc_primitives:
     da_prev = 0.0f;
 
     dg = 0.0f;'
+- id: 27
+  name: SDSC_OP_ACCUMULATOR
+  category: METABOLIC
+  description: '真积分累加器 (Pure Accumulator): s = clamp(s + x*g, -16, 16), out = s (时序工作记忆核)'
+  has_state: true
+  has_aux: false
+  default_p1: 0.05
+  default_p2: 0.0
+  lyapunov_bound: '[-16.0, 16.0]'
+  eval_code: 's = fminf(fmaxf(s + x * g, -16.0f), 16.0f);
+
+    out = s;'
+  differentiable: true
+  ste_gradient: none
+  bounds:
+    state:
+    - -16.0
+    - 16.0
+    out:
+    - -16.0
+    - 16.0
+    params:
+      g:
+      - -4.0
+      - 4.0
+  vjp_code: 'float active = (s_next > -16.0f && s_next < 16.0f) ? 1.0f : 0.0f;
+
+    float dtot = dy + ds_next;
+
+    dx = dtot * g * active;
+
+    ds_prev = dtot * active;
+
+    da_prev = 0.0f;
+
+    dg = dtot * x * active;'
 cell_types:
 - code: 0
   name: SENSE_RAW_INPUT_0

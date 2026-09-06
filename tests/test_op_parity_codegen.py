@@ -32,7 +32,7 @@ def test_cell_type_bijective_mapping():
     """门禁 2: 确保所有 30 种形态学 CellType 与硬件原语具有双向保真映射，消灭类型坍缩"""
     assert len(kops.CellType.__dict__) >= 30
     for meta in kops.PRIMITIVES_META:
-        assert 0 <= meta["id"] <= 26
+        assert 0 <= meta["id"] <= 27  # 原语集含 ACCUMULATOR(27)
         assert meta["category"] in ("RECEPTOR", "METABOLIC", "GATING", "EFFECTOR", "COGNITIVE", "PASSTHRU")
 
 def test_three_way_bit_parity_c11_cpp_gpu():

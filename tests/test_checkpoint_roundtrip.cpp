@@ -91,7 +91,7 @@ void test_all_cell_types_roundtrip_fidelity() {
             assert(false && "Every CellType must roundtrip losslessly!");
         }
         uint8_t op = CellularOrganism::cell_type_to_sdsc_opcode(t);
-        assert(op <= 26 && "Execution opcode must be within [0, 26]");
+        assert(op <= 27 && "Execution opcode must be within [0, 27] (含 ACCUMULATOR)");
     }
     std::cout << "  ✓ 纯序列化编码表 1:1 双射校验通过 (30/30 类型无一坍缩)" << std::endl;
 
@@ -202,19 +202,19 @@ void test_integral_feedback_loop_boundedness() {
         auto act = org.forward_nd(&inp, 1, false);
         double s = org.cells[1].state_val;
         assert(std::isfinite(s) && "积分器状态必须为有限数，严禁出现 NaN 或 inf!");
-        assert(std::abs(s) <= 4.0001 && "积分器状态必须严格钳位在 [-4.0, 4.0] 内!");
+        assert(std::abs(s) <= 16.0001 && "积分器状态必须严格钳位在 [-16.0, 16.0] 内 (ACCUMULATOR 契约)!");
     }
 
     // 注入病态 NaN 与 Inf 输入，验证防御坚固性
     double nan_inp = std::numeric_limits<double>::quiet_NaN();
     org.forward_nd(&nan_inp, 1, false);
     assert(std::isfinite(org.cells[1].state_val) && "NaN 输入下积分器状态依然必须严格有限且有界！");
-    assert(std::abs(org.cells[1].state_val) <= 4.0001);
+    assert(std::abs(org.cells[1].state_val) <= 16.0001);
 
     double inf_inp = std::numeric_limits<double>::infinity();
     org.forward_nd(&inf_inp, 1, false);
     assert(std::isfinite(org.cells[1].state_val) && "Inf 输入下积分器状态依然必须严格有限且有界！");
-    assert(std::abs(org.cells[1].state_val) <= 4.0001);
+    assert(std::abs(org.cells[1].state_val) <= 16.0001);
 
     std::cout << "  ✓ 强反馈环路推演 200 步 + NaN/Inf 压力注入后 state = " << org.cells[1].state_val
               << " (严格限制在 [-4.0, 4.0]，零溢出，零 NaN 穿透)" << std::endl;

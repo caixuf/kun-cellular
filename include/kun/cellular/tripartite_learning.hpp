@@ -287,7 +287,7 @@ public:
             auto& ind = population[e];
             TrainingTrajectoryBatch trajectory_data = get_trajectory(ind);
 
-            if (!trajectory_data.inputs.empty() && trajectory_data.inputs.size() == trajectory_data.targets.size()) {
+            if (ind.pbt_params.bptt_steps > 0 && !trajectory_data.inputs.empty() && trajectory_data.inputs.size() == trajectory_data.targets.size()) {
                 size_t steps = std::min(size_t(ind.pbt_params.bptt_steps), trajectory_data.inputs.size());
                 
                 // 截取当前短窗

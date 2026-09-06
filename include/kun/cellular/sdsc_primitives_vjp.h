@@ -92,11 +92,10 @@ SDSC_INLINE SdscOpVJP sdsc_primitive_vjp(
             break;
         }
         case 4: { // SDSC_OP_SUM
-            float dtanh = 1.0f - out * out;
-            dx = dy * dtanh * g;
+            dx = dy;
             ds_prev = 0.0f;
             da_prev = 0.0f;
-            dg = dy * dtanh * x;
+            dg = 0.0f;
             break;
         }
         case 5: { // SDSC_OP_INTEGRATE
@@ -153,11 +152,10 @@ SDSC_INLINE SdscOpVJP sdsc_primitive_vjp(
             break;
         }
         case 11: { // SDSC_OP_MULTIPLY
-            float dtanh = 1.0f - out * out;
-            dx = dy * dtanh * g * 1.5f;
+            dx = dy;
             ds_prev = 0.0f;
             da_prev = 0.0f;
-            dg = dy * dtanh * x * 1.5f;
+            dg = 0.0f;
             break;
         }
         case 12: { // SDSC_OP_DIFF
@@ -168,14 +166,10 @@ SDSC_INLINE SdscOpVJP sdsc_primitive_vjp(
             break;
         }
         case 13: { // SDSC_OP_SUB
-            float dtanh = 1.0f - out * out;
-            float du = dy * dtanh;
-            float ds_local = -du * g;
-            float ds_tot = ds_local + ds_next;
-            dx = du * g + ds_tot * 0.40f;
-            ds_prev = ds_tot * 0.60f;
+            dx = dy;
+            ds_prev = 0.0f;
             da_prev = 0.0f;
-            dg = du * (x - s_next);
+            dg = 0.0f;
             break;
         }
         case 14: { // SDSC_OP_RATIO
@@ -207,11 +201,10 @@ SDSC_INLINE SdscOpVJP sdsc_primitive_vjp(
             break;
         }
         case 17: { // SDSC_OP_DEADZONE
-            bool active = (fabsf(x) > 0.08f);
-            dx = active ? (dy * g) : 0.0f;
+            dx = (fabsf(x) > fabsf(g)) ? dy : 0.0f;
             ds_prev = 0.0f;
             da_prev = 0.0f;
-            dg = active ? (dy * x) : 0.0f;
+            dg = 0.0f;
             break;
         }
         case 18: { // SDSC_OP_INHIBIT
@@ -297,6 +290,15 @@ SDSC_INLINE SdscOpVJP sdsc_primitive_vjp(
             ds_prev = 0.0f;
             da_prev = 0.0f;
             dg = 0.0f;
+            break;
+        }
+        case 27: { // SDSC_OP_ACCUMULATOR
+            float active = (s_next > -16.0f && s_next < 16.0f) ? 1.0f : 0.0f;
+            float dtot = dy + ds_next;
+            dx = dtot * g * active;
+            ds_prev = dtot * active;
+            da_prev = 0.0f;
+            dg = dtot * x * active;
             break;
         }
         default:

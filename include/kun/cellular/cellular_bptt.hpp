@@ -311,6 +311,20 @@ public:
             init_optimizer(org);
         }
 
+        // 尺寸守卫: 梯度向量与当前基因组不匹配 (如空窗/消融模式) 时直接跳过更新
+        if (grads.grad_synapses.size() < num_syn || grads.grad_gains.size() < num_cells) {
+            return;
+        }
+
+        // 0. NaN/Inf 梯度消毒 (nan_to_num): 任何非有限梯度分量归零,
+        //    防止单点爆炸通过 Adam 写穿整个基因组 (Hebbian 路径有 isfinite 守卫, Adam 路径同样必须有)
+        for (float& g : const_cast<std::vector<float>&>(grads.grad_synapses)) {
+            if (!std::isfinite(g)) g = 0.0f;
+        }
+        for (float& g : const_cast<std::vector<float>&>(grads.grad_gains)) {
+            if (!std::isfinite(g)) g = 0.0f;
+        }
+
         // 1. 梯度范数裁剪 (Grad Norm Clip)
         double total_norm_sq = 0.0;
         for (float g : grads.grad_synapses) total_norm_sq += g * g;
@@ -325,7 +339,9 @@ public:
         const float bias_correction1 = 1.0f - std::pow(beta1, static_cast<float>(adam_step));
         const float bias_correction2 = 1.0f - std::pow(beta2, static_cast<float>(adam_step));
 
-        // 2. 更新突触权重
+        // 2. 更新突触权重 (带事务快照: 更新后出现非有限权重则整体回滚)
+        std::vector<float> weight_snapshot(num_syn);
+        for (size_t i = 0; i < num_syn; ++i) weight_snapshot[i] = org.compiled_synapses_[i].weight;
         for (size_t i = 0; i < num_syn; ++i) {
             float g = grads.grad_synapses[i] * clip_factor;
             m_synapses[i] = beta1 * m_synapses[i] + (1.0f - beta1) * g;
@@ -363,6 +379,25 @@ public:
         }
 
         // 4. 执行李雅普诺夫稳定流形投影 (Lyapunov Manifold Projection)
+        // 事务回滚: 若 Adam 更新把任何权重写成 NaN/Inf, 恢复更新前快照
+        bool any_nonfinite = false;
+        for (size_t i = 0; i < num_syn; ++i) {
+            if (!std::isfinite(org.compiled_synapses_[i].weight)) { any_nonfinite = true; break; }
+        }
+        if (any_nonfinite) {
+            for (size_t i = 0; i < num_syn; ++i) {
+                org.compiled_synapses_[i].weight = weight_snapshot[i];
+                if (i < org.synapses.size()) org.synapses[i].weight = weight_snapshot[i];
+            }
+            // 快照亦不干净时退化为初值 (基因始祖权重)
+            for (size_t i = 0; i < num_syn; ++i) {
+                if (!std::isfinite(org.compiled_synapses_[i].weight)) {
+                    double init_w = org.synapses[i].initial_weight;
+                    org.compiled_synapses_[i].weight = init_w;
+                    if (i < org.synapses.size()) org.synapses[i].weight = init_w;
+                }
+            }
+        }
         apply_lyapunov_projection(org, 0.95f);
     }
 

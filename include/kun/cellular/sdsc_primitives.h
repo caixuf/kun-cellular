@@ -23,20 +23,20 @@ typedef enum {
     SDSC_OP_SENSE_1          = 1,   /* 原始输入通道 1 (透传直连) */
     SDSC_OP_SENSE_2          = 2,   /* 原始输入通道 2 (透传直连) */
     SDSC_OP_SENSE_3          = 3,   /* 原始输入通道 3 (透传直连) */
-    SDSC_OP_SUM              = 4,   /* 非线性饱和加权叠加: tanh(x * g) */
+    SDSC_OP_SUM              = 4,   /* 线性叠加直通 (Pure Sum): out = x (双端口折叠由调用方完成, 增益无关) */
     SDSC_OP_INTEGRATE        = 5,   /* 稳态误差积分累加器 (Leaky Integrator): s = 0.85*s + 0.15*x, out = tanh(s * g) */
     SDSC_OP_AMPLIFY          = 6,   /* 敏捷高增益兴奋门: tanh(x * g * 2.5) */
     SDSC_OP_INVERT           = 7,   /* 反相负反馈抑制门: -tanh(x * g) */
     SDSC_OP_DAMPER           = 8,   /* 惯性一阶低通阻尼滤波: s = 0.70*s + 0.30*x, out = s */
     SDSC_OP_CLIP             = 9,   /* 区间硬饱和截断: clamp(x * g, -1.0, 1.0) */
     SDSC_OP_ABS              = 10,   /* 绝对值全波整流能量提取: |tanh(x * g)| */
-    SDSC_OP_MULTIPLY         = 11,   /* 二阶非线性增益调制: tanh(x * g * 1.5) */
+    SDSC_OP_MULTIPLY         = 11,   /* 乘法直通 (Pure Multiply): out = x (in0*in1 折叠由调用方完成) */
     SDSC_OP_DIFF             = 12,   /* 一阶时间差分/微分 (PD阻尼基石): out = x - s, s = x */
-    SDSC_OP_SUB              = 13,   /* 双均线差分剪刀差对比器: s = 0.60*s + 0.40*x, out = tanh((x - s) * g) */
+    SDSC_OP_SUB              = 13,   /* 差分直通 (Pure Sub): out = x (in0-in1 折叠由调用方完成) */
     SDSC_OP_RATIO            = 14,   /* 相对比率有界归一化: s = 0.85*s + 0.15*|x|, out = clamp(x / (s + 0.1), -2.0, 2.0) */
-    SDSC_OP_THRESHOLD        = 15,   /* 三态阶跃硬门控: x > 0.25 -> 1.0; x < -0.25 -> -1.0; else 0.0 */
-    SDSC_OP_HYSTERESIS       = 16,   /* 施密特双阈值迟滞抗抖门: x > 0.15 -> s=1; x < -0.15 -> s=-1; out = s */
-    SDSC_OP_DEADZONE         = 17,   /* 中心死区微噪滤除门: |x| > 0.08 ? x*g : 0.0 */
+    SDSC_OP_THRESHOLD        = 15,   /* 阶跃决策硬门 (参数化): x > g ? 1 : 0 (g=阈值) */
+    SDSC_OP_HYSTERESIS       = 16,   /* 施密特对称双阈值迟滞 (参数化): x>g=>1, x<-g=>-1 (g=半窗宽) */
+    SDSC_OP_DEADZONE         = 17,   /* 中心死区噪声门 (参数化): |x|>|g| ? x : 0 (g=死区半宽) */
     SDSC_OP_INHIBIT          = 18,   /* 侧向抑制与能量闭锁: s = 0.80*s + 0.20*|x|, out = tanh(x*g) * max(0.0, 1.0 - s) */
     SDSC_OP_AND              = 19,   /* 时空协同兴奋与门: (x > 0 && s > 0) ? 1.0 : 0.0, s = x */
     SDSC_OP_MIN_MAX          = 20,   /* 时序极值包络提取门: out = max(x, s), s = x */
@@ -45,7 +45,8 @@ typedef enum {
     SDSC_OP_ACT_RESET        = 23,   /* 防御性归零复位门: |x| < 0.10 ? 0.0 : x */
     SDSC_OP_CORRELATION      = 24,   /* 时空自相关注意力核: s = 0.90*s + (x*a)*0.10, a = x, out = tanh(s * g) */
     SDSC_OP_FATIGUE          = 25,   /* 神经元代谢适应疲劳门: s = min(2.0, s + |x|*0.15)*0.96, out = tanh(x*g) / (1.0 + s) */
-    SDSC_OP_PASSTHRU         = 26   /* 直通透传通道: out = x */
+    SDSC_OP_PASSTHRU         = 26,   /* 直通透传通道: out = x */
+    SDSC_OP_ACCUMULATOR      = 27   /* 真积分累加器 (Pure Accumulator): s = clamp(s + x*g, -16, 16), out = s (时序工作记忆核) */
 } SdscOpType;
 
 /**
@@ -87,7 +88,7 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_SUM: { // opcode 4
-            out = tanhf(x * g);
+            out = x;
             break;
         }
         case SDSC_OP_INTEGRATE: { // opcode 5
@@ -117,7 +118,7 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_MULTIPLY: { // opcode 11
-            out = tanhf(x * g * 1.5f);
+            out = x;
             break;
         }
         case SDSC_OP_DIFF: { // opcode 12
@@ -126,8 +127,7 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_SUB: { // opcode 13
-            s = s * 0.60f + x * 0.40f;
-            out = tanhf((x - s) * g);
+            out = x;
             break;
         }
         case SDSC_OP_RATIO: { // opcode 14
@@ -136,17 +136,17 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_THRESHOLD: { // opcode 15
-            out = (x > 0.25f) ? 1.0f : ((x < -0.25f) ? -1.0f : 0.0f);
+            out = (x > g) ? 1.0f : 0.0f;
             break;
         }
         case SDSC_OP_HYSTERESIS: { // opcode 16
-            if (x > 0.15f) s = 1.0f;
-            else if (x < -0.15f) s = -1.0f;
+            if (x > g) s = 1.0f;
+            else if (x < -g) s = -1.0f;
             out = s;
             break;
         }
         case SDSC_OP_DEADZONE: { // opcode 17
-            out = (fabsf(x) > 0.08f) ? (x * g) : 0.0f;
+            out = (fabsf(x) > fabsf(g)) ? x : 0.0f;
             break;
         }
         case SDSC_OP_INHIBIT: { // opcode 18
@@ -189,6 +189,11 @@ SDSC_INLINE float sdsc_primitive_eval(
         }
         case SDSC_OP_PASSTHRU: { // opcode 26
             out = x;
+            break;
+        }
+        case SDSC_OP_ACCUMULATOR: { // opcode 27
+            s = fminf(fmaxf(s + x * g, -16.0f), 16.0f);
+            out = s;
             break;
         }
         default:
