@@ -105,6 +105,12 @@ endforeach()
 add_executable(train_maze_navigator "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_maze_navigator.cpp")
 target_link_libraries(train_maze_navigator PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_maze_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_maze_tripartite.cpp")
+target_link_libraries(train_maze_tripartite PRIVATE kun_cellular Threads::Threads m)
+
+add_executable(train_household_coverage_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_household_coverage_tripartite.cpp")
+target_link_libraries(train_household_coverage_tripartite PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_doudizhu_champion "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_doudizhu_champion.cpp")
 target_link_libraries(train_doudizhu_champion PRIVATE kun_cellular Threads::Threads m)
 
@@ -137,6 +143,9 @@ target_link_libraries(train_cart_pole_tripartite PRIVATE kun_cellular Threads::T
 
 add_executable(train_quant_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_tripartite.cpp")
 target_link_libraries(train_quant_tripartite PRIVATE kun_cellular Threads::Threads m)
+
+add_executable(train_adas_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_adas_tripartite.cpp")
+target_link_libraries(train_adas_tripartite PRIVATE kun_cellular Threads::Threads m)
 
 if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
     add_executable(bench_adas_scales "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_adas_scales.cpp")

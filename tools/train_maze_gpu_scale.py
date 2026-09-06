@@ -254,10 +254,16 @@ def transplant_champion(pop, champ_path, jitter_rng=None):
     COL = C - 1
 
     CT2EVAL = {0: 0, 1: 0, 2: 0, 3: 0,          # 受体统一引擎 SENSE op0 (通道由辐射按槽位路由)
+               10: 8,                            # OP_EMA -> SDSC_OP_DAMPER
+               11: 12,                           # OP_DIFF -> SDSC_OP_DIFF
                13: 4,                            # OP_SUM
                14: 13,                           # OP_SUB
+               15: 11,                           # OP_MULTIPLY
+               19: 25,                           # OP_OSCILLATOR
+               24: 15,                           # GATE_THRESHOLD
+               25: 16,                           # GATE_HYSTERESIS
                28: 17,                           # GATE_DEADZONE
-               30: 21, 31: 22, 32: 23}           # ACT_POS/NEG/RESET
+               30: 21, 31: 22, 32: 23, 33: 21}   # ACT_POS/NEG/RESET/IMMUNE
 
     # 槽位映射: 受体 0..3 → (15,0..3) (感觉辐射直达); 中间细胞 → 8..; 效应器 → 56..59
     slot, eff_map = {}, {}
@@ -329,6 +335,34 @@ def transplant_champion(pop, champ_path, jitter_rng=None):
             sign = -1.0 if (ops[v] == 14 and port == 1) else 1.0  # 仅 SUB 的 port1 取负
             pop.intra_weights[:, COL, slot[v], su] += sign * w * (p1s[u] if u < 4 else 1.0)
 
+    # 2.5 记忆嫁接 (任务层, 底座原生 op 16 HYSTERESIS 双稳态): 堵死锁存 → 停车 + 持续自旋 → 前方开阔自解
+    #     输入 x = 3.0·front: front < 0.117 → 锁存 -1 (脱困模式); front > 0.117 → 翻回 +1
+    graft = os.environ.get("MAZE_MEMORY_GRAFT", "0") == "1"  # 默认关 (消融实验见 git log)
+    if graft:
+        # v3 完整记忆嫁接 (v2 单极性输入无法翻转双稳态, 缺常数偏置源):
+        # 常数发生器: INTEGRAL 自激吸引子 s=0.85s+0.15(0.3f+2tanh(s)) → s*≈1.92, out≈0.96 常数
+        # (tanh 有界, 李雅普诺夫安全; ~30 步自激从观测种子生长)
+        op_dev[eid(19)] = 5                        # OP_INTEGRATE (漏积分器, 自激)
+        gain[:, eid(19)] = 1.0
+        pop.intra_weights[:, COL, 19, 0] += 0.3    # front → 自激种子
+        pop.intra_weights[:, COL, 19, 19] += 2.0   # 自环 → 吸引子 (常数源 ≈ +0.96)
+        # 施密特触发器: x = 3·front - 0.5 → L=+1 (front>0.283 开阔) / L=-1 (front<0.05 堵死)
+        op_dev[eid(20)] = 4                        # OP_SUM 纯直通 (偏置合成)
+        gain[:, eid(20)] = 1.0
+        pop.intra_weights[:, COL, 20, 0] += 3.0    # front → 比较
+        pop.intra_weights[:, COL, 20, 19] += -0.52 # 常数偏置 -0.5 (÷0.96)
+        op_dev[eid(16)] = 16                       # GATE_HYSTERESIS 双稳态转锁
+        gain[:, eid(16)] = 0.35
+        pop.intra_weights[:, COL, 16, 20] += 1.0   # 合成信号 → 锁存
+        pop.intra_weights[:, COL, 57, 16] += 0.6   # 锁存 → ACT_NEG 侧整流 (堵死 → CW 自旋直到开阔)
+        # 退避持久化 (第二级工作记忆): 锁事件 → 积分器 → ~15 步衰减的持续 CW 偏置
+        # (L=-1 时 x17=-3 → s 下行 → out17<0 → 经 ACT_NEG 整流 = 持续自旋偏置, 撤出死胡同)
+        op_dev[eid(17)] = 5                        # OP_INTEGRATE (退避记忆, τ≈6 步衰减)
+        gain[:, eid(17)] = 1.0
+        pop.intra_weights[:, COL, 17, 16] += 3.0   # 锁存 → 记忆充电
+        pop.intra_weights[:, COL, 57, 17] += 0.5   # 记忆 → 持续 CW 偏置 (整流后 |out17|)
+        print("[记忆嫁接] v4: 常数源+偏置+转锁+退避持久化 (9 突触, 无推进干涉)")
+
     # 3. 其余个体: 移植图 + 权重抖动
     for p in range(1, P):
         pop.intra_weights[p] = pop.intra_weights[0] + torch.randn_like(pop.intra_weights[p]) * 0.02
@@ -379,6 +413,7 @@ def main():
 
     test_grids = torch.stack([torch.from_numpy(gen_maze(W, 55555 + i)) for i in range(50)])
     gens = 100
+    snapshot_path = os.path.join(ROOT, "checkpoints", "maze_gpu_scale_best.pt")
     mazes_per_gen = 256
     t_start = time.time()
     best_sr = 0.0
@@ -403,7 +438,9 @@ def main():
             inp[:, :4] = obs
             if bool(env.reached.all()):
                 break
-        grids2 = torch.stack([torch.from_numpy(gen_maze(W, int(torch.randint(0, 2**30, (1,)).item()),
+        # 课程对照记录: 混合尺寸 (11..21) 已证伪 (最好 7.8% < 纯 21×21 的 11.3%), 回退
+        csize = 21
+        grids2 = torch.stack([torch.from_numpy(gen_maze(csize, int(torch.randint(0, 2**30, (1,)).item()),
                                                          braid_prob=0.05 + 0.20 * (gen % 5) / 5.0))
                               for _ in range(mazes_per_gen)])
         env2 = BatchedMazeTask(grids2, DEVICE)
@@ -418,9 +455,10 @@ def main():
             if bool(env2.reached.all()):
                 break
         fit = (env.fitness() + env2.fitness()) * 0.5   # 双迷宫均值 (选择噪声减半)
-        # 每 5 代: 21×21 固定 50 种子快评
+        # 每 5 代: 21×21 全新随机 50 网格快评 (根治固定集泄漏: run4 固定集 7.4% 但 OOD 0/200)
         if gen % 5 == 4 or gen == gens - 1:
-            tiled = test_grids.repeat(6, 1, 1)[:pop_size]   # 50 张测试图平铺到 256 个体 (每图约 5 次)
+            fresh_seeds = [int(torch.randint(0, 2**30, (1,)).item()) for _ in range(50)]
+            tiled = torch.stack([torch.from_numpy(gen_maze(W, s)) for s in fresh_seeds]).repeat(6, 1, 1)[:pop_size]
             tenv = BatchedMazeTask(tiled, DEVICE)
             pop.reset_states()
             obs = tenv.observation()
@@ -435,7 +473,17 @@ def main():
                 if bool(tenv.reached.all()):
                     break
             sr = float(tenv.reached.float().mean()) * 100.0
-            best_sr = max(best_sr, sr)
+            if sr > best_sr:
+                best_sr = sr
+                # SR-最优个体快照 (argmax: 通关优先, 平手取训练适应度)
+                score = tenv.reached.float() * 1000.0 + (fit - fit.min()) / (fit.max() - fit.min() + 1e-6)
+                best_idx = int(torch.argmax(score))
+                torch.save({"intra": pop.intra_weights[best_idx].cpu(),
+                            "inter": pop.inter_weights[best_idx].cpu(),
+                            "p1": pop.param1[best_idx].cpu(),
+                            "p2": pop.param2[best_idx].cpu(),
+                            "ops": torch.from_numpy(np.asarray(pop.op_types))}, snapshot_path)
+                print(f"  [快照] Gen {gen} SR {sr:.1f}% 个#{best_idx} 已存 {os.path.basename(snapshot_path)}")
             top5 = torch.topk(fit, 5).values.mean().item()
             print(f"  Gen {gen:3d} | 训练 top5 适应度 {top5:8.1f} | 21×21 快评 SR {sr:5.1f}% | 最好 {best_sr:5.1f}% | 用时 {time.time()-t_start:.0f}s")
 
@@ -448,6 +496,31 @@ def main():
     # 导出最佳个体 (最后一轮 fit 的 argmax 为精英头位)
     pop.export_champion_to_sdsc_bin(0, os.path.join(ROOT, "checkpoints", "maze_gpu_scale_champion.bin"))
     print("[产物] checkpoints/maze_gpu_scale_champion.bin (待 C++ 内核独立验收)")
+
+    # ---- 训后独立 OOD 验收: 200 全新种子 (seed 77000+, 训练/快评从未触及) ----
+    if os.path.exists(snapshot_path):
+        st = torch.load(snapshot_path)
+        pop.intra_weights[0] = st["intra"].to(DEVICE)
+        pop.inter_weights[0] = st["inter"].to(DEVICE)
+        pop.param1[0] = st["p1"].to(DEVICE)
+        pop.param2[0] = st["p2"].to(DEVICE)
+        pop.op_types = st["ops"].numpy()
+        pop.rebuild_indices()
+        ood_grids = torch.stack([torch.from_numpy(gen_maze(W, 77000 + i)) for i in range(200)]).repeat(2, 1, 1)[:pop_size]
+        oenv = BatchedMazeTask(ood_grids, DEVICE)
+        ood_unique = oenv.reached[:200]
+        pop.reset_states()
+        obs = oenv.observation()
+        inp_ood = torch.zeros(pop_size, 32, device=DEVICE)
+        inp_ood[:, :4] = obs
+        for step in range(STEPS):
+            acts = pop.forward_step(inp_ood)
+            oenv.step(acts[:, 0] * 2.1, (acts[:, 3] - acts[:, 1]) * 5.0, torch.zeros(pop_size, device=DEVICE))
+            obs = oenv.observation(); inp_ood[:, :4] = obs
+            if bool(oenv.reached.all()):
+                break
+        ood_sr = float(ood_unique.float().mean()) * 100.0
+        print(f"[OOD 验收] GPU 规模冠军 @ 21×21 全新 200 种子: SR = {int(ood_unique.sum())}/200 = {ood_sr:.1f}%")
 
 
 if __name__ == "__main__":

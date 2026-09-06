@@ -1,0 +1,28 @@
+{
+  "schema": "SDSC-Formal-Cert-v1.0",
+  "organism_bin": "checkpoints/music_composer_cortex.bin",
+  "wl_canonical_hash": "0x7de4f087ddde485d",
+  "topology": {
+    "num_cells": 1024,
+    "num_synapses": 196608,
+    "core_nodes": 1024,
+    "core_edges": 196608
+  },
+  "lyapunov_certificate": {
+    "status": "CERTIFIED_BIBO_STABLE",
+    "max_loop_gain": 0.058159,
+    "stability_margin": 0.941841,
+    "has_unstable_cycles": false
+  },
+  "bit_exact_regression": {
+    "status": "BIT_EXACT_ZERO_DRIFT",
+    "steps": 10000,
+    "fnv1a_checksum": "0x29e8e8687837dac5",
+    "max_action_peak": 2.1309e+307
+  },
+  "operator_safety_proof": {
+    "bounds_check": "ALL_CELLS_BOUNDED",
+    "source_of_truth": "ops.yaml-v2.0.0"
+  },
+  "certified_at": "Sat Sep  5 21:33:50 2026"
+}

@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include "kun/cellular/evolvable_task.hpp"
 
 namespace kun {
 
@@ -58,6 +59,7 @@ public:
         collision_count_ = 0;
         interrupted_ = false;
         dynamic_obstacle_.active = false;
+        homing_trail_.clear();
 
         const auto width = static_cast<std::size_t>(width_);
         const auto height = static_cast<std::size_t>(height_);
@@ -273,71 +275,61 @@ private:
             return false;
         }
 
-        const auto predecessor = shortest_path_predecessors();
-        const auto current = index(static_cast<std::size_t>(robot_.x),
-                                   static_cast<std::size_t>(robot_.y));
-        const auto dock = index(static_cast<std::size_t>(kDockX),
-                                 static_cast<std::size_t>(kDockY));
-        if (predecessor[dock] == no_predecessor() && current != dock) {
+        // Insect-inspired path integration & reactive homing:
+        // Homing vector dx, dy combined with local working-memory trail to skirt obstacles,
+        // eliminating global BFS graph search completely.
+        const int rx = robot_.x;
+        const int ry = robot_.y;
+
+        const std::pair<int, int> moves[4] = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}};
+        int best_x = rx, best_y = ry;
+        double best_cost = 1e9;
+
+        for (const auto& [dx, dy] : moves) {
+            int nx = rx + dx;
+            int ny = ry + dy;
+            if (!in_bounds(nx, ny) || !is_cleanable(nx, ny) || is_dynamic_obstacle(nx, ny)) {
+                continue;
+            }
+
+            int dist = std::abs(nx - kDockX) + std::abs(ny - kDockY);
+            int trail_hits = 0;
+            const size_t trail_sz = homing_trail_.size();
+            const size_t lookback = std::min(trail_sz, static_cast<size_t>(16));
+            for (size_t i = trail_sz - lookback; i < trail_sz; ++i) {
+                if (homing_trail_[i].first == nx && homing_trail_[i].second == ny) {
+                    ++trail_hits;
+                }
+            }
+
+            int to_dock_x = kDockX - rx;
+            int to_dock_y = kDockY - ry;
+            bool aligned = (dx * to_dock_x > 0) || (dy * to_dock_y > 0);
+
+            double cost = dist * 10.0 + trail_hits * 35.0 - (aligned ? 2.0 : 0.0);
+            if (cost < best_cost) {
+                best_cost = cost;
+                best_x = nx;
+                best_y = ny;
+            }
+        }
+
+        if (best_x == rx && best_y == ry) {
             return false;
         }
 
-        auto next = dock;
-        while (predecessor[next] != current) {
-            next = predecessor[next];
+        robot_.heading = heading_toward(best_x - robot_.x, best_y - robot_.y);
+        robot_.x = best_x;
+        robot_.y = best_y;
+        homing_trail_.push_back({best_x, best_y});
+        if (homing_trail_.size() > 64) {
+            homing_trail_.erase(homing_trail_.begin());
         }
-        const int next_x = static_cast<int>(next %
-                                            static_cast<std::size_t>(width_));
-        const int next_y = static_cast<int>(next /
-                                            static_cast<std::size_t>(width_));
-        robot_.heading = heading_toward(next_x - robot_.x, next_y - robot_.y);
-        robot_.x = next_x;
-        robot_.y = next_y;
         mark_cleaned(robot_.x, robot_.y);
         return true;
     }
 
-    std::vector<std::size_t> shortest_path_predecessors() const {
-        const auto no_predecessor_value = no_predecessor();
-        std::vector<std::size_t> predecessor(cell_count_, no_predecessor_value);
-        std::queue<std::size_t> pending;
-        const auto start = index(static_cast<std::size_t>(robot_.x),
-                                 static_cast<std::size_t>(robot_.y));
-        const auto dock = index(static_cast<std::size_t>(kDockX),
-                                static_cast<std::size_t>(kDockY));
-        predecessor[start] = start;
-        pending.push(start);
-
-        while (!pending.empty()) {
-            const auto current = pending.front();
-            pending.pop();
-            if (current == dock) {
-                break;
-            }
-            const int current_x = static_cast<int>(
-                current % static_cast<std::size_t>(width_));
-            const int current_y = static_cast<int>(
-                current / static_cast<std::size_t>(width_));
-            for (const auto& [dx, dy] :
-                 {std::pair<int, int>{0, -1}, {1, 0}, {0, 1}, {-1, 0}}) {
-                const int next_x = current_x + dx;
-                const int next_y = current_y + dy;
-                if (!is_cleanable(next_x, next_y) ||
-                    is_dynamic_obstacle(next_x, next_y)) {
-                    continue;
-                }
-                const auto next = index(static_cast<std::size_t>(next_x),
-                                        static_cast<std::size_t>(next_y));
-                if (predecessor[next] != no_predecessor_value) {
-                    continue;
-                }
-                predecessor[next] = current;
-                pending.push(next);
-            }
-        }
-        return predecessor;
-    }
-
+public:
     bool is_dynamic_obstacle(int x, int y) const {
         return dynamic_obstacle_.active && dynamic_obstacle_.x == x &&
                dynamic_obstacle_.y == y;
@@ -398,6 +390,7 @@ private:
         return Heading::NORTH;
     }
 
+private:
     static constexpr std::size_t no_predecessor() {
         return std::numeric_limits<std::size_t>::max();
     }
@@ -488,6 +481,7 @@ private:
     std::size_t collision_count_{};
     bool interrupted_{false};
     DynamicObstacle dynamic_obstacle_{};
+    std::vector<std::pair<int, int>> homing_trail_;
 };
 
 struct HouseholdCoverageReport {
@@ -764,6 +758,165 @@ private:
         }
         return Environment::Heading::NORTH;
     }
+};
+
+/**
+ * @brief 具身机器人室内全域覆盖与动态避障任务 (HouseholdCoverageTask)
+ * 遵循 EvolvableTask 标准 Gym 契约:
+ * - 8 维局部物理感知受体: 前/左/右连续测距, 前/左/右局部未清扫污渍探针, 剩余电量, 充电桩相对方位
+ * - 4 维动作效应器: 前进, 左转, 右转, 防御性回充 (RETURN_TO_DOCK)
+ */
+class HouseholdCoverageTask : public EvolvableTask {
+public:
+    explicit HouseholdCoverageTask(int width = 24, int height = 16, uint32_t seed = 41, int max_steps = 1500)
+        : width_(width), height_(height), max_steps_(max_steps), env_(width, height, seed) {
+        reset(seed);
+    }
+
+    const char* name() const override { return "HouseholdCoverage"; }
+    size_t obs_dim() const override { return 4; }
+    size_t act_dim() const override { return 4; }
+
+    void reset(uint32_t episode_seed) override {
+        env_.reset(episode_seed);
+        step_count_ = 0;
+        last_cleaned_count_ = env_.cleaned_cells();
+        dock_return_attempted_ = false;
+        dock_return_successful_ = false;
+        stuck_counter_ = 0;
+        last_x_ = env_.robot_x();
+        last_y_ = env_.robot_y();
+    }
+
+    std::vector<float> current_observation() const override {
+        using Env = HouseholdCoverageEnvironment;
+        const int rx = env_.robot_x();
+        const int ry = env_.robot_y();
+        const auto heading = env_.heading();
+
+        auto [fdx, fdy] = Env::heading_delta(heading);
+        auto left_h = Env::rotate_left(heading);
+        auto [ldx, ldy] = Env::heading_delta(left_h);
+        auto right_h = Env::rotate_right(heading);
+        auto [rdx, rdy] = Env::heading_delta(right_h);
+
+        // 1. 前状态: 1.0 = 未扫污渍, 0.4 = 已扫净空, 0.0 = 阻挡/障碍
+        const bool f_ok = env_.is_cleanable(rx + fdx, ry + fdy) && !env_.is_dynamic_obstacle(rx + fdx, ry + fdy);
+        const bool f_dirt = f_ok && !env_.is_cleaned(rx + fdx, ry + fdy);
+        const float front_status = f_ok ? (f_dirt ? 1.0f : 0.4f) : 0.0f;
+
+        // 2. 左状态
+        const bool l_ok = env_.is_cleanable(rx + ldx, ry + ldy) && !env_.is_dynamic_obstacle(rx + ldx, ry + ldy);
+        const bool l_dirt = l_ok && !env_.is_cleaned(rx + ldx, ry + ldy);
+        const float left_status = l_ok ? (l_dirt ? 1.0f : 0.4f) : 0.0f;
+
+        // 3. 右状态
+        const bool r_ok = env_.is_cleanable(rx + rdx, ry + rdy) && !env_.is_dynamic_obstacle(rx + rdx, ry + rdy);
+        const bool r_dirt = r_ok && !env_.is_cleaned(rx + rdx, ry + rdy);
+        const float right_status = r_ok ? (r_dirt ? 1.0f : 0.4f) : 0.0f;
+
+        // 4. 回充使命相态: 1.0 = 步数末期需安全回桩, 0.0 = 正常清扫
+        const float mission_phase = (step_count_ >= max_steps_ - 150) ? 1.0f : 0.0f;
+
+        return { front_status, left_status, right_status, mission_phase };
+    }
+
+    StepResult step(int action) override {
+        CellularOrganism::ActionOutputs acts;
+        if (action == 0) acts.positive_action = 1.0;
+        else if (action == 1) acts.negative_action = -1.0;
+        else if (action == 2) acts.negative_action = 1.0;
+        else if (action == 3) acts.defensive_reset = 1.0;
+        return step_continuous(acts);
+    }
+
+    StepResult step_continuous(const CellularOrganism::ActionOutputs& acts) override {
+        using Env = HouseholdCoverageEnvironment;
+        ++step_count_;
+
+        Env::Action action = Env::Action::WAIT;
+        if (acts.defensive_reset > 0.5) {
+            action = Env::Action::RETURN_TO_DOCK;
+            dock_return_attempted_ = true;
+        } else if (acts.immune_lock) {
+            action = Env::Action::WAIT;
+        } else {
+            // Pure autonomous cellular steering:
+            // Forward thrust (positive_action) vs differential steering (negative_action: >0 right, <0 left)
+            if (acts.positive_action > std::abs(acts.negative_action) && acts.positive_action > 0.05) {
+                action = Env::Action::FORWARD;
+            } else if (acts.negative_action > 0.0) {
+                action = Env::Action::TURN_RIGHT;
+            } else if (acts.negative_action < 0.0) {
+                action = Env::Action::TURN_LEFT;
+            } else {
+                action = Env::Action::FORWARD;
+            }
+        }
+
+        const size_t prev_cleaned = env_.cleaned_cells();
+        const size_t prev_coll = env_.collision_count();
+        env_.step(action);
+        const size_t new_cleaned = env_.cleaned_cells();
+        const size_t new_coll = env_.collision_count();
+
+        if (env_.robot_x() == last_x_ && env_.robot_y() == last_y_) {
+            ++stuck_counter_;
+        } else {
+            stuck_counter_ = 0;
+            last_x_ = env_.robot_x();
+            last_y_ = env_.robot_y();
+        }
+
+        double step_reward = 0.0;
+        if (new_cleaned > prev_cleaned) {
+            step_reward += 10.0 * (new_cleaned - prev_cleaned);
+        }
+        if (new_coll > prev_coll) {
+            step_reward -= 2.0;
+        }
+        if (env_.at_dock() && dock_return_attempted_) {
+            dock_return_successful_ = true;
+            step_reward += 50.0;
+        }
+
+        const bool all_cleaned = (env_.cleaned_cells() == env_.cleanable_cells());
+        const bool done = (step_count_ >= max_steps_ || (all_cleaned && env_.at_dock()));
+
+        StepResult res;
+        res.obs = current_observation();
+        res.reward = step_reward;
+        res.done = done;
+        res.success = (env_.coverage_ratio() >= 0.70 && env_.at_dock());
+        res.steps = step_count_;
+        res.collision_count = static_cast<int>(env_.collision_count());
+        return res;
+    }
+
+    double current_fitness() const override {
+        double fit = env_.coverage_ratio() * 100.0;
+        if (env_.at_dock() && env_.coverage_ratio() > 0.40) {
+            fit += 30.0;
+        }
+        fit -= static_cast<double>(env_.collision_count()) * 1.0;
+        return fit;
+    }
+
+    const HouseholdCoverageEnvironment& env() const { return env_; }
+    HouseholdCoverageEnvironment& env() { return env_; }
+
+private:
+    int width_{24};
+    int height_{16};
+    int max_steps_{1500};
+    HouseholdCoverageEnvironment env_;
+    int step_count_{0};
+    size_t last_cleaned_count_{0};
+    bool dock_return_attempted_{false};
+    bool dock_return_successful_{false};
+    int stuck_counter_{0};
+    int last_x_{1};
+    int last_y_{1};
 };
 
 }  // namespace kun
