@@ -156,7 +156,7 @@ let currentLoadingOid = null;
 // 3. 异步流式加载纯二进制流形 (ArrayBuffer 零解析损耗，支持快速切换瞬时 Abort)
 export async function loadBinaryManifold(organismId, scn = scene, bnds = null) {
   const targetScn = scn || scene;
-  const oid = organismId || (bnds && bnds.organismId) || (typeof window !== 'undefined' && window.currentSelectedOrgId) || 'sdsc_mega_1million';
+  const oid = organismId || (bnds && bnds.organismId) || (typeof window !== 'undefined' && window.currentSelectedOrgId) || 'quant_master_champion';
 
   if (currentManifoldId === oid && manifoldPointsMesh) return;
   if (currentLoadingOid === oid) return;

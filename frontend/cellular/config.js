@@ -103,21 +103,14 @@ export const HARDWARE_COSMIC_SPECS = {
 
 export const LIFEFORM_SCALES = {
   doudizhu_evolved_champion: 12,
-  doudizhu_game_champion: 1024,
   adas_tripartite_champion: 18,
   adas_cortex_champion: 210,
-  adas_track_champion: 1024,
-  real_trained_champion: 1024,
-  quant_master_champion: 1032,
   quant_tripartite_champion: 9,
+  quant_master_champion: 1032,
   maze_tripartite_champion: 21,
   household_coverage_champion: 11,
   fluid_damper_champion: 40,
-  cartpole_tripartite_champion: 8,
-  music_composer_cortex: 1024,
-  sdsc_mega_1million: 1000000,
-  mega: 1000000,
-  '1m': 1000000
+  cartpole_tripartite_champion: 8
 };
 
 export const TOOLTIP_DICT = {
