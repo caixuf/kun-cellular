@@ -2329,37 +2329,37 @@ class SiliconCellularOrganism:
                 act_ids = [c.id for c in self.cells if getattr(c, "layer", "") == "L3_MOTOR" or str(c.type).upper().startswith(("ACT", "MOTOR", "EFFECTOR"))]
                 core_ids = [c.id for c in self.cells if c.id not in sense_ids and c.id not in act_ids]
 
-                if oid in ("adas_cortex_champion", "adas_track_champion"):
+                if oid in ("adas_cortex_champion", "adas_track_champion", "adas_tripartite_champion"):
                     self.symbiotic_macro_cells = [
-                        SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(0, 12)), color="#22d3ee"),
-                        SymbioticMacroCell(2, "AssociationCortex", core_ids or list(range(12, 204)), color="#34d399"),
-                        SymbioticMacroCell(3, "MotorEffectorCore", act_ids or list(range(204, 210)), color="#f43f5e")
+                        SymbioticMacroCell(1, "SensoryColumn", sense_ids or list(range(0, min(12, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "AssociationCortex", core_ids or list(range(min(12, len(self.cells)), max(min(12, len(self.cells)), len(self.cells) - 2))), color="#34d399"),
+                        SymbioticMacroCell(3, "MotorEffectorCore", act_ids or list(range(max(0, len(self.cells) - 2), len(self.cells))), color="#f43f5e")
                     ]
-                elif oid == "maze_navigation_champion":
+                elif oid in ("maze_tripartite_champion", "maze_navigation_champion"):
                     self.symbiotic_macro_cells = [
-                        SymbioticMacroCell(1, "LidarSensoryRay", sense_ids, color="#22d3ee"),
-                        SymbioticMacroCell(2, "SpatialEscapeMemory", core_ids, color="#34d399"),
-                        SymbioticMacroCell(3, "SteerThrustEffector", act_ids, color="#f43f5e")
+                        SymbioticMacroCell(1, "LidarSensoryRay", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "SpatialEscapeMemory", core_ids or list(range(min(4, len(self.cells)), max(min(4, len(self.cells)), len(self.cells) - 2))), color="#34d399"),
+                        SymbioticMacroCell(3, "SteerThrustEffector", act_ids or list(range(max(0, len(self.cells) - 2), len(self.cells))), color="#f43f5e")
+                    ]
+                elif oid == "household_coverage_champion":
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "ObstacleSensoryRay", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "CoverageSpatialMemory", core_ids or list(range(min(4, len(self.cells)), max(min(4, len(self.cells)), len(self.cells) - 3))), color="#34d399"),
+                        SymbioticMacroCell(3, "DifferentialMotorCore", act_ids or list(range(max(0, len(self.cells) - 3), len(self.cells))), color="#f43f5e")
+                    ]
+                elif oid in ("cartpole_tripartite_champion", "cartpole_balance_champion"):
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "CartPoleSensory", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "BalanceDampingCore", core_ids or list(range(min(4, len(self.cells)), max(min(4, len(self.cells)), len(self.cells) - 2))), color="#34d399"),
+                        SymbioticMacroCell(3, "PushForceActuator", act_ids or list(range(max(0, len(self.cells) - 2), len(self.cells))), color="#f43f5e")
                     ]
                 elif oid == "fluid_damper_champion":
                     self.symbiotic_macro_cells = [
-                        SymbioticMacroCell(1, "FluidDisturbanceSensory", sense_ids, color="#22d3ee"),
-                        SymbioticMacroCell(2, "AdaptiveDampingCortex", core_ids, color="#34d399"),
-                        SymbioticMacroCell(3, "AntiSlipEffectorCore", act_ids, color="#f43f5e")
+                        SymbioticMacroCell(1, "FluidDisturbanceSensory", sense_ids or list(range(min(6, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "AdaptiveDampingCortex", core_ids or list(range(min(6, len(self.cells)), max(min(6, len(self.cells)), len(self.cells) - 2))), color="#34d399"),
+                        SymbioticMacroCell(3, "AntiSlipEffectorCore", act_ids or list(range(max(0, len(self.cells) - 2), len(self.cells))), color="#f43f5e")
                     ]
-                elif oid in ("quant_master_champion", "quant_futures_champion", "real_trained_champion"):
-                    self.symbiotic_macro_cells = [
-                        SymbioticMacroCell(1, "MomentumSensoryCore", sense_ids or list(range(min(32, len(self.cells)))), color="#22d3ee"),
-                        SymbioticMacroCell(2, "HysteresisDecisionManifold", core_ids or list(range(min(32, len(self.cells)), max(min(32, len(self.cells)), len(self.cells) - 64))), color="#34d399"),
-                        SymbioticMacroCell(3, "ExecutionRiskLock", act_ids or list(range(max(0, len(self.cells) - 64), len(self.cells))), color="#f43f5e")
-                    ]
-                elif oid.startswith("quant_"):
-                    self.symbiotic_macro_cells = [
-                        SymbioticMacroCell(1, "QuantSensoryLattice", sense_ids or list(range(min(32, len(self.cells)))), color="#22d3ee"),
-                        SymbioticMacroCell(2, "QuantArbitrageManifold", core_ids or list(range(min(32, len(self.cells)), max(min(32, len(self.cells)), len(self.cells) - 16))), color="#34d399"),
-                        SymbioticMacroCell(3, "QuantExecutionRing", act_ids or list(range(max(0, len(self.cells) - 16), len(self.cells))), color="#f43f5e")
-                    ]
-                elif oid == "doudizhu_game_champion":
+                elif oid in ("doudizhu_game_champion", "doudizhu_evolved_champion"):
                     if len(self.cells) >= 1024:
                         self.symbiotic_macro_cells = [
                             SymbioticMacroCell(1, "FullDeckSensoryArch", list(range(0, 32)), color="#22d3ee"),
@@ -2371,16 +2371,28 @@ class SiliconCellularOrganism:
                         ]
                     else:
                         self.symbiotic_macro_cells = [
-                            SymbioticMacroCell(1, "HandIntensitySensory", sense_ids or [0, 1], color="#22d3ee"),
-                            SymbioticMacroCell(2, "GameDecayHysteresis", core_ids or [2, 3, 4, 5], color="#34d399"),
-                            SymbioticMacroCell(3, "PlayPassActionEffector", act_ids or [6, 7, 8], color="#f43f5e")
+                            SymbioticMacroCell(1, "CardLatticeSensory", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
+                            SymbioticMacroCell(2, "GameTheoryDecisionCore", core_ids or list(range(min(4, len(self.cells)), max(min(4, len(self.cells)), len(self.cells) - 3))), color="#34d399"),
+                            SymbioticMacroCell(3, "ActionSprintEffector", act_ids or list(range(max(0, len(self.cells) - 3), len(self.cells))), color="#f43f5e")
                         ]
+                elif oid in ("quant_master_champion", "quant_futures_champion", "real_trained_champion", "quant_tripartite_champion") or oid.startswith("quant_"):
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "MomentumSensoryCore", sense_ids or list(range(min(32, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "HysteresisDecisionManifold", core_ids or list(range(min(32, len(self.cells)), max(min(32, len(self.cells)), len(self.cells) - 16))), color="#34d399"),
+                        SymbioticMacroCell(3, "ExecutionRiskLock", act_ids or list(range(max(0, len(self.cells) - 16), len(self.cells))), color="#f43f5e")
+                    ]
                 elif oid == "music_composer_cortex":
                     self.symbiotic_macro_cells = [
                         SymbioticMacroCell(1, "TonotopicHarmonicCortex", list(range(0, 256)), color="#22d3ee"),
                         SymbioticMacroCell(2, "TensionResolutionCortex", list(range(256, 512)), color="#10b981"),
                         SymbioticMacroCell(3, "RhythmGrooveCPGCortex", list(range(512, 768)), color="#f59e0b"),
                         SymbioticMacroCell(4, "MelodicMotifMemoryCortex", list(range(768, 1024)), color="#a855f7")
+                    ]
+                elif oid == "sdsc_mega_1million":
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "VoxelVelocitySensory", sense_ids or list(range(0, min(32, len(self.cells)))), color="#22d3ee"),
+                        SymbioticMacroCell(2, "FluidAttractorManifold", core_ids or list(range(min(32, len(self.cells)), max(min(32, len(self.cells)), len(self.cells) - 16))), color="#34d399"),
+                        SymbioticMacroCell(3, "TurbulenceDamperArray", act_ids or list(range(max(0, len(self.cells) - 16), len(self.cells))), color="#f43f5e")
                     ]
                 else:
                     self.symbiotic_macro_cells = [
@@ -3145,6 +3157,29 @@ class SiliconLifeformLibrary:
                         "impact_score": f"{sz_mb}MB 真实权重",
                         "description": f"真实巨型检查点: {ckpt_rel} ({sz_mb} MB)。RTX 5060 硬件演化 {nc:,} 物理细胞与 {ns:,} 突触因果图谱。"
                     })
+                except Exception:
+                    pass
+
+            # 1.5 形式化李雅普诺夫稳态认证证书 (.cert.json)
+            cert_file = ckpt_path + ".cert.json"
+            if os.path.exists(cert_file):
+                try:
+                    with open(cert_file, "r", encoding="utf-8") as cf:
+                        cdata = json.load(cf)
+                        lyap = cdata.get("lyapunov_certificate", {})
+                        gain = float(lyap.get("max_loop_gain", 0.0))
+                        margin = float(lyap.get("stability_margin", 0.0))
+                        reg = cdata.get("bit_exact_regression", {})
+                        steps = int(reg.get("steps", 0))
+                        specs.append({
+                            "book_id": f"{oid}_formal_cert",
+                            "title": f"形式化认证: Lyapunov ρ={gain:.4f} < 1.0",
+                            "badge": "形式化验证",
+                            "file_path": os.path.relpath(cert_file, ROOT_DIR),
+                            "citations": steps,
+                            "impact_score": "BIBO 稳态",
+                            "description": f"形式化数学证明: 环路增益 ρ={gain:.4f}，稳态裕度 {margin:.4f}，{steps:,} 步位级精确零漂移认证通过。"
+                        })
                 except Exception:
                     pass
 

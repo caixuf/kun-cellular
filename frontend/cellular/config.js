@@ -102,15 +102,19 @@ export const HARDWARE_COSMIC_SPECS = {
 };
 
 export const LIFEFORM_SCALES = {
-  adas_world_model_100m: 100000000,
-  adas_occupancy_10m: 10000000,
-  adas_transient_1m: 1000000,
+  doudizhu_evolved_champion: 12,
+  doudizhu_game_champion: 1024,
+  adas_tripartite_champion: 18,
+  adas_cortex_champion: 210,
   adas_track_champion: 1024,
-  quant_world_model_100m: 100000000,
-  quant_cross_asset_10m: 10000000,
-  quant_market_making_1m: 1000000,
-  quant_master_champion: 1032,
   real_trained_champion: 1024,
+  quant_master_champion: 1032,
+  quant_tripartite_champion: 9,
+  maze_tripartite_champion: 21,
+  household_coverage_champion: 11,
+  fluid_damper_champion: 40,
+  cartpole_tripartite_champion: 8,
+  music_composer_cortex: 1024,
   sdsc_mega_1million: 1000000,
   mega: 1000000,
   '1m': 1000000
