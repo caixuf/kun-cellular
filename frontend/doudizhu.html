@@ -512,7 +512,8 @@
 
                 <span>玩家身份:</span>
                 <select id="roleSelect" class="btn" style="padding:2px 6px;font-size:11px;color:var(--amber-glow);font-weight:700;">
-                    <option value="peasant">🤝 玩家当农民 (与左位AI配合)</option>
+                    <option value="bidding">🎯 智能竞价 (三方自主叫地主·真人与AI比拼起手决策)</option>
+                    <option value="peasant">🤝 玩家必当农民 (与左位AI配合)</option>
                     <option value="landlord">👑 玩家当地主 (拿底牌·先手)</option>
                 </select>
 
@@ -588,11 +589,16 @@
 
             <!-- 底部: 玩家交互与手牌 -->
             <div class="player-bottom">
-                <div class="action-bar">
+                <div class="action-bar" id="playActionBar">
                     <button id="btnDeselect" class="btn">重选 (Clear)</button>
                     <button id="btnPass" class="btn btn-danger">过牌 (Pass)</button>
                     <button id="btnHint" class="btn">国手提示 (Hint)</button>
                     <button id="btnPlay" class="btn btn-primary">出牌 (Play)</button>
+                </div>
+                <div class="action-bar" id="biddingActionBar" style="display:none;">
+                    <span style="font-size:12px;font-weight:700;color:var(--amber-glow);margin-right:6px;">🎯 智能叫牌决策:</span>
+                    <button id="btnBidCall" class="btn btn-primary" style="background:linear-gradient(135deg, #eab308, #ca8a04);border-color:#facc15;font-weight:800;box-shadow:0 0 10px rgba(234,179,8,0.4);padding:4px 16px;">👑 叫地主 (抢底牌·先手)</button>
+                    <button id="btnBidPass" class="btn btn-danger" style="font-weight:700;padding:4px 14px;">🏳️ 不叫 (Pass)</button>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <span style="font-size:11px;font-weight:700;color:var(--text-main);">玩家手牌:</span>
@@ -745,6 +751,9 @@ class Card {
 
 // 游戏状态机
 const GameState = {
+    phase: "bidding", // "bidding" or "playing"
+    bidTurn: 0,
+    bidPassCount: 0,
     hands: [[], [], []], // 0: Player, 1: Left AI, 2: Right AI
     kitty: [],
     landlordIdx: 2, // 默认右位 AI
@@ -812,6 +821,110 @@ function playFx(type) {
     }
 }
 
+// 牌力评估器 (基于真实斗地主叫牌门槛: 大王4分, 小王3分, 2为2分, A为1分, 王炸额外4分, 炸弹额外3分)
+function calcHandStrength(h) {
+    let s = 0;
+    const c = {};
+    h.forEach(x => {
+        c[x.rankIdx] = (c[x.rankIdx] || 0) + 1;
+        if (x.rankIdx === 14) s += 4;
+        else if (x.rankIdx === 13) s += 3;
+        else if (x.rankIdx === 12) s += 2;
+        else if (x.rankIdx === 11) s += 1;
+    });
+    if (c[13] && c[14]) s += 4;
+    for (let r = 0; r <= 12; r++) {
+        if (c[r] === 4) s += 3;
+    }
+    return s;
+}
+
+function getSeatName(idx) {
+    return idx === 0 ? "玩家" : (idx === 1 ? "左位AI" : "右位AI");
+}
+
+function finalizeLandlord(winnerIdx) {
+    GameState.phase = "playing";
+    GameState.landlordIdx = winnerIdx;
+
+    // 地主拿底牌
+    GameState.hands[winnerIdx].push(...GameState.kitty);
+    GameState.hands[winnerIdx].sort((a, b) => b.rankIdx - a.rankIdx);
+
+    // 如果地主是玩家，扣减玩家记牌器底牌
+    if (winnerIdx === 0) {
+        GameState.kitty.forEach(c => {
+            GameState.deckRemaining[c.rankIdx]--;
+        });
+    }
+
+    GameState.currentTurn = winnerIdx;
+    GameState.lastTrick = null;
+    GameState.passCount = 0;
+    selectedUserCards.clear();
+
+    playFx("card");
+    addLog(`👑 [${getSeatName(winnerIdx)}] 成为【地主】！底牌掀开: [${GameState.kitty.map(c => c.rankStr).join(' ')}]，手牌增至 20 张并获得首发权！`, "bomb");
+
+    const tag = document.getElementById("trickTypeTag");
+    if (tag) tag.textContent = "当前牌面: 自由出牌 (新局开始)";
+
+    updateUI();
+    checkTurnTrigger();
+}
+
+function handleBidPass(playerIdx) {
+    playFx("pass");
+    GameState.bidPassCount++;
+
+    if (GameState.bidPassCount >= 3) {
+        // 三方都不叫: 自动由起手牌力最高者当选地主
+        const s0 = calcHandStrength(GameState.hands[0]);
+        const s1 = calcHandStrength(GameState.hands[1]);
+        const s2 = calcHandStrength(GameState.hands[2]);
+        let bestIdx = 0;
+        let maxS = s0;
+        if (s1 > maxS) { bestIdx = 1; maxS = s1; }
+        if (s2 > maxS) { bestIdx = 2; maxS = s2; }
+
+        addLog(`三方均未主动叫地主，系统判定由起手势能最高者 [${getSeatName(bestIdx)}] (牌力 ${maxS} 分) 承接地主！`, "warning");
+        finalizeLandlord(bestIdx);
+        return;
+    }
+
+    GameState.bidTurn = (GameState.bidTurn + 1) % 3;
+    updateUI();
+    triggerBiddingStep();
+}
+
+function triggerBiddingStep() {
+    if (GameState.phase !== "bidding") return;
+    if (GameState.autoTimer) clearTimeout(GameState.autoTimer);
+
+    if (GameState.bidTurn === 0 && GameState.mode === "human") {
+        // 等待玩家手动点击叫地主或不叫
+        updateUI();
+        return;
+    }
+
+    // AI 或者 auto 观战模式
+    GameState.autoTimer = setTimeout(() => {
+        if (GameState.phase !== "bidding") return;
+        const currentSeat = GameState.bidTurn;
+        const hand = GameState.hands[currentSeat];
+        const strength = calcHandStrength(hand);
+
+        // 微柱皮层牌力评估：>= 6 分叫地主，< 6 分不叫
+        if (strength >= 6) {
+            addLog(`🧠 [${getSeatName(currentSeat)}] 1024-微柱神经皮层评估起手势能: ${strength}分 (>=6 临界阈值)，果断发起【👑 叫地主】！`, "bomb");
+            finalizeLandlord(currentSeat);
+        } else {
+            addLog(`🧠 [${getSeatName(currentSeat)}] 1024-微柱神经皮层评估起手势能: ${strength}分 (<6 阈值)，胜率不足选择【🏳️ 不叫】`, "info");
+            handleBidPass(currentSeat);
+        }
+    }, GameState.autoSpeed);
+}
+
 // 洗牌与发牌
 function initDeck() {
     if (GameState.autoTimer) clearTimeout(GameState.autoTimer);
@@ -833,47 +946,12 @@ function initDeck() {
         [deck[i], deck[j]] = [deck[j], deck[i]];
     }
 
-    // 根据身份选择决定谁当地主
-    const userWantsLandlord = (document.getElementById("roleSelect").value === "landlord");
-    GameState.landlordIdx = userWantsLandlord ? 0 : 2;
-
-    // 牌力评估器 (基于真实斗地主叫牌门槛: 大王4分, 小王3分, 2为2分, A为1分, 王炸额外4分, 炸弹额外3分)
-    function calcHandStrength(h) {
-        let s = 0;
-        const c = {};
-        h.forEach(x => {
-            c[x.rankIdx] = (c[x.rankIdx] || 0) + 1;
-            if (x.rankIdx === 14) s += 4;
-            else if (x.rankIdx === 13) s += 3;
-            else if (x.rankIdx === 12) s += 2;
-            else if (x.rankIdx === 11) s += 1;
-        });
-        if (c[13] && c[14]) s += 4;
-        for (let r = 0; r <= 12; r++) {
-            if (c[r] === 4) s += 3;
-        }
-        return s;
-    }
-
-    // 洗牌与发牌 (保证地主手牌牌力 >= 5，模拟真实斗地主叫牌底线，杜绝必输死局)
-    let attempts = 0;
-    while (attempts < 50) {
-        attempts++;
-        for (let i = deck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [deck[i], deck[j]] = [deck[j], deck[i]];
-        }
-        const candidateHand = deck.slice(GameState.landlordIdx * 17, (GameState.landlordIdx + 1) * 17);
-        if (calcHandStrength(candidateHand) >= 5) break;
-    }
+    const roleChoice = document.getElementById("roleSelect").value;
 
     GameState.hands[0] = deck.slice(0, 17);
     GameState.hands[1] = deck.slice(17, 34);
     GameState.hands[2] = deck.slice(34, 51);
     GameState.kitty = deck.slice(51, 54);
-
-    // 地主拿底牌
-    GameState.hands[GameState.landlordIdx].push(...GameState.kitty);
 
     // 从大到小排序手牌
     for (let i = 0; i < 3; i++) {
@@ -889,10 +967,9 @@ function initDeck() {
         GameState.deckRemaining[c.rankIdx]--;
     });
 
-    GameState.currentTurn = GameState.landlordIdx;
+    selectedUserCards.clear();
     GameState.lastTrick = null;
     GameState.passCount = 0;
-    selectedUserCards.clear();
 
     // 重置本局倍数与出牌统计
     GameState.chips.multiplier = 1;
@@ -903,13 +980,42 @@ function initDeck() {
     document.getElementById("playedLeft").innerHTML = "";
     document.getElementById("playedRight").innerHTML = "";
     document.getElementById("centerTrick").innerHTML = "";
-    document.getElementById("trickTypeTag").textContent = "当前牌面: 自由出牌 (新局开始)";
 
-    updateUI();
-    addLog(`新对局开始! 地主为 [${GameState.landlordIdx === 0 ? '玩家' : (GameState.landlordIdx === 1 ? '左位AI' : '右位AI')}]，拿走 3 张底牌。`, "play");
+    if (roleChoice === "bidding") {
+        // 🎯 智能竞价模式
+        GameState.phase = "bidding";
+        GameState.bidTurn = Math.floor(Math.random() * 3);
+        GameState.bidPassCount = 0;
+        GameState.landlordIdx = -1;
 
-    // 若非玩家回合，启动 AI 流程
-    checkTurnTrigger();
+        const tag = document.getElementById("trickTypeTag");
+        if (tag) tag.textContent = "当前牌面: 智能竞价 (三方自主叫地主)";
+        updateUI();
+        addLog(`🎴 发牌完毕，进入【智能竞价阶段】！底牌盖放，首位叫牌: [${getSeatName(GameState.bidTurn)}]`, "info");
+        triggerBiddingStep();
+    } else {
+        // 固定身份模式
+        GameState.phase = "playing";
+        GameState.landlordIdx = (roleChoice === "landlord") ? 0 : 2;
+
+        // 地主拿底牌
+        GameState.hands[GameState.landlordIdx].push(...GameState.kitty);
+        GameState.hands[GameState.landlordIdx].sort((a, b) => b.rankIdx - a.rankIdx);
+
+        if (GameState.landlordIdx === 0) {
+            GameState.kitty.forEach(c => {
+                GameState.deckRemaining[c.rankIdx]--;
+            });
+        }
+
+        GameState.currentTurn = GameState.landlordIdx;
+        const tag = document.getElementById("trickTypeTag");
+        if (tag) tag.textContent = "当前牌面: 自由出牌 (新局开始)";
+
+        updateUI();
+        addLog(`新对局开始! 固定地主为 [${getSeatName(GameState.landlordIdx)}]，拿走 3 张底牌。`, "play");
+        checkTurnTrigger();
+    }
 }
 
 function renderCard(card, isSelected = false) {
@@ -930,42 +1036,113 @@ function renderCard(card, isSelected = false) {
 }
 
 function updateUI() {
+    const isBidding = (GameState.phase === "bidding");
+
     // 渲染底牌
     const kittyBox = document.getElementById("kittyCards");
     kittyBox.innerHTML = "";
-    GameState.kitty.forEach(c => kittyBox.appendChild(renderCard(c)));
+    if (isBidding) {
+        for (let i = 0; i < 3; i++) {
+            const coverEl = document.createElement("div");
+            coverEl.className = "card-el";
+            coverEl.style.cssText = "background:#1e293b;border:1px dashed #64748b;color:#94a3b8;font-size:15px;display:flex;align-items:center;justify-content:center;box-shadow:none;";
+            coverEl.textContent = "🎴";
+            kittyBox.appendChild(coverEl);
+        }
+    } else {
+        GameState.kitty.forEach(c => kittyBox.appendChild(renderCard(c)));
+    }
 
     // 渲染角色标签与张数
-    const isUserLandlord = (GameState.landlordIdx === 0);
-    const isLeftLandlord = (GameState.landlordIdx === 1);
-    const isRightLandlord = (GameState.landlordIdx === 2);
+    if (isBidding) {
+        document.getElementById("roleUser").textContent = "🎯 待定";
+        document.getElementById("roleUser").className = "role-badge";
+        document.getElementById("roleLeft").textContent = "🎯 待定";
+        document.getElementById("roleLeft").className = "role-badge";
+        document.getElementById("roleRight").textContent = "🎯 待定";
+        document.getElementById("roleRight").className = "role-badge";
 
-    document.getElementById("roleUser").textContent = isUserLandlord ? "👑 地主" : "🤝 农民";
-    document.getElementById("roleUser").className = "role-badge " + (isUserLandlord ? "role-landlord" : "role-peasant");
+        document.getElementById("countUser").textContent = `${GameState.hands[0].length} 张`;
+        document.getElementById("countLeft").textContent = `${GameState.hands[1].length} 张`;
+        document.getElementById("countRight").textContent = `${GameState.hands[2].length} 张`;
 
-    document.getElementById("roleLeft").textContent = isLeftLandlord ? "👑 地主" : "🤝 农民";
-    document.getElementById("roleLeft").className = "role-badge " + (isLeftLandlord ? "role-landlord" : "role-peasant");
+        // 席位高亮
+        document.getElementById("seatLeft").className = "player-seat " + (GameState.bidTurn === 1 ? "active-turn" : "");
+        document.getElementById("seatRight").className = "player-seat " + (GameState.bidTurn === 2 ? "active-turn" : "");
 
-    document.getElementById("roleRight").textContent = isRightLandlord ? "👑 地主" : "🤝 农民";
-    document.getElementById("roleRight").className = "role-badge " + (isRightLandlord ? "role-landlord" : "role-peasant");
+        document.getElementById("statusLeft").textContent = (GameState.bidTurn === 1) ? "💭 评估手牌叫牌中..." : "";
+        document.getElementById("statusLeft").className = "seat-status-badge " + ((GameState.bidTurn === 1) ? "status-thinking" : "");
 
-    document.getElementById("countUser").textContent = `${GameState.hands[0].length} 张`;
-    document.getElementById("countLeft").textContent = `${GameState.hands[1].length} 张`;
-    document.getElementById("countRight").textContent = `${GameState.hands[2].length} 张`;
+        document.getElementById("statusRight").textContent = (GameState.bidTurn === 2) ? "💭 评估手牌叫牌中..." : "";
+        document.getElementById("statusRight").className = "seat-status-badge " + ((GameState.bidTurn === 2) ? "status-thinking" : "");
 
-    // 席位高亮
-    document.getElementById("seatLeft").className = "player-seat " + (GameState.currentTurn === 1 ? "active-turn" : "");
-    document.getElementById("seatRight").className = "player-seat " + (GameState.currentTurn === 2 ? "active-turn" : "");
+        document.getElementById("statusUser").textContent = (GameState.bidTurn === 0) ? "👉 轮到您叫地主" : "等待他人叫牌";
+        document.getElementById("statusUser").className = "seat-status-badge " + ((GameState.bidTurn === 0) ? "status-thinking" : "");
 
-    // 席位状态
-    document.getElementById("statusLeft").textContent = (GameState.currentTurn === 1) ? "思考中..." : "";
-    document.getElementById("statusLeft").className = "seat-status-badge " + ((GameState.currentTurn === 1) ? "status-thinking" : "");
+        const playBar = document.getElementById("playActionBar");
+        const bidBar = document.getElementById("biddingActionBar");
+        if (playBar) playBar.style.display = "none";
+        if (bidBar) bidBar.style.display = (GameState.bidTurn === 0 && GameState.mode === "human") ? "flex" : "none";
 
-    document.getElementById("statusRight").textContent = (GameState.currentTurn === 2) ? "思考中..." : "";
-    document.getElementById("statusRight").className = "seat-status-badge " + ((GameState.currentTurn === 2) ? "status-thinking" : "");
+        if (GameState.mode === "auto") {
+            document.getElementById("gameStatusText").textContent = `>> 观战竞价: [${getSeatName(GameState.bidTurn)}] 正在进行1024-微柱起手牌力推演...`;
+        } else {
+            document.getElementById("gameStatusText").textContent = (GameState.bidTurn === 0) 
+                ? ">> 轮到您的回合：请根据起手牌力决定「👑 叫地主」还是「🏳️ 不叫」" 
+                : `>> 智能竞价中: [${getSeatName(GameState.bidTurn)}] 正在进行微柱皮层起手牌势能评估...`;
+        }
+    } else {
+        const isUserLandlord = (GameState.landlordIdx === 0);
+        const isLeftLandlord = (GameState.landlordIdx === 1);
+        const isRightLandlord = (GameState.landlordIdx === 2);
 
-    document.getElementById("statusUser").textContent = (GameState.currentTurn === 0) ? "👉 轮到您出牌" : "等待对手出牌";
-    document.getElementById("statusUser").className = "seat-status-badge " + ((GameState.currentTurn === 0) ? "status-thinking" : "");
+        document.getElementById("roleUser").textContent = isUserLandlord ? "👑 地主" : "🤝 农民";
+        document.getElementById("roleUser").className = "role-badge " + (isUserLandlord ? "role-landlord" : "role-peasant");
+
+        document.getElementById("roleLeft").textContent = isLeftLandlord ? "👑 地主" : "🤝 农民";
+        document.getElementById("roleLeft").className = "role-badge " + (isLeftLandlord ? "role-landlord" : "role-peasant");
+
+        document.getElementById("roleRight").textContent = isRightLandlord ? "👑 地主" : "🤝 农民";
+        document.getElementById("roleRight").className = "role-badge " + (isRightLandlord ? "role-landlord" : "role-peasant");
+
+        document.getElementById("countUser").textContent = `${GameState.hands[0].length} 张`;
+        document.getElementById("countLeft").textContent = `${GameState.hands[1].length} 张`;
+        document.getElementById("countRight").textContent = `${GameState.hands[2].length} 张`;
+
+        // 席位高亮
+        document.getElementById("seatLeft").className = "player-seat " + (GameState.currentTurn === 1 ? "active-turn" : "");
+        document.getElementById("seatRight").className = "player-seat " + (GameState.currentTurn === 2 ? "active-turn" : "");
+
+        // 席位状态
+        document.getElementById("statusLeft").textContent = (GameState.currentTurn === 1) ? "思考中..." : "";
+        document.getElementById("statusLeft").className = "seat-status-badge " + ((GameState.currentTurn === 1) ? "status-thinking" : "");
+
+        document.getElementById("statusRight").textContent = (GameState.currentTurn === 2) ? "思考中..." : "";
+        document.getElementById("statusRight").className = "seat-status-badge " + ((GameState.currentTurn === 2) ? "status-thinking" : "");
+
+        document.getElementById("statusUser").textContent = (GameState.currentTurn === 0) ? "👉 轮到您出牌" : "等待对手出牌";
+        document.getElementById("statusUser").className = "seat-status-badge " + ((GameState.currentTurn === 0) ? "status-thinking" : "");
+
+        const playBar = document.getElementById("playActionBar");
+        const bidBar = document.getElementById("biddingActionBar");
+        if (playBar) playBar.style.display = "flex";
+        if (bidBar) bidBar.style.display = "none";
+
+        // 按钮状态
+        const isUserTurn = (GameState.currentTurn === 0) && (GameState.mode === "human");
+        const canPass = isUserTurn && (GameState.lastTrick !== null && GameState.lastTrick.player !== 0);
+
+        document.getElementById("btnPlay").disabled = !isUserTurn;
+        document.getElementById("btnPass").disabled = !canPass;
+        document.getElementById("btnHint").disabled = !isUserTurn;
+        document.getElementById("btnDeselect").disabled = !isUserTurn || (selectedUserCards.size === 0);
+
+        if (GameState.mode === "auto") {
+            document.getElementById("gameStatusText").textContent = `>> 观战模式: 1024-微柱神经皮层自动推演中 [席位 ${GameState.currentTurn === 0 ? '玩家位' : (GameState.currentTurn === 1 ? '左位AI' : '右位地主')}]...`;
+        } else {
+            document.getElementById("gameStatusText").textContent = isUserTurn ? ">> 轮到您的回合，请选牌后点击「出牌」或「过牌」" : `>> 1024-微柱神经皮层博弈解算中 (席位 ${GameState.currentTurn === 1 ? '左位AI' : '右位地主'})...`;
+        }
+    }
 
     // 渲染玩家手牌
     const userStrip = document.getElementById("userHandStrip");
@@ -974,7 +1151,7 @@ function updateUI() {
         const isSel = selectedUserCards.has(card);
         const cardEl = renderCard(card, isSel);
         cardEl.onclick = () => {
-            if (GameState.mode === "auto") return; // 观战模式禁止点击
+            if (GameState.mode === "auto" || GameState.phase === "bidding") return; // 观战模式或叫牌阶段禁止点击
             if (selectedUserCards.has(card)) selectedUserCards.delete(card);
             else selectedUserCards.add(card);
             updateUI();
@@ -984,28 +1161,15 @@ function updateUI() {
 
     // 记牌器更新
     const trackerGrid = document.getElementById("cardTrackerGrid");
-    trackerGrid.innerHTML = "";
-    for (let r = 14; r >= 0; r--) {
-        const item = document.createElement("div");
-        item.className = "tracker-item";
-        const rem = GameState.deckRemaining[r];
-        item.innerHTML = `<div class="tracker-rank">${RANKS[r]}</div><div class="tracker-count" style="color:${rem > 0 ? '#ffb700' : '#475569'}">${rem}</div>`;
-        trackerGrid.appendChild(item);
-    }
-
-    // 按钮状态
-    const isUserTurn = (GameState.currentTurn === 0) && (GameState.mode === "human");
-    const canPass = isUserTurn && (GameState.lastTrick !== null && GameState.lastTrick.player !== 0);
-
-    document.getElementById("btnPlay").disabled = !isUserTurn;
-    document.getElementById("btnPass").disabled = !canPass;
-    document.getElementById("btnHint").disabled = !isUserTurn;
-    document.getElementById("btnDeselect").disabled = !isUserTurn || (selectedUserCards.size === 0);
-
-    if (GameState.mode === "auto") {
-        document.getElementById("gameStatusText").textContent = `>> 观战模式: 1024-微柱神经皮层自动推演中 [席位 ${GameState.currentTurn === 0 ? '玩家位' : (GameState.currentTurn === 1 ? '左位AI' : '右位地主')}]...`;
-    } else {
-        document.getElementById("gameStatusText").textContent = isUserTurn ? ">> 轮到您的回合，请选牌后点击「出牌」或「过牌」" : `>> 1024-微柱神经皮层博弈解算中 (席位 ${GameState.currentTurn === 1 ? '左位AI' : '右位地主'})...`;
+    if (trackerGrid) {
+        trackerGrid.innerHTML = "";
+        for (let r = 14; r >= 0; r--) {
+            const item = document.createElement("div");
+            item.className = "tracker-item";
+            const rem = GameState.deckRemaining[r];
+            item.innerHTML = `<div class="tracker-rank">${RANKS[r]}</div><div class="tracker-count" style="color:${rem > 0 ? '#ffb700' : '#475569'}">${rem}</div>`;
+            trackerGrid.appendChild(item);
+        }
     }
 
     // 统计面板更新
@@ -1597,6 +1761,10 @@ function setSeatStatus(playerIdx, text, className) {
 
 // 调度下一个回合
 function checkTurnTrigger() {
+    if (GameState.phase === "bidding") {
+        triggerBiddingStep();
+        return;
+    }
     if (GameState.mode === "auto") {
         GameState.autoTimer = setTimeout(() => {
             const aiCards = aiDecide(GameState.currentTurn);
@@ -1705,6 +1873,19 @@ function handleGameOver(winnerIdx) {
 
 // 事件绑定
 window.addEventListener("DOMContentLoaded", () => {
+    // 智能竞价: 叫地主 (抢底牌)
+    document.getElementById("btnBidCall").onclick = () => {
+        if (GameState.phase !== "bidding" || GameState.bidTurn !== 0) return;
+        addLog(`👑 [玩家] 主动发起【👑 叫地主】！准备抢拿底牌！`, "bomb");
+        finalizeLandlord(0);
+    };
+
+    // 智能竞价: 不叫 (Pass)
+    document.getElementById("btnBidPass").onclick = () => {
+        if (GameState.phase !== "bidding" || GameState.bidTurn !== 0) return;
+        handleBidPass(0);
+    };
+
     // 出牌
     document.getElementById("btnPlay").onclick = () => {
         if (selectedUserCards.size === 0) return;

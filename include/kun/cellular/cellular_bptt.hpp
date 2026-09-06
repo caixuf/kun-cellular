@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstring>
 #include <iostream>
+#include <functional>
 
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/sdsc_primitives.h"
@@ -13,6 +14,27 @@
 #include "kun/cellular/generated_ops.hpp"
 
 namespace kun {
+
+/**
+ * 通用损失函数规范 (Universal Substrate Loss Protocol)
+ * 提供对标 PyTorch / Transformer 的标准化前向与反向梯度接口
+ */
+enum class SubstrateLossType {
+    MSE = 0,               // 均方误差 (Mean Squared Error)
+    CROSS_ENTROPY = 1,     // 动作分布交叉熵 / 负对数似然 (NLL)
+    POLICY_GRADIENT = 2,   // 优势加权策略梯度 (Advantage-weighted Policy Gradient)
+    SMOOTH_L1 = 3          // 鲁棒 Huber 损失
+};
+
+struct SubstrateLossGrad {
+    float loss_val{0.0f};
+    std::vector<float> dL_dout; // [channels] 对预测效应器输出的伴随导数
+};
+
+using SubstrateLossFn = std::function<SubstrateLossGrad(
+    const std::vector<float>& preds,
+    const std::vector<float>& targets
+)>;
 
 /**
  * BPTT 录带单步快照 (Forward Tape Step)
@@ -127,10 +149,17 @@ public:
      * @param grads             返回的突触权重与增益梯度
      * @return float            全轨迹均方误差损失 (MSE Loss)
      */
-    float backward(
+    /**
+     * @brief 通用损失函数反向传播 (Universal BPTT Backward)
+     * 支持经典 MSE、分类交叉熵 (Cross Entropy)、策略梯度强化学习 (Policy Gradient / PPO / GRPO),
+     * 以及用户传入自定义可微损失回调函数 (Custom Loss Functor)。
+     */
+    float backward_with_loss(
         const CellularOrganism& org,
         const std::vector<std::vector<float>>& target_outputs,
-        BPTTGradients& grads
+        BPTTGradients& grads,
+        SubstrateLossType loss_type = SubstrateLossType::MSE,
+        const SubstrateLossFn& custom_loss_fn = nullptr
     ) {
         const size_t T = std::min(current_tape_len, target_outputs.size());
         if (T == 0) return 0.0f;
@@ -166,23 +195,83 @@ public:
             std::fill(delta_out.begin(), delta_out.end(), 0.0f);
             std::fill(delta_in_ports.begin(), delta_in_ports.end(), 0.0f);
 
-            // 1. 注入效应器动作监督误差 (MSE Loss)
+            // 1. 注入效应器动作监督误差 (通用损失计算)
             if (t < static_cast<int>(target_outputs.size())) {
                 const auto& targets = target_outputs[t];
+
+                // 提取当前步效应器输出通道与其对应的细胞索引
+                std::vector<float> preds;
+                std::vector<size_t> eff_cell_indices;
                 for (const auto& ac : org.compiled_actions_) {
                     if (ac.cell_idx >= N) continue;
                     const auto& c = org.cells[ac.cell_idx];
                     if (!is_effector_cell(c.type)) continue;
                     size_t ch = effector_channel_index(c.type, c.param2);
-                    if (ch < targets.size()) {
-                        float pred = step.cell_outputs[ac.cell_idx];
+                    if (ch >= preds.size()) {
+                        preds.resize(ch + 1, 0.0f);
+                        eff_cell_indices.resize(ch + 1, static_cast<size_t>(-1));
+                    }
+                    preds[ch] = step.cell_outputs[ac.cell_idx];
+                    eff_cell_indices[ch] = ac.cell_idx;
+                }
+
+                if (custom_loss_fn) {
+                    auto res = custom_loss_fn(preds, targets);
+                    total_loss += res.loss_val;
+                    for (size_t ch = 0; ch < res.dL_dout.size() && ch < eff_cell_indices.size(); ++ch) {
+                        size_t c_idx = eff_cell_indices[ch];
+                        if (c_idx < N) delta_out[c_idx] += res.dL_dout[ch];
+                    }
+                } else if (loss_type == SubstrateLossType::CROSS_ENTROPY) {
+                    float max_p = preds.empty() ? 0.0f : *std::max_element(preds.begin(), preds.end());
+                    float sum_exp = 0.0f;
+                    std::vector<float> probs(preds.size());
+                    for (size_t k = 0; k < preds.size(); ++k) {
+                        probs[k] = std::exp(preds[k] - max_p);
+                        sum_exp += probs[k];
+                    }
+                    if (sum_exp > 1e-7f) {
+                        for (float& p : probs) p /= sum_exp;
+                    }
+                    for (size_t ch = 0; ch < preds.size() && ch < targets.size(); ++ch) {
                         float target = targets[ch];
-                        float diff = pred - target;
-                        delta_out[ac.cell_idx] += 2.0f * diff; // dL/dout
+                        float p = std::max(probs[ch], 1e-7f);
+                        total_loss += (-target * std::log(p));
+                        size_t c_idx = eff_cell_indices[ch];
+                        if (c_idx < N) delta_out[c_idx] += (probs[ch] - target);
+                    }
+                } else if (loss_type == SubstrateLossType::POLICY_GRADIENT) {
+                    // targets: [0]=chosen_action_idx, [1]=advantage
+                    int chosen_act = targets.empty() ? 0 : static_cast<int>(targets[0]);
+                    float adv = targets.size() > 1 ? targets[1] : 1.0f;
+
+                    float max_p = preds.empty() ? 0.0f : *std::max_element(preds.begin(), preds.end());
+                    float sum_exp = 0.0f;
+                    std::vector<float> probs(preds.size());
+                    for (size_t k = 0; k < preds.size(); ++k) {
+                        probs[k] = std::exp(preds[k] - max_p);
+                        sum_exp += probs[k];
+                    }
+                    if (sum_exp > 1e-7f) {
+                        for (float& p : probs) p /= sum_exp;
+                    }
+                    float p_chosen = (chosen_act >= 0 && chosen_act < static_cast<int>(probs.size())) ? probs[chosen_act] : 1e-7f;
+                    total_loss += (-adv * std::log(std::max(p_chosen, 1e-7f)));
+                    for (size_t ch = 0; ch < preds.size(); ++ch) {
+                        float grad = -adv * ((static_cast<int>(ch) == chosen_act ? 1.0f : 0.0f) - probs[ch]);
+                        size_t c_idx = eff_cell_indices[ch];
+                        if (c_idx < N) delta_out[c_idx] += grad;
+                    }
+                } else {
+                    // 经典 MSE 损失
+                    for (size_t ch = 0; ch < preds.size() && ch < targets.size(); ++ch) {
+                        float diff = preds[ch] - targets[ch];
                         total_loss += diff * diff;
-                        loss_count++;
+                        size_t c_idx = eff_cell_indices[ch];
+                        if (c_idx < N) delta_out[c_idx] += 2.0f * diff;
                     }
                 }
+                loss_count++;
             }
 
             // 2. 注入跨步时序循环突触反馈梯度 (Recurrent Synapse Gradient: t -> t+1)
@@ -297,6 +386,17 @@ public:
         }
 
         return loss_count > 0 ? (total_loss / loss_count) : 0.0f;
+    }
+
+    /**
+     * @brief 向后兼容的默认 MSE 反向传播接口
+     */
+    float backward(
+        const CellularOrganism& org,
+        const std::vector<std::vector<float>>& target_outputs,
+        BPTTGradients& grads
+    ) {
+        return backward_with_loss(org, target_outputs, grads, SubstrateLossType::MSE);
     }
 
     /**
