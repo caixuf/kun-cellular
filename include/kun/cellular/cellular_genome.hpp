@@ -28,6 +28,7 @@
 #include <thread>
 
 #include "kun/cellular/generated_ops.hpp"
+#include "kun/cellular/cellular_relaxation.hpp"
 
 namespace kun {
 
@@ -1522,6 +1523,266 @@ public:
             const size_t ch = effector_channel_index(c.type, c.param2);
             if (ch < out_dim) y[ch] = static_cast<float>(c.output_val);
         }
+    }
+
+    // ========================================================================
+    // 4.6 测试时动态松弛思考步 (Test-Time Compute: Dynamical Attractor Relaxation)
+    // 在读取效应器通道前，通过内部时序循环反馈进行 K 步动态松弛，促使隐层状态沿 Kahn 拓扑流形
+    // 收敛至李雅普诺夫稳态吸引子 (Fixed-Point Attractor)。
+    // 纯数学拓扑动力学，严格恪守 Rule 7 Substrate Immunity 宪章。
+    // ========================================================================
+    ActionOutputs forward_with_relaxation(
+        const double* inputs,
+        size_t in_dim,
+        const RelaxationConfig& config,
+        RelaxationTelemetry* telemetry = nullptr)
+    {
+        if (!is_compiled_) compile();
+        if (inputs == nullptr) in_dim = 0;
+
+        const size_t num_cells = cells.size();
+        if (num_cells == 0) {
+            if (telemetry) {
+                *telemetry = RelaxationTelemetry{};
+            }
+            return ActionOutputs{};
+        }
+
+        double* __restrict port_ptr = flat_port_inputs_.data();
+        Cell* __restrict cells_ptr = cells.data();
+        auto* __restrict syn_ptr = compiled_synapses_.data();
+        const size_t num_synapses = compiled_synapses_.size();
+        const auto* __restrict order_ptr = execution_order_.data();
+        const size_t num_ordered = execution_order_.size();
+
+        // 记录初始松弛态电位与相空间总能量 E(0)
+        std::vector<double> prev_potentials(num_cells, 0.0);
+        for (size_t i = 0; i < num_cells; ++i) {
+            prev_potentials[i] = cells_ptr[i].prev_output_val;
+        }
+        double initial_energy = compute_network_potential_energy(prev_potentials.data(), num_cells);
+
+        size_t actual_steps = 0;
+        double final_l2_diff = 0.0;
+        double final_max_diff = 0.0;
+        double final_energy = initial_energy;
+        bool is_converged = false;
+        bool bibo_ok = true;
+        std::vector<double> step_deltas;
+        std::vector<double> step_energies;
+        const size_t max_steps = std::max<size_t>(1, config.max_steps);
+        step_deltas.reserve(max_steps);
+        step_energies.reserve(max_steps);
+
+        for (size_t step = 0; step < max_steps; ++step) {
+            actual_steps = step + 1;
+
+            // 1. 清空扁平输入端口缓冲
+            std::memset(port_ptr, 0, flat_port_inputs_.size() * sizeof(double));
+
+            // 2. 注入时序循环反馈信号 (一等公民 Recurrent Loops: 反馈上一松弛迭代步内部电位)
+            for (size_t i = 0; i < num_synapses; ++i) {
+                const auto& syn = syn_ptr[i];
+                if (syn.is_recurrent) {
+                    double val = cells_ptr[syn.from_idx].prev_output_val * syn.weight;
+                    port_ptr[syn.to_idx * 2 + syn.to_port] += val;
+                }
+            }
+
+            // 3. 按 Kahn 拓扑顺序逐一激发细胞并即时前向传播
+            for (size_t i = 0; i < num_ordered; ++i) {
+                size_t idx = order_ptr[i];
+                auto& c = cells_ptr[idx];
+                double in0 = port_ptr[idx * 2 + 0];
+                double in1 = port_ptr[idx * 2 + 1];
+
+                dispatch_cell_forward(c, in0, in1, in_dim, inputs);
+
+                if (std::abs(c.output_val) > 1e-6) {
+                    c.activation_count++;
+                    c.glow_charge = std::min(1.0f, c.glow_charge + 0.3f);
+                }
+
+                // 膜穿透孔道微观动力学与跨膜电位演进
+                float drive = static_cast<float>(c.output_val);
+                if (drive > 0.05f) {
+                    c.membrane_pores[0] = std::clamp(c.membrane_pores[0] * 0.75f + 0.25f * std::min(1.0f, drive * 0.8f), 0.05f, 1.0f);
+                    c.membrane_pores[2] = std::clamp(c.membrane_pores[2] * 0.80f + 0.20f * std::min(1.0f, drive * 0.5f), 0.02f, 0.9f);
+                    c.membrane_potential += (35.0f - c.membrane_potential) * (c.membrane_pores[0] * 0.25f);
+                } else {
+                    c.membrane_pores[0] = std::max(0.05f, c.membrane_pores[0] * 0.88f);
+                    c.membrane_pores[1] = std::clamp(c.membrane_pores[1] * 0.85f + 0.15f * 0.4f, 0.1f, 0.8f);
+                    c.membrane_potential += (-70.0f - c.membrane_potential) * (c.membrane_pores[1] * 0.20f);
+                }
+                c.membrane_pores[4] = std::clamp(0.2f + 0.6f * c.glow_charge, 0.1f, 0.95f);
+                c.membrane_pores[5] = std::clamp(0.1f + 0.5f * (std::abs(drive) > 0.5f ? 0.6f : 0.1f), 0.05f, 0.85f);
+
+                // 前向突触即时传递至后续位阶节点 (CSR 出边索引)
+                for (size_t k = out_start_[idx]; k < out_start_[idx + 1]; ++k) {
+                    const auto& syn = syn_ptr[out_edges_[k]];
+                    if (!syn.is_recurrent) {
+                        port_ptr[syn.to_idx * 2 + syn.to_port] += c.output_val * syn.weight;
+                    }
+                }
+            }
+
+            // 4. 李雅普诺夫 BIBO 稳定性校验、电位残差距离与阻尼更新
+            double step_l2_sq = 0.0;
+            double step_max_diff = 0.0;
+            double step_energy = 0.0;
+            const double alpha = std::clamp(config.damping_factor, 0.0001, 1.0);
+
+            for (size_t i = 0; i < num_cells; ++i) {
+                double v = cells_ptr[i].output_val;
+                if (!std::isfinite(v)) {
+                    bibo_ok = false;
+                    v = 0.0;
+                } else if (std::abs(v) > config.bibo_bound) {
+                    bibo_ok = false;
+                    v = std::clamp(v, -config.bibo_bound, config.bibo_bound);
+                }
+
+                // 阻尼状态松弛更新: state = (1 - alpha) * prev + alpha * v
+                if (alpha < 0.999999) {
+                    v = (1.0 - alpha) * prev_potentials[i] + alpha * v;
+                }
+
+                cells_ptr[i].output_val = v;
+                cells_ptr[i].prev_output_val = v;
+
+                double diff = std::abs(v - prev_potentials[i]);
+                step_l2_sq += diff * diff;
+                if (diff > step_max_diff) step_max_diff = diff;
+                step_energy += v * v;
+
+                prev_potentials[i] = v;
+            }
+
+            final_l2_diff = std::sqrt(step_l2_sq);
+            final_max_diff = step_max_diff;
+            final_energy = 0.5 * step_energy;
+            step_deltas.push_back(final_l2_diff);
+            step_energies.push_back(final_energy);
+
+            if (final_max_diff <= config.convergence_tol) {
+                is_converged = true;
+                if (config.early_stop && step > 0) {
+                    break;
+                }
+            }
+        }
+
+        // 5. 可选在线突触权重塑性学习 (Hebbian Plasticity on Converged Fixed Point)
+        if (config.enable_hebbian) {
+            for (size_t i = 0; i < num_synapses; ++i) {
+                auto& syn = syn_ptr[i];
+                if (syn.hebbian_rate <= 1e-6) continue;
+
+                double u_pre = cells_ptr[syn.from_idx].output_val;
+                double u_post = cells_ptr[syn.to_idx].output_val;
+
+                double delta_w = syn.hebbian_rate * (u_pre * u_post - syn.hebbian_decay * u_post * u_post * syn.weight);
+                syn.weight = std::clamp(syn.weight + delta_w, -3.0, 3.0);
+                if (!std::isfinite(syn.weight)) syn.weight = syn.initial_weight;
+            }
+        }
+
+        // 6. 收集稳态吸引子动作信号与概念相空间指标
+        ActionOutputs actions{};
+        double total_energy = 0.0;
+        for (const auto& c : cells) {
+            total_energy += c.output_val * c.output_val;
+        }
+        actions.thought_energy = total_energy;
+
+        for (const auto& ac : compiled_actions_) {
+            double val = cells_ptr[ac.cell_idx].output_val;
+            if (ac.type == CellType::ACT_PRIMARY_POSITIVE) actions.positive_action = val;
+            else if (ac.type == CellType::ACT_PRIMARY_NEGATIVE) actions.negative_action = val;
+            else if (ac.type == CellType::ACT_DEFENSIVE_RESET) actions.defensive_reset = val;
+            else if (ac.type == CellType::ACT_IMMUNE_BLOCK && val > 0.5) actions.immune_lock = true;
+            else if (ac.type == CellType::PREDICT_SENSE_0) actions.predicted_sense_0 = val;
+            else if (ac.type == CellType::PREDICT_SENSE_1) actions.predicted_sense_1 = val;
+        }
+
+        const double in0_obs = (in_dim > 0) ? inputs[0] : 0.0;
+        const double in1_obs = (in_dim > 1) ? inputs[1] : 0.0;
+        double err0 = in0_obs - actions.predicted_sense_0;
+        double err1 = in1_obs - actions.predicted_sense_1;
+        actions.prediction_error = std::sqrt(err0 * err0 + err1 * err1);
+
+        if (is_converged) actions.thought_mode = "STABLE_ATTRACTOR";
+        else if (actions.prediction_error > 5.0) actions.thought_mode = "SURPRISE";
+        else if (actions.thought_energy > 8.0) actions.thought_mode = "FOCUS";
+        else if (actions.thought_energy < 0.2) actions.thought_mode = "EXPLORATION";
+        else actions.thought_mode = "RELAXING_ATTRACTOR";
+
+        // 7. 导出松弛动力学遥测指标
+        if (telemetry) {
+            telemetry->actual_steps = actual_steps;
+            telemetry->initial_energy = initial_energy;
+            telemetry->final_energy = final_energy;
+            telemetry->delta_energy = final_energy - initial_energy;
+            telemetry->max_potential_delta = final_max_diff;
+            telemetry->l2_potential_delta = final_l2_diff;
+            telemetry->converged = is_converged;
+            telemetry->bibo_stable = bibo_ok;
+            telemetry->step_deltas = std::move(step_deltas);
+            telemetry->step_energies = std::move(step_energies);
+            if (!telemetry->step_deltas.empty() && telemetry->step_deltas.front() > 1e-12) {
+                telemetry->spectral_contraction = telemetry->step_deltas.back() / telemetry->step_deltas.front();
+            } else {
+                telemetry->spectral_contraction = 0.0;
+            }
+        }
+
+        return actions;
+    }
+
+    // 便捷重载版本 1: 支持 (inputs, relaxation_steps, in_dim, ...)
+    ActionOutputs forward_with_relaxation(
+        const double* inputs,
+        size_t relaxation_steps,
+        size_t in_dim,
+        double convergence_threshold = 1e-5,
+        bool enable_hebbian = false,
+        RelaxationTelemetry* telemetry = nullptr)
+    {
+        RelaxationConfig cfg;
+        cfg.max_steps = (relaxation_steps == 0) ? 1 : relaxation_steps;
+        cfg.convergence_tol = convergence_threshold;
+        cfg.enable_hebbian = enable_hebbian;
+        return forward_with_relaxation(inputs, in_dim, cfg, telemetry);
+    }
+
+    // 便捷重载版本 2: 支持 forward_with_relaxation(inputs, relaxation_steps, telemetry)
+    ActionOutputs forward_with_relaxation(
+        const double* inputs,
+        size_t relaxation_steps = 4,
+        RelaxationTelemetry* telemetry = nullptr)
+    {
+        return forward_with_relaxation(inputs, relaxation_steps, 4, 1e-5, false, telemetry);
+    }
+
+    // 便捷重载版本 3: 支持 forward_with_relaxation(inputs, relaxation_steps, in_dim, telemetry)
+    ActionOutputs forward_with_relaxation(
+        const double* inputs,
+        size_t relaxation_steps,
+        size_t in_dim,
+        RelaxationTelemetry* telemetry)
+    {
+        return forward_with_relaxation(inputs, relaxation_steps, in_dim, 1e-5, false, telemetry);
+    }
+
+    // 便捷重载版本 4: 固定 4 维数组输入与全参数
+    ActionOutputs forward_with_relaxation(
+        const double inputs[4],
+        size_t relaxation_steps,
+        double convergence_threshold,
+        bool enable_hebbian = false,
+        RelaxationTelemetry* telemetry = nullptr)
+    {
+        return forward_with_relaxation(inputs, relaxation_steps, 4, convergence_threshold, enable_hebbian, telemetry);
     }
 
     // ── 闭门心理推演与反事实想象 (Mental Simulation / Thought Rollout) ──
