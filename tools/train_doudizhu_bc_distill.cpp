@@ -417,6 +417,55 @@ static int train_bc(const char* path) {
 }
 
 // rank 策略实战评测: 对启发式对手 N 局 (direct rank 语义)
+// 混合策略评测: rank 头置信度 (top1-top2 margin) > theta 时接管, 否则回退启发式执行器
+// 决定性实验: 若混合胜率 > 57.8% (纯委托) → 细胞智能有真实净贡献
+static int eval_hybrid_games(int games, float theta, const char* ckpt) {
+    CellularOrganism org = build_doudizhu_rank_cortex_v3();
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    org.load_checkpoint_bin(ckpt);
+    int wins = 0; long hybrid_take = 0, heur_take = 0;
+    for (int g = 0; g < games; ++g) {
+        DouDiZhuCardGameTask task(40, (uint32_t)(3100000 + g * 97), 17.5);
+        task.set_rank_action_mode(true);
+        bool done = false;
+        while (!done) {
+            auto o = task.current_observation();
+            std::vector<double> in(o.begin(), o.end());
+            org.reset_state(true);
+            org.forward_nd(in.data(), in.size(), false);
+            float s[17];
+            for (int k = 0; k <= 16; ++k) s[k] = (float)org.cells[64 + k].output_val;
+            int b1 = 0, b2 = -1; float v1 = -1e9f, v2 = -1e9f;
+            for (int k = 0; k < 17; ++k) {
+                if (s[k] > v1) { v2 = v1; b2 = b1; v1 = s[k]; b1 = k; }
+                else if (s[k] > v2) { v2 = s[k]; b2 = k; }
+            }
+            float margin = v1 - v2;
+            if (margin > theta) {
+                float y[19] = {0};
+                for (int k = 0; k <= 15; ++k) y[3 + k] = s[k];
+                y[18] = (float)org.cells[79].output_val - 1.0f;
+                y[(b1 == 15) ? 18 : 3 + b1] = v1 + 3.0f;
+                auto res = task.step_rank_from_tensor(y);
+                done = res.done;
+                if (res.success) wins++;
+                hybrid_take++;
+            } else {
+                task.teacher_play_capture();   // 启发式执行器接管 (只动 seat 0)
+                auto res = task.settle_turn();
+                done = res.done;
+                if (res.success) wins++;
+                heur_take++;
+            }
+        }
+    }
+    printf("[混合 θ=%.1f] 胜率 %.1f%% (%d/%d) | rank接管 %.1f%% 启发式 %.1f%%\n",
+           theta, 100.0 * wins / games, wins, games,
+           100.0 * hybrid_take / (hybrid_take + heur_take), 100.0 * heur_take / (hybrid_take + heur_take));
+    return wins;
+}
+
 static int eval_rank_games(int games, const char* ckpt_path) {
     CellularOrganism org = CellularOrganism::load_checkpoint_bin(ckpt_path);
     org.compile();
@@ -552,11 +601,261 @@ static int train_rank_grpo(int iters, int group) {
     return 0;
 }
 
+// ============================ v5a 候选打分制 ============================
+// 数据: 每决策 (obs32, K, K×8 候选特征, label, gid); 教师标签 = 匹配教师实际 (type,rank) 的候选
+static int gen_dataset_cand(int games, const char* path) {
+    CellularOrganism probe_unused; (void)probe_unused;   // 无需模型 — 教师自走
+    std::ofstream f(path, std::ios::binary);
+    int32_t hdr = games; f.write((char*)&hdr, 4);
+    long samples = 0, skipped = 0;
+    for (int g = 0; g < games; ++g) {
+        DouDiZhuCardGameTask task(40, (uint32_t)(6600000 + g * 191), 17.5);
+        task.set_rank_action_mode(true);
+        bool done = false;
+        while (!done) {
+            auto o = task.current_observation();
+            auto cands = task.enumerate_candidates(0);
+            int pre = task.cards_left(0);
+            (void)pre;
+            int lr = task.teacher_play_capture();   // 教师走 (变更状态), 返回点数或 -1=过
+            auto t_trick = task.table_trick();
+            int label = -1;
+            for (size_t i = 0; i < cands.size(); ++i) {
+                if (lr < 0) { if (cands[i].type == 0) { label = (int)i; break; } }
+                else if (cands[i].type == (int)t_trick.type && cands[i].rank == t_trick.rank) { label = (int)i; break; }
+            }
+            auto res = task.settle_turn();
+            if (label < 0) { skipped++; done = res.done; continue; }
+            f.write((char*)o.data(), sizeof(float) * 32);
+            int32_t K = (int32_t)cands.size(); f.write((char*)&K, 4);
+            for (auto& c : cands) {
+                auto cf = task.candidate_features(c);
+                f.write((char*)cf.data(), sizeof(float) * 12);
+            }
+            f.write((char*)&label, 4);
+            int32_t gid = g; f.write((char*)&gid, 4);
+            samples++;
+            done = res.done;
+        }
+    }
+    f.close();
+    printf("[v5数据] %d 局 -> %ld 样本 (跳过 %ld 未匹配)\n-> %s\n", games, samples, skipped, path);
+    return (int)samples;
+}
+
+// 训练: 每决策 K 次前向, margin 目标 (label→+1, 其他→0), MSE 反传累加, 每 decision 一步 Adam
+static int train_bc_cand(const char* path) {
+    CellularOrganism org = build_doudizhu_candidate_scorer();
+    CellularBPTTEngine bptt;
+    std::ifstream f(path, std::ios::binary);
+    int32_t games; f.read((char*)&games, 4);
+    struct Sample { std::array<float, 32> obs; std::vector<std::array<float, 12>> cands; int label; int32_t gid; };
+    std::vector<Sample> data;
+    while (f.good()) {
+        Sample s;
+        f.read((char*)s.obs.data(), 128);
+        int32_t K; f.read((char*)&K, 4);
+        if (!f.good() || K <= 0 || K > 64) break;
+        s.cands.resize(K);
+        for (int i = 0; i < K; ++i) f.read((char*)s.cands[i].data(), 48);
+        f.read((char*)&s.label, 4);
+        f.read((char*)&s.gid, 4);
+        if (!f.good()) break;
+        data.push_back(std::move(s));
+    }
+    f.close();
+    printf("[v5训练] 载入 %zu 决策\n", data.size());
+    // 初始化基线: 训练前单步复现 (判别学习是否真实发生)
+    {
+        long correct0 = 0;
+        for (auto& s : data) {
+            float best = -1e9f; int best_i = 0;
+            for (size_t i = 0; i < s.cands.size(); ++i) {
+                std::vector<float> in(44);
+                for (int d = 0; d < 32; ++d) in[d] = s.obs[d];
+                for (int d = 0; d < 12; ++d) in[32 + d] = s.cands[i][d];
+                org.reset_state(true);
+                std::vector<double> din(in.begin(), in.end());
+                org.forward_nd(din.data(), din.size(), false);
+                float sc = (float)org.cells.back().output_val;
+                if (sc > best) { best = sc; best_i = (int)i; }
+            }
+            if (best_i == s.label) correct0++;
+        }
+        printf("[v5初始基线] 单步复现 %.1f%%\n", 100.0 * correct0 / data.size());
+    }
+    const int EPOCHS = 25;
+    const float LR = 0.02f;
+    std::mt19937 rng(42);
+    for (int ep = 1; ep <= EPOCHS; ++ep) {
+        std::shuffle(data.begin(), data.end(), rng);
+        double loss_sum = 0;
+        for (auto& s : data) {
+            BPTTGradients grads;
+            for (size_t i = 0; i < s.cands.size(); ++i) {
+                std::vector<float> in(44);
+                for (int d = 0; d < 32; ++d) in[d] = s.obs[d];
+                for (int d = 0; d < 12; ++d) in[32 + d] = s.cands[i][d];
+                org.reset_state(true);
+                bptt.reset_tape();
+                std::vector<double> din(in.begin(), in.end());
+                org.forward_nd(din.data(), din.size(), false);
+                bptt.record_step(org);
+                float target = ((int)i == s.label) ? 1.0f : -0.2f;   // 对比目标: 非标签下压
+                std::vector<std::vector<float>> tgts = {{target}};
+                double L = bptt.backward_with_loss(org, tgts, grads, SubstrateLossType::MSE);
+                loss_sum += L;
+            }
+            bptt.step_adam(org, grads, LR);
+        }
+        if (ep % 5 == 0 || ep == 1) printf("[v5训练] Epoch %d/%d | MSE %.4f\n", ep, EPOCHS, loss_sum / data.size());
+    }
+    // 单步复现: 每决策 argmax 候选是否命中教师标签
+    long correct = 0;
+    for (auto& s : data) {
+        float best = -1e9f; int best_i = 0;
+        for (size_t i = 0; i < s.cands.size(); ++i) {
+            std::vector<float> in(40);
+            for (int d = 0; d < 32; ++d) in[d] = s.obs[d];
+            for (int d = 0; d < 8; ++d) in[32 + d] = s.cands[i][d];
+            org.reset_state(true);
+            std::vector<double> din(in.begin(), in.end());
+            org.forward_nd(din.data(), din.size(), false);
+            float sc = (float)org.cells.back().output_val;
+            if (sc > best) { best = sc; best_i = (int)i; }
+        }
+        if (best_i == s.label) correct++;
+    }
+    printf("[v5单步] 候选复现 %.1f%% (%ld/%zu)\n", 100.0 * correct / data.size(), correct, data.size());
+    org.save_checkpoint_bin("checkpoints/doudizhu_cand_scorer.bin");
+    printf("[产物] checkpoints/doudizhu_cand_scorer.bin\n");
+    return 0;
+}
+
+// 实战: 评分器 argmax 候选出牌 (无任何规则硬编码 — 张数/牌型/过牌全由网络打分)
+static int eval_cand_games(int games, const char* ckpt) {
+    CellularOrganism org = build_doudizhu_candidate_scorer();
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    org.load_checkpoint_bin(ckpt);
+    int wins = 0; long live_pass = 0, live_steps = 0, pass_label_hit = 0;
+    for (int g = 0; g < games; ++g) {
+        DouDiZhuCardGameTask task(40, (uint32_t)(3100000 + g * 97), 17.5);
+        bool done = false;
+        while (!done) {
+            auto o = task.current_observation();
+            auto cands = task.enumerate_candidates(0);
+            int pre_cards = task.cards_left(0);
+            float best = -1e9f; size_t best_i = 0;
+            for (size_t i = 0; i < cands.size(); ++i) {
+                std::vector<float> in(44);
+                for (int d = 0; d < 32; ++d) in[d] = o[d];
+                auto cf = task.candidate_features(cands[i]);
+                for (int d = 0; d < 12; ++d) in[32 + d] = cf[d];
+                org.reset_state(true);
+                std::vector<double> din(in.begin(), in.end());
+                org.forward_nd(din.data(), din.size(), false);
+                float sc = (float)org.cells.back().output_val;
+                if (sc > best) { best = sc; best_i = i; }
+            }
+            auto res = task.play_candidate(cands[best_i]);
+            done = res.done;
+            if (res.success) wins++;
+            live_steps++;
+            if (task.cards_left(0) == pre_cards) live_pass++;
+            if (cands[best_i].type == 0) pass_label_hit++;
+        }
+    }
+    printf("[v5实战] %d 局对启发式: 胜率 %.1f%% (%d/%d)\n", games, 100.0 * wins / games, wins, games);
+    printf("[v5活体] 步数 %ld 选择过牌 %.1f%% 实际过牌 %.1f%%\n", live_steps,
+           100.0 * pass_label_hit / live_steps, 100.0 * live_pass / live_steps);
+    return 0;
+}
+
+// DAgger v5a: 评分器驱动轨迹 (分布 = 自身), 任务拷贝上只读教师标注
+static int gen_dataset_cand_dagger(int games, const char* path) {
+    CellularOrganism org = build_doudizhu_candidate_scorer();
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    org.load_checkpoint_bin("checkpoints/doudizhu_cand_scorer.bin");
+    std::ofstream f(path, std::ios::binary);
+    int32_t hdr = games; f.write((char*)&hdr, 4);
+    long samples = 0, skipped = 0;
+    for (int g = 0; g < games; ++g) {
+        DouDiZhuCardGameTask task(40, (uint32_t)(8800000 + g * 233), 17.5);
+        bool done = false;
+        while (!done) {
+            auto o = task.current_observation();
+            auto cands = task.enumerate_candidates(0);
+            // 评分器选候选
+            float best = -1e9f; size_t best_i = 0;
+            for (size_t i = 0; i < cands.size(); ++i) {
+                std::vector<float> in(44);
+                for (int d = 0; d < 32; ++d) in[d] = o[d];
+                auto cf = task.candidate_features(cands[i]);
+                for (int d = 0; d < 12; ++d) in[32 + d] = cf[d];
+                org.reset_state(true);
+                std::vector<double> din(in.begin(), in.end());
+                org.forward_nd(din.data(), din.size(), false);
+                float sc = (float)org.cells.back().output_val;
+                if (sc > best) { best = sc; best_i = i; }
+            }
+            // 教师标签: 拷贝状态只读标注 (评分器动作未应用前)
+            DouDiZhuCardGameTask probe = task;
+            int lr = probe.teacher_play_capture();
+            auto t_trick = probe.table_trick();
+            int label = -1;
+            for (size_t i = 0; i < cands.size(); ++i) {
+                if (lr < 0) { if (cands[i].type == 0) { label = (int)i; break; } }
+                else if (cands[i].type == (int)t_trick.type && cands[i].rank == t_trick.rank) { label = (int)i; break; }
+            }
+            auto res = task.play_candidate(cands[best_i]);   // 评分器驱动
+            if (label >= 0) {
+                f.write((char*)o.data(), sizeof(float) * 32);
+                int32_t K = (int32_t)cands.size(); f.write((char*)&K, 4);
+                for (auto& c : cands) {
+                    auto cf = task.candidate_features(c);
+                    f.write((char*)cf.data(), sizeof(float) * 12);
+                }
+                f.write((char*)&label, 4);
+                int32_t gid = g; f.write((char*)&gid, 4);
+                samples++;
+            } else skipped++;
+            done = res.done;
+        }
+    }
+    f.close();
+    printf("[v5-DAgger] %d 局 (评分器驱动) -> %ld 样本 (跳过 %ld)\n-> %s\n", games, samples, skipped, path);
+    return (int)samples;
+}
+
 int main(int argc, char** argv) {
     std::string mode = argc > 1 ? argv[1] : "train";
     if (mode == "eval_rank") {
         int games = argc > 2 ? std::atoi(argv[2]) : 500;
         eval_rank_games(games, argc > 3 ? argv[3] : "checkpoints/doudizhu_bc_rank.bin");
+        return 0;
+    }
+    if (mode == "gen_cand_dagger") {
+        gen_dataset_cand_dagger(argc > 2 ? std::atoi(argv[2]) : 2000, "/tmp/opencode/doudizhu_cand_dagger.bin");
+        return 0;
+    }
+    if (mode == "gen_cand") {
+        gen_dataset_cand(argc > 2 ? std::atoi(argv[2]) : 2000, "/tmp/opencode/doudizhu_cand.bin");
+        return 0;
+    }
+    if (mode == "train_cand") {
+        train_bc_cand(argc > 2 ? argv[2] : "/tmp/opencode/doudizhu_cand.bin");
+        return 0;
+    }
+    if (mode == "eval_cand") {
+        eval_cand_games(argc > 2 ? std::atoi(argv[2]) : 500, argc > 3 ? argv[3] : "checkpoints/doudizhu_cand_scorer.bin");
+        return 0;
+    }
+    if (mode == "eval_hybrid") {
+        int games = argc > 2 ? std::atoi(argv[2]) : 500;
+        float theta = argc > 3 ? (float)std::atof(argv[3]) : 1.0f;
+        eval_hybrid_games(games, theta, argc > 4 ? argv[4] : "checkpoints/doudizhu_bc_rank.bin");
         return 0;
     }
     if (mode == "train_rank_grpo") {

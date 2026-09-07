@@ -501,6 +501,90 @@ public:
     }
 
     // 教师出牌捕获: 座 0 委托启发式出牌, 立即返回所出点数 (-1=过牌); 轮转未执行
+// ============================ v5a 候选打分制 (DouZero 接口) ============================
+// 决策接口重构 (会诊共识): 网络不再生成动作, 而是对任务层枚举的合法候选 (牌型×点数×张数)
+// 逐个打分 — 乘性合法交互由候选编码预先消解, 线性读出只需排序
+struct CandPlay { int type; int rank; int count; };   // type: TrickType; count 0 = 过牌
+
+std::vector<CandPlay> enumerate_candidates(int p) const {
+    std::vector<CandPlay> out;
+    if (table_trick_.type == TRICK_NONE) {
+        for (int r = 0; r < 15; ++r) {
+            if (hands_[p][r] >= 1) out.push_back({TRICK_SOLO, r, 1});
+            if (r < 13 && hands_[p][r] >= 2) out.push_back({TRICK_PAIR, r, 2});
+            if (r < 13 && hands_[p][r] >= 4) out.push_back({TRICK_BOMB, r, 4});
+        }
+        if (hands_[p][13] >= 1 && hands_[p][14] >= 1) out.push_back({TRICK_ROCKET, 14, 2});
+    } else {
+        if (table_trick_.type == TRICK_SOLO) {
+            for (int r = table_trick_.rank + 1; r < 13; ++r)
+                if (hands_[p][r] >= 1 && !((r == 13 || r == 14) && hands_[p][13] > 0 && hands_[p][14] > 0))
+                    out.push_back({TRICK_SOLO, r, 1});
+        } else if (table_trick_.type == TRICK_PAIR) {
+            for (int r = table_trick_.rank + 1; r < 13; ++r)
+                if (hands_[p][r] == 2) out.push_back({TRICK_PAIR, r, 2});
+        } else if (table_trick_.type == TRICK_BOMB) {
+            for (int r = table_trick_.rank + 1; r < 13; ++r)
+                if (hands_[p][r] == 4) out.push_back({TRICK_BOMB, r, 4});
+        }
+        // 炸弹/火箭可压任何非炸弹非火箭
+        if (table_trick_.type != TRICK_BOMB && table_trick_.type != TRICK_ROCKET) {
+            for (int r = 0; r < 13; ++r)
+                if (hands_[p][r] == 4) out.push_back({TRICK_BOMB, r, 4});
+        }
+        if (table_trick_.type != TRICK_ROCKET && hands_[p][13] >= 1 && hands_[p][14] >= 1)
+            out.push_back({TRICK_ROCKET, 14, 2});
+        out.push_back({TRICK_NONE, -1, 0});   // 过牌 (on-cover 恒合法)
+    }
+    return out;
+}
+
+// 候选特征 (12 维): [solo, pair, bomb, rocket, is_pass, rank/14, count/4, 我方持此点数/4,
+//                     cover余量=(rank-trick)/14, 同型压制, 炸弹压非炸, 火箭压非火]
+std::vector<float> candidate_features(const CandPlay& c) const {
+    float f[12] = {0};
+    if (c.type == TRICK_NONE) { f[4] = 1.0f; return std::vector<float>(f, f + 12); }
+    if (c.type == TRICK_SOLO) f[0] = 1.0f;
+    else if (c.type == TRICK_PAIR) f[1] = 1.0f;
+    else if (c.type == TRICK_BOMB) f[2] = 1.0f;
+    else if (c.type == TRICK_ROCKET) { f[3] = 1.0f; f[7] = (float)(hands_[0][13] + hands_[0][14]) / 2.0f; }
+    f[5] = (c.rank >= 0) ? (float)c.rank / 14.0f : 0.0f;
+    f[6] = (float)c.count / 4.0f;
+    if (c.type != TRICK_ROCKET) f[7] = (float)hands_[0][c.rank] / 4.0f;
+    // 交互特征: 候选 vs 台面
+    if (table_trick_.type == TRICK_NONE) {
+        f[8] = -1.0f;   // 自由领出: 无需压制
+    } else {
+        if (c.rank >= 0) f[8] = ((float)c.rank - (float)table_trick_.rank) / 14.0f;
+        if (c.type == (int)table_trick_.type && c.rank > table_trick_.rank) f[9] = 1.0f;
+        if (c.type == TRICK_BOMB && table_trick_.type != TRICK_BOMB && table_trick_.type != TRICK_ROCKET) f[10] = 1.0f;
+        if (c.type == TRICK_ROCKET && table_trick_.type != TRICK_ROCKET) f[11] = 1.0f;
+    }
+    return std::vector<float>(f, f + 12);
+}
+
+// 出指定候选 (agent seat 0) + 统一结算
+StepResult play_candidate(const CandPlay& c) {
+    if (c.type == TRICK_NONE) {
+        pass_count_++;
+        if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; }
+        else current_turn_ = (0 + 1) % 3;
+    } else if (c.type == TRICK_ROCKET) {
+        hands_[0][13]--; hands_[0][14]--; cards_left_[0] -= 2;
+        table_trick_ = Trick{TRICK_ROCKET, 14, 0};
+        record_card_played(13, 1, 0); record_card_played(14, 1, 0);
+        pass_count_ = 0; current_turn_ = 1;
+    } else {
+        hands_[0][c.rank] -= c.count;
+        cards_left_[0] -= c.count;
+        table_trick_ = Trick{(TrickType)c.type, c.rank, 0};
+        record_card_played(c.rank, c.count, 0);
+        pass_count_ = 0; current_turn_ = 1;
+    }
+    return settle_turn();
+}
+
+
     int teacher_play_capture() {
         int pre = cards_left_[0];
         play_opponent_turn(0);
@@ -1694,6 +1778,37 @@ inline CellularOrganism build_doudizhu_64cell_rank_cortex() {
                 org.synapses.push_back({h, cid, 0, -0.25, true, 50.0f, -1.0f});
         }
     }
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    return org;
+}
+
+/**
+ * @brief v5a 候选评分器: 40 受体 (32 obs + 8 候选特征) -> 24 特征 (SUM/ABS) -> 1 分数头
+ * 唯一效应器 = 分数头 (channel 0); 每候选一次前向, 任务层 argmax 选牌
+ */
+inline CellularOrganism build_doudizhu_candidate_scorer() {
+    CellularOrganism org;
+    for (int d = 0; d < 44; ++d)   // 32 obs + 12 候选交互特征
+        org.cells.push_back({(uint32_t)d, CellType::SENSE_CHANNEL, 1.0, (double)d, 0.0, 0.0, false, 0.0, 0, 0, 10.0f, (float)d * 2.0f, 0.0f});
+    uint32_t lcg = 0x5DEECE66u;
+    auto rnd = [&]() {
+        lcg = lcg * 1664525u + 1013904223u;
+        return (double)(int32_t)(lcg >> 8) / 8388608.0;
+    };
+    for (int f = 0; f < 24; ++f) {
+        uint32_t cid = 100 + (uint32_t)f;
+        CellType t = (f % 2 == 0) ? CellType::OP_SUM : CellType::OP_ABS;
+        org.cells.push_back({cid, t, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 60.0f, (float)f * 3.0f, 0.0f});
+        for (int j = 0; j < 10; ++j)
+            org.synapses.push_back({(uint32_t)((int)(rnd() * 44.0) & 43), cid, 0, 0.4 * rnd(), true, 50.0f, -1.0f});
+    }
+    uint32_t head_id = 200;
+    org.cells.push_back({head_id, CellType::ACT_CHANNEL, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 90.0f, 0.0f, 0.0f});
+    for (int f = 0; f < 24; ++f)
+        org.synapses.push_back({(uint32_t)(100 + f), head_id, 0, 0.25 * rnd(), true, 50.0f, -1.0f});
+    for (int d = 32; d < 44; ++d)   // 候选编码直连线 (含交互)
+        org.synapses.push_back({(uint32_t)d, head_id, 0, 0.4, true, 50.0f, -1.0f});
     for (auto& s : org.synapses) s.initial_weight = s.weight;
     org.compile();
     return org;
