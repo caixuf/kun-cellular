@@ -122,6 +122,12 @@ int main(int argc, char** argv) {
         const char* e = std::getenv("DZ_MODEL_BID_GATE");
         return e ? std::atof(e) : 17.5;
     }();
+    // 行为克隆热启动: DZ_BC_CKPT=路径 → 地主/农民柱载入蒸馏权重 (BC→GRPO 管线)
+    const char* BC_CKPT = std::getenv("DZ_BC_CKPT");
+    const bool NO_GRPO = []() {
+        const char* e = std::getenv("DZ_NO_GRPO");
+        return e ? (std::atoi(e) != 0) : false;
+    }();
     const bool DIRECT_ACT = []() {
         const char* e = std::getenv("DZ_DIRECT_ACT");
         return e ? (std::atoi(e) != 0) : false;
@@ -137,6 +143,11 @@ int main(int argc, char** argv) {
     CellularOrganism bid_org = build_doudizhu_bidding_cortex();
     CellularOrganism landlord_org = build_doudizhu_landlord_cortex(base_ckpt);
     CellularOrganism peasant_org = build_doudizhu_peasant_cortex(base_ckpt);
+    if (BC_CKPT) {
+        CellularOrganism bc = CellularOrganism::load_checkpoint_bin(BC_CKPT);
+        landlord_org = bc; peasant_org = bc;
+        std::cout << "   - BC 蒸馏热启动: " << BC_CKPT << " (地主/农民柱)\n";
+    }
 
     std::cout << "✅ 成功构建神经叫牌与 MoE 双角色微柱结构:\n";
     std::cout << "   - 叫牌微柱细胞数: " << bid_org.cells.size() << " | 突触数: " << bid_org.compiled_synapses_.size() << "\n";
@@ -206,7 +217,7 @@ int main(int argc, char** argv) {
 
     auto t_start = std::chrono::high_resolution_clock::now();
 
-    for (int epoch = 1; epoch <= TOTAL_EPOCHS; ++epoch) {
+    for (int epoch = 1; NO_GRPO ? false : (epoch <= TOTAL_EPOCHS); ++epoch) {
         float epoch_loss = 0.0f;
         float epoch_entropy = 0.0f;
         float epoch_adv = 0.0f;

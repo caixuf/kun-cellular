@@ -1449,6 +1449,17 @@ inline CellularOrganism build_doudizhu_64cell_recurrent_cortex() {
     org.synapses.push_back({26, 46, 0, 1.0, true, 50.0f, -1.0f});
     org.synapses.push_back({44, 47, 0, 1.0, true, 50.0f, -1.0f});
 
+    // 1.4 过牌通道激活修复: 效应器 62 (ACT_NEG/让牌) 此前仅两条 0.05-0.08 细线
+    // 且上游条件苛刻 → Δneg ≡ 0 (网络无法表达"过牌", act0 永不可达)
+    // → 接入多样活输入, 权重交给 BC/GRPO 学习
+    org.synapses.push_back({2, 62, 0, 0.50, true, 50.0f, -1.0f});   // 台面牌力威胁 → 审慎让牌
+    org.synapses.push_back({18, 62, 0, 0.35, true, 50.0f, -1.0f});  // 大王未见 → 惜牌
+    org.synapses.push_back({19, 62, 0, 0.40, true, 50.0f, -1.0f});  // 2 余量 → 审慎
+    org.synapses.push_back({20, 62, 0, 0.40, true, 50.0f, -1.0f});  // A 余量 → 审慎
+    org.synapses.push_back({29, 62, 0, 0.60, true, 50.0f, -1.0f});  // 对手听牌威胁 → 避让
+    org.synapses.push_back({21, 62, 0, 0.30, true, 50.0f, -1.0f});  // 小王未见
+    org.synapses.push_back({26, 62, 0, 0.45, true, 50.0f, -1.0f});  // 全场节奏 → 节奏性让牌
+
     // 1.5 记牌晶格 -> 记忆槽直汇 (Card-Counting Lattice -> Memory Slots):
     // obs[15..21] 对手余牌/记牌器 → INTEGRAL 工作记忆 (48/52/57) 与 EMA 短程记忆 (49/53)
     org.synapses.push_back({15, 48, 0, 0.85, true, 50.0f, -1.0f});
