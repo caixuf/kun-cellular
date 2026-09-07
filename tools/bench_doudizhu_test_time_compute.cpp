@@ -292,5 +292,20 @@ int main(int argc, char** argv) {
     CellularOrganism integral_org = build_integral_recurrent_organism();
     run_and_report_suite("测试对象 (b): OP_INTEGRAL 递归循环微柱生命体 (rho ≈ 0.49)", integral_org, harness);
 
+    // -----------------------------------------------------------------------
+    // 测试对象 (c): 64 细胞时序循环皮层联合优化模型 (doudizhu_64cell_grpo_cotrained.bin)
+    // -----------------------------------------------------------------------
+    const std::string cotrained_path = "checkpoints/doudizhu_64cell_grpo_cotrained.bin";
+    std::ifstream ifs_c(cotrained_path, std::ios::binary);
+    if (ifs_c.good()) {
+        ifs_c.close();
+        try {
+            CellularOrganism cotrained = CellularOrganism::load_checkpoint_bin(cotrained_path);
+            run_and_report_suite("测试对象 (c): 64 细胞循环皮层联合优化模型 (doudizhu_64cell_grpo_cotrained.bin)", cotrained, harness);
+        } catch (const std::exception& e) {
+            std::cout << "⚠️ 载入检查点 " << cotrained_path << " 失败: " << e.what() << "\n";
+        }
+    }
+
     return 0;
 }

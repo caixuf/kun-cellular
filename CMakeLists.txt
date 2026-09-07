@@ -120,6 +120,9 @@ target_link_libraries(train_doudizhu_policy_gradient PRIVATE kun_cellular Thread
 add_executable(train_doudizhu_grpo "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_doudizhu_grpo.cpp")
 target_link_libraries(train_doudizhu_grpo PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_doudizhu_grpo_cotrained "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_doudizhu_grpo_cotrained.cpp")
+target_link_libraries(train_doudizhu_grpo_cotrained PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(bench_doudizhu_test_time_compute "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_doudizhu_test_time_compute.cpp")
 target_link_libraries(bench_doudizhu_test_time_compute PRIVATE kun_cellular Threads::Threads m)
 

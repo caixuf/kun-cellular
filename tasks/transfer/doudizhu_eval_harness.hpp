@@ -253,10 +253,10 @@ public:
 
             while (true) {
                 auto obs = task.current_observation();
-                double inps[4] = {obs[0], obs[1], obs[2], obs[3]};
+                std::vector<double> inps(obs.begin(), obs.end());
 
                 auto t0 = std::chrono::high_resolution_clock::now();
-                auto acts = org.forward(inps, false);
+                auto acts = org.forward_nd(inps.data(), inps.size(), false);
                 auto t1 = std::chrono::high_resolution_clock::now();
                 total_latency_ns += std::chrono::duration<double, std::nano>(t1 - t0).count();
                 decision_calls++;
@@ -325,11 +325,11 @@ public:
 
             while (true) {
                 auto obs = task.current_observation();
-                double inps[4] = {obs[0], obs[1], obs[2], obs[3]};
+                std::vector<double> inps(obs.begin(), obs.end());
 
                 RelaxationTelemetry telem;
                 auto t0 = std::chrono::high_resolution_clock::now();
-                auto acts = org.forward_with_relaxation(inps, 4, cfg, &telem);
+                auto acts = org.forward_with_relaxation(inps.data(), inps.size(), cfg, &telem);
                 auto t1 = std::chrono::high_resolution_clock::now();
 
                 total_latency_ns += std::chrono::duration<double, std::nano>(t1 - t0).count();
@@ -341,9 +341,13 @@ public:
                 float act2 = static_cast<float>(acts.defensive_reset);  // SEIZE
 
                 int act = 1;
-                if (act2 > act1 && act2 > act0) act = 2;
-                else if (act0 > act1) act = 0;
-                else act = 1;
+                if (task.table_trick().type == DouDiZhuCardGameTask::TRICK_NONE) {
+                    act = (act2 > act1) ? 2 : 1;
+                } else {
+                    if (act2 > act1 && act2 > act0) act = 2;
+                    else if (act0 > act1) act = 0;
+                    else act = 1;
+                }
 
                 // 残局决策评测 (手牌 <= 5 张)
                 int cards_p0 = task.cards_left(0);

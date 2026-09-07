@@ -259,7 +259,7 @@ public:
     }
 
     const char* name() const override { return "DouDiZhu-ImperfectInfoGame"; }
-    size_t obs_dim() const override { return 4; } // [己方手牌均值, 己方剩余张数比率, 场上上家牌力, 高牌打出统计]
+    size_t obs_dim() const override { return 32; } // 32 维高维全息感知晶格 (15手牌 + 7高牌记牌 + 6台面上下文 + 4角色余牌)
     size_t act_dim() const override { return 3; } // 0: 让牌(Pass/Hold), 1: 合规跟牌(Clean Follow), 2: 强行夺权(Power Seize)
 
     // 叫地主起手势能估值 (Bidding Filter)
@@ -369,36 +369,57 @@ public:
     }
 
     std::vector<float> current_observation() const override {
-        float sum_ranks = 0.0f;
-        int count = cards_left_[0];
-        if (count > 0) {
-            for (int r = 0; r < 15; ++r) {
-                sum_ranks += static_cast<float>(r * hands_[0][r]);
-            }
-        }
-        float hand_strength = count > 0 ? (sum_ranks / count) / 14.0f : 0.0f;
-        float cards_left_ratio = static_cast<float>(cards_left_[0]) / 20.0f;
+        std::vector<float> obs;
+        obs.reserve(32);
 
-        // 场上上家牌力 (若当前台面由农民盟友掌控，视作无威胁 0.0，避免误伤友军)
+        // 1. 15 dims: 己方手牌在 15 个点数等级上的分布 (3 到大王)
+        // 点数 0..12 (3..2) 每张牌最多 4 张 (除以 4.0 归一化); 13 (小王), 14 (大王) 最多 1 张 (除以 1.0 归一化)
+        for (int r = 0; r < 15; ++r) {
+            float max_c = (r < 13) ? 4.0f : 1.0f;
+            obs.push_back(std::clamp(static_cast<float>(hands_[0][r]) / max_c, 0.0f, 1.0f));
+        }
+
+        // 2. 7 dims: 记牌器中尚未打出的未知高牌分布 (J, Q, K, A, 2, 小王, 大王)
+        // 点数 8..14: J(8), Q(9), K(10), A(11), 2(12), BJ(13), RJ(14)
+        for (int r = 8; r < 15; ++r) {
+            float max_unseen = (r < 13) ? 4.0f : 1.0f;
+            obs.push_back(std::clamp(static_cast<float>(lattice_.unseen[r]) / max_unseen, 0.0f, 1.0f));
+        }
+
+        // 3. 6 dims: 台面牌型上下文 (牌型类别, 牌力点数, 牌型张数长度, 己方控台, 盟友控台, 地主控台)
+        float trick_type = static_cast<float>(table_trick_.type) / 4.0f;
+        float trick_rank = (table_trick_.type != TRICK_NONE && table_trick_.rank >= 0)
+                               ? (static_cast<float>(table_trick_.rank) / 14.0f) : 0.0f;
+        float trick_len = 0.0f;
+        if (table_trick_.type == TRICK_SOLO) trick_len = 1.0f / 4.0f;
+        else if (table_trick_.type == TRICK_PAIR) trick_len = 2.0f / 4.0f;
+        else if (table_trick_.type == TRICK_BOMB) trick_len = 4.0f / 4.0f;
+        else if (table_trick_.type == TRICK_ROCKET) trick_len = 2.0f / 4.0f;
+
         int teammate = (role_ == 1) ? -1 : (landlord_ == 1 ? 2 : 1);
-        float table_strength = 0.0f;
-        if (table_trick_.type != TRICK_NONE && table_trick_.owner != 0) {
-            if (role_ == 0 && table_trick_.owner == teammate) {
-                table_strength = 0.0f;
-            } else {
-                table_strength = static_cast<float>(table_trick_.rank) / 14.0f;
-            }
-        }
+        float owner_self = (table_trick_.type != TRICK_NONE && table_trick_.owner == 0) ? 1.0f : 0.0f;
+        float owner_partner = (table_trick_.type != TRICK_NONE && role_ == 0 && table_trick_.owner == teammate) ? 1.0f : 0.0f;
+        float owner_landlord = (table_trick_.type != TRICK_NONE && table_trick_.owner == landlord_) ? 1.0f : 0.0f;
 
-        // 记牌器：全场高牌已打出比率 (15维晶格中 2 与双王打出度)
-        float history_intensity = std::clamp(static_cast<float>(high_cards_played_) / 6.0f, 0.0f, 1.0f);
+        obs.push_back(std::clamp(trick_type, 0.0f, 1.0f));
+        obs.push_back(std::clamp(trick_rank, 0.0f, 1.0f));
+        obs.push_back(std::clamp(trick_len, 0.0f, 1.0f));
+        obs.push_back(owner_self);
+        obs.push_back(owner_partner);
+        obs.push_back(owner_landlord);
 
-        return {
-            std::clamp(hand_strength, 0.0f, 1.0f),
-            std::clamp(cards_left_ratio, 0.0f, 1.0f),
-            std::clamp(table_strength, 0.0f, 1.0f),
-            std::clamp(history_intensity, 0.0f, 1.0f)
-        };
+        // 4. 4 dims: 玩家角色与各方余牌 (地主/农民角色, 己方余牌比率, 盟友余牌比率, 地主余牌比率)
+        float player_role = (role_ == 1) ? 1.0f : 0.0f;
+        float p0_cards = std::clamp(static_cast<float>(cards_left_[0]) / 20.0f, 0.0f, 1.0f);
+        float partner_cards = (role_ == 0 && teammate >= 0) ? std::clamp(static_cast<float>(cards_left_[teammate]) / 20.0f, 0.0f, 1.0f) : 0.0f;
+        float landlord_cards = std::clamp(static_cast<float>(cards_left_[landlord_]) / 20.0f, 0.0f, 1.0f);
+
+        obs.push_back(player_role);
+        obs.push_back(p0_cards);
+        obs.push_back(partner_cards);
+        obs.push_back(landlord_cards);
+
+        return obs;
     }
 
     void play_opponent_turn(int p) {
@@ -1007,12 +1028,17 @@ public:
 
     StepResult step_continuous(const CellularOrganism::ActionOutputs& acts) override {
         int act = 1;
-        if (acts.defensive_reset > acts.positive_action && acts.defensive_reset > acts.negative_action) {
-            act = 2; // 强行夺权/炸弹突击 (Power Seize)
-        } else if (acts.negative_action > acts.positive_action) {
-            act = 0; // 审慎让牌 (Strategic Pass/Hold)
+        if (table_trick_.type == TRICK_NONE) {
+            // 自由出牌权: 规则禁止让牌 (0), 只能在合规出牌 (1) 与抢牌/冲刺 (2) 间决断
+            act = (acts.defensive_reset > acts.positive_action) ? 2 : 1;
         } else {
-            act = 1; // 合规跟牌 (Clean Follow, 保全手牌结构)
+            if (acts.defensive_reset > acts.positive_action && acts.defensive_reset > acts.negative_action) {
+                act = 2; // 强行夺权/炸弹突击 (Power Seize)
+            } else if (acts.negative_action > acts.positive_action) {
+                act = 0; // 审慎让牌 (Strategic Pass/Hold)
+            } else {
+                act = 1; // 合规跟牌 (Clean Follow, 保全手牌结构)
+            }
         }
         return step(act);
     }
@@ -1046,6 +1072,167 @@ private:
     int games_played_{0};
     std::mt19937 rng_;
 };
+
+/**
+ * @brief 构建 64 细胞时序循环皮层微柱生命体 (64-Cell Recurrent Cortical Architecture)
+ * 架构规范:
+ * 1. 32 维高维全息感知受体 (Cells 0..31: SENSE_CHANNEL 0..31, 涵盖 15 手牌 + 7 高牌记牌 + 6 台面上下文 + 4 角色余牌);
+ * 2. 16 维前馈特征提取中间层 (Cells 32..47: SUM, SUB, AMPLIFY, THRESHOLD, CLIP, ABS, MULTIPLY, DAMPER 等);
+ * 3. 12 维内部循环动态吸引子核心 (Cells 48..59: 包含 OP_INTEGRAL, OP_EMA, OP_SUM, OP_HYSTERESIS,
+ *    配置递归循环反馈突触, 谱半径 rho ≈ 0.60 满足李雅普诺夫收缩映射与 BIBO 稳态);
+ * 4. 1 维全局决策收敛枢纽 (Cell 60: OP_SUM);
+ * 5. 3 维动作效应器通道 (Cells 61..63: ACT_PRIMARY_POSITIVE 跟牌, ACT_PRIMARY_NEGATIVE 让牌, ACT_DEFENSIVE_RESET 抢牌);
+ * 6. 严格恪守 Rule 7 Substrate Immunity 宪章：底座纯数学动力学，任务适配层零污染。
+ */
+inline CellularOrganism build_doudizhu_64cell_recurrent_cortex() {
+    CellularOrganism org;
+
+    // --- Layer 0: 32 维全息感知受体 (Cells 0..31) ---
+    for (uint32_t i = 0; i < 32; ++i) {
+        float y_pos = -60.0f + (120.0f / 31.0f) * static_cast<float>(i);
+        org.cells.push_back({
+            i, CellType::SENSE_CHANNEL, 1.0, static_cast<double>(i),
+            0.0, 0.0, false, 0.0, 0, 0, -80.0f, y_pos, 0.0f
+        });
+    }
+
+    // --- Layer 1: 16 维特征提取与态势估计 (Cells 32..47) ---
+    org.cells.push_back({32, CellType::OP_SUM, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, -50.0f, 0.0f});
+    org.cells.push_back({33, CellType::OP_SUM, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, -43.0f, 0.0f});
+    org.cells.push_back({34, CellType::OP_SUB, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, -36.0f, 0.0f});
+    org.cells.push_back({35, CellType::GATE_THRESHOLD, -0.25, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, -29.0f, 0.0f});
+    org.cells.push_back({36, CellType::OP_SUM, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, -22.0f, 0.0f});
+    org.cells.push_back({37, CellType::OP_SUB, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, -15.0f, 0.0f});
+    org.cells.push_back({38, CellType::OP_SUM, 1.2, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, -8.0f, 0.0f});
+    org.cells.push_back({39, CellType::GATE_THRESHOLD, -0.25, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, -1.0f, 0.0f});
+    org.cells.push_back({40, CellType::OP_SUB, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, 6.0f, 0.0f});
+    org.cells.push_back({41, CellType::OP_MULTIPLY, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, 13.0f, 0.0f});
+    org.cells.push_back({42, CellType::GATE_THRESHOLD, -0.5, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, 20.0f, 0.0f});
+    org.cells.push_back({43, CellType::OP_EMA, 0.35, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, 27.0f, 0.0f});
+    org.cells.push_back({44, CellType::OP_SUB, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, 34.0f, 0.0f});
+    org.cells.push_back({45, CellType::GATE_THRESHOLD, -0.16, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, 41.0f, 0.0f});
+    org.cells.push_back({46, CellType::OP_SUM, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, 48.0f, 0.0f});
+    org.cells.push_back({47, CellType::OP_ABS, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -35.0f, 55.0f, 0.0f});
+
+    // --- Layer 2: 12 维内部循环动态吸引子核心 (Cells 48..59) ---
+    org.cells.push_back({48, CellType::OP_INTEGRAL, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, -44.0f, 0.0f});
+    org.cells.push_back({49, CellType::OP_EMA, 0.60, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, -36.0f, 0.0f});
+    org.cells.push_back({50, CellType::OP_SUM, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, -28.0f, 0.0f});
+    org.cells.push_back({51, CellType::OP_SUM, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, -20.0f, 0.0f});
+    org.cells.push_back({52, CellType::OP_INTEGRAL, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, -12.0f, 0.0f});
+    org.cells.push_back({53, CellType::OP_EMA, 0.60, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, -4.0f, 0.0f});
+    org.cells.push_back({54, CellType::OP_SUB, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, 4.0f, 0.0f});
+    org.cells.push_back({55, CellType::OP_SUM, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, 12.0f, 0.0f});
+    org.cells.push_back({56, CellType::GATE_HYSTERESIS, 0.2, 0.8, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, 20.0f, 0.0f});
+    org.cells.push_back({57, CellType::OP_INTEGRAL, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, 28.0f, 0.0f});
+    org.cells.push_back({58, CellType::OP_EMA, 0.60, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, 36.0f, 0.0f});
+    org.cells.push_back({59, CellType::OP_SUM, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 5.0f, 44.0f, 0.0f});
+
+    // --- Layer 3: 1 维全局决策收敛枢纽 (Cell 60) ---
+    org.cells.push_back({60, CellType::OP_SUM, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 40.0f, 0.0f, 0.0f});
+
+    // --- Layer 4: 3 维动作效应器通道 (Cells 61..63) ---
+    org.cells.push_back({61, CellType::ACT_PRIMARY_POSITIVE, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 75.0f, -30.0f, 0.0f});
+    org.cells.push_back({62, CellType::ACT_PRIMARY_NEGATIVE, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 75.0f, 0.0f, 0.0f});
+    org.cells.push_back({63, CellType::ACT_DEFENSIVE_RESET, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 75.0f, 30.0f, 0.0f});
+
+    // 1. Layer 0 (Sensory) -> Layer 1 (Features)
+    for (uint32_t i = 0; i <= 7; ++i) {
+        org.synapses.push_back({i, 32, 0, 0.35, true, 50.0f, -1.0f});
+    }
+    for (uint32_t i = 8; i <= 14; ++i) {
+        org.synapses.push_back({i, 33, 0, 0.60, true, 50.0f, -1.0f});
+    }
+    org.synapses.push_back({33, 34, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({23, 34, 1, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({33, 35, 0, -1.0, true, 50.0f, -1.0f});
+    for (uint32_t i = 15; i <= 21; ++i) {
+        org.synapses.push_back({i, 36, 0, 0.40, true, 50.0f, -1.0f});
+    }
+    org.synapses.push_back({36, 37, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({33, 37, 1, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({31, 38, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({29, 39, 0, -1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({23, 40, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({33, 40, 1, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({26, 41, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({30, 41, 1, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({27, 42, 0, -1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({22, 43, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({29, 44, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({31, 44, 1, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({29, 45, 0, -1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({26, 46, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({44, 47, 0, 1.0, true, 50.0f, -1.0f});
+
+    // 2. Layer 1 -> Layer 2 (Attractor Core)
+    org.synapses.push_back({34, 50, 0, 1.2, true, 50.0f, -1.0f});
+    org.synapses.push_back({41, 51, 0, 1.6, true, 50.0f, -1.0f});
+    org.synapses.push_back({42, 50, 0, 0.8, true, 50.0f, -1.0f});
+    org.synapses.push_back({42, 55, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({45, 55, 0, 2.2, true, 50.0f, -1.0f});
+    org.synapses.push_back({37, 51, 0, 0.9, true, 50.0f, -1.0f});
+    org.synapses.push_back({39, 55, 0, 1.4, true, 50.0f, -1.0f});
+    org.synapses.push_back({46, 57, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({38, 58, 0, 0.7, true, 50.0f, -1.0f});
+    org.synapses.push_back({40, 54, 0, 0.8, true, 50.0f, -1.0f});
+    org.synapses.push_back({34, 54, 1, 0.8, true, 50.0f, -1.0f});
+    org.synapses.push_back({54, 56, 0, 1.0, true, 50.0f, -1.0f});
+    org.synapses.push_back({56, 59, 0, 0.9, true, 50.0f, -1.0f});
+
+    // 3. Layer 2 内部动态循环反馈回路 (Internal Recurrent Loops, 谱半径 rho ≈ 0.60)
+    org.synapses.push_back({50, 48, 0, 0.774, true, 50.0f, -1.0f});
+    org.synapses.push_back({48, 50, 1, 0.774, true, 50.0f, -1.0f});
+
+    org.synapses.push_back({51, 49, 0, 0.774, true, 50.0f, -1.0f});
+    org.synapses.push_back({49, 51, 1, 0.774, true, 50.0f, -1.0f});
+
+    org.synapses.push_back({55, 52, 0, 0.774, true, 50.0f, -1.0f});
+    org.synapses.push_back({52, 55, 1, 0.774, true, 50.0f, -1.0f});
+
+    org.synapses.push_back({59, 57, 0, 0.774, true, 50.0f, -1.0f});
+    org.synapses.push_back({57, 59, 1, 0.774, true, 50.0f, -1.0f});
+
+    // 侧向交互抑制
+    org.synapses.push_back({50, 51, 0, -0.25, true, 50.0f, -1.0f});
+    org.synapses.push_back({51, 50, 0, -0.25, true, 50.0f, -1.0f});
+    org.synapses.push_back({55, 51, 0, -0.40, true, 50.0f, -1.0f});
+    org.synapses.push_back({59, 60, 0, 0.80, true, 50.0f, -1.0f});
+
+    // 4. Layer 2 / Layer 1 -> Layer 4 (Effectors: 61, 62, 63: 经过规范化缩放，防止 Softmax 饱和与梯度消失)
+    org.synapses.push_back({50, 61, 0, 0.08, true, 50.0f, -1.0f});
+    org.synapses.push_back({51, 62, 0, 0.08, true, 50.0f, -1.0f});
+    org.synapses.push_back({55, 63, 0, 0.09, true, 50.0f, -1.0f});
+    org.synapses.push_back({60, 61, 0, 0.03, true, 50.0f, -1.0f});
+    org.synapses.push_back({60, 63, 0, 0.03, true, 50.0f, -1.0f});
+    org.synapses.push_back({51, 63, 0, -0.05, true, 50.0f, -1.0f});
+
+    // 基础直觉前向反射
+    org.synapses.push_back({34, 61, 0, 0.04, true, 50.0f, -1.0f});
+    org.synapses.push_back({41, 62, 0, 0.05, true, 50.0f, -1.0f});
+    org.synapses.push_back({45, 63, 0, 0.06, true, 50.0f, -1.0f});
+
+    // 补齐其余通道与中间特征的通路 (确保 64 细胞全图连通活性)
+    org.synapses.push_back({32, 50, 0, 0.40, true, 50.0f, -1.0f});
+    org.synapses.push_back({32, 61, 0, 0.02, true, 50.0f, -1.0f});
+    org.synapses.push_back({35, 55, 0, 1.10, true, 50.0f, -1.0f});
+    org.synapses.push_back({24, 43, 0, 0.60, true, 50.0f, -1.0f});
+    org.synapses.push_back({25, 50, 0, 1.20, true, 50.0f, -1.0f});
+    org.synapses.push_back({43, 50, 0, -0.40, true, 50.0f, -1.0f});
+    org.synapses.push_back({28, 55, 0, 0.70, true, 50.0f, -1.0f});
+    org.synapses.push_back({28, 51, 0, -0.50, true, 50.0f, -1.0f});
+    org.synapses.push_back({38, 55, 0, 1.10, true, 50.0f, -1.0f});
+    org.synapses.push_back({44, 55, 0, 0.80, true, 50.0f, -1.0f});
+    org.synapses.push_back({47, 59, 0, 0.50, true, 50.0f, -1.0f});
+    org.synapses.push_back({55, 53, 0, 0.60, true, 50.0f, -1.0f});
+    org.synapses.push_back({53, 55, 0, 0.60, true, 50.0f, -1.0f});
+    org.synapses.push_back({58, 51, 0, 0.80, true, 50.0f, -1.0f});
+    org.synapses.push_back({58, 59, 0, 0.50, true, 50.0f, -1.0f});
+
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    return org;
+}
 
 /**
  * @brief 智驾极限交互拓扑工况任务 (UnprotectedIntersectionTask)
