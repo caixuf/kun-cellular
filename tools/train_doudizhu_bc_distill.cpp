@@ -68,7 +68,7 @@ static int gen_dataset_rank(int games, const char* path) {
 
 // DAgger: 模型驱动轨迹 (分布 = 模型自身), 教师标签在任务拷贝上只读标注 (根治分布偏移)
 static int gen_dataset_dagger(int games, const char* path) {
-    CellularOrganism org = build_doudizhu_64cell_rank_cortex();
+    CellularOrganism org = build_doudizhu_rank_cortex_v3();
     for (auto& s : org.synapses) s.initial_weight = s.weight;
     org.compile();
     org.load_checkpoint_bin("checkpoints/doudizhu_bc_rank.bin");
@@ -175,7 +175,7 @@ static int train_bc_rank(const char* path) {
     printf("[BC-rank] 载入 %zu 样本\n", X.size());
     if (X.empty()) return 1;
 
-    CellularOrganism org = build_doudizhu_64cell_rank_cortex();
+    CellularOrganism org = build_doudizhu_rank_cortex_v3();
     for (auto& s : org.synapses) {
         if (s.to_cell_id >= 64) s.weight *= 4.0;   // rank 头入权放大 (logits 表达范围)
     }
@@ -476,11 +476,93 @@ static int eval_rank_games(int games, const char* ckpt_path) {
     return 0;
 }
 
+// 暖启动 GRPO: DAgger 蒸馏权重 -> on-policy 采样轨迹 -> 组相对优势 -> GRPO_SURROGATE 剪裁替代目标
+static int train_rank_grpo(int iters, int group) {
+    CellularOrganism org = build_doudizhu_rank_cortex_v3();
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    org.load_checkpoint_bin("checkpoints/doudizhu_bc_rank.bin");
+    CellularBPTTEngine bptt;
+    const float CLIP = 0.2f, ENT = 0.012f, LR = 0.008f;
+    uint32_t lcg = 7717u;
+    auto rnd01 = [&]() { lcg = lcg * 1664525u + 1013904223u; return (double)(lcg >> 8) / 16777216.0; };
+    int total_wins = 0, total_games = 0;
+    for (int it = 1; it <= iters; ++it) {
+        struct StepRec { std::array<float, 32> obs; int chosen; float old_prob; int game; };
+        std::vector<StepRec> steps;
+        std::vector<double> game_reward(group, 0.0);
+        std::vector<int> game_won(group, 0);
+        for (int g = 0; g < group; ++g) {
+            DouDiZhuCardGameTask task(40, (uint32_t)(5500000 + (long)it * 977 + g * 31), 17.5);
+            task.set_rank_action_mode(true);
+            bool done = false; double shaped = 0.0;
+            while (!done) {
+                auto o = task.current_observation();
+                StepRec rec; std::copy(o.begin(), o.end(), rec.obs.begin());
+                org.reset_state(true);
+                std::vector<double> in(o.begin(), o.end());
+                org.forward_nd(in.data(), in.size(), false);
+                std::vector<float> preds(17);
+                for (int k = 0; k <= 16; ++k) preds[k] = (float)org.cells[64 + k].output_val;
+                // 合法无关的 softmax 采样 (探索); 通道语义: k=15 → 过牌(18), 其他 → 3+k
+                double logits[17], mx = -1e30;
+                for (int k = 0; k < 17; ++k) { logits[k] = (k == 15) ? (double)preds[15] - 1.0 : (double)preds[k]; if (logits[k] > mx) mx = logits[k]; }
+                double exps[17], sum = 0;
+                for (int k = 0; k < 17; ++k) { exps[k] = std::exp(logits[k] - mx); sum += exps[k]; }
+                int chosen = 15; double acc = 0, r = rnd01() * sum;
+                for (int k = 0; k < 17; ++k) { acc += exps[k]; if (r <= acc) { chosen = k; break; } }
+                rec.chosen = (chosen == 15) ? 18 : 3 + chosen;
+                rec.old_prob = (float)(exps[chosen] / std::max(sum, 1e-9));
+                rec.game = g;
+                float y[19] = {0};
+                for (int k = 0; k <= 16; ++k) y[3 + k] = preds[k];
+                y[18] = (float)org.cells[79].output_val - 1.0f;
+                y[rec.chosen] = preds[chosen] + 3.0f;   // 选中通道强制最高 (applier argmax 对齐)
+                auto res = task.step_rank_from_tensor(y);
+                shaped += res.reward;
+                steps.push_back(rec);
+                done = res.done;
+            }
+            game_won[g] = (task.cards_left(0) <= 0) ? 1 : 0;
+            game_reward[g] = 0.7 * game_won[g] - 0.7 * (1 - game_won[g]) + 0.02 * shaped;
+            total_games++; total_wins += game_won[g];
+        }
+        // 组相对优势 (GRPO 核心)
+        double mean = 0; for (double r : game_reward) mean += r; mean /= group;
+        double var = 0; for (double r : game_reward) var += (r - mean) * (r - mean);
+        double sd = std::sqrt(var / group) + 1e-6;
+        // 逐决策重放反传 (当前权重 ≈ rollout 权重, on-policy)
+        BPTTGradients grads;
+        for (auto& st : steps) {
+            double adv = (game_reward[st.game] - mean) / sd;
+            org.reset_state(true);
+            bptt.reset_tape();
+            std::vector<double> in(st.obs.begin(), st.obs.end());
+            org.forward_nd(in.data(), in.size(), false);
+            std::vector<std::vector<float>> tgts = {{(float)st.chosen, (float)adv, st.old_prob, CLIP, ENT}};
+            bptt.backward_with_loss(org, tgts, grads, SubstrateLossType::GRPO_SURROGATE);
+        }
+        bptt.step_adam(org, grads, LR);
+        if (it % 20 == 0 || it == 1)
+            printf("[GRPO-rank] iter %d/%d | 近期胜率 %.1f%% (%d 局)\n", it, iters, 100.0 * total_wins / total_games, total_games);
+        if (it % 100 == 0) org.save_checkpoint_bin("checkpoints/doudizhu_bc_rank.bin");
+    }
+    org.save_checkpoint_bin("checkpoints/doudizhu_bc_rank.bin");
+    printf("[GRPO-rank] 完成: %d 局 胜率 %.1f%%\n", total_games, 100.0 * total_wins / total_games);
+    return 0;
+}
+
 int main(int argc, char** argv) {
     std::string mode = argc > 1 ? argv[1] : "train";
     if (mode == "eval_rank") {
         int games = argc > 2 ? std::atoi(argv[2]) : 500;
         eval_rank_games(games, argc > 3 ? argv[3] : "checkpoints/doudizhu_bc_rank.bin");
+        return 0;
+    }
+    if (mode == "train_rank_grpo") {
+        int iters = argc > 2 ? std::atoi(argv[2]) : 300;
+        int group = argc > 3 ? std::atoi(argv[3]) : 8;
+        train_rank_grpo(iters, group);
         return 0;
     }
     if (mode == "gen_dagger") {
