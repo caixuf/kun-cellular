@@ -29,6 +29,10 @@
 
 #include "kun/cellular/generated_ops.hpp"
 #include "kun/cellular/cellular_relaxation.hpp"
+#include "kun/cellular/cellular_router.hpp"
+#include "kun/cellular/cellular_mla.hpp"
+#include "kun/cellular/cellular_rope.hpp"
+#include "kun/cellular/cellular_speculative.hpp"
 
 namespace kun {
 
@@ -336,7 +340,98 @@ public:
     bool is_compiled_{false};
     bool is_compiled() const { return is_compiled_; }
 
+    // === 六大内生现代大模型机制器官 (Endogenous Modern LLM Architectural Organs) ===
+    size_t relaxation_steps_{1};
+    double relaxation_damping_{0.5};
+
+    std::shared_ptr<CellularMLAEngine> mla_engine_{nullptr};
+    std::shared_ptr<RotaryPhaseTable> rope_table_{nullptr};
+    std::shared_ptr<CellularRouter> moe_router_{nullptr};
+    std::vector<CellularOrganism> moe_experts_;
+    std::shared_ptr<CellularSpeculativeEngine> speculative_engine_{nullptr};
+    std::shared_ptr<CellularOrganism> draft_organism_{nullptr};
+
     CellularOrganism() = default;
+
+    CellularOrganism(const CellularOrganism& other)
+        : organism_id(other.organism_id),
+          parent_organism_id(other.parent_organism_id),
+          generation(other.generation),
+          lineage_name(other.lineage_name),
+          mutation_receipt(other.mutation_receipt),
+          cells(other.cells),
+          synapses(other.synapses),
+          fitness_score(other.fitness_score),
+          cumulative_reward(other.cumulative_reward),
+          max_drawdown(other.max_drawdown),
+          trade_count(other.trade_count),
+          custom_metrics(other.custom_metrics),
+          compiled_synapses_(other.compiled_synapses_),
+          compiled_actions_(other.compiled_actions_),
+          execution_order_(other.execution_order_),
+          out_start_(other.out_start_),
+          out_edges_(other.out_edges_),
+          flat_port_inputs_(other.flat_port_inputs_),
+          spatial_grid_(other.spatial_grid_),
+          is_compiled_(other.is_compiled_),
+          relaxation_steps_(other.relaxation_steps_),
+          relaxation_damping_(other.relaxation_damping_),
+          rope_table_(other.rope_table_),
+          moe_router_(other.moe_router_),
+          moe_experts_(other.moe_experts_),
+          speculative_engine_(other.speculative_engine_)
+    {
+        if (other.mla_engine_) {
+            mla_engine_ = std::make_shared<CellularMLAEngine>(*other.mla_engine_);
+        }
+        if (other.draft_organism_) {
+            draft_organism_ = std::make_shared<CellularOrganism>(*other.draft_organism_);
+        }
+    }
+
+    CellularOrganism& operator=(const CellularOrganism& other) {
+        if (this == &other) return *this;
+        organism_id = other.organism_id;
+        parent_organism_id = other.parent_organism_id;
+        generation = other.generation;
+        lineage_name = other.lineage_name;
+        mutation_receipt = other.mutation_receipt;
+        cells = other.cells;
+        synapses = other.synapses;
+        fitness_score = other.fitness_score;
+        cumulative_reward = other.cumulative_reward;
+        max_drawdown = other.max_drawdown;
+        trade_count = other.trade_count;
+        custom_metrics = other.custom_metrics;
+        compiled_synapses_ = other.compiled_synapses_;
+        compiled_actions_ = other.compiled_actions_;
+        execution_order_ = other.execution_order_;
+        out_start_ = other.out_start_;
+        out_edges_ = other.out_edges_;
+        flat_port_inputs_ = other.flat_port_inputs_;
+        spatial_grid_ = other.spatial_grid_;
+        is_compiled_ = other.is_compiled_;
+        relaxation_steps_ = other.relaxation_steps_;
+        relaxation_damping_ = other.relaxation_damping_;
+        rope_table_ = other.rope_table_;
+        moe_router_ = other.moe_router_;
+        moe_experts_ = other.moe_experts_;
+        speculative_engine_ = other.speculative_engine_;
+        if (other.mla_engine_) {
+            mla_engine_ = std::make_shared<CellularMLAEngine>(*other.mla_engine_);
+        } else {
+            mla_engine_.reset();
+        }
+        if (other.draft_organism_) {
+            draft_organism_ = std::make_shared<CellularOrganism>(*other.draft_organism_);
+        } else {
+            draft_organism_.reset();
+        }
+        return *this;
+    }
+
+    CellularOrganism(CellularOrganism&&) = default;
+    CellularOrganism& operator=(CellularOrganism&&) = default;
 
     // 回合间状态重置: 清零动态膜电位与记忆, 保留基因组 (参数/拓扑/坐标) 不变。
     // reset_plasticity: 是否将在线学习调整的突触权重重置回初始基因组权重
@@ -364,7 +459,88 @@ public:
                 s.weight = s.initial_weight;
             }
         }
+
+        if (mla_engine_) {
+            mla_engine_->reset_memory();
+        }
+        if (draft_organism_) {
+            draft_organism_->reset_state(reset_plasticity);
+        }
+        for (auto& exp : moe_experts_) {
+            exp.reset_state(reset_plasticity);
+        }
     }
+
+    // === 内生现代机制器官配置 API (Native Organ Configuration APIs) ===
+    void set_relaxation_steps(size_t steps, double damping = 0.5) {
+        relaxation_steps_ = (steps == 0) ? 1 : steps;
+        relaxation_damping_ = damping;
+    }
+
+    void enable_mla(const MLAConfig& cfg, uint32_t seed = 42) {
+        mla_engine_ = std::make_shared<CellularMLAEngine>(cfg);
+        mla_engine_->weights.init_xavier(cfg, seed);
+    }
+
+    void enable_mla(size_t in_dim, size_t latent_dim, size_t num_heads = 2, size_t head_dim = 8, size_t max_history = 32, uint32_t seed = 42) {
+        MLAConfig cfg;
+        cfg.in_dim = in_dim;
+        cfg.latent_dim = latent_dim;
+        cfg.q_latent_dim = latent_dim;
+        cfg.num_heads = num_heads;
+        cfg.head_dim = head_dim;
+        cfg.max_history_len = max_history;
+        enable_mla(cfg, seed);
+    }
+
+    void enable_rope(const RoPEConfig& cfg) {
+        rope_table_ = std::make_shared<RotaryPhaseTable>(cfg);
+    }
+
+    void enable_rope(size_t dim, float base_freq = 10000.0f, size_t max_seq_len = 64) {
+        RoPEConfig cfg;
+        cfg.dim = dim;
+        cfg.base_freq = base_freq;
+        cfg.max_seq_len = max_seq_len;
+        enable_rope(cfg);
+    }
+
+    void enable_moe(const MoERouterConfig& cfg, uint32_t seed = 42) {
+        moe_router_ = std::make_shared<CellularRouter>(cfg, seed);
+    }
+
+    void enable_moe(size_t in_dim, size_t num_experts, size_t top_k = 2, double load_balance_alpha = 0.01, uint32_t seed = 42) {
+        MoERouterConfig cfg;
+        cfg.input_dim = in_dim;
+        cfg.num_experts = num_experts;
+        cfg.top_k = top_k;
+        cfg.load_balance_alpha = load_balance_alpha;
+        enable_moe(cfg, seed);
+    }
+
+    void add_moe_expert(const CellularOrganism& expert) {
+        moe_experts_.push_back(expert);
+    }
+
+    void enable_speculative(const CellularOrganism& draft_core, float acceptance_threshold = 0.65f) {
+        SpeculativeConfig cfg;
+        cfg.acceptance_threshold = acceptance_threshold;
+        speculative_engine_ = std::make_shared<CellularSpeculativeEngine>(cfg);
+        draft_organism_ = std::make_shared<CellularOrganism>(draft_core);
+    }
+
+    bool has_mla() const { return mla_engine_ != nullptr; }
+    bool has_rope() const { return rope_table_ != nullptr; }
+    bool has_moe() const { return moe_router_ != nullptr && !moe_experts_.empty(); }
+    bool has_speculative() const { return speculative_engine_ != nullptr && draft_organism_ != nullptr; }
+
+    const std::shared_ptr<CellularMLAEngine>& mla_engine() const { return mla_engine_; }
+    const std::shared_ptr<RotaryPhaseTable>& rope_table() const { return rope_table_; }
+    const std::shared_ptr<CellularRouter>& moe_router() const { return moe_router_; }
+    const std::vector<CellularOrganism>& moe_experts() const { return moe_experts_; }
+    std::vector<CellularOrganism>& moe_experts() { return moe_experts_; }
+    const std::shared_ptr<CellularSpeculativeEngine>& speculative_engine() const { return speculative_engine_; }
+    const std::shared_ptr<CellularOrganism>& draft_organism() const { return draft_organism_; }
 
     // 创建最简单细胞原生生物 (Archean Progenitor / Mode A: Handcrafted Progenitor)
     static CellularOrganism create_seed_organism(uint64_t id = 1) {
@@ -1388,6 +1564,19 @@ public:
         double prediction_error{0.0};  // 预测惊奇度 (Surprise)
         double thought_energy{0.0};    // 内部神经节相空间总动能
         const char* thought_mode{"STABLE_ATTRACTOR"}; // "EXPLORATION", "FOCUS", "SURPRISE", "STABLE_ATTRACTOR"
+
+        // 辅助通道索引访问器 (连续切片访问)
+        double operator[](size_t idx) const {
+            switch (idx) {
+                case 0: return positive_action;
+                case 1: return negative_action;
+                case 2: return defensive_reset;
+                case 3: return immune_lock ? 1.0 : 0.0;
+                case 4: return predicted_sense_0;
+                case 5: return predicted_sense_1;
+                default: return 0.0;
+            }
+        }
     };
 
     ActionOutputs forward(const double inputs[4], bool enable_hebbian = true) {
@@ -1783,6 +1972,104 @@ public:
         RelaxationTelemetry* telemetry = nullptr)
     {
         return forward_with_relaxation(inputs, relaxation_steps, 4, convergence_threshold, enable_hebbian, telemetry);
+    }
+
+    // ========================================================================
+    // 4.7 内生统一大模型机制前向推演调度器 (Endogenous All-6 Unified Forward)
+    // 自动无缝协同六大机制:
+    //   - MLA 键值隐空间低秩记忆
+    //   - RoPE 相对时序旋转相位
+    //   - 细粒度 MoE 稀疏微柱路由 (0 开销旁路)
+    //   - 测试时动态松弛计算 (K 步李雅普诺夫吸引子收敛)
+    //   - 双进程投机推演决策仲裁 (16 细胞草稿先行 + 主微柱校验)
+    // ========================================================================
+    ActionOutputs forward_endogenous(const double* inputs, size_t in_dim, bool enable_hebbian = false) {
+        if (!is_compiled_) compile();
+
+        // 1. MLA 潜空间时序记忆与 RoPE 几何相移检索增强
+        std::vector<double> augmented_inputs;
+        const double* eff_inputs = inputs;
+        size_t eff_dim = in_dim;
+
+        if (mla_engine_ && in_dim > 0 && in_dim == mla_engine_->config.in_dim) {
+            augmented_inputs.resize(in_dim);
+            std::vector<float> in_f(inputs, inputs + in_dim);
+            if (rope_table_ && rope_table_->config.dim <= in_dim) {
+                rope_table_->apply_inplace(in_f.data(), mla_engine_->current_history_len);
+            }
+            std::vector<float> mla_out(in_dim, 0.0f);
+            mla_engine_->step_forward(in_f.data(), mla_out.data());
+            for (size_t i = 0; i < in_dim; ++i) {
+                augmented_inputs[i] = inputs[i] + 0.1 * static_cast<double>(mla_out[i]);
+            }
+            eff_inputs = augmented_inputs.data();
+        }
+
+        auto run_single_cortex = [&](CellularOrganism& org) -> ActionOutputs {
+            if (org.relaxation_steps_ > 1) {
+                return org.forward_with_relaxation(eff_inputs, org.relaxation_steps_, eff_dim, 1e-5, enable_hebbian);
+            } else if (relaxation_steps_ > 1) {
+                return org.forward_with_relaxation(eff_inputs, relaxation_steps_, eff_dim, 1e-5, enable_hebbian);
+            } else {
+                return org.forward_nd(eff_inputs, eff_dim, enable_hebbian);
+            }
+        };
+
+        auto run_moe_forward = [&]() -> ActionOutputs {
+            const auto& routing = moe_router_->route(eff_inputs, eff_dim, false);
+            double pos = 0.0, neg = 0.0, def = 0.0;
+            for (size_t k = 0; k < routing.topk_indices.size(); ++k) {
+                size_t exp_idx = routing.topk_indices[k];
+                double w = routing.topk_weights[k];
+                if (exp_idx < moe_experts_.size()) {
+                    auto exp_act = run_single_cortex(moe_experts_[exp_idx]);
+                    pos += exp_act.positive_action * w;
+                    neg += exp_act.negative_action * w;
+                    def += exp_act.defensive_reset * w;
+                }
+            }
+            ActionOutputs acts{};
+            acts.positive_action = pos;
+            acts.negative_action = neg;
+            acts.defensive_reset = def;
+            acts.thought_mode = "MOE_SPARSE_ENDOGENOUS";
+            return acts;
+        };
+
+        // 2. 投机推理裁决 (Speculative Decision):
+        if (speculative_engine_ && draft_organism_) {
+            auto draft_act = draft_organism_->forward_nd(eff_inputs, eff_dim, false);
+            
+            ActionOutputs verifier_act = (moe_router_ && !moe_experts_.empty())
+                ? run_moe_forward()
+                : run_single_cortex(*this);
+
+            std::vector<float> draft_vec = {
+                static_cast<float>(draft_act.positive_action),
+                static_cast<float>(draft_act.negative_action),
+                static_cast<float>(draft_act.defensive_reset)
+            };
+            std::vector<float> verifier_vec = {
+                static_cast<float>(verifier_act.positive_action),
+                static_cast<float>(verifier_act.negative_action),
+                static_cast<float>(verifier_act.defensive_reset)
+            };
+
+            auto decision = speculative_engine_->arbitrate(draft_vec.data(), verifier_vec.data(), 3);
+            return decision.draft_accepted ? draft_act : verifier_act;
+        }
+
+        // 3. 非投机模式下，如果有 MoE
+        if (moe_router_ && !moe_experts_.empty()) {
+            return run_moe_forward();
+        }
+
+        // 4. 基础单微柱前向
+        return run_single_cortex(*this);
+    }
+
+    ActionOutputs step_endogenous(const double* inputs, size_t in_dim, bool enable_hebbian = false) {
+        return forward_endogenous(inputs, in_dim, enable_hebbian);
     }
 
     // ── 闭门心理推演与反事实想象 (Mental Simulation / Thought Rollout) ──
