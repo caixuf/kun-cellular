@@ -37,6 +37,7 @@ int main(int argc, char** argv) {
     CellularOrganism endogenous_brain = base_cortex;
     // 器官消融开关 (审计用): DZ_DISABLE_MLA/ROPE/RELAX/MOE/SPEC=1 逐项关闭
     auto env_off = [](const char* k) { const char* e = std::getenv(k); return e && std::atoi(e) != 0; };
+    bool selfplay = env_off("DZ_SELFPLAY");
     bool dis_mla = env_off("DZ_DISABLE_MLA"), dis_rope = env_off("DZ_DISABLE_ROPE"),
          dis_relax = env_off("DZ_DISABLE_RELAX"), dis_moe = env_off("DZ_DISABLE_MOE"),
          dis_spec = env_off("DZ_DISABLE_SPEC");
@@ -119,6 +120,24 @@ int main(int argc, char** argv) {
             brain_clone.reset_state(true);
             DouDiZhuCardGameTask task(40, s, BIDDING_GATE);
             int role = task.role();
+
+            // L3 自博弈: 对手 1/2 号位 = 同权重训练柱克隆 (强对手阶梯)
+            static CellularOrganism sp_opp1 = base_cortex, sp_opp2 = base_cortex;
+            if (selfplay) {
+                auto make_policy = [](CellularOrganism& org) {
+                    return [&org](const std::vector<float>& obs) -> int {
+                        std::vector<double> in(obs.begin(), obs.end());
+                        auto a = org.forward_nd(in.data(), in.size(), false);
+                        if (a.defensive_reset > a.positive_action && a.defensive_reset > a.negative_action) return 2;
+                        if (a.negative_action > a.positive_action) return 0;
+                        return 1;
+                    };
+                };
+                task.set_seat_policy(1, make_policy(sp_opp1));   // 每局任务实例必须重绑 (task 每局新建)
+                task.set_seat_policy(2, make_policy(sp_opp2));
+                sp_opp1.reset_state(true);
+                sp_opp2.reset_state(true);
+            }
 
             // 根据角色调节路由器偏置，实现角色专精路由 (Role Specialization)
             // 专家 0 对应地主，专家 1 对应农民
