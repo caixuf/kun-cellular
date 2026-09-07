@@ -66,6 +66,47 @@ static int gen_dataset_rank(int games, const char* path) {
     return (int)samples;
 }
 
+// DAgger: 模型驱动轨迹 (分布 = 模型自身), 教师标签在任务拷贝上只读标注 (根治分布偏移)
+static int gen_dataset_dagger(int games, const char* path) {
+    CellularOrganism org = build_doudizhu_64cell_rank_cortex();
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    org.load_checkpoint_bin("checkpoints/doudizhu_bc_rank.bin");
+    std::ofstream f(path, std::ios::binary);
+    int32_t hdr = games; f.write((char*)&hdr, 4);
+    long samples = 0;
+    for (int g = 0; g < games; ++g) {
+        DouDiZhuCardGameTask task(40, (uint32_t)(7700000 + g * 211), 17.5);
+        task.set_rank_action_mode(true);
+        bool done = false;
+        while (!done) {
+            auto o = task.current_observation();
+            float obs[32];
+            for (int d = 0; d < 32; ++d) obs[d] = o[d];
+            org.reset_state(true);
+            std::vector<double> in(o.begin(), o.end());
+            org.forward_nd(in.data(), in.size(), false);
+            float y[19] = {0};
+            for (int k = 0; k <= 15; ++k) y[3 + k] = (float)org.cells[64 + k].output_val;
+            y[18] = (float)org.cells[79].output_val - 1.0f;
+            // 教师标签: 状态拷贝 (模型动作未应用前), 只读标注
+            DouDiZhuCardGameTask probe = task;
+            int label_rank = probe.teacher_play_capture();
+            int label = (label_rank >= 0 && label_rank <= 14) ? label_rank : 15;
+            f.write((char*)obs, sizeof(float) * 32);
+            f.write((char*)&label, 4);
+            int32_t gid = g;
+            f.write((char*)&gid, 4);
+            samples++;
+            auto res = task.step_rank_from_tensor(y);   // 模型动作驱动轨迹
+            done = res.done;
+        }
+    }
+    f.close();
+    printf("[DAgger] %d 局 (模型驱动) -> %ld 样本\n-> %s\n", games, samples, path);
+    return (int)samples;
+}
+
 static int gen_dataset(int games, const char* path) {
     std::ofstream f(path, std::ios::binary);
     int32_t hdr = games; f.write((char*)&hdr, 4);
@@ -154,8 +195,8 @@ static int train_bc_rank(const char* path) {
     printf("[BC-rank] cells=%zu max_cell_id=%zu | 磁带窗口=%zu\n", org.cells.size(),
            [&]{ size_t m=0; for (auto& c : org.cells) m = std::max(m, (size_t)c.id); return m; }(), (size_t)0);
 
-    const int EPOCHS = 80;
-    const float LR = 0.012f;
+    const int EPOCHS = 120;
+    const float LR = 0.02f;
     std::vector<std::array<double, 9>> grad_snap;
     std::mt19937 rng(42);
     for (int ep = 1; ep <= EPOCHS; ++ep) {
@@ -440,6 +481,11 @@ int main(int argc, char** argv) {
     if (mode == "eval_rank") {
         int games = argc > 2 ? std::atoi(argv[2]) : 500;
         eval_rank_games(games, argc > 3 ? argv[3] : "checkpoints/doudizhu_bc_rank.bin");
+        return 0;
+    }
+    if (mode == "gen_dagger") {
+        int games = argc > 2 ? std::atoi(argv[2]) : 2000;
+        gen_dataset_dagger(games, "/tmp/opencode/doudizhu_bc_dagger.bin");
         return 0;
     }
     if (mode == "gen_rank") {
