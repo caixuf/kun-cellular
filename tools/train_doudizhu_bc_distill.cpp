@@ -32,6 +32,39 @@ static int lowest_beat_rank(const int hand[15], const kun::DouDiZhuCardGameTask:
     return -1;
 }
 
+// v2: rank 数据集 — 标签 = 教师实际打出的点数 (0..14) 或过牌 (15), 精确无歧义
+static int gen_dataset_rank(int games, const char* path) {
+    std::ofstream f(path, std::ios::binary);
+    int32_t hdr = games; f.write((char*)&hdr, 4);
+    long samples = 0;
+    int label_hist[17] = {0};
+    for (int g = 0; g < games; ++g) {
+        DouDiZhuCardGameTask task(40, (uint32_t)(900000 + g * 173), 17.5);
+        task.set_rank_action_mode(true);
+        bool done = false;
+        while (!done) {
+            auto o = task.current_observation();
+            float obs[32];
+            for (int d = 0; d < 32; ++d) obs[d] = o[d];
+            int played_rank = task.teacher_play_capture();  // 立即捕获 (rotation 前)
+            int label = (played_rank >= 0 && played_rank <= 14) ? played_rank : 15;
+            auto res = task.settle_turn();                  // 轮转 + 结算
+            label_hist[label]++;
+            f.write((char*)obs, sizeof(float) * 32);
+            f.write((char*)&label, 4);
+            int32_t gid = g;
+            f.write((char*)&gid, 4);
+            samples++;
+            done = res.done;
+        }
+    }
+    f.close();
+    printf("[数据集v2] %d 局 → %ld 样本 | 点数标签分布:", games, samples);
+    for (int r = 0; r < 16; ++r) printf(" %d:%d", r, label_hist[r]);
+    printf("\n→ %s\n", path);
+    return (int)samples;
+}
+
 static int gen_dataset(int games, const char* path) {
     std::ofstream f(path, std::ios::binary);
     int32_t hdr = games; f.write((char*)&hdr, 4);
@@ -82,6 +115,96 @@ static int gen_dataset(int games, const char* path) {
     printf("[数据集] %d 局 → %ld 样本 | 标签分布: 过牌=%d 跟牌=%d 夺权=%d → %s\n",
            games, samples, label_hist[0], label_hist[1], label_hist[2], path);
     return (int)samples;
+}
+
+static int train_bc_rank(const char* path) {
+    std::ifstream f(path, std::ios::binary);
+    int32_t games; f.read((char*)&games, 4);
+    std::vector<std::array<float, 32>> X;
+    std::vector<int> Y; std::vector<int32_t> G;
+    while (f.good()) {
+        std::array<float, 32> x; int y; int32_t gid;
+        f.read((char*)x.data(), sizeof(float) * 32);
+        f.read((char*)&y, 4); f.read((char*)&gid, 4);
+        if (!f.good()) break;
+        X.push_back(x); Y.push_back(y); G.push_back(gid);
+    }
+    f.close();
+    printf("[BC-rank] 载入 %zu 样本\n", X.size());
+    if (X.empty()) return 1;
+
+    CellularOrganism org = build_doudizhu_64cell_rank_cortex();
+    for (auto& s : org.synapses) {
+        if (s.to_cell_id >= 64) s.weight *= 4.0;   // rank 头入权放大 (logits 表达范围)
+    }
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    kun::CellularBPTTEngine bptt;
+    bptt.init_optimizer(org);
+
+    // 按局分组 (序列 BPTT)
+    std::vector<std::vector<size_t>> seqs;
+    {
+        std::map<int32_t, std::vector<size_t>> by_game;
+        for (size_t s = 0; s < X.size(); ++s) by_game[G[s]].push_back(s);
+        for (auto& kv : by_game) seqs.push_back(kv.second);
+    }
+    printf("[BC-rank] %zu 局序列\n", seqs.size());
+    printf("[BC-rank] cells=%zu max_cell_id=%zu | 磁带窗口=%zu\n", org.cells.size(),
+           [&]{ size_t m=0; for (auto& c : org.cells) m = std::max(m, (size_t)c.id); return m; }(), (size_t)0);
+
+    const int EPOCHS = 40;
+    const float LR = 0.006f;
+    std::mt19937 rng(42);
+    for (int ep = 1; ep <= EPOCHS; ++ep) {
+        std::shuffle(seqs.begin(), seqs.end(), rng);
+        double loss_sum = 0; long n = 0;
+        long seq_i = 0;
+        for (auto& seq : seqs) {
+            if (ep == 1 && seq_i % 200 == 0) printf("[BC-rank] ep1 seq %ld/%zu (len %zu)\n", seq_i, seqs.size(), seq.size());
+            seq_i++;
+            bptt.reset_tape();
+            org.reset_state(true);
+            std::vector<std::vector<float>> tgts;  // 19 通道: [0..2] 旧效应器 (小权重), [3+r] 点数, [18] 过牌
+            for (size_t s : seq) {
+                std::vector<double> in(X[s].begin(), X[s].end());
+                org.forward_nd(in.data(), in.size(), false);
+                bptt.record_step(org);
+                std::vector<float> tgt(19, 0.02f);
+                tgt[3 + Y[s]] = 0.9f;
+                tgts.push_back(tgt);
+            }
+            BPTTGradients grads;
+            double L = bptt.backward_with_loss(org, tgts, grads, SubstrateLossType::CROSS_ENTROPY);
+            bptt.step_adam(org, grads, LR);
+            loss_sum += L; n += (long)seq.size();
+        }
+        if (ep % 5 == 0 || ep == 1)
+            printf("[BC-rank] Epoch %d/%d | CE %.4f\n", ep, EPOCHS, loss_sum / (double)n);
+    }
+
+    // 训练后复现准确率 (argmax over 合法通道, 与 step_rank_from_tensor 同映射)
+    long correct = 0;
+    for (size_t s = 0; s < X.size(); ++s) {
+        org.reset_state(true);
+        std::vector<double> in(X[s].begin(), X[s].end());
+        auto acts = org.forward_nd(in.data(), in.size(), false);
+        // 简化: 单步无上下文; 预测 = 最大 effector 通道 (3..18)
+        float y[19] = {0};
+        y[0] = (float)acts.positive_action; y[1] = (float)acts.negative_action; y[2] = (float)acts.defensive_reset;
+        // ACT_CHANNEL 输出在 write_action_tensor 语义里 — 这里直接扫描细胞 64..80
+        int best_r = 15; float best_v = 0.1f;   // 无信号 → 默认过牌(15)
+        for (int k = 0; k <= 16; ++k) {
+            float v = (float)org.cells[64 + k].output_val;
+            int ch = 3 + k;
+            if (v > best_v && (k == 16 || ch - 3 <= 14)) { best_v = v; best_r = (k == 16) ? 15 : k; }
+        }
+        if (best_r == Y[s]) correct++;
+    }
+    printf("[BC-rank] 单步复现准确率: %.1f%% (%ld/%zu)\n", 100.0 * correct / X.size(), correct, X.size());
+    org.save_checkpoint_bin("checkpoints/doudizhu_bc_rank.bin");
+    printf("[产物] checkpoints/doudizhu_bc_rank.bin\n");
+    return 0;
 }
 
 static int train_bc(const char* path) {
@@ -207,8 +330,48 @@ static int train_bc(const char* path) {
     return 0;
 }
 
+// rank 策略实战评测: 对启发式对手 N 局 (direct rank 语义)
+static int eval_rank_games(int games, const char* ckpt_path) {
+    CellularOrganism org = CellularOrganism::load_checkpoint_bin(ckpt_path);
+    org.compile();
+    int wins = 0;
+    for (int g = 0; g < games; ++g) {
+        DouDiZhuCardGameTask task(40, (uint32_t)(3100000 + g * 97), 17.5);
+        task.set_rank_action_mode(true);
+        org.reset_state(true);
+        bool done = false;
+        while (!done) {
+            auto o = task.current_observation();
+            std::vector<double> in(o.begin(), o.end());
+            org.forward_nd(in.data(), in.size(), false);
+            float y[19] = {0};
+            for (int k = 0; k <= 15; ++k) y[3 + k] = (float)org.cells[64 + k].output_val;
+            y[18] = (float)org.cells[79].output_val;  // 过牌通道 (学习到的)
+            auto res = task.step_rank_from_tensor(y);
+            done = res.done;
+            if (res.success) wins++;
+        }
+    }
+    printf("[rank 实战] %d 局对启发式: 胜率 %.1f%% (%d/%d)\n", games, 100.0 * wins / games, wins, games);
+    return 0;
+}
+
 int main(int argc, char** argv) {
     std::string mode = argc > 1 ? argv[1] : "train";
+    if (mode == "eval_rank") {
+        int games = argc > 2 ? std::atoi(argv[2]) : 500;
+        eval_rank_games(games, argc > 3 ? argv[3] : "checkpoints/doudizhu_bc_rank.bin");
+        return 0;
+    }
+    if (mode == "gen_rank") {
+        int games = argc > 2 ? std::atoi(argv[2]) : 2000;
+        gen_dataset_rank(games, "/tmp/opencode/doudizhu_bc_dataset_rank.bin");
+        return 0;
+    }
+    if (mode == "train_rank") {
+        train_bc_rank(argc > 2 ? argv[2] : "/tmp/opencode/doudizhu_bc_dataset_rank.bin");
+        return 0;
+    }
     if (mode == "gen") {
         int games = argc > 2 ? std::atoi(argv[2]) : 2000;
         gen_dataset(games, "/tmp/opencode/doudizhu_bc_dataset.bin");

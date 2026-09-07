@@ -500,6 +500,100 @@ public:
         return obs;
     }
 
+    // 教师出牌捕获: 座 0 委托启发式出牌, 立即返回所出点数 (-1=过牌); 轮转未执行
+    int teacher_play_capture() {
+        int pre = cards_left_[0];
+        play_opponent_turn(0);
+        if (cards_left_[0] >= pre) return -1;
+        return table_trick_.rank;
+    }
+
+    // 通用结算: 胜负检查 + 对手轮转 + 记账 (step() 尾部的座位泛化)
+    StepResult settle_turn() {
+        double reward = 0.0;
+        bool done = false;
+        bool is_landlord = (role_ == 1);
+        int guard_steps = 0;   // rotation 上限守卫 (教师捕获路径 round_count_ 不递增)
+        if (cards_left_[0] <= 0) {
+            agent_won_ = true; done = true;
+            reward += is_landlord ? 35.0 + 1.0 * (cards_left_[1] + cards_left_[2]) : 30.0 + 1.5 * cards_left_[landlord_];
+        }
+        while (current_turn_ != 0 && !done && round_count_ < max_rounds_ && guard_steps < max_rounds_ * 3) {
+            int p = current_turn_;
+            play_opponent_turn(p);
+            guard_steps++;
+            if (cards_left_[p] <= 0) {
+                done = true;
+                if (is_landlord || p == landlord_) { agent_won_ = false; reward -= 20.0; }
+                else { agent_won_ = true; reward += 30.0 + 1.0 * cards_left_[landlord_]; }
+                break;
+            }
+        }
+        if (!done && round_count_ >= max_rounds_) { agent_won_ = false; reward -= 10.0; done = true; }
+        if (done) { games_played_++; if (agent_won_) total_wins_++; }
+        StepResult res;
+        res.obs = current_observation();
+        res.reward = reward; res.done = done; res.success = agent_won_;
+        res.steps = round_count_; res.min_dist_to_goal = static_cast<double>(cards_left_[0]);
+        return res;
+    }
+
+    // 点数级出牌 (rank head): y[3..17]=点数分, y[18]=过牌分; 合法点数内取 argmax
+    StepResult step_rank_from_tensor(const float* y) {
+        round_count_++;
+        apply_rank_action(0, y);
+        return settle_turn();
+    }
+
+    void apply_rank_action(int p, const float* y) {
+        bool is_landlord = (p == landlord_);
+        int nxt = (p + 1) % 3;
+        float pass_score = y[18];
+        int best_r = -1; float best_s = pass_score;
+        for (int r = 0; r < 15; ++r) {
+            bool legal = false;
+            if (table_trick_.type == TRICK_NONE) {
+                legal = (hands_[p][r] >= 1);
+            } else if (table_trick_.type == TRICK_SOLO) {
+                legal = (r > table_trick_.rank) && (hands_[p][r] >= 1) &&
+                        !((r == 13 || r == 14) && hands_[p][13] > 0 && hands_[p][14] > 0);
+            } else if (table_trick_.type == TRICK_PAIR) {
+                legal = (r > table_trick_.rank) && (hands_[p][r] == 2);
+            } else if (table_trick_.type == TRICK_BOMB) {
+                legal = (r > table_trick_.rank) && (hands_[p][r] == 4);
+            }
+            if (legal && y[3 + r] > best_s) { best_s = y[3 + r]; best_r = r; }
+        }
+        if (best_r < 0) {
+            if (table_trick_.type == TRICK_NONE) {
+                for (int r = 0; r < 15; ++r) {
+                    if (hands_[p][r] >= 1 && hands_[p][r] < 4) {
+                        if ((r == 13 || r == 14) && has_rocket(p)) continue;
+                        hands_[p][r]--; cards_left_[p]--;
+                        table_trick_ = Trick{TRICK_SOLO, r, p}; record_card_played(r, 1, p);
+                        break;
+                    }
+                }
+                pass_count_ = 0; current_turn_ = nxt;
+            } else {
+                pass_count_++;
+                if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; }
+                else current_turn_ = nxt;
+            }
+            return;
+        }
+        int cnt = 1;
+        if (table_trick_.type == TRICK_PAIR) cnt = 2;
+        else if (table_trick_.type == TRICK_BOMB) cnt = 4;
+        else if (table_trick_.type == TRICK_NONE) cnt = std::min(3, hands_[p][best_r]);
+        hands_[p][best_r] -= cnt; cards_left_[p] -= cnt;
+        TrickType tt = (cnt == 4) ? TRICK_BOMB : (cnt == 2) ? TRICK_PAIR : TRICK_SOLO;
+        table_trick_ = Trick{tt, best_r, p};
+        record_card_played(best_r, cnt, p);
+        pass_count_ = 0;
+        current_turn_ = nxt;
+    }
+
     void apply_seat_policy_action(int p, int act) {
         // step() 的逐分支镜像 (座位参数化): 与智能体共用同一执行器 play_opponent_turn(p)
         bool is_landlord = (p == landlord_);
@@ -1348,12 +1442,14 @@ private:
     bool agent_won_{false};
     int total_wins_{0};
     int games_played_{0};
-    NeuralBidEvaluator neural_bid_evaluator_{nullptr};
-    SeatActionPolicy seat_policies_[3]{nullptr, nullptr, nullptr};
-    bool direct_actions_{false}; // true: 三动作=直接出牌语义 (禁用启发式委托), GRPO 必须真学出牌
+    bool direct_actions_{false};
+    bool rank_action_mode_{false};
 public:
     void set_direct_actions(bool d) { direct_actions_ = d; }
+    void set_rank_action_mode(bool d) { rank_action_mode_ = d; }
 private:
+    NeuralBidEvaluator neural_bid_evaluator_{nullptr};
+    SeatActionPolicy seat_policies_[3]{nullptr, nullptr, nullptr};
     std::mt19937 rng_;
 };
 
@@ -1537,6 +1633,34 @@ inline CellularOrganism build_doudizhu_64cell_recurrent_cortex() {
     org.synapses.push_back({58, 51, 0, 0.80, true, 50.0f, -1.0f});
     org.synapses.push_back({58, 59, 0, 0.50, true, 50.0f, -1.0f});
 
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    return org;
+}
+
+/**
+ * @brief 构建 64+17 细胞点数级动作头皮层 (Rank-Level Action Head)
+ * 通道 3..17 = 出牌点数 0..14, 通道 18 = 过牌 (旧三效应器占通道 0/1/2)
+ */
+inline CellularOrganism build_doudizhu_64cell_rank_cortex() {
+    CellularOrganism org = build_doudizhu_64cell_recurrent_cortex();
+    for (int k = 0; k <= 16; ++k) {
+        uint32_t cid = 64 + static_cast<uint32_t>(k);
+        double param2 = 3.0 + static_cast<double>(k);
+        float x_pos = -20.0f + (180.0f / 16.0f) * static_cast<float>(k);
+        org.cells.push_back({
+            cid, CellType::ACT_CHANNEL, 1.0, param2, 0.0, 0.0, false, 0.0, 0, 0, 75.0f, x_pos, 0.0f
+        });
+    }
+    for (int k = 0; k <= 16; ++k) {
+        uint32_t cid = 64 + static_cast<uint32_t>(k);
+        float w60 = 0.35f, w50 = 0.22f;
+        if (k == 16) { w60 = 0.10f; w50 = 0.10f; }
+        org.synapses.push_back({60, cid, 0, w60, true, 50.0f, -1.0f});
+        org.synapses.push_back({50, cid, 0, w50, true, 50.0f, -1.0f});
+        org.synapses.push_back({48, cid, 0, 0.18, true, 50.0f, -1.0f});
+        org.synapses.push_back({57, cid, 0, 0.15, true, 50.0f, -1.0f});
+    }
     for (auto& s : org.synapses) s.initial_weight = s.weight;
     org.compile();
     return org;
