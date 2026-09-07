@@ -23,7 +23,8 @@ enum class SubstrateLossType {
     MSE = 0,               // 均方误差 (Mean Squared Error)
     CROSS_ENTROPY = 1,     // 动作分布交叉熵 / 负对数似然 (NLL)
     POLICY_GRADIENT = 2,   // 优势加权策略梯度 (Advantage-weighted Policy Gradient)
-    SMOOTH_L1 = 3          // 鲁棒 Huber 损失
+    SMOOTH_L1 = 3,         // 鲁棒 Huber 损失
+    GRPO_SURROGATE = 4     // Group Relative Policy Optimization 剪裁替代目标
 };
 
 struct SubstrateLossGrad {
@@ -259,6 +260,59 @@ public:
                     total_loss += (-adv * std::log(std::max(p_chosen, 1e-7f)));
                     for (size_t ch = 0; ch < preds.size(); ++ch) {
                         float grad = -adv * ((static_cast<int>(ch) == chosen_act ? 1.0f : 0.0f) - probs[ch]);
+                        size_t c_idx = eff_cell_indices[ch];
+                        if (c_idx < N) delta_out[c_idx] += grad;
+                    }
+                } else if (loss_type == SubstrateLossType::GRPO_SURROGATE) {
+                    // DeepSeek-GRPO 剪裁比率替代目标与信息熵正则 (Group Relative Policy Optimization)
+                    // targets: [0]=chosen_action_idx, [1]=advantage, [2]=old_prob, [3]=clip_eps, [4]=entropy_coef
+                    int chosen_act = targets.empty() ? 0 : static_cast<int>(targets[0]);
+                    float adv = targets.size() > 1 ? targets[1] : 0.0f;
+                    float old_prob = targets.size() > 2 ? targets[2] : 0.0f;
+                    float clip_eps = targets.size() > 3 ? targets[3] : 0.2f;
+                    float entropy_coef = targets.size() > 4 ? targets[4] : 0.01f;
+
+                    float max_p = preds.empty() ? 0.0f : *std::max_element(preds.begin(), preds.end());
+                    float sum_exp = 0.0f;
+                    std::vector<float> probs(preds.size());
+                    for (size_t k = 0; k < preds.size(); ++k) {
+                        probs[k] = std::exp(preds[k] - max_p);
+                        sum_exp += probs[k];
+                    }
+                    if (sum_exp > 1e-7f) {
+                        for (float& p : probs) p /= sum_exp;
+                    }
+
+                    float p_chosen = (chosen_act >= 0 && chosen_act < static_cast<int>(probs.size())) ? probs[chosen_act] : 1e-7f;
+                    if (old_prob < 1e-7f) old_prob = p_chosen;
+                    float ratio = p_chosen / std::max(old_prob, 1e-7f);
+
+                    bool clipped = false;
+                    if (adv > 0.0f && ratio > 1.0f + clip_eps) clipped = true;
+                    else if (adv < 0.0f && ratio < 1.0f - clip_eps) clipped = true;
+
+                    float surrogate = clipped ? (std::clamp(ratio, 1.0f - clip_eps, 1.0f + clip_eps) * adv) : (ratio * adv);
+                    float pol_loss = -surrogate;
+
+                    float entropy = 0.0f;
+                    for (float p : probs) {
+                        if (p > 1e-7f) entropy -= p * std::log(p);
+                    }
+
+                    total_loss += (pol_loss - entropy_coef * entropy);
+
+                    for (size_t ch = 0; ch < preds.size(); ++ch) {
+                        float d_pol = 0.0f;
+                        if (!clipped) {
+                            float delta_ak = (static_cast<int>(ch) == chosen_act ? 1.0f : 0.0f);
+                            d_pol = -adv * ratio * (delta_ak - probs[ch]);
+                        }
+                        float d_ent = 0.0f;
+                        if (entropy_coef > 0.0f) {
+                            float p_k = std::max(probs[ch], 1e-7f);
+                            d_ent = entropy_coef * probs[ch] * (std::log(p_k) + entropy);
+                        }
+                        float grad = d_pol + d_ent;
                         size_t c_idx = eff_cell_indices[ch];
                         if (c_idx < N) delta_out[c_idx] += grad;
                     }

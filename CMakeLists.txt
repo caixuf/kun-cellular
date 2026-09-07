@@ -117,6 +117,9 @@ target_link_libraries(train_doudizhu_champion PRIVATE kun_cellular Threads::Thre
 add_executable(train_doudizhu_policy_gradient "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_doudizhu_policy_gradient.cpp")
 target_link_libraries(train_doudizhu_policy_gradient PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_doudizhu_grpo "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_doudizhu_grpo.cpp")
+target_link_libraries(train_doudizhu_grpo PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_quant_futures "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_futures.cpp")
 target_link_libraries(train_quant_futures PRIVATE kun_cellular Threads::Threads m)
 
