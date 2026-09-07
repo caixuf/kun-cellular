@@ -500,6 +500,18 @@ public:
         return obs;
     }
 
+    // 座次上下文 (会诊裁决 b): 后家(下家)/前家(上家) 地主身份与余牌 — 教师用此判断
+    // 残局紧迫度与是否接压队友; 模型此前完全缺失 (44 维信息缺口)
+    std::vector<float> seat_context() const {
+        int nxt = (0 + 1) % 3, prv = (0 + 2) % 3;
+        return {
+            (nxt == landlord_) ? 1.0f : 0.0f,
+            (prv == landlord_) ? 1.0f : 0.0f,
+            std::clamp(static_cast<float>(cards_left_[nxt]) / 20.0f, 0.0f, 1.0f),
+            std::clamp(static_cast<float>(cards_left_[prv]) / 20.0f, 0.0f, 1.0f),
+        };
+    }
+
     // 教师出牌捕获: 座 0 委托启发式出牌, 立即返回所出点数 (-1=过牌); 轮转未执行
 // ============================ v5a 候选打分制 (DouZero 接口) ============================
 // 决策接口重构 (会诊共识): 网络不再生成动作, 而是对任务层枚举的合法候选 (牌型×点数×张数)
@@ -516,13 +528,14 @@ std::vector<CandPlay> enumerate_candidates(int p) const {
         }
         if (hands_[p][13] >= 1 && hands_[p][14] >= 1) out.push_back({TRICK_ROCKET, 14, 2});
     } else {
+        // 会诊 Task 2.1: 候选 = 规则合法全集 (单张跟牌覆盖 0..14, 可拆对/拆三);
+        // 保牌 (不拆火箭) 只是教师偏好, 不是合法性 — 教师选择恒为合法子集, 标签零跳过
         if (table_trick_.type == TRICK_SOLO) {
-            for (int r = table_trick_.rank + 1; r < 13; ++r)
-                if (hands_[p][r] >= 1 && !((r == 13 || r == 14) && hands_[p][13] > 0 && hands_[p][14] > 0))
-                    out.push_back({TRICK_SOLO, r, 1});
+            for (int r = table_trick_.rank + 1; r < 15; ++r)
+                if (hands_[p][r] >= 1) out.push_back({TRICK_SOLO, r, 1});
         } else if (table_trick_.type == TRICK_PAIR) {
             for (int r = table_trick_.rank + 1; r < 13; ++r)
-                if (hands_[p][r] == 2) out.push_back({TRICK_PAIR, r, 2});
+                if (hands_[p][r] >= 2) out.push_back({TRICK_PAIR, r, 2});
         } else if (table_trick_.type == TRICK_BOMB) {
             for (int r = table_trick_.rank + 1; r < 13; ++r)
                 if (hands_[p][r] == 4) out.push_back({TRICK_BOMB, r, 4});
@@ -1789,26 +1802,37 @@ inline CellularOrganism build_doudizhu_64cell_rank_cortex() {
  */
 inline CellularOrganism build_doudizhu_candidate_scorer() {
     CellularOrganism org;
-    for (int d = 0; d < 44; ++d)   // 32 obs + 12 候选交互特征
+    for (int d = 0; d < 48; ++d)   // 36 obs (32 + 4 座次) + 12 候选交互特征 (会诊裁决 b)
         org.cells.push_back({(uint32_t)d, CellType::SENSE_CHANNEL, 1.0, (double)d, 0.0, 0.0, false, 0.0, 0, 0, 10.0f, (float)d * 2.0f, 0.0f});
     uint32_t lcg = 0x5DEECE66u;
-    auto rnd = [&]() {
+    auto rnd01 = [&]() {           // [0,1) 均匀 (修复: 原 (int32_t)(lcg>>8) 非负 → 权重全正)
         lcg = lcg * 1664525u + 1013904223u;
-        return (double)(int32_t)(lcg >> 8) / 8388608.0;
+        return (double)(lcg >> 8) / 16777216.0;
+    };
+    auto rnd_sym = [&](double scale) { return scale * (2.0 * rnd01() - 1.0); };   // ±scale
+    auto rnd_receptor = [&]() -> uint32_t {
+        lcg = lcg * 1664525u + 1013904223u;
+        return (uint32_t)((lcg >> 8) % 48u);
     };
     for (int f = 0; f < 24; ++f) {
         uint32_t cid = 100 + (uint32_t)f;
         CellType t = (f % 2 == 0) ? CellType::OP_SUM : CellType::OP_ABS;
         org.cells.push_back({cid, t, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 60.0f, (float)f * 3.0f, 0.0f});
         for (int j = 0; j < 10; ++j)
-            org.synapses.push_back({(uint32_t)((int)(rnd() * 44.0) & 43), cid, 0, 0.4 * rnd(), true, 50.0f, -1.0f});
+            org.synapses.push_back({rnd_receptor(), cid, 0, rnd_sym(0.4), true, 50.0f, -1.0f});
     }
-    uint32_t head_id = 200;
+    uint32_t head_id = 200;   // 分数头 (channel 0)
     org.cells.push_back({head_id, CellType::ACT_CHANNEL, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 90.0f, 0.0f, 0.0f});
     for (int f = 0; f < 24; ++f)
-        org.synapses.push_back({(uint32_t)(100 + f), head_id, 0, 0.25 * rnd(), true, 50.0f, -1.0f});
+        org.synapses.push_back({(uint32_t)(100 + f), head_id, 0, rnd_sym(0.25), true, 50.0f, -1.0f});
     for (int d = 32; d < 44; ++d)   // 候选编码直连线 (含交互)
-        org.synapses.push_back({(uint32_t)d, head_id, 0, 0.4, true, 50.0f, -1.0f});
+        org.synapses.push_back({(uint32_t)d, head_id, 0, rnd_sym(0.4), true, 50.0f, -1.0f});
+    uint32_t value_id = 201;   // 价值头 (channel 1): 整局 MC 回报回归 (v5b 价值盲修复)
+    org.cells.push_back({value_id, CellType::ACT_CHANNEL, 1.0, 1.0, 0.0, 0.0, false, 0.0, 0, 0, 90.0f, 4.0f, 0.0f});
+    for (int f = 0; f < 24; ++f)
+        org.synapses.push_back({(uint32_t)(100 + f), value_id, 0, 0.0, true, 50.0f, -1.0f});   // 零初始化残差
+    for (int d = 0; d < 32; ++d)   // 状态直连: 余牌/角色/记牌器
+        if (d >= 15) org.synapses.push_back({(uint32_t)d, value_id, 0, 0.2, true, 50.0f, -1.0f});
     for (auto& s : org.synapses) s.initial_weight = s.weight;
     org.compile();
     return org;

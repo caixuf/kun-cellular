@@ -532,6 +532,7 @@ static int train_rank_grpo(int iters, int group) {
     org.compile();
     org.load_checkpoint_bin("checkpoints/doudizhu_bc_rank.bin");
     CellularBPTTEngine bptt;
+    bptt.init_optimizer(org);   // 防御: 显式初始化优化器状态 (adam_step 时序)
     const float CLIP = 0.2f, ENT = 0.012f, LR = 0.008f;
     uint32_t lcg = 7717u;
     auto rnd01 = [&]() { lcg = lcg * 1664525u + 1013904223u; return (double)(lcg >> 8) / 16777216.0; };
@@ -604,203 +605,48 @@ static int train_rank_grpo(int iters, int group) {
 // ============================ v5a 候选打分制 ============================
 // 数据: 每决策 (obs32, K, K×8 候选特征, label, gid); 教师标签 = 匹配教师实际 (type,rank) 的候选
 static int gen_dataset_cand(int games, const char* path) {
-    CellularOrganism probe_unused; (void)probe_unused;   // 无需模型 — 教师自走
     std::ofstream f(path, std::ios::binary);
+    const char magic[4] = {'D','D','Z','C'};
+    int32_t ver = 3;
+    f.write(magic, 4); f.write((char*)&ver, 4);
     int32_t hdr = games; f.write((char*)&hdr, 4);
     long samples = 0, skipped = 0;
     for (int g = 0; g < games; ++g) {
         DouDiZhuCardGameTask task(40, (uint32_t)(6600000 + g * 191), 17.5);
         task.set_rank_action_mode(true);
         bool done = false;
-        while (!done) {
-            auto o = task.current_observation();
-            auto cands = task.enumerate_candidates(0);
-            int pre = task.cards_left(0);
-            (void)pre;
-            int lr = task.teacher_play_capture();   // 教师走 (变更状态), 返回点数或 -1=过
-            auto t_trick = task.table_trick();
-            int label = -1;
-            for (size_t i = 0; i < cands.size(); ++i) {
-                if (lr < 0) { if (cands[i].type == 0) { label = (int)i; break; } }
-                else if (cands[i].type == (int)t_trick.type && cands[i].rank == t_trick.rank) { label = (int)i; break; }
-            }
-            auto res = task.settle_turn();
-            if (label < 0) { skipped++; done = res.done; continue; }
-            f.write((char*)o.data(), sizeof(float) * 32);
-            int32_t K = (int32_t)cands.size(); f.write((char*)&K, 4);
-            for (auto& c : cands) {
-                auto cf = task.candidate_features(c);
-                f.write((char*)cf.data(), sizeof(float) * 12);
-            }
-            f.write((char*)&label, 4);
-            int32_t gid = g; f.write((char*)&gid, 4);
+        std::vector<std::vector<char>> buf;   // 按局缓冲 (终局回填团队胜负)
+        auto write_sample = [&](const std::vector<float>& obs, const std::vector<DouDiZhuCardGameTask::CandPlay>& cs,
+                                const std::vector<std::vector<float>>& feats, int label, int32_t gid) {
+            std::vector<char> rec;
+            rec.insert(rec.end(), (char*)obs.data(), (char*)obs.data() + 144);   // 36 floats (v3)
+            int32_t K = (int32_t)cs.size();
+            rec.insert(rec.end(), (char*)&K, (char*)&K + 4);
+            for (auto& cf : feats) rec.insert(rec.end(), (char*)cf.data(), (char*)cf.data() + 48);
+            rec.insert(rec.end(), (char*)&label, (char*)&label + 4);
+            rec.insert(rec.end(), (char*)&gid, (char*)&gid + 4);
+            int32_t won = -1;
+            rec.insert(rec.end(), (char*)&won, (char*)&won + 4);
+            buf.push_back(std::move(rec));
             samples++;
-            done = res.done;
-        }
-    }
-    f.close();
-    printf("[v5数据] %d 局 -> %ld 样本 (跳过 %ld 未匹配)\n-> %s\n", games, samples, skipped, path);
-    return (int)samples;
-}
-
-// 训练: 每决策 K 次前向, margin 目标 (label→+1, 其他→0), MSE 反传累加, 每 decision 一步 Adam
-static int train_bc_cand(const char* path) {
-    CellularOrganism org = build_doudizhu_candidate_scorer();
-    CellularBPTTEngine bptt;
-    std::ifstream f(path, std::ios::binary);
-    int32_t games; f.read((char*)&games, 4);
-    struct Sample { std::array<float, 32> obs; std::vector<std::array<float, 12>> cands; int label; int32_t gid; };
-    std::vector<Sample> data;
-    while (f.good()) {
-        Sample s;
-        f.read((char*)s.obs.data(), 128);
-        int32_t K; f.read((char*)&K, 4);
-        if (!f.good() || K <= 0 || K > 64) break;
-        s.cands.resize(K);
-        for (int i = 0; i < K; ++i) f.read((char*)s.cands[i].data(), 48);
-        f.read((char*)&s.label, 4);
-        f.read((char*)&s.gid, 4);
-        if (!f.good()) break;
-        data.push_back(std::move(s));
-    }
-    f.close();
-    printf("[v5训练] 载入 %zu 决策\n", data.size());
-    // 初始化基线: 训练前单步复现 (判别学习是否真实发生)
-    {
-        long correct0 = 0;
-        for (auto& s : data) {
-            float best = -1e9f; int best_i = 0;
-            for (size_t i = 0; i < s.cands.size(); ++i) {
-                std::vector<float> in(44);
-                for (int d = 0; d < 32; ++d) in[d] = s.obs[d];
-                for (int d = 0; d < 12; ++d) in[32 + d] = s.cands[i][d];
-                org.reset_state(true);
-                std::vector<double> din(in.begin(), in.end());
-                org.forward_nd(din.data(), din.size(), false);
-                float sc = (float)org.cells.back().output_val;
-                if (sc > best) { best = sc; best_i = (int)i; }
+        };
+        auto flush_game = [&](int32_t won) {
+            for (auto& rec : buf) {
+                int32_t* w = (int32_t*)(rec.data() + rec.size() - 4);
+                *w = won;
+                f.write(rec.data(), (std::streamsize)rec.size());
             }
-            if (best_i == s.label) correct0++;
-        }
-        printf("[v5初始基线] 单步复现 %.1f%%\n", 100.0 * correct0 / data.size());
-    }
-    const int EPOCHS = 25;
-    const float LR = 0.02f;
-    std::mt19937 rng(42);
-    for (int ep = 1; ep <= EPOCHS; ++ep) {
-        std::shuffle(data.begin(), data.end(), rng);
-        double loss_sum = 0;
-        for (auto& s : data) {
-            BPTTGradients grads;
-            for (size_t i = 0; i < s.cands.size(); ++i) {
-                std::vector<float> in(44);
-                for (int d = 0; d < 32; ++d) in[d] = s.obs[d];
-                for (int d = 0; d < 12; ++d) in[32 + d] = s.cands[i][d];
-                org.reset_state(true);
-                bptt.reset_tape();
-                std::vector<double> din(in.begin(), in.end());
-                org.forward_nd(din.data(), din.size(), false);
-                bptt.record_step(org);
-                float target = ((int)i == s.label) ? 1.0f : -0.2f;   // 对比目标: 非标签下压
-                std::vector<std::vector<float>> tgts = {{target}};
-                double L = bptt.backward_with_loss(org, tgts, grads, SubstrateLossType::MSE);
-                loss_sum += L;
-            }
-            bptt.step_adam(org, grads, LR);
-        }
-        if (ep % 5 == 0 || ep == 1) printf("[v5训练] Epoch %d/%d | MSE %.4f\n", ep, EPOCHS, loss_sum / data.size());
-    }
-    // 单步复现: 每决策 argmax 候选是否命中教师标签
-    long correct = 0;
-    for (auto& s : data) {
-        float best = -1e9f; int best_i = 0;
-        for (size_t i = 0; i < s.cands.size(); ++i) {
-            std::vector<float> in(40);
-            for (int d = 0; d < 32; ++d) in[d] = s.obs[d];
-            for (int d = 0; d < 8; ++d) in[32 + d] = s.cands[i][d];
-            org.reset_state(true);
-            std::vector<double> din(in.begin(), in.end());
-            org.forward_nd(din.data(), din.size(), false);
-            float sc = (float)org.cells.back().output_val;
-            if (sc > best) { best = sc; best_i = (int)i; }
-        }
-        if (best_i == s.label) correct++;
-    }
-    printf("[v5单步] 候选复现 %.1f%% (%ld/%zu)\n", 100.0 * correct / data.size(), correct, data.size());
-    org.save_checkpoint_bin("checkpoints/doudizhu_cand_scorer.bin");
-    printf("[产物] checkpoints/doudizhu_cand_scorer.bin\n");
-    return 0;
-}
-
-// 实战: 评分器 argmax 候选出牌 (无任何规则硬编码 — 张数/牌型/过牌全由网络打分)
-static int eval_cand_games(int games, const char* ckpt) {
-    CellularOrganism org = build_doudizhu_candidate_scorer();
-    for (auto& s : org.synapses) s.initial_weight = s.weight;
-    org.compile();
-    org.load_checkpoint_bin(ckpt);
-    int wins = 0; long live_pass = 0, live_steps = 0, pass_label_hit = 0;
-    for (int g = 0; g < games; ++g) {
-        DouDiZhuCardGameTask task(40, (uint32_t)(3100000 + g * 97), 17.5);
-        bool done = false;
+        };
+        StepResult res;
         while (!done) {
+            // 因果顺序 (会诊 Task 3): 动作前一次性快照 obs/候选/特征
             auto o = task.current_observation();
             auto cands = task.enumerate_candidates(0);
-            int pre_cards = task.cards_left(0);
-            float best = -1e9f; size_t best_i = 0;
-            for (size_t i = 0; i < cands.size(); ++i) {
-                std::vector<float> in(44);
-                for (int d = 0; d < 32; ++d) in[d] = o[d];
-                auto cf = task.candidate_features(cands[i]);
-                for (int d = 0; d < 12; ++d) in[32 + d] = cf[d];
-                org.reset_state(true);
-                std::vector<double> din(in.begin(), in.end());
-                org.forward_nd(din.data(), din.size(), false);
-                float sc = (float)org.cells.back().output_val;
-                if (sc > best) { best = sc; best_i = i; }
-            }
-            auto res = task.play_candidate(cands[best_i]);
-            done = res.done;
-            if (res.success) wins++;
-            live_steps++;
-            if (task.cards_left(0) == pre_cards) live_pass++;
-            if (cands[best_i].type == 0) pass_label_hit++;
-        }
-    }
-    printf("[v5实战] %d 局对启发式: 胜率 %.1f%% (%d/%d)\n", games, 100.0 * wins / games, wins, games);
-    printf("[v5活体] 步数 %ld 选择过牌 %.1f%% 实际过牌 %.1f%%\n", live_steps,
-           100.0 * pass_label_hit / live_steps, 100.0 * live_pass / live_steps);
-    return 0;
-}
-
-// DAgger v5a: 评分器驱动轨迹 (分布 = 自身), 任务拷贝上只读教师标注
-static int gen_dataset_cand_dagger(int games, const char* path) {
-    CellularOrganism org = build_doudizhu_candidate_scorer();
-    for (auto& s : org.synapses) s.initial_weight = s.weight;
-    org.compile();
-    org.load_checkpoint_bin("checkpoints/doudizhu_cand_scorer.bin");
-    std::ofstream f(path, std::ios::binary);
-    int32_t hdr = games; f.write((char*)&hdr, 4);
-    long samples = 0, skipped = 0;
-    for (int g = 0; g < games; ++g) {
-        DouDiZhuCardGameTask task(40, (uint32_t)(8800000 + g * 233), 17.5);
-        bool done = false;
-        while (!done) {
-            auto o = task.current_observation();
-            auto cands = task.enumerate_candidates(0);
-            // 评分器选候选
-            float best = -1e9f; size_t best_i = 0;
-            for (size_t i = 0; i < cands.size(); ++i) {
-                std::vector<float> in(44);
-                for (int d = 0; d < 32; ++d) in[d] = o[d];
-                auto cf = task.candidate_features(cands[i]);
-                for (int d = 0; d < 12; ++d) in[32 + d] = cf[d];
-                org.reset_state(true);
-                std::vector<double> din(in.begin(), in.end());
-                org.forward_nd(din.data(), din.size(), false);
-                float sc = (float)org.cells.back().output_val;
-                if (sc > best) { best = sc; best_i = i; }
-            }
-            // 教师标签: 拷贝状态只读标注 (评分器动作未应用前)
+            std::vector<std::vector<float>> feats;
+            for (auto& c : cands) feats.push_back(task.candidate_features(c));
+            std::vector<float> obs36(o.begin(), o.end());
+            for (float v : task.seat_context()) obs36.push_back(v);   // 48 维公开信息 (座次)
+            // 教师标签: 任务拷贝只读标注 (不推进真实账本)
             DouDiZhuCardGameTask probe = task;
             int lr = probe.teacher_play_capture();
             auto t_trick = probe.table_trick();
@@ -809,25 +655,425 @@ static int gen_dataset_cand_dagger(int games, const char* path) {
                 if (lr < 0) { if (cands[i].type == 0) { label = (int)i; break; } }
                 else if (cands[i].type == (int)t_trick.type && cands[i].rank == t_trick.rank) { label = (int)i; break; }
             }
-            auto res = task.play_candidate(cands[best_i]);   // 评分器驱动
-            if (label >= 0) {
-                f.write((char*)o.data(), sizeof(float) * 32);
-                int32_t K = (int32_t)cands.size(); f.write((char*)&K, 4);
-                for (auto& c : cands) {
-                    auto cf = task.candidate_features(c);
-                    f.write((char*)cf.data(), sizeof(float) * 12);
-                }
-                f.write((char*)&label, 4);
-                int32_t gid = g; f.write((char*)&gid, 4);
-                samples++;
-            } else skipped++;
+            // 真实 task 执行教师动作 (teacher_play_capture 应用同一确定性动作)
+            task.teacher_play_capture();
+            res = task.settle_turn();
+            if (label < 0) { skipped++; done = res.done; continue; }   // 教师动作不在候选集 (记录为跳过, 无选择偏差风险)
+            write_sample(obs36, cands, feats, label, (int32_t)g);
             done = res.done;
         }
+        flush_game(res.success ? 1 : 0);   // 团队胜负 (农民队友出完也算胜)
     }
     f.close();
-    printf("[v5-DAgger] %d 局 (评分器驱动) -> %ld 样本 (跳过 %ld)\n-> %s\n", games, samples, skipped, path);
+    printf("[v5数据] %d 局 -> %ld 样本 (跳过 %ld, won=团队res.success, 特征=动作前快照)\n-> %s\n", games, samples, skipped, path);
     return (int)samples;
 }
+
+// ---------- 共享: 按头定位 (param2), 不再依赖倒数第几个细胞 ----------
+static size_t find_head_by_channel(const CellularOrganism& org, double ch) {
+    for (size_t i = 0; i < org.cells.size(); ++i)
+        if (org.cells[i].type == CellType::ACT_CHANNEL && org.cells[i].param2 == ch) return i;
+    return (size_t)-1;
+}
+static void build_scorer_input(const std::vector<float>& obs, const std::vector<float>& cf, std::vector<double>& in) {
+    in.resize(48);   // v3: 36 obs (32 + 4 座次) + 12 候选交互
+    for (int d = 0; d < 36; ++d) in[d] = obs[d];
+    for (int d = 0; d < 12; ++d) in[36 + d] = cf[d];
+}
+// 分数头专用 MSE (价值头导数恒 0 — 不用 target=0 冒充冻结)
+static const SubstrateLossFn kScoreOnlyLoss = [](const std::vector<float>& preds, const std::vector<float>& targets) -> SubstrateLossGrad {
+    SubstrateLossGrad g;
+    float diff = preds[0] - targets[0];
+    g.loss_val = diff * diff;
+    g.dL_dout.resize(preds.size(), 0.0f);
+    g.dL_dout[0] = 2.0f * diff;
+    return g;
+};
+// listwise 候选 CE: dL/dscore = p_i - 1[i=label] (targets[0] 携带 -log p_label 供日志)
+static std::vector<float> g_listwise_delta{0.0f};
+static const SubstrateLossFn kListwiseLoss = [](const std::vector<float>& preds, const std::vector<float>& targets) -> SubstrateLossGrad {
+    SubstrateLossGrad g;
+    g.loss_val = targets.empty() ? 0.0f : targets[0];
+    g.dL_dout.assign(preds.size(), 0.0f);
+    if (!g_listwise_delta.empty()) g.dL_dout[0] = g_listwise_delta[0];
+    return g;
+};
+// JSON 模型加载 (返回值! bin 为 static 量化格式会破坏通道号 → 拒绝)
+static bool load_scorer_json(const char* path, CellularOrganism& org) {
+    auto loaded = CellularOrganism::load_checkpoint_json(path);
+    if (loaded.cells.empty()) { fprintf(stderr, "[错误] 模型加载失败: %s\n", path); return false; }
+    org = std::move(loaded);
+    return true;
+}
+static double score_candidate(CellularOrganism& org, size_t score_head,
+                              const std::vector<float>& obs, const std::vector<float>& cf) {
+    std::vector<double> in;
+    build_scorer_input(obs, cf, in);
+    org.reset_state(false);   // 修复: reset(true) 会恢复祖先权重 (抹掉训练)!
+    org.forward_nd(in.data(), in.size(), false);
+    return org.cells[score_head].output_val;
+}
+
+// ---------- DAgger: 评分器驱动 + 因果快照 + 团队 won ----------
+static int gen_dataset_cand_dagger(int games, const char* path, const char* model_path) {
+    CellularOrganism org = build_doudizhu_candidate_scorer();
+    if (!load_scorer_json(model_path, org)) return 1;
+    size_t score_head = find_head_by_channel(org, 0.0);
+    if (score_head == (size_t)-1) { fprintf(stderr, "[错误] 找不到分数头\n"); return 1; }
+    std::ofstream f(path, std::ios::binary);
+    const char magic[4] = {'D','D','Z','C'};
+    int32_t ver = 3;
+    f.write(magic, 4); f.write((char*)&ver, 4);
+    int32_t hdr = games; f.write((char*)&hdr, 4);
+    long samples = 0, skipped = 0;
+    for (int g = 0; g < games; ++g) {
+        DouDiZhuCardGameTask task(40, (uint32_t)(8800000 + g * 233), 17.5);
+        bool done = false;
+        std::vector<std::vector<char>> buf;
+        auto write_sample = [&](const std::vector<float>& obs, const std::vector<DouDiZhuCardGameTask::CandPlay>& cs,
+                                const std::vector<std::vector<float>>& feats, int label, int32_t gid) {
+            std::vector<char> rec;
+            rec.insert(rec.end(), (char*)obs.data(), (char*)obs.data() + 144);   // 36 floats (v3)
+            int32_t K = (int32_t)cs.size();
+            rec.insert(rec.end(), (char*)&K, (char*)&K + 4);
+            for (auto& cf : feats) rec.insert(rec.end(), (char*)cf.data(), (char*)cf.data() + 48);
+            rec.insert(rec.end(), (char*)&label, (char*)&label + 4);
+            rec.insert(rec.end(), (char*)&gid, (char*)&gid + 4);
+            int32_t won = -1;
+            rec.insert(rec.end(), (char*)&won, (char*)&won + 4);
+            buf.push_back(std::move(rec));
+            samples++;
+        };
+        auto flush_game = [&](int32_t won) {
+            for (auto& rec : buf) {
+                int32_t* w = (int32_t*)(rec.data() + rec.size() - 4);
+                *w = won;
+                f.write(rec.data(), (std::streamsize)rec.size());
+            }
+        };
+        StepResult res;
+        while (!done) {
+            // 动作前快照
+            auto o = task.current_observation();
+            auto cands = task.enumerate_candidates(0);
+            std::vector<std::vector<float>> feats;
+            for (auto& c : cands) feats.push_back(task.candidate_features(c));
+            std::vector<float> obs36(o.begin(), o.end());
+            for (float v : task.seat_context()) obs36.push_back(v);   // 48 维公开信息
+            // 模型选候选
+            float best = -1e30f; size_t best_i = 0; bool any_finite = false;
+            for (size_t i = 0; i < cands.size(); ++i) {
+                double sc = score_candidate(org, score_head, obs36, feats[i]);
+                if (!std::isfinite(sc)) { fprintf(stderr, "[错误] 非有限分数, 终止\n"); return 1; }
+                if (!any_finite || sc > best) { best = (float)sc; best_i = i; any_finite = true; }
+            }
+            // 教师标签: 拷贝只读标注 (模型动作未应用前)
+            DouDiZhuCardGameTask probe = task;
+            int lr = probe.teacher_play_capture();
+            auto t_trick = probe.table_trick();
+            int label = -1;
+            for (size_t i = 0; i < cands.size(); ++i) {
+                if (lr < 0) { if (cands[i].type == 0) { label = (int)i; break; } }
+                else if (cands[i].type == (int)t_trick.type && cands[i].rank == t_trick.rank) { label = (int)i; break; }
+            }
+            res = task.play_candidate(cands[best_i]);   // 模型驱动
+            if (label >= 0) write_sample(obs36, cands, feats, label, (int32_t)g);
+            else skipped++;
+            done = res.done;
+        }
+        flush_game(res.success ? 1 : 0);
+    }
+    f.close();
+    printf("[v5-DAgger] %d 局 -> %ld 样本 (跳过 %ld)\n-> %s\n", games, samples, skipped, path);
+    return 0;
+}
+
+// ---------- 纯 BC 训练: 梯度正确聚合 (K 候选求和/÷K, 每决策一次 Adam) ----------
+static int train_bc_cand(const char* path) {
+    CellularOrganism org = build_doudizhu_candidate_scorer();
+    CellularBPTTEngine bptt;
+    bptt.init_optimizer(org);
+    std::ifstream f(path, std::ios::binary);
+    char magic[4]; int32_t ver = 0;
+    f.read(magic, 4); f.read((char*)&ver, 4);
+    if (ver == 0 && std::memcmp(magic, "DDZC", 4) != 0) {
+        // 旧格式 (无版本) — 显式拒绝 (会诊 Task 3.3)
+        fprintf(stderr, "[错误] 旧版无版本数据 (需 v3 DDZC): %s\n", path); return 1;
+    }
+    if (ver != 3) { fprintf(stderr, "[错误] 数据版本 %d != 3\n", ver); return 1; }
+    int32_t games; f.read((char*)&games, 4);
+    struct Sample { std::array<float, 32> obs; std::array<float, 4> seat; std::vector<std::array<float, 12>> cands; int label; int32_t gid; int won; };
+    std::vector<Sample> data;
+    while (f.good()) {
+        Sample s;
+        f.read((char*)s.obs.data(), 128);
+        f.read((char*)s.seat.data(), 16);
+        int32_t K; f.read((char*)&K, 4);
+        if (!f.good() || K <= 0 || K > 64) break;
+        s.cands.resize(K);
+        for (int i = 0; i < K; ++i) f.read((char*)s.cands[i].data(), 48);
+        f.read((char*)&s.label, 4);
+        f.read((char*)&s.gid, 4);
+        f.read((char*)&s.won, 4);
+        if (!f.good() || s.label < 0 || s.label >= K) break;
+        data.push_back(std::move(s));
+    }
+    f.close();
+    // DAgger 混合: 追加教师数据防遗忘 (V5_TEACHER_DATA)
+    if (const char* extra = std::getenv("V5_TEACHER_DATA")) {
+        std::ifstream f2(extra, std::ios::binary);
+        char m2[4]; int32_t v2; f2.read(m2, 4); f2.read((char*)&v2, 4);
+        if (v2 != 3) { fprintf(stderr, "[错误] 教师混合数据非 v3\n"); return 1; }
+        int32_t g2; f2.read((char*)&g2, 4);
+        long extra_n = 0;
+        while (f2.good()) {
+            Sample s;
+            f2.read((char*)s.obs.data(), 128);
+            f2.read((char*)s.seat.data(), 16);
+            int32_t K; f2.read((char*)&K, 4);
+            if (!f2.good() || K <= 0 || K > 64) break;
+            s.cands.resize(K);
+            for (int i = 0; i < K; ++i) f2.read((char*)s.cands[i].data(), 48);
+            f2.read((char*)&s.label, 4);
+            f2.read((char*)&s.gid, 4);
+            f2.read((char*)&s.won, 4);
+            if (!f2.good() || s.label < 0 || s.label >= K) break;
+            data.push_back(std::move(s));
+            extra_n++;
+        }
+        printf("[v5训练] 载入 %zu 决策 (含教师混合 %ld)\n", data.size(), extra_n);
+    } else {
+        printf("[v5训练] 载入 %zu 决策\n", data.size());
+    }
+    size_t score_head = find_head_by_channel(org, 0.0);
+    size_t value_head = find_head_by_channel(org, 1.0);
+    auto obs_of = [](const Sample* s) {
+        std::vector<float> o(s->obs.begin(), s->obs.end());
+        for (float v : s->seat) o.push_back(v);
+        return o;   // 36 维
+    };
+    // 初始基线
+    {
+        long correct0 = 0;
+        for (auto& s : data) {
+            float best = -1e30f; int best_i = 0;
+            for (size_t i = 0; i < s.cands.size(); ++i) {
+                std::vector<float> cf(s.cands[i].begin(), s.cands[i].end());
+                auto obs = obs_of(&s);
+                double sc = score_candidate(org, score_head, obs, cf);
+                if (sc > best) { best = (float)sc; best_i = i; }
+            }
+            if (best_i == s.label) correct0++;
+        }
+        printf("[v5初始基线] 单步复现 %.1f%%\n", 100.0 * correct0 / data.size());
+    }
+    double ce_sum = 0; long ce_cnt = 0;
+    const int EPOCHS = std::getenv("V5_EPOCHS") ? std::atoi(std::getenv("V5_EPOCHS")) : 15;
+    const float LR = std::getenv("V5_LR") ? (float)std::atof(std::getenv("V5_LR")) : 0.02f;
+    const size_t MAXD = std::getenv("V5_MAXD") ? (size_t)std::atoll(std::getenv("V5_MAXD")) : data.size();
+    const bool LISTWISE = std::getenv("V5_LOSS") && std::string(std::getenv("V5_LOSS")) == "ce";
+    if (MAXD < data.size()) { data.resize(MAXD); printf("[微型] 截取 %zu 决策\n", MAXD); }
+    std::mt19937 rng(42);
+    for (int ep = 1; ep <= EPOCHS; ++ep) {
+        std::shuffle(data.begin(), data.end(), rng);
+        double mse_sum = 0; long mse_cnt = 0;
+        for (auto& s : data) {
+            BPTTGradients sum, one;
+            sum.grad_synapses.assign(org.compiled_synapses_.size(), 0.0f);
+            sum.grad_gains.assign(org.cells.size(), 0.0f);
+            const float inv_k = 1.0f / (float)s.cands.size();
+            auto obs = obs_of(&s);
+            if (LISTWISE) {
+                // 第一遍: K 个分数 + softmax (log-sum-exp 稳定)
+                std::vector<double> scores(s.cands.size());
+                for (size_t i = 0; i < s.cands.size(); ++i) {
+                    std::vector<float> cf(s.cands[i].begin(), s.cands[i].end());
+                    scores[i] = score_candidate(org, score_head, obs, cf);
+                }   // obs 36 维
+                double mx = *std::max_element(scores.begin(), scores.end());
+                double Z = 0; for (double v : scores) Z += std::exp(v - mx);
+                std::vector<double> p(s.cands.size());
+                for (size_t i = 0; i < s.cands.size(); ++i) p[i] = std::exp(scores[i] - mx) / Z;
+                double ce = -std::log(std::max(p[s.label], 1e-9));
+                // 第二遍: 逐候选举录带反传 (权重未变, 前向确定性)
+                for (size_t i = 0; i < s.cands.size(); ++i) {
+                    std::vector<float> cf(s.cands[i].begin(), s.cands[i].end());
+                    std::vector<double> in;
+                    build_scorer_input(obs, cf, in);
+                    org.reset_state(false);
+                    bptt.reset_tape();
+                    org.forward_nd(in.data(), in.size(), false);
+                    bptt.record_step(org);
+                    g_listwise_delta[0] = (float)(p[i] - ((int)i == s.label ? 1.0 : 0.0));
+                    std::vector<std::vector<float>> tgts = {{(float)ce}};
+                    bptt.backward_with_loss(org, tgts, one, SubstrateLossType::MSE, kListwiseLoss);
+                    for (size_t j = 0; j < sum.grad_synapses.size(); ++j)
+                        sum.grad_synapses[j] += one.grad_synapses[j];   // 候选 CE 梯度不除 K (会诊 4.9)
+                    for (size_t j = 0; j < sum.grad_gains.size(); ++j)
+                        sum.grad_gains[j] += one.grad_gains[j];
+                }
+                ce_sum += ce; ce_cnt++;
+                bptt.step_adam(org, sum, LR);
+                continue;
+            }
+            for (size_t i = 0; i < s.cands.size(); ++i) {
+                std::vector<float> cf(s.cands[i].begin(), s.cands[i].end());
+                std::vector<double> in;
+                build_scorer_input(obs, cf, in);
+                org.reset_state(false);
+                bptt.reset_tape();
+                org.forward_nd(in.data(), in.size(), false);
+                bptt.record_step(org);
+                float target = ((int)i == s.label) ? 1.0f : -0.2f;
+                std::vector<std::vector<float>> tgts = {{target}};
+                bptt.backward_with_loss(org, tgts, one, SubstrateLossType::MSE, kScoreOnlyLoss);
+                double d = org.cells[score_head].output_val - target;
+                mse_sum += d * d; mse_cnt++;
+                for (size_t j = 0; j < sum.grad_synapses.size(); ++j)
+                    sum.grad_synapses[j] += inv_k * one.grad_synapses[j];
+                for (size_t j = 0; j < sum.grad_gains.size(); ++j)
+                    sum.grad_gains[j] += inv_k * one.grad_gains[j];
+            }
+            // 诊断: 梯度范数 + 权重位移
+            double gnorm = 0, wshift = 0;
+            for (size_t j = 0; j < sum.grad_synapses.size(); ++j) gnorm += sum.grad_synapses[j] * sum.grad_synapses[j];
+            gnorm = std::sqrt(gnorm);
+            for (size_t j = 0; j < org.compiled_synapses_.size(); ++j)
+                wshift += std::abs(org.compiled_synapses_[j].weight - org.compiled_synapses_[j].initial_weight);
+            if (ep == 1 && &data[0] == &s) {
+                printf("[诊断] 首决策: 梯度范数 %.4f | 头入权样本:", gnorm);
+                size_t sh = find_head_by_channel(org, 0.0);
+                long cnt = 0;
+                for (size_t j = 0; j < org.compiled_synapses_.size() && cnt < 5; ++j)
+                    if (org.compiled_synapses_[j].to_idx == sh) { printf(" %.4f", org.compiled_synapses_[j].weight); cnt++; }
+                printf("\n");
+            }
+            bptt.step_adam(org, sum, LR);
+        }
+        if (ep % 5 == 0 || ep == 1) {
+            double wshift_total = 0;
+            for (size_t j = 0; j < org.compiled_synapses_.size(); ++j)
+                wshift_total += std::abs(org.compiled_synapses_[j].weight - org.compiled_synapses_[j].initial_weight);
+            if (LISTWISE)
+                printf("[v5训练-CE] Epoch %d/%d | 候选CE %.4f | 累计权重位移 %.4f\n", ep, EPOCHS, ce_sum / std::max(1L, ce_cnt), wshift_total);
+            else
+                printf("[v5训练] Epoch %d/%d | 候选MSE %.4f | 累计权重位移 %.4f\n", ep, EPOCHS, mse_sum / std::max(1L, mse_cnt), wshift_total);
+        }
+    }
+    // 训练后单步 (44 维一致)
+    long correct = 0;
+    for (auto& s : data) {
+        float best = -1e30f; int best_i = 0;
+        for (size_t i = 0; i < s.cands.size(); ++i) {
+            std::vector<float> cf(s.cands[i].begin(), s.cands[i].end());
+            auto obs = obs_of(&s);
+            double sc = score_candidate(org, score_head, obs, cf);
+            if (sc > best) { best = (float)sc; best_i = i; }
+        }
+        if (best_i == s.label) correct++;
+    }
+    printf("[v5单步] 候选复现 %.1f%% (%ld/%zu)\n", 100.0 * correct / data.size(), correct, data.size());
+    // JSON 保存 + 往返门禁 (会诊 Task 1.5: 保存前后分数一致)
+    const char* out = "checkpoints/doudizhu_cand_scorer.json";
+    if (!org.save_checkpoint_json(out)) { fprintf(stderr, "[错误] 保存失败\n"); return 1; }
+    {
+        CellularOrganism rt;
+        if (!load_scorer_json(out, rt)) return 1;
+        size_t sh2 = find_head_by_channel(rt, 0.0);
+        long mismatch = 0;
+        for (size_t si = 0; si < data.size() && si < 50; ++si) {
+            auto& s = data[si];
+            auto obs = obs_of(&s);
+            for (size_t i = 0; i < s.cands.size(); ++i) {
+                std::vector<float> cf(s.cands[i].begin(), s.cands[i].end());
+                double a = score_candidate(org, score_head, obs, cf);
+                double b = score_candidate(rt, sh2, obs, cf);
+                if (std::abs(a - b) > 1e-4 * (1.0 + std::abs(a))) mismatch++;
+            }
+        }
+        printf("[往返门禁] %ld/%ld 分点超差 %s\n", mismatch, std::min<size_t>(50, data.size()), mismatch ? "→ FAIL" : "→ PASS");
+    }
+    printf("[产物] %s\n", out);
+    return 0;
+}
+
+// ---------- 统一基线评测协议 (会诊 Task 5): teacher/first/uniform/init/model ----------
+static double wilson_lower(int wins, int n) {
+    if (n == 0) return 0.0;
+    double z = 1.959964, p = (double)wins / n, n2 = (double)n * n;
+    double center = (p + z * z / (2 * n)) / (1 + z * z / n);
+    double half = z * std::sqrt(p * (1 - p) / n + z * z / (4 * n2)) / (1 + z * z / n);
+    return center - half;
+}
+static int eval_cand_games(int games, const char* policy_arg) {
+    std::string policy = policy_arg;
+    CellularOrganism org;
+    size_t score_head = (size_t)-1;
+    bool use_model = false, use_teacher = false;
+    if (policy == "teacher") use_teacher = true;
+    else if (policy == "init") { org = build_doudizhu_candidate_scorer(); }
+    else if (policy == "first" || policy == "uniform") { org = build_doudizhu_candidate_scorer(); }   // 修复: 规则策略曾被误分类为 model
+    else if (policy == "model") { }
+    else { policy = "model"; }
+    if (policy == "model") {
+        // main 已把路径传入 policy_arg? 约定: eval_cand <games> model <path>
+        use_model = true;
+    }
+    // 模型路径由外部变量传递 (eval_model_path)
+    extern std::string g_eval_model_path;
+    if (use_model) {
+        if (!load_scorer_json(g_eval_model_path.c_str(), org)) return 1;
+        score_head = find_head_by_channel(org, 0.0);
+        if (score_head == (size_t)-1) { fprintf(stderr, "[错误] 找不到分数头\n"); return 1; }
+    } else if (!use_teacher) {
+        score_head = find_head_by_channel(org, 0.0);
+    }
+    uint32_t lcg = 424243u;
+    auto rnd01 = [&]() { lcg = lcg * 1664525u + 1013904223u; return (double)(lcg >> 8) / 16777216.0; };
+    int wins = 0; long live_pass = 0, live_steps = 0;
+    for (int g = 0; g < games; ++g) {
+        DouDiZhuCardGameTask task(40, (uint32_t)(3100000 + g * 97), 17.5);
+        bool done = false;
+        while (!done) {
+            auto cands = task.enumerate_candidates(0);
+            size_t pick = 0;
+            if (use_teacher) {
+                task.teacher_play_capture();
+                auto res = task.settle_turn();
+                live_steps++;
+                if (task.cards_left(0) >= (long)cands.size() + 1000) { } // no-op
+                done = res.done;
+                if (res.success) wins++;
+                continue;
+            } else if (policy == "first") {
+                pick = 0;
+            } else if (policy == "uniform") {
+                pick = (size_t)((int)(rnd01() * (double)cands.size()) % cands.size());
+            } else {
+                auto o = task.current_observation();
+                std::vector<float> obs32(o.begin(), o.end());
+                float best = -1e30f;
+                for (size_t i = 0; i < cands.size(); ++i) {
+                    auto cf = task.candidate_features(cands[i]);
+                    double sc = score_candidate(org, score_head, obs32, cf);
+                    if (!std::isfinite(sc)) { fprintf(stderr, "[错误] 非有限分数\n"); return 1; }
+                    if (sc > best) { best = (float)sc; pick = i; }
+                }
+            }
+            int pre = task.cards_left(0);
+            auto res = task.play_candidate(cands[pick]);
+            done = res.done;
+            if (res.success) wins++;
+            live_steps++;
+            if (task.cards_left(0) == pre) live_pass++;
+        }
+    }
+    printf("[v5实战/%s] %d 局: 胜率 %.1f%% (%d/%d) Wilson95下界 %.1f%% | 步数 %ld 过牌 %.1f%%\n",
+           policy_arg, games, 100.0 * wins / games, wins, games, 100.0 * wilson_lower(wins, games),
+           live_steps, 100.0 * live_pass / std::max(1L, live_steps));
+    return 0;
+}
+std::string g_eval_model_path = "checkpoints/doudizhu_cand_scorer.json";
 
 int main(int argc, char** argv) {
     std::string mode = argc > 1 ? argv[1] : "train";
@@ -837,7 +1083,8 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (mode == "gen_cand_dagger") {
-        gen_dataset_cand_dagger(argc > 2 ? std::atoi(argv[2]) : 2000, "/tmp/opencode/doudizhu_cand_dagger.bin");
+        gen_dataset_cand_dagger(argc > 2 ? std::atoi(argv[2]) : 2000, "/tmp/opencode/doudizhu_cand_dagger.bin",
+                                argc > 3 ? argv[3] : "checkpoints/doudizhu_cand_scorer.json");
         return 0;
     }
     if (mode == "gen_cand") {
@@ -849,7 +1096,10 @@ int main(int argc, char** argv) {
         return 0;
     }
     if (mode == "eval_cand") {
-        eval_cand_games(argc > 2 ? std::atoi(argv[2]) : 500, argc > 3 ? argv[3] : "checkpoints/doudizhu_cand_scorer.bin");
+        int games = argc > 2 ? std::atoi(argv[2]) : 500;
+        std::string pol = argc > 3 ? argv[3] : "model";
+        if (pol == "model") g_eval_model_path = argc > 4 ? argv[4] : "checkpoints/doudizhu_cand_scorer.json";
+        eval_cand_games(games, pol.c_str());
         return 0;
     }
     if (mode == "eval_hybrid") {

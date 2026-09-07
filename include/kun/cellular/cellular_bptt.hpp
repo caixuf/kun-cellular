@@ -457,13 +457,15 @@ public:
      * Adam 优化更新 + 梯度裁剪
      */
     void step_adam(CellularOrganism& org, const BPTTGradients& grads, float lr = 0.005f) {
-        adam_step++;
         const size_t num_syn = org.compiled_synapses_.size();
         const size_t num_cells = org.cells.size();
 
+        // [修复] init_optimizer 会重置 adam_step=0; 若在其后不重新递增,
+        // 首步 bias_correction = 1-β⁰ = 0 → m̂ = 0/0 = NaN → 写穿全部细胞增益 (param1)
         if (m_synapses.size() != num_syn || m_gains.size() != num_cells) {
             init_optimizer(org);
         }
+        adam_step++;
 
         // 尺寸守卫: 梯度向量与当前基因组不匹配 (如空窗/消融模式) 时直接跳过更新
         if (grads.grad_synapses.size() < num_syn || grads.grad_gains.size() < num_cells) {
