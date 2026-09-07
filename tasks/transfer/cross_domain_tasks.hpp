@@ -545,6 +545,8 @@ public:
         return settle_turn();
     }
 
+    long forced_pass_count_ = 0;   // 诊断: 无合法牌强制过
+    long voluntary_pass_count_ = 0; // 诊断: 有合法牌但主动过
     void apply_rank_action(int p, const float* y) {
         bool is_landlord = (p == landlord_);
         int nxt = (p + 1) % 3;
@@ -565,6 +567,15 @@ public:
             if (legal && y[3 + r] > best_s) { best_s = y[3 + r]; best_r = r; }
         }
         if (best_r < 0) {
+            bool any_legal = false;
+            for (int r = 0; r < 15 && !any_legal; ++r) {
+                if (table_trick_.type == TRICK_NONE) any_legal = (hands_[p][r] >= 1);
+                else if (table_trick_.type == TRICK_SOLO) any_legal = (r > table_trick_.rank) && (hands_[p][r] >= 1);
+                else if (table_trick_.type == TRICK_PAIR) any_legal = (r > table_trick_.rank) && (hands_[p][r] == 2);
+                else if (table_trick_.type == TRICK_BOMB) any_legal = (r > table_trick_.rank) && (hands_[p][r] == 4);
+            }
+            if (!any_legal && table_trick_.type != TRICK_NONE) forced_pass_count_++;
+            else if (any_legal) voluntary_pass_count_++;
             if (table_trick_.type == TRICK_NONE) {
                 for (int r = 0; r < 15; ++r) {
                     if (hands_[p][r] >= 1 && hands_[p][r] < 4) {
@@ -1660,6 +1671,28 @@ inline CellularOrganism build_doudizhu_64cell_rank_cortex() {
         org.synapses.push_back({50, cid, 0, w50, true, 50.0f, -1.0f});
         org.synapses.push_back({48, cid, 0, 0.18, true, 50.0f, -1.0f});
         org.synapses.push_back({57, cid, 0, 0.15, true, 50.0f, -1.0f});
+        // 点数身份特征 (关键修复): 此前 17 个细胞共享完全相同的输入 → 输出恒等,
+        // 排名与输入无关 (结构上不可能按手牌选点数)!
+        if (k <= 14) {
+            // 手牌通道 k = 点数 k (obs[0..14]): "我是否持有此点数"
+            org.synapses.push_back({(uint32_t)k, cid, 0, 1.2, true, 50.0f, -1.0f});
+            if (k >= 8) {
+                // 记牌器高牌通道 (obs 15..21 = J..大王 未见量): "对手是否可能压我"
+                org.synapses.push_back({(uint32_t)(15 + k - 8), cid, 0, 0.5, true, 50.0f, -1.0f});
+            }
+        }
+        if (k == 15) {
+            // 过牌头直接特征 (混淆诊断: 过牌 16.5k 次全误判, 共享通路信号被出牌头稀释)
+            // obs[23] = 当前台面牌力 (0..1): 台面越高越该过
+            org.synapses.push_back({23, cid, 0, 1.0, true, 50.0f, -1.0f});
+            // obs[15..21] = 高牌未见量: 对手可能压我 → 倾向过
+            for (uint32_t l = 15; l <= 21; ++l)
+                org.synapses.push_back({l, cid, 0, 0.3, true, 50.0f, -1.0f});
+            // 手牌持有量负特征 (obs[0..14]): 持牌越多越不该过
+            // (修正: obs[29] 余牌比率是自增强过牌陷阱 — 过牌→余牌高→更倾向过)
+            for (uint32_t h = 0; h <= 14; ++h)
+                org.synapses.push_back({h, cid, 0, -0.25, true, 50.0f, -1.0f});
+        }
     }
     for (auto& s : org.synapses) s.initial_weight = s.weight;
     org.compile();
