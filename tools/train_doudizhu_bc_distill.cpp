@@ -822,6 +822,7 @@ static int train_bc_cand(const char* path) {
         f.read((char*)&s.gid, 4);
         f.read((char*)&s.won, 4);
         if (!f.good() || s.label < 0 || s.label >= K) break;
+        s.dagger = std::getenv("V5_MAIN_IS_DAGGER") != nullptr;   // 网格: 主文件 = DAgger 轨迹
         data.push_back(std::move(s));
     }
     f.close();
@@ -844,7 +845,7 @@ static int train_bc_cand(const char* path) {
             f2.read((char*)&s.gid, 4);
             f2.read((char*)&s.won, 4);
             if (!f2.good() || s.label < 0 || s.label >= K) break;
-            s.dagger = true;   // DAgger 网格: 按样本源加权 (V5_DAGGER_W)
+            // 教师混合数据 (权重恒 1.0)
             data.push_back(std::move(s));
             extra_n++;
         }
@@ -919,6 +920,10 @@ static int train_bc_cand(const char* path) {
                         sum.grad_synapses[j] += one.grad_synapses[j];   // 候选 CE 梯度不除 K (会诊 4.9)
                     for (size_t j = 0; j < sum.grad_gains.size(); ++j)
                         sum.grad_gains[j] += one.grad_gains[j];
+                }
+                if (s.dagger && DAGGER_W != 1.0f) {   // DAgger 网格: 固定预算, 仅缩放 DAgger 样本梯度
+                    for (float& g : sum.grad_synapses) g *= DAGGER_W;
+                    for (float& g : sum.grad_gains) g *= DAGGER_W;
                 }
                 ce_sum += ce; ce_cnt++;
                 bptt.step_adam(org, sum, LR);
