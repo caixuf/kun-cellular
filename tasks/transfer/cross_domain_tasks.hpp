@@ -1197,6 +1197,19 @@ inline CellularOrganism build_doudizhu_64cell_recurrent_cortex() {
     org.synapses.push_back({26, 46, 0, 1.0, true, 50.0f, -1.0f});
     org.synapses.push_back({44, 47, 0, 1.0, true, 50.0f, -1.0f});
 
+    // 1.5 记牌晶格 -> 记忆槽直汇 (Card-Counting Lattice -> Memory Slots):
+    // obs[15..21] 对手余牌/记牌器 → INTEGRAL 工作记忆 (48/52/57) 与 EMA 短程记忆 (49/53)
+    org.synapses.push_back({15, 48, 0, 0.85, true, 50.0f, -1.0f});
+    org.synapses.push_back({16, 48, 0, 0.85, true, 50.0f, -1.0f});
+    org.synapses.push_back({17, 48, 0, 0.85, true, 50.0f, -1.0f});
+    org.synapses.push_back({18, 49, 0, 0.70, true, 50.0f, -1.0f});
+    org.synapses.push_back({19, 52, 0, 0.85, true, 50.0f, -1.0f});
+    org.synapses.push_back({20, 52, 0, 0.85, true, 50.0f, -1.0f});
+    org.synapses.push_back({21, 52, 0, 0.85, true, 50.0f, -1.0f});
+    org.synapses.push_back({15, 53, 0, 0.70, true, 50.0f, -1.0f});
+    org.synapses.push_back({16, 57, 0, 0.80, true, 50.0f, -1.0f});
+    org.synapses.push_back({17, 57, 0, 0.80, true, 50.0f, -1.0f});
+
     // 2. Layer 1 -> Layer 2 (Attractor Core)
     org.synapses.push_back({34, 50, 0, 1.2, true, 50.0f, -1.0f});
     org.synapses.push_back({41, 51, 0, 1.6, true, 50.0f, -1.0f});

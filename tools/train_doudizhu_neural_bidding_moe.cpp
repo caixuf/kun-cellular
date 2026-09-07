@@ -252,7 +252,7 @@ int main(int argc, char** argv) {
 
                     // 探索采样
                     double diff = (bid_score - std::max(CALIBRATED_THRESHOLD, opp_max_score)) / 1.2;
-                    float p_bid = std::clamp(static_cast<float>(1.0 / (1.0 + std::exp(-diff))), 0.01f, 0.99f);
+                    float p_bid = std::clamp(static_cast<float>(1.0 / (1.0 + std::exp(-diff))), 0.15f, 0.99f);
 
                     std::bernoulli_distribution b_dist(p_bid);
                     bool decision = b_dist(train_rng);
