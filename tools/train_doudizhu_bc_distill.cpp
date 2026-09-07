@@ -679,6 +679,9 @@ static void build_scorer_input(const std::vector<float>& obs, const std::vector<
     in.resize(48);   // v3: 36 obs (32 + 4 座次) + 12 候选交互
     for (int d = 0; d < 36; ++d) in[d] = obs[d];
     for (int d = 0; d < 12; ++d) in[36 + d] = cf[d];
+    // 受控消融 (会诊裁决): V5_ZERO_SEAT=1 → 座次 4 通道置零 (原图接线完全一致, 仅信息缺失)
+    if (std::getenv("V5_ZERO_SEAT"))
+        for (int d = 32; d < 36; ++d) in[d] = 0.0;
 }
 // 分数头专用 MSE (价值头导数恒 0 — 不用 target=0 冒充冻结)
 static const SubstrateLossFn kScoreOnlyLoss = [](const std::vector<float>& preds, const std::vector<float>& targets) -> SubstrateLossGrad {
@@ -1031,9 +1034,18 @@ static int eval_cand_games(int games, const char* policy_arg) {
     uint32_t lcg = 424243u;
     auto rnd01 = [&]() { lcg = lcg * 1664525u + 1013904223u; return (double)(lcg >> 8) / 16777216.0; };
     int wins = 0; long live_pass = 0, live_steps = 0;
+    int ll_w = 0, ll_n = 0, fm_w = 0, fm_n = 0;   // 角色分层 (诊断协议)
     for (int g = 0; g < games; ++g) {
         DouDiZhuCardGameTask task(40, (uint32_t)(3100000 + g * 97), 17.5);
         bool done = false;
+        bool agent_is_landlord = false;
+        {
+            // 首个决策前的角色探测 (叫牌已由构造完成)
+            DouDiZhuCardGameTask probe = task;
+            int lr0 = probe.teacher_play_capture();
+            (void)lr0;
+            agent_is_landlord = (probe.role() == 1);
+        }
         while (!done) {
             auto cands = task.enumerate_candidates(0);
             size_t pick = 0;
@@ -1041,9 +1053,12 @@ static int eval_cand_games(int games, const char* policy_arg) {
                 task.teacher_play_capture();
                 auto res = task.settle_turn();
                 live_steps++;
-                if (task.cards_left(0) >= (long)cands.size() + 1000) { } // no-op
                 done = res.done;
                 if (res.success) wins++;
+                if (done) {
+                    if (agent_is_landlord) { ll_n++; if (res.success) ll_w++; }
+                    else { fm_n++; if (res.success) fm_w++; }
+                }
                 continue;
             } else if (policy == "first") {
                 pick = 0;
@@ -1066,8 +1081,14 @@ static int eval_cand_games(int games, const char* policy_arg) {
             if (res.success) wins++;
             live_steps++;
             if (task.cards_left(0) == pre) live_pass++;
+            if (done) {   // 角色分层按局计数 (修复: 此前按决策步数误计)
+                if (agent_is_landlord) { ll_n++; if (res.success) ll_w++; }
+                else { fm_n++; if (res.success) fm_w++; }
+            }
         }
     }
+    printf("[角色分层] 地主 %d/%d = %.1f%% | 农民 %d/%d = %.1f%%\n",
+           ll_w, ll_n, ll_n ? 100.0 * ll_w / ll_n : 0.0, fm_w, fm_n, fm_n ? 100.0 * fm_w / fm_n : 0.0);
     printf("[v5实战/%s] %d 局: 胜率 %.1f%% (%d/%d) Wilson95下界 %.1f%% | 步数 %ld 过牌 %.1f%%\n",
            policy_arg, games, 100.0 * wins / games, wins, games, 100.0 * wilson_lower(wins, games),
            live_steps, 100.0 * live_pass / std::max(1L, live_steps));
@@ -1093,6 +1114,53 @@ int main(int argc, char** argv) {
     }
     if (mode == "train_cand") {
         train_bc_cand(argc > 2 ? argv[2] : "/tmp/opencode/doudizhu_cand.bin");
+        return 0;
+    }
+    if (mode == "audit_conflicts") {
+        // 会诊裁决: e_alias = Σ(n_g - max_a n_g,a)/N, 键 = 量化obs + 规范候选集合, 标签=(type,rank,count)
+        std::ifstream f(argc > 2 ? argv[2] : "/tmp/opencode/doudizhu_cand.bin", std::ios::binary);
+        char magic[4]; int32_t ver; f.read(magic, 4); f.read((char*)&ver, 4);
+        if (ver != 3) { fprintf(stderr, "[错误] 需 v3 数据\n"); return 1; }
+        int32_t games; f.read((char*)&games, 4);
+        std::map<std::string, std::map<std::string, long>> groups;   // 决策键 → 标签键 → 计数
+        long N = 0;
+        while (f.good()) {
+            float ob[36]; int32_t K, label, gid, won;
+            f.read((char*)ob, 144);
+            f.read((char*)&K, 4);
+            if (!f.good() || K <= 0 || K > 64) break;
+            std::vector<std::array<float, 12>> cs(K);
+            for (int i = 0; i < K; ++i) f.read((char*)cs[i].data(), 48);
+            f.read((char*)&label, 4); f.read((char*)&gid, 4); f.read((char*)&won, 4);
+            if (!f.good()) break;
+            char key[512]; int off = 0;
+            for (int d = 0; d < 36; ++d) off += snprintf(key + off, sizeof(key) - off, "%d,", (int)std::lround(ob[d] * 1000));
+            std::vector<std::string> cand_keys;
+            for (int i = 0; i < K; ++i) {
+                char ck[64];
+                snprintf(ck, sizeof(ck), "%d-%d-%d", (int)cs[i][0] ? 1 : (cs[i][1] ? 2 : (cs[i][2] ? 3 : (cs[i][3] ? 4 : 0))),
+                         (int)std::lround(cs[i][5] * 14), (int)std::lround(cs[i][6] * 4));
+                cand_keys.push_back(ck);
+            }
+            std::sort(cand_keys.begin(), cand_keys.end());
+            for (auto& ck : cand_keys) { off += snprintf(key + off, sizeof(key) - off, "%s;", ck.c_str()); }
+            char lk[64];
+            snprintf(lk, sizeof(lk), "%d-%d-%d", (int)cs[label][0] ? 1 : (cs[label][1] ? 2 : (cs[label][2] ? 3 : (cs[label][3] ? 4 : 0))),
+                     (int)std::lround(cs[label][5] * 14), (int)std::lround(cs[label][6] * 4));
+            groups[key][lk]++;
+            N++;
+        }
+        f.close();
+        long alias_err = 0, dup_groups = 0, dup_n = 0;
+        for (auto& [k, labels] : groups) {
+            long n = 0, mx = 0;
+            for (auto& [lk, c] : labels) { n += c; mx = std::max(mx, c); }
+            alias_err += n - mx;
+            if (n > 1) { dup_groups++; dup_n += n; }
+        }
+        printf("[冲突审计] N=%ld 组=%ld | e_alias=%.2f%% | 重复组 %ld 个 (覆盖 %ld 样本, %.1f%%)\n",
+               N, (long)groups.size(), 100.0 * alias_err / std::max(1L, N), dup_groups, dup_n,
+               100.0 * dup_n / std::max(1L, N));
         return 0;
     }
     if (mode == "eval_cand") {
