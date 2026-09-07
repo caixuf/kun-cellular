@@ -24,20 +24,28 @@ int main(int argc, char** argv) {
 
     const int NUM_EPISODES = 5000;
     const uint32_t SEED_BASE = 20260907;
-    const double BIDDING_GATE = 18.5; // 专家王者叫牌门限
+    const double BIDDING_GATE = []() { const char* e = std::getenv("DZ_GATE"); return e ? std::atof(e) : 18.5; }(); // 专家王者叫牌门限
 
     // 1. 加载 64 细胞主皮层作为专家基础基因
     const std::string ckpt_path = "checkpoints/doudizhu_64cell_grpo_cotrained.bin";
-    CellularOrganism base_cortex = CellularOrganism::load_checkpoint_bin(ckpt_path);
+    // DZ_BASE_UNTRAINED=1: 对照实验 (归因 GRPO 训练 vs 手写架构)
+    CellularOrganism base_cortex = std::getenv("DZ_BASE_UNTRAINED")
+        ? build_doudizhu_64cell_recurrent_cortex()
+        : CellularOrganism::load_checkpoint_bin(ckpt_path);
 
     // 2. 构造内生一体化生命体 (Endogenous Organism)
     CellularOrganism endogenous_brain = base_cortex;
+    // 器官消融开关 (审计用): DZ_DISABLE_MLA/ROPE/RELAX/MOE/SPEC=1 逐项关闭
+    auto env_off = [](const char* k) { const char* e = std::getenv(k); return e && std::atoi(e) != 0; };
+    bool dis_mla = env_off("DZ_DISABLE_MLA"), dis_rope = env_off("DZ_DISABLE_ROPE"),
+         dis_relax = env_off("DZ_DISABLE_RELAX"), dis_moe = env_off("DZ_DISABLE_MOE"),
+         dis_spec = env_off("DZ_DISABLE_SPEC");
     
     // 激活原生内生器官
-    endogenous_brain.enable_mla(32, 8, 2, 8, 32, 42);
-    endogenous_brain.enable_rope(8, 10000.0f, 64);
-    endogenous_brain.enable_moe(32, 2, 1, 0.01, 42); // 2 个角色专精专家，Top-1 路由
-    endogenous_brain.set_relaxation_steps(2, 0.5);
+    if (!dis_mla) endogenous_brain.enable_mla(32, 8, 2, 8, 32, 42);
+    if (!dis_rope) endogenous_brain.enable_rope(8, 10000.0f, 64);
+    if (!dis_moe) endogenous_brain.enable_moe(32, 2, 1, 0.01, 42); // 2 个角色专精专家，Top-1 路由
+    if (!dis_relax) endogenous_brain.set_relaxation_steps(2, 0.5);
 
     // 专家 0: 地主专精微柱 (偏激进输出)
     CellularOrganism landlord_expert = base_cortex;
@@ -61,7 +69,9 @@ int main(int argc, char** argv) {
 
     // 16 细胞快速草稿核
     CellularOrganism draft_core = CellularOrganism::create_seed_organism(999);
-    endogenous_brain.enable_speculative(draft_core, 0.65f);
+    if (!dis_spec) endogenous_brain.enable_speculative(draft_core, 0.65f);
+    printf("[消融配置] MLA=%d ROPE=%d RELAX=%d MOE=%d SPEC=%d\n",
+           !dis_mla, !dis_rope, !dis_relax, !dis_moe, !dis_spec);
 
     std::cout << "⏳ 正在执行 5,000 局对偶种子盲测 (Baseline 1 vs Endogenous Brain)...\n";
 
@@ -112,12 +122,14 @@ int main(int argc, char** argv) {
 
             // 根据角色调节路由器偏置，实现角色专精路由 (Role Specialization)
             // 专家 0 对应地主，专家 1 对应农民
-            if (role == 1) {
-                brain_clone.moe_router()->biases()[0] = 5.0;
-                brain_clone.moe_router()->biases()[1] = -5.0;
-            } else {
-                brain_clone.moe_router()->biases()[0] = -5.0;
-                brain_clone.moe_router()->biases()[1] = 5.0;
+            if (brain_clone.moe_router()) {
+                if (role == 1) {
+                    brain_clone.moe_router()->biases()[0] = 5.0;
+                    brain_clone.moe_router()->biases()[1] = -5.0;
+                } else {
+                    brain_clone.moe_router()->biases()[0] = -5.0;
+                    brain_clone.moe_router()->biases()[1] = 5.0;
+                }
             }
 
             while (true) {
