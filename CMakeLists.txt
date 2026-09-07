@@ -138,6 +138,9 @@ target_link_libraries(bench_doudizhu_all6_composite PRIVATE kun_cellular Threads
 add_executable(bench_doudizhu_endogenous_60 "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_doudizhu_endogenous_60.cpp")
 target_link_libraries(bench_doudizhu_endogenous_60 PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_doudizhu_neural_bidding_moe "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_doudizhu_neural_bidding_moe.cpp")
+target_link_libraries(train_doudizhu_neural_bidding_moe PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_quant_futures "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_futures.cpp")
 target_link_libraries(train_quant_futures PRIVATE kun_cellular Threads::Threads m)
 

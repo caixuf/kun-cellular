@@ -253,9 +253,34 @@ public:
         }
     };
 
-    explicit DouDiZhuCardGameTask(int max_rounds = 40, uint32_t seed = 42, double bidding_threshold = 14.2)
-        : max_rounds_(max_rounds), bidding_threshold_(bidding_threshold), rng_(seed) {
+    using NeuralBidEvaluator = std::function<bool(const std::vector<float>& hand_obs, double opp_max_score)>;
+
+    explicit DouDiZhuCardGameTask(int max_rounds = 40, uint32_t seed = 42, double bidding_threshold = 16.0,
+                                  NeuralBidEvaluator neural_bid = nullptr)
+        : max_rounds_(max_rounds), bidding_threshold_(bidding_threshold),
+          neural_bid_evaluator_(std::move(neural_bid)), rng_(seed) {
         reset(seed);
+    }
+
+    void set_neural_bid_evaluator(NeuralBidEvaluator eval) { neural_bid_evaluator_ = std::move(eval); }
+    const NeuralBidEvaluator& neural_bid_evaluator() const { return neural_bid_evaluator_; }
+
+    std::vector<float> initial_hand_observation() const {
+        std::vector<float> obs(32, 0.0f);
+        for (int r = 0; r < 15; ++r) {
+            float max_c = (r < 13) ? 4.0f : 1.0f;
+            obs[r] = std::clamp(static_cast<float>(hands_[0][r]) / max_c, 0.0f, 1.0f);
+        }
+        for (int r = 8; r < 15; ++r) {
+            float max_unseen = (r < 13) ? 4.0f : 1.0f;
+            int unseen_cnt = ((r < 13) ? 4 : 1) - hands_[0][r];
+            obs[15 + (r - 8)] = std::clamp(static_cast<float>(unseen_cnt) / max_unseen, 0.0f, 1.0f);
+        }
+        obs[28] = 0.0f;
+        obs[29] = 17.0f / 20.0f;
+        obs[30] = 17.0f / 20.0f;
+        obs[31] = 17.0f / 20.0f;
+        return obs;
     }
 
     const char* name() const override { return "DouDiZhu-ImperfectInfoGame"; }
@@ -331,8 +356,14 @@ public:
         double score2 = evaluate_hand_potential(2);
 
         // 烂牌不盲叫地主，只有手牌大牌/成型牌势能充足时才叫地主拿 3 张底牌
-        // 精准门禁：起手势能 >= bidding_threshold_ 且高于两个对手，确保叫牌胜率维持在 65%+
-        bool p0_bids = (score0 >= bidding_threshold_ && score0 >= score1 && score0 >= score2);
+        // 精准门禁：若配置神经叫牌核，则由端到端全息感知晶格自主决断；否则使用真实专家门限 (16.0)
+        bool p0_bids = false;
+        if (neural_bid_evaluator_) {
+            auto hand_obs = initial_hand_observation();
+            p0_bids = neural_bid_evaluator_(hand_obs, std::max(score1, score2));
+        } else {
+            p0_bids = (score0 >= bidding_threshold_ && score0 >= score1 && score0 >= score2);
+        }
         if (p0_bids) {
             landlord_ = 0;
             role_ = 1; // 地主
@@ -1070,6 +1101,7 @@ private:
     bool agent_won_{false};
     int total_wins_{0};
     int games_played_{0};
+    NeuralBidEvaluator neural_bid_evaluator_{nullptr};
     std::mt19937 rng_;
 };
 
@@ -1229,6 +1261,66 @@ inline CellularOrganism build_doudizhu_64cell_recurrent_cortex() {
     org.synapses.push_back({58, 51, 0, 0.80, true, 50.0f, -1.0f});
     org.synapses.push_back({58, 59, 0, 0.50, true, 50.0f, -1.0f});
 
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    return org;
+}
+
+/**
+ * @brief 构建 64 细胞端到端神经叫牌皮层微柱 (Neural Bidding Cortex)
+ * 32 维全息手牌输入 -> 16 维特征提取 (大牌前馈赋能、散牌抑制) -> 12 维循环动力学核心 -> 效应器输出 (叫牌/不叫)
+ */
+inline CellularOrganism build_doudizhu_bidding_cortex() {
+    CellularOrganism org = build_doudizhu_64cell_recurrent_cortex();
+
+    // 强化大牌 (11: A, 12: 2, 13: 小王, 14: 大王) 对叫牌通道 (Cell 61) 的直接前馈赋能
+    org.synapses.push_back({11, 61, 0, 0.15, true, 50.0f, -1.0f});
+    org.synapses.push_back({12, 61, 0, 0.40, true, 50.0f, -1.0f});
+    org.synapses.push_back({13, 61, 0, 0.55, true, 50.0f, -1.0f});
+    org.synapses.push_back({14, 61, 0, 0.75, true, 50.0f, -1.0f});
+
+    // 散牌 (0..6: 3..9) 对让牌通道 (Cell 62) 产生正向激励 (抑制盲目叫牌)
+    for (uint32_t r = 0; r <= 6; ++r) {
+        org.synapses.push_back({r, 62, 0, 0.35, true, 50.0f, -1.0f});
+    }
+
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    return org;
+}
+
+/**
+ * @brief 构建 64 细胞地主进攻专精皮层微柱 (Landlord Assault Specialist Column)
+ */
+inline CellularOrganism build_doudizhu_landlord_cortex(const std::string& base_ckpt = "") {
+    CellularOrganism org;
+    if (!base_ckpt.empty() && std::ifstream(base_ckpt).good()) {
+        org = CellularOrganism::load_checkpoint_bin(base_ckpt);
+    } else {
+        org = build_doudizhu_64cell_recurrent_cortex();
+    }
+    for (auto& syn : org.synapses) {
+        if (syn.to_cell_id >= 60 && syn.to_cell_id <= 63) syn.weight *= 1.05; // 强化进攻激进度
+    }
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    return org;
+}
+
+/**
+ * @brief 构建 64 细胞农民防守协作专精皮层微柱 (Peasant Cooperation Specialist Column)
+ */
+inline CellularOrganism build_doudizhu_peasant_cortex(const std::string& base_ckpt = "") {
+    CellularOrganism org;
+    if (!base_ckpt.empty() && std::ifstream(base_ckpt).good()) {
+        org = CellularOrganism::load_checkpoint_bin(base_ckpt);
+    } else {
+        org = build_doudizhu_64cell_recurrent_cortex();
+    }
+    for (auto& syn : org.synapses) {
+        if (syn.from_cell_id == 26 && syn.to_cell_id == 62) syn.weight *= 1.4; // 盟友牌大果断让牌
+        if (syn.to_cell_id >= 60 && syn.to_cell_id <= 63) syn.weight *= 0.95; // 强化稳健保牌
+    }
     for (auto& s : org.synapses) s.initial_weight = s.weight;
     org.compile();
     return org;

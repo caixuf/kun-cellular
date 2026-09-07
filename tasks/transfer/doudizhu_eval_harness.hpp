@@ -73,7 +73,7 @@ struct BaselinePerformance {
 struct ThreeBaselineReport {
     int total_episodes{0};
     uint32_t seed_base{0};
-    double bidding_gate_threshold{5.0};
+    double bidding_gate_threshold{16.0};
     BaselinePerformance baseline_0; // 随机合法出牌 (无门禁)
     BaselinePerformance baseline_1; // 随机合法出牌 + 门禁 (Strength >= 5)
     BaselinePerformance target;     // 待评生命体
@@ -156,7 +156,7 @@ public:
     explicit DouDiZhuThreeBaselineHarness(
         int num_episodes = 5000,
         uint32_t seed_base = 20260907,
-        double bidding_gate_threshold = 5.0,
+        double bidding_gate_threshold = 16.0,
         int max_rounds = 40)
         : num_episodes_(num_episodes),
           seed_base_(seed_base),
@@ -391,10 +391,81 @@ public:
         return compile_report(target_perf);
     }
 
+    /**
+     * @brief 评测具备端到端神经叫牌 + MoE 双角色专精微柱的生命体
+     */
+    ThreeBaselineReport evaluate_neural_moe_organism(
+        const std::string& target_name,
+        DouDiZhuCardGameTask::NeuralBidEvaluator bid_eval,
+        CellularOrganism landlord_org,
+        CellularOrganism peasant_org,
+        double* out_avg_latency_ns = nullptr,
+        uint64_t* out_decision_calls = nullptr) const
+    {
+        BaselinePerformance target_perf;
+        target_perf.name = target_name;
+        target_perf.total_episodes = num_episodes_;
+        target_perf.win_records.resize(num_episodes_);
+        target_perf.chip_records.resize(num_episodes_);
+
+        int wins = 0;
+        double total_chips = 0.0;
+        double total_steps = 0.0;
+        double total_latency_ns = 0.0;
+        uint64_t decision_calls = 0;
+
+        for (int i = 0; i < num_episodes_; ++i) {
+            uint32_t s = seeds_[i];
+            DouDiZhuCardGameTask task(max_rounds_, s, bidding_gate_threshold_, bid_eval);
+
+            auto l_org = landlord_org;
+            auto p_org = peasant_org;
+            l_org.reset_state(true);
+            p_org.reset_state(true);
+
+            while (true) {
+                auto obs = task.current_observation();
+                std::vector<double> inps(obs.begin(), obs.end());
+
+                auto t0 = std::chrono::high_resolution_clock::now();
+                CellularOrganism::ActionOutputs acts;
+                if (task.role() == 1) {
+                    acts = l_org.forward_nd(inps.data(), inps.size(), false);
+                } else {
+                    acts = p_org.forward_nd(inps.data(), inps.size(), false);
+                }
+                auto t1 = std::chrono::high_resolution_clock::now();
+                total_latency_ns += std::chrono::duration<double, std::nano>(t1 - t0).count();
+                decision_calls++;
+
+                auto res = task.step_continuous(acts);
+                if (res.done) {
+                    if (res.success) wins++;
+                    double chips = res.success ? 200.0 : -200.0;
+                    total_chips += chips;
+                    total_steps += res.steps;
+                    target_perf.win_records[i] = res.success ? 1 : 0;
+                    target_perf.chip_records[i] = chips;
+                    break;
+                }
+            }
+        }
+
+        if (out_avg_latency_ns) {
+            *out_avg_latency_ns = decision_calls > 0 ? (total_latency_ns / decision_calls) : 0.0;
+        }
+        if (out_decision_calls) {
+            *out_decision_calls = decision_calls;
+        }
+
+        finalize_performance(target_perf, wins, total_chips, total_steps);
+        return compile_report(target_perf);
+    }
+
 private:
     int num_episodes_{5000};
     uint32_t seed_base_{20260907};
-    double bidding_gate_threshold_{5.0};
+    double bidding_gate_threshold_{16.0};
     int max_rounds_{40};
     std::vector<uint32_t> seeds_;
     BaselinePerformance b0_;
