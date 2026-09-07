@@ -417,6 +417,7 @@ public:
         for (int i = 0; i < num_episodes_; ++i) {
             uint32_t s = seeds_[i];
             DouDiZhuCardGameTask task(max_rounds_, s, bidding_gate_threshold_, bid_eval);
+            if (std::getenv("DZ_DIRECT_ACT")) task.set_direct_actions(true);
 
             auto l_org = landlord_org;
             auto p_org = peasant_org;

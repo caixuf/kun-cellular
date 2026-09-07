@@ -501,97 +501,174 @@ public:
     }
 
     void apply_seat_policy_action(int p, int act) {
+        // step() 的逐分支镜像 (座位参数化): 与智能体共用同一执行器 play_opponent_turn(p)
         bool is_landlord = (p == landlord_);
-        // 王炸在场: 天牌必过
-        if (table_trick_.type == TRICK_ROCKET) {
-            pass_count_++;
-            if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; }
-            else current_turn_ = (p + 1) % 3;
-            return;
+        int teammate = is_landlord ? -1 : (3 - landlord_ - p);
+        int landlord_cards = is_landlord ? 0 : cards_left_[landlord_];
+        int enemy_min_cards = 20;
+        if (is_landlord) {
+            for (int q = 0; q < 3; ++q) if (q != p) enemy_min_cards = std::min(enemy_min_cards, cards_left_[q]);
+        } else {
+            enemy_min_cards = landlord_cards;
         }
-        if (table_trick_.type == TRICK_NONE) {
-            // 自由出牌权 (规则禁止过牌): act1=低单引牌, act2=高单强攻, act0=低单
-            int r_played = -1, cnt = 1;
-            if (act == 2) {
-                for (int r = 14; r >= 0; --r) {
-                    if (hands_[p][r] >= 1 && hands_[p][r] < 4) {
-                        if ((r == 13 || r == 14) && has_rocket(p)) continue;
-                        r_played = r; break;
+        int nxt = (p + 1) % 3;
+
+        if (act == 0) {
+            if (table_trick_.type == TRICK_NONE) {
+                if (direct_actions_) {
+                    for (int r = 0; r < 15; ++r) {
+                        if (hands_[p][r] >= 1 && hands_[p][r] < 4) {
+                            if ((r == 13 || r == 14) && has_rocket(p)) continue;
+                            hands_[p][r]--; cards_left_[p]--;
+                            table_trick_ = Trick{TRICK_SOLO, r, p}; record_card_played(r, 1, p);
+                            break;
+                        }
                     }
+                    pass_count_ = 0; current_turn_ = (p + 1) % 3;
+                } else {
+                    play_opponent_turn(p, false); // 规则禁止自由过牌, 强制常规出牌
+                }
+            } else if (!is_landlord && table_trick_.owner == teammate) {
+                pass_count_++;
+                if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; }
+                else current_turn_ = nxt;
+            } else if (enemy_min_cards <= 2) {
+                play_opponent_turn(p, false); // 不可过牌送死, 强制阻击
+            } else {
+                bool followed_natural = false;
+                if (table_trick_.type == TRICK_SOLO) {
+                    for (int r = table_trick_.rank + 1; r < 15; ++r) {
+                        if (hands_[p][r] == 1) {
+                            if ((r == 13 || r == 14) && has_rocket(p)) continue;
+                            hands_[p][r]--; cards_left_[p]--;
+                            table_trick_ = Trick{TRICK_SOLO, r, p}; record_card_played(r, 1, p);
+                            followed_natural = true; break;
+                        }
+                    }
+                } else if (table_trick_.type == TRICK_PAIR) {
+                    for (int r = table_trick_.rank + 1; r < 13; ++r) {
+                        if (hands_[p][r] == 2) {
+                            hands_[p][r] -= 2; cards_left_[p] -= 2;
+                            table_trick_ = Trick{TRICK_PAIR, r, p}; record_card_played(r, 2, p);
+                            followed_natural = true; break;
+                        }
+                    }
+                }
+                if (!followed_natural) {
+                    pass_count_++;
+                    if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; }
+                    else current_turn_ = nxt;
+                } else {
+                    pass_count_ = 0; current_turn_ = nxt;
+                }
+            }
+        } else if (act == 1) {
+            if (direct_actions_ && table_trick_.type != TRICK_NONE) {
+                // 直接最低合法跟牌 (无启发式委托): 策略必须真学出牌
+                int lo = -1, cnt = 1;
+                if (table_trick_.type == TRICK_SOLO) {
+                    for (int r = table_trick_.rank + 1; r < 15; ++r) {
+                        if (hands_[p][r] >= 1 && hands_[p][r] < 4) {
+                            if ((r == 13 || r == 14) && has_rocket(p)) continue;
+                            lo = r; cnt = 1; break;
+                        }
+                    }
+                } else if (table_trick_.type == TRICK_PAIR) {
+                    for (int r = table_trick_.rank + 1; r < 13; ++r) {
+                        if (hands_[p][r] == 2) { lo = r; cnt = 2; break; }
+                    }
+                } else {
+                    for (int r = table_trick_.rank + 1; r < 13; ++r) {
+                        if (hands_[p][r] == 4) { lo = r; cnt = 4; break; }
+                    }
+                }
+                if (lo >= 0) {
+                    hands_[p][lo] -= cnt; cards_left_[p] -= cnt;
+                    table_trick_ = Trick{table_trick_.type, lo, p}; record_card_played(lo, cnt, p);
+                    pass_count_ = 0; current_turn_ = (p + 1) % 3;
+                } else {
+                    pass_count_++;
+                    if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; }
+                    else current_turn_ = (p + 1) % 3;
                 }
             } else {
-                for (int r = 0; r < 15; ++r) {
-                    if (hands_[p][r] >= 1 && hands_[p][r] < 4) {
-                        if ((r == 13 || r == 14) && has_rocket(p)) continue;
-                        r_played = r; break;
+                play_opponent_turn(p, false); // 合规跟牌: 与智能体共用同一执行器 (含内部过牌账本)
+            }
+        } else { // act == 2: 强行夺权 / 炸弹突击 / 残局冲刺
+            bool played = false;
+            if (table_trick_.type == TRICK_NONE) {
+                if (cards_left_[p] <= 2 && has_rocket(p)) { play_rocket(p); played = true; }
+                else if (cards_left_[p] == 2) {
+                    for (int r = 0; r < 13; ++r) {
+                        if (hands_[p][r] == 2) {
+                            hands_[p][r] -= 2; cards_left_[p] -= 2;
+                            table_trick_ = Trick{TRICK_PAIR, r, p}; record_card_played(r, 2, p);
+                            played = true; break;
+                        }
+                    }
+                } else if (cards_left_[p] == 1) {
+                    for (int r = 14; r >= 0; --r) {
+                        if (hands_[p][r] >= 1) {
+                            hands_[p][r]--; cards_left_[p]--;
+                            table_trick_ = Trick{TRICK_SOLO, r, p}; record_card_played(r, 1, p);
+                            played = true; break;
+                        }
                     }
                 }
-            }
-            if (r_played < 0) { // 兜底: 拆对/出炸弹
-                for (int r = 0; r < 15; ++r) { if (hands_[p][r] >= 1) { r_played = r; cnt = 1; break; } }
-            }
-            hands_[p][r_played] -= cnt;
-            cards_left_[p] -= cnt;
-            table_trick_ = Trick{TRICK_SOLO, r_played, p};
-            record_card_played(r_played, cnt, p);
-            pass_count_ = 0;
-            current_turn_ = (p + 1) % 3;
-            return;
-        }
-        // 跟牌/夺权
-        int lo = -1, hi = -1;
-        if (table_trick_.type == TRICK_SOLO) {
-            for (int r = table_trick_.rank + 1; r < 15; ++r) {
-                if (hands_[p][r] >= 1 && hands_[p][r] < 4) {
-                    if ((r == 13 || r == 14) && has_rocket(p)) continue;
-                    if (lo < 0) lo = r;
-                    hi = r;
+                // 记牌器赋能冲刺 (座位视角: 总量 - 已打出 - 己方)
+                if (!played && (cards_left_[p] <= 5 || enemy_min_cards <= 3)) {
+                    int top_unseen = -1;
+                    for (int r = 14; r >= 0; --r) {
+                        float total = (r < 13) ? 4.0f : 1.0f;
+                        if ((total - static_cast<float>(lattice_.played[r]) - static_cast<float>(hands_[p][r])) > 0.5f) { top_unseen = r; break; }
+                    }
+                    for (int r = 14; r > top_unseen && r >= 10; --r) {
+                        if (hands_[p][r] >= 1) {
+                            if ((r == 13 || r == 14) && has_rocket(p)) continue;
+                            hands_[p][r]--; cards_left_[p]--;
+                            table_trick_ = Trick{TRICK_SOLO, r, p}; record_card_played(r, 1, p);
+                            played = true; break;
+                        }
+                    }
                 }
-            }
-        } else if (table_trick_.type == TRICK_PAIR) {
-            for (int r = table_trick_.rank + 1; r < 13; ++r) {
-                if (hands_[p][r] == 2) { if (lo < 0) lo = r; hi = r; }
-            }
-        } else { // BOMB: 仅更大炸弹或王炸
-            for (int r = table_trick_.rank + 1; r < 13; ++r) {
-                if (hands_[p][r] == 4) { if (lo < 0) lo = r; hi = r; }
-            }
-        }
-        if (lo >= 0 && act >= 1) {
-            int r_played = (act == 2) ? hi : lo;
-            int cnt = (table_trick_.type == TRICK_PAIR) ? 2 : ((table_trick_.type == TRICK_BOMB) ? 4 : 1);
-            if (table_trick_.type == TRICK_SOLO && hands_[p][r_played] > 1 && hands_[p][r_played] < 4) cnt = 1;
-            hands_[p][r_played] -= cnt;
-            cards_left_[p] -= cnt;
-            table_trick_ = Trick{table_trick_.type, r_played, p};
-            record_card_played(r_played, cnt, p);
-            pass_count_ = 0;
-            current_turn_ = (p + 1) % 3;
-        } else if (lo < 0 && act == 2 && table_trick_.type != TRICK_BOMB) {
-            // 夺权: 炸弹/王炸
-            bool did = false;
-            for (int r = 0; r < 13; ++r) {
-                if (hands_[p][r] == 4) {
-                    hands_[p][r] -= 4; cards_left_[p] -= 4;
-                    table_trick_ = Trick{TRICK_BOMB, r, p}; record_card_played(r, 4, p);
-                    did = true; break;
+                if (!played) play_opponent_turn(p, false);
+                pass_count_ = 0;
+                current_turn_ = nxt;
+            } else if (!is_landlord && table_trick_.owner == teammate) {
+                pass_count_++;
+                if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; }
+                else current_turn_ = nxt;
+            } else {
+                bool urgent = (enemy_min_cards <= 3) || (cards_left_[p] <= 3) || (table_trick_.type == TRICK_BOMB);
+                if (urgent && table_trick_.type != TRICK_ROCKET) {
+                    for (int r = 0; r < 13; ++r) {
+                        if (hands_[p][r] == 4 && (table_trick_.type != TRICK_BOMB || r > table_trick_.rank)) {
+                            hands_[p][r] -= 4; cards_left_[p] -= 4;
+                            table_trick_ = Trick{TRICK_BOMB, r, p}; record_card_played(r, 4, p);
+                            played = true; break;
+                        }
+                    }
+                    if (!played && has_rocket(p)) { play_rocket(p); played = true; }
                 }
+                if (!played && enemy_min_cards == 1 && table_trick_.type == TRICK_SOLO) {
+                    for (int r = 14; r > table_trick_.rank; --r) {
+                        if (hands_[p][r] >= 1 && hands_[p][r] < 4) {
+                            if ((r == 13 || r == 14) && has_rocket(p)) continue;
+                            hands_[p][r]--; cards_left_[p]--;
+                            table_trick_ = Trick{TRICK_SOLO, r, p}; record_card_played(r, 1, p);
+                            played = true; break;
+                        }
+                    }
+                }
+                if (!played) play_opponent_turn(p, false); // 其余情况最小合法跟牌 (同一执行器)
             }
-            if (!did && has_rocket(p)) { play_rocket(p); did = true; }
-            if (did) { pass_count_ = 0; current_turn_ = (p + 1) % 3; }
-            else { pass_count_++; if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; } else current_turn_ = (p + 1) % 3; }
-        } else {
-            // 过牌
-            pass_count_++;
-            if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; }
-            else current_turn_ = (p + 1) % 3;
         }
     }
 
-    void play_opponent_turn(int p) {
+    void play_opponent_turn(int p, bool allow_hook = true) {
         if (cards_left_[p] <= 0) return;
-        // 外部策略钩子: 座位 p 由训练柱驱动 (L3 自博弈)
-        if (seat_policies_[p]) {
+        // 外部策略钩子: 座位 p 由训练柱驱动 (L3 自博弈; allow_hook=false 防内部委托递归)
+        if (allow_hook && seat_policies_[p]) {
             apply_seat_policy_action(p, seat_policies_[p](observation_for(p)));
             return;
         }
@@ -1198,6 +1275,36 @@ public:
     }
 
     StepResult step_continuous(const CellularOrganism::ActionOutputs& acts) override {
+        if (direct_actions_) {
+            int act = (acts.defensive_reset > acts.positive_action) ? 2
+                    : ((acts.negative_action > acts.positive_action) ? 0 : 1);
+            round_count_++;
+            apply_seat_policy_action(0, act);
+            double reward = 0.0;
+            bool done = false;
+            bool is_landlord = (role_ == 1);
+            if (cards_left_[0] <= 0) {
+                agent_won_ = true; done = true;
+                reward += is_landlord ? 35.0 + 1.0 * (cards_left_[1] + cards_left_[2]) : 30.0 + 1.5 * cards_left_[landlord_];
+            }
+            while (current_turn_ != 0 && !done && round_count_ < max_rounds_) {
+                int p = current_turn_;
+                play_opponent_turn(p);
+                if (cards_left_[p] <= 0) {
+                    done = true;
+                    if (is_landlord || p == landlord_) { agent_won_ = false; reward -= 20.0; }
+                    else { agent_won_ = true; reward += 30.0 + 1.0 * cards_left_[landlord_]; }
+                    break;
+                }
+            }
+            if (!done && round_count_ >= max_rounds_) { agent_won_ = false; reward -= 10.0; done = true; }
+            if (done) { games_played_++; if (agent_won_) total_wins_++; }
+            StepResult res;
+            res.obs = current_observation();
+            res.reward = reward; res.done = done; res.success = agent_won_;
+            res.steps = round_count_; res.min_dist_to_goal = static_cast<double>(cards_left_[0]);
+            return res;
+        }
         int act = 1;
         if (table_trick_.type == TRICK_NONE) {
             // 自由出牌权: 规则禁止让牌 (0), 只能在合规出牌 (1) 与抢牌/冲刺 (2) 间决断
@@ -1243,6 +1350,10 @@ private:
     int games_played_{0};
     NeuralBidEvaluator neural_bid_evaluator_{nullptr};
     SeatActionPolicy seat_policies_[3]{nullptr, nullptr, nullptr};
+    bool direct_actions_{false}; // true: 三动作=直接出牌语义 (禁用启发式委托), GRPO 必须真学出牌
+public:
+    void set_direct_actions(bool d) { direct_actions_ = d; }
+private:
     std::mt19937 rng_;
 };
 

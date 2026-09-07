@@ -122,6 +122,10 @@ int main(int argc, char** argv) {
         const char* e = std::getenv("DZ_MODEL_BID_GATE");
         return e ? std::atof(e) : 17.5;
     }();
+    const bool DIRECT_ACT = []() {
+        const char* e = std::getenv("DZ_DIRECT_ACT");
+        return e ? (std::atoi(e) != 0) : false;
+    }();
     const bool FREEZE_BID = []() {
         const char* e = std::getenv("DZ_FREEZE_BID");
         return e ? (std::atoi(e) != 0) : true;   // 默认冻结 (先验 18.8%@17.5 已证健康)
@@ -263,6 +267,7 @@ int main(int argc, char** argv) {
                 };
 
                 DouDiZhuCardGameTask task(40, deal_seed, CALIBRATED_THRESHOLD, bid_eval_train);
+                if (DIRECT_ACT) task.set_direct_actions(true);
                 rr.role = task.role();
                 if (rr.role == 1) epoch_landlord_games++;
                 else epoch_peasant_games++;
@@ -488,6 +493,7 @@ int main(int argc, char** argv) {
     std::cout << "[Step 3] 启动 5,000 局 3-Baseline 标准实证对账盲测 (对齐专家门禁 threshold=" << CALIBRATED_THRESHOLD << ")...\n";
     DouDiZhuThreeBaselineHarness harness(5000, 20260907, CALIBRATED_THRESHOLD, 40);
 
+    std::cout << "   - 直接出牌模式: " << (DIRECT_ACT ? "是 (禁用启发式委托)" : "否") << "\n";
     auto final_bid_eval = [&](const std::vector<float>& hand_obs, double opp_max_score) -> bool {
         auto b = bid_org;
         b.reset_state(true);

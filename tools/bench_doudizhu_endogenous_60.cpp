@@ -9,6 +9,9 @@
 using namespace kun;
 using namespace kun::cellular;
 
+static long agent_calls = 0;
+static long agent_act[3] = {0, 0, 0};
+
 int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
@@ -123,20 +126,29 @@ int main(int argc, char** argv) {
 
             // L3 自博弈: 对手 1/2 号位 = 同权重训练柱克隆 (强对手阶梯)
             static CellularOrganism sp_opp1 = base_cortex, sp_opp2 = base_cortex;
+            static long sp_calls = 0;
+            static long sp_act[3] = {0, 0, 0};
             if (selfplay) {
                 auto make_policy = [](CellularOrganism& org) {
                     return [&org](const std::vector<float>& obs) -> int {
                         std::vector<double> in(obs.begin(), obs.end());
                         auto a = org.forward_nd(in.data(), in.size(), false);
-                        if (a.defensive_reset > a.positive_action && a.defensive_reset > a.negative_action) return 2;
-                        if (a.negative_action > a.positive_action) return 0;
-                        return 1;
+                        sp_calls++;
+                        int act;
+                        if (a.defensive_reset > a.positive_action && a.defensive_reset > a.negative_action) act = 2;
+                        else if (a.negative_action > a.positive_action) act = 0;
+                        else act = 1;
+                        sp_act[act]++;
+                        return act;
                     };
                 };
                 task.set_seat_policy(1, make_policy(sp_opp1));   // 每局任务实例必须重绑 (task 每局新建)
                 task.set_seat_policy(2, make_policy(sp_opp2));
                 sp_opp1.reset_state(true);
                 sp_opp2.reset_state(true);
+            }
+            if (selfplay && i == NUM_EPISODES - 1) {
+                printf("[自博弈插桩] 钩子调用 %ld 次 | act0=%ld act1=%ld act2=%ld\n", sp_calls, sp_act[0], sp_act[1], sp_act[2]);
             }
 
             // 根据角色调节路由器偏置，实现角色专精路由 (Role Specialization)
@@ -157,6 +169,12 @@ int main(int argc, char** argv) {
 
                 auto t0 = std::chrono::high_resolution_clock::now();
                 auto acts = brain_clone.step_endogenous(inps.data(), inps.size(), false);
+                if (i == NUM_EPISODES - 1) {
+                    agent_calls++;
+                    if (acts.defensive_reset > acts.positive_action && acts.defensive_reset > acts.negative_action) agent_act[2]++;
+                    else if (acts.negative_action > acts.positive_action) agent_act[0]++;
+                    else agent_act[1]++;
+                }
                 auto t1 = std::chrono::high_resolution_clock::now();
                 total_brain_latency_ns += std::chrono::duration<double, std::nano>(t1 - t0).count();
                 decision_calls++;
@@ -214,6 +232,7 @@ int main(int argc, char** argv) {
               << (100.0 * p_wins_brain / p_games) << "% vs Baseline 1 " << (100.0 * p_wins_b1 / p_games) << "%)\n";
     std::cout << "   - McNemar 对账检验: " << mcnemar.to_string(2) << "\n";
     std::cout << "   - 最终胜率突破: " << wr_brain << "% (相对原 50.9% 暴涨 +" << (wr_brain - 50.9) << "%)\n\n";
+    printf("[智能体插桩] 调用 %ld 次 | act0=%ld act1=%ld act2=%ld\n", agent_calls, agent_act[0], agent_act[1], agent_act[2]);
 
     return 0;
 }
