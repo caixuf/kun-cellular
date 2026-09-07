@@ -1700,6 +1700,40 @@ inline CellularOrganism build_doudizhu_64cell_rank_cortex() {
 }
 
 /**
+ * @brief v3 rank 皮层: 64 细胞柱 + 17 头 + 64 细胞专属特征层 (SUM/ABS 无状态非线性)
+ * 特征层全扇入 32 受体 (确定性 LCG 随机投影) + 全扇出 17 头 — 突破共享窄管容量瓶颈
+ */
+inline CellularOrganism build_doudizhu_rank_cortex_v3() {
+    CellularOrganism org = build_doudizhu_64cell_rank_cortex();
+    // 结构化特征层 (v4): 15 个阈值细胞精确编码 "rank k 能否压过当前台面牌力"
+    // T_k = (obs23 > k/14) → 头 k 学到 "教师选最低可压牌" 的逆序偏好 (每头独立 α_k)
+    for (int k = 0; k <= 14; ++k) {
+        uint32_t cid = 96 + static_cast<uint32_t>(k);
+        org.cells.push_back({cid, CellType::GATE_THRESHOLD, (double)k / 14.0 + 0.01, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 150.0f, (float)k, 0.0f});
+        org.synapses.push_back({23, cid, 0, 1.0, true, 50.0f, -1.0f});
+        org.synapses.push_back({cid, (uint32_t)(64 + k), 0, 0.0, true, 50.0f, -1.0f});   // 零初始化
+    }
+    // 聚合特征: 手牌持有总量 / 台面牌型张数 / 高牌未见总量
+    auto add_agg = [&](uint32_t cid, CellType t, double p1, std::initializer_list<uint32_t> recs, bool to_all_heads) {
+        org.cells.push_back({cid, t, p1, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 160.0f, 0.0f, 0.0f});
+        for (uint32_t r : recs) org.synapses.push_back({r, cid, 0, 1.0, true, 50.0f, -1.0f});
+        if (to_all_heads) {
+            for (int k = 0; k <= 16; ++k)
+                org.synapses.push_back({cid, (uint32_t)(64 + k), 0, 0.0, true, 50.0f, -1.0f});
+        }
+    };
+    add_agg(111, CellType::OP_SUM, 1.0, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}, true);
+    add_agg(112, CellType::SENSE_CHANNEL, 1.0, {}, false);
+    org.cells.back().param2 = 24.0;   // obs[24] = 台面牌型张数
+    for (int k = 0; k <= 16; ++k)
+        org.synapses.push_back({112, (uint32_t)(64 + k), 0, 0.0, true, 50.0f, -1.0f});
+    add_agg(113, CellType::OP_SUM, 1.0, {15, 16, 17, 18, 19, 20, 21}, true);
+    for (auto& s : org.synapses) s.initial_weight = s.weight;
+    org.compile();
+    return org;
+}
+
+/**
  * @brief 构建 64 细胞端到端神经叫牌皮层微柱 (Neural Bidding Cortex)
  * 32 维全息手牌输入 -> 16 维特征提取 (大牌前馈赋能、散牌抑制) -> 12 维循环动力学核心 -> 效应器输出 (叫牌/不叫)
  */
