@@ -129,6 +129,9 @@ target_link_libraries(bench_doudizhu_test_time_compute PRIVATE kun_cellular Thre
 add_executable(bench_doudizhu_moe "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_doudizhu_moe.cpp")
 target_link_libraries(bench_doudizhu_moe PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(bench_doudizhu_mla "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_doudizhu_mla.cpp")
+target_link_libraries(bench_doudizhu_mla PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_quant_futures "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_futures.cpp")
 target_link_libraries(train_quant_futures PRIVATE kun_cellular Threads::Threads m)
 
