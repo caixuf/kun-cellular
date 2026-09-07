@@ -2461,7 +2461,11 @@ public:
 
         uint64_t header_sz = 72;
         uint64_t cells_off = header_sz;
-        uint64_t cells_sz = num_cells * 4;
+        // [bin v4] 细胞记录 10 字节: op + param1_f32 + param2_f32 + flags
+        // 修复: v3 的 param×64→int8 饱和量化会摧毁 SENSE_CHANNEL/ACT_CHANNEL 的 param2 通道号
+        // (通道 2..43 全部塌缩为 127/64→floor→通道 1); v4 用 float32 存整数通道号 (<2^24) 精确无损
+        uint64_t cell_rec = (num_cells > 0) ? 10 : 4;   // op(1) + p1_f32(4) + p2_f32(4) + flags(1) = 10
+        uint64_t cells_sz = num_cells * cell_rec;
         uint64_t row_ptr_off = cells_off + cells_sz;
         uint64_t row_ptr_sz = (num_cells + 1) * 4;
         uint64_t col_idx_off = row_ptr_off + row_ptr_sz;
@@ -2486,6 +2490,7 @@ public:
             uint64_t coords_off{0};
             uint64_t extra{0};
         } hdr;
+        hdr.version = 4;   // [bin v4] 参数全精度 (v2/v3 兼容读保留)
         hdr.n_cells = num_cells;
         hdr.n_syns = num_synapses;
         hdr.in_d = in_dim;
@@ -2501,16 +2506,14 @@ public:
 
         for (const auto& c : cells) {
             uint8_t op = cell_type_to_serialization_code(c.type);
-            int8_t p1_i8 = static_cast<int8_t>(std::clamp(std::round(c.param1 * 64.0), -128.0, 127.0));
-            int8_t p2_i8 = static_cast<int8_t>(std::clamp(std::round(c.param2 * 64.0), -128.0, 127.0));
-            uint8_t p1_u8 = static_cast<uint8_t>(p1_i8);
-            uint8_t p2_u8 = static_cast<uint8_t>(p2_i8);
             uint8_t flags = 0;
             if (c.type <= CellType::SENSE_CHANNEL || c.type == CellType::PREDICT_SENSE_0 || c.type == CellType::PREDICT_SENSE_1) flags |= 0x01;
             if (c.type >= CellType::ACT_PRIMARY_POSITIVE && c.type <= CellType::ACT_CHANNEL) flags |= 0x02;
+            float p1_f = static_cast<float>(c.param1);
+            float p2_f = static_cast<float>(c.param2);
             ofs.write(reinterpret_cast<const char*>(&op), 1);
-            ofs.write(reinterpret_cast<const char*>(&p1_u8), 1);
-            ofs.write(reinterpret_cast<const char*>(&p2_u8), 1);
+            ofs.write(reinterpret_cast<const char*>(&p1_f), 4);
+            ofs.write(reinterpret_cast<const char*>(&p2_f), 4);
             ofs.write(reinterpret_cast<const char*>(&flags), 1);
         }
 
@@ -2595,34 +2598,42 @@ public:
         } hdr;
 
         ifs.read(reinterpret_cast<char*>(&hdr), sizeof(hdr));
-        if (!ifs || hdr.magic != 0x53445343 || (hdr.version != 2 && hdr.version != 3) || hdr.n_cells == 0) {
+        if (!ifs || hdr.magic != 0x53445343 || (hdr.version < 2 || hdr.version > 4) || hdr.n_cells == 0) {
             return org;
         }
 
         uint32_t num_cells = hdr.n_cells;
         uint32_t num_syns = hdr.n_syns;
 
-        // 1. 读取 Cell 特征
+        // 1. 读取 Cell 特征 (v4: 10 字节记录 op+p1_f32+p2_f32+flags, 参数无损; v2/v3: 4 字节 int8 量化)
         ifs.seekg(hdr.c_off);
-        std::vector<uint8_t> cell_bytes(num_cells * 4);
+        const bool is_v4 = (hdr.version >= 4);
+        const uint32_t cell_rec = is_v4 ? 10 : 4;
+        std::vector<uint8_t> cell_bytes(num_cells * cell_rec);
         ifs.read(reinterpret_cast<char*>(cell_bytes.data()), cell_bytes.size());
 
         org.cells.resize(num_cells);
         for (uint32_t i = 0; i < num_cells; ++i) {
-            uint8_t op = cell_bytes[i * 4 + 0];
-            uint8_t p1_u8 = cell_bytes[i * 4 + 1];
-            uint8_t p2_u8 = cell_bytes[i * 4 + 2];
-            uint8_t flags = cell_bytes[i * 4 + 3];
-
-            int8_t p1_i8 = static_cast<int8_t>(p1_u8);
-            int8_t p2_i8 = static_cast<int8_t>(p2_u8);
+            const uint8_t* rec = cell_bytes.data() + i * cell_rec;
+            uint8_t op = rec[0];
+            uint8_t flags = is_v4 ? rec[11] : rec[3];
 
             org.cells[i].id = i;
             org.cells[i].type = (hdr.version >= 3)
                 ? serialization_code_to_cell_type(op)
                 : sdsc_opcode_to_cell_type(op, flags, hdr.version);
-            org.cells[i].param1 = static_cast<double>(p1_i8) / 64.0;
-            org.cells[i].param2 = static_cast<double>(p2_i8) / 64.0;
+            if (is_v4) {
+                float p1_f, p2_f;
+                std::memcpy(&p1_f, rec + 1, 4);
+                std::memcpy(&p2_f, rec + 5, 4);
+                org.cells[i].param1 = static_cast<double>(p1_f);
+                org.cells[i].param2 = static_cast<double>(p2_f);
+            } else {
+                int8_t p1_i8 = static_cast<int8_t>(rec[1]);
+                int8_t p2_i8 = static_cast<int8_t>(rec[2]);
+                org.cells[i].param1 = static_cast<double>(p1_i8) / 64.0;
+                org.cells[i].param2 = static_cast<double>(p2_i8) / 64.0;
+            }
             org.cells[i].latch_state = false;
         }
 

@@ -12,6 +12,7 @@
 #include <random>
 #include <cmath>
 #include <map>
+#include <set>
 #include <array>
 
 using namespace kun;
@@ -701,12 +702,14 @@ static const SubstrateLossFn kListwiseLoss = [](const std::vector<float>& preds,
     if (!g_listwise_delta.empty()) g.dL_dout[0] = g_listwise_delta[0];
     return g;
 };
-// JSON 模型加载 (返回值! bin 为 static 量化格式会破坏通道号 → 拒绝)
-static bool load_scorer_json(const char* path, CellularOrganism& org) {
-    auto loaded = CellularOrganism::load_checkpoint_json(path);
-    if (loaded.cells.empty()) { fprintf(stderr, "[错误] 模型加载失败: %s\n", path); return false; }
-    org = std::move(loaded);
-    return true;
+// 模型加载 (bin v4 参数无损优先; 旧 JSON 兼容回退; 返回值必须接住!)
+static bool load_scorer_model(const char* path, CellularOrganism& org) {
+    auto loaded = CellularOrganism::load_checkpoint_bin(path);
+    if (!loaded.cells.empty()) { org = std::move(loaded); return true; }
+    loaded = CellularOrganism::load_checkpoint_json(path);
+    if (!loaded.cells.empty()) { org = std::move(loaded); return true; }
+    fprintf(stderr, "[错误] 模型加载失败: %s\n", path);
+    return false;
 }
 static double score_candidate(CellularOrganism& org, size_t score_head,
                               const std::vector<float>& obs, const std::vector<float>& cf) {
@@ -720,7 +723,7 @@ static double score_candidate(CellularOrganism& org, size_t score_head,
 // ---------- DAgger: 评分器驱动 + 因果快照 + 团队 won ----------
 static int gen_dataset_cand_dagger(int games, const char* path, const char* model_path) {
     CellularOrganism org = build_doudizhu_candidate_scorer();
-    if (!load_scorer_json(model_path, org)) return 1;
+    if (!load_scorer_model(model_path, org)) return 1;
     size_t score_head = find_head_by_channel(org, 0.0);
     if (score_head == (size_t)-1) { fprintf(stderr, "[错误] 找不到分数头\n"); return 1; }
     std::ofstream f(path, std::ios::binary);
@@ -805,7 +808,7 @@ static int train_bc_cand(const char* path) {
     }
     if (ver != 3) { fprintf(stderr, "[错误] 数据版本 %d != 3\n", ver); return 1; }
     int32_t games; f.read((char*)&games, 4);
-    struct Sample { std::array<float, 32> obs; std::array<float, 4> seat; std::vector<std::array<float, 12>> cands; int label; int32_t gid; int won; };
+    struct Sample { std::array<float, 32> obs; std::array<float, 4> seat; std::vector<std::array<float, 12>> cands; int label; int32_t gid; int won; bool dagger{false}; };
     std::vector<Sample> data;
     while (f.good()) {
         Sample s;
@@ -841,6 +844,7 @@ static int train_bc_cand(const char* path) {
             f2.read((char*)&s.gid, 4);
             f2.read((char*)&s.won, 4);
             if (!f2.good() || s.label < 0 || s.label >= K) break;
+            s.dagger = true;   // DAgger 网格: 按样本源加权 (V5_DAGGER_W)
             data.push_back(std::move(s));
             extra_n++;
         }
@@ -875,6 +879,7 @@ static int train_bc_cand(const char* path) {
     const float LR = std::getenv("V5_LR") ? (float)std::atof(std::getenv("V5_LR")) : 0.02f;
     const size_t MAXD = std::getenv("V5_MAXD") ? (size_t)std::atoll(std::getenv("V5_MAXD")) : data.size();
     const bool LISTWISE = std::getenv("V5_LOSS") && std::string(std::getenv("V5_LOSS")) == "ce";
+    const float DAGGER_W = std::getenv("V5_DAGGER_W") ? (float)std::atof(std::getenv("V5_DAGGER_W")) : 1.0f;   // DAgger 样本权重网格 0/0.1/0.25/0.5
     if (MAXD < data.size()) { data.resize(MAXD); printf("[微型] 截取 %zu 决策\n", MAXD); }
     std::mt19937 rng(42);
     for (int ep = 1; ep <= EPOCHS; ++ep) {
@@ -976,12 +981,60 @@ static int train_bc_cand(const char* path) {
         if (best_i == s.label) correct++;
     }
     printf("[v5单步] 候选复现 %.1f%% (%ld/%zu)\n", 100.0 * correct / data.size(), correct, data.size());
+    // 微型门禁失败样本解释 (会诊裁决): 逐个打印误判 + 冲突检测 (同44维输入是否异标签)
+    if (data.size() <= 64) {
+        auto key_of = [](const Sample* s) {
+            char k[1024]; int off = 0;
+            for (int d = 0; d < 32; ++d) off += snprintf(k + off, sizeof(k) - off, "%d,", (int)std::lround(s->obs[d] * 1000));
+            for (float v : s->seat) off += snprintf(k + off, sizeof(k) - off, "%d,", (int)std::lround(v * 1000));
+            std::vector<std::string> cks;
+            for (auto& c : s->cands) {
+                char ck[64];
+                snprintf(ck, sizeof(ck), "%d-%d-%d", (int)(c[0] ? 1 : (c[1] ? 2 : (c[2] ? 3 : (c[3] ? 4 : 0)))),
+                         (int)std::lround(c[5] * 14), (int)std::lround(c[6] * 4));
+                cks.push_back(ck);
+            }
+            std::sort(cks.begin(), cks.end());
+            for (auto& ck : cks) off += snprintf(k + off, sizeof(k) - off, "%s;", ck.c_str());
+            return std::string(k);
+        };
+        std::map<std::string, std::set<std::string>> label_map;
+        for (auto& s : data) label_map[key_of(&s)].insert(
+            [&]{ char lk[64]; auto& c = s.cands[s.label];
+                 snprintf(lk, sizeof(lk), "%d-%d-%d", (int)(c[0] ? 1 : (c[1] ? 2 : (c[2] ? 3 : (c[3] ? 4 : 0)))),
+                          (int)std::lround(c[5] * 14), (int)std::lround(c[6] * 4)); return std::string(lk); }());
+        long fails = 0;
+        for (auto& s : data) {
+            float best = -1e30f; int best_i = 0;
+            for (size_t i = 0; i < s.cands.size(); ++i) {
+                std::vector<float> cf(s.cands[i].begin(), s.cands[i].end());
+                auto obs = obs_of(&s);
+                double sc = score_candidate(org, score_head, obs, cf);
+                if (sc > best) { best = (float)sc; best_i = (int)i; }
+            }
+            if (best_i != s.label) {
+                fails++;
+                auto& c = s.cands[best_i];
+                char pk[64];
+                snprintf(pk, sizeof(pk), "%d-%d-%d", (int)(c[0] ? 1 : (c[1] ? 2 : (c[2] ? 3 : (c[3] ? 4 : 0)))),
+                         (int)std::lround(c[5] * 14), (int)std::lround(c[6] * 4));
+                auto& lm = label_map[key_of(&s)];
+                printf("[微型失败#%ld] gid=%d K=%zu 真标签候选=%d (类型%d 点%d) | 误选 %s | 同键标签数=%zu %s\n",
+                       fails, s.gid, s.cands.size(), s.label,
+                       (int)(s.cands[s.label][0] ? 1 : (s.cands[s.label][1] ? 2 : (s.cands[s.label][2] ? 3 : (s.cands[s.label][3] ? 4 : 0)))),
+                       (int)std::lround(s.cands[s.label][5] * 14), pk, lm.size(),
+                       lm.size() > 1 ? "← 冲突组 (不可辨识)" : "");
+            }
+        }
+        printf("[微型门禁] 失败 %ld/%zu | 冲突组数 %ld\n", fails, data.size(),
+               (long)std::count_if(label_map.begin(), label_map.end(), [](auto& p) { return p.second.size() > 1; }));
+    }
     // JSON 保存 + 往返门禁 (会诊 Task 1.5: 保存前后分数一致)
-    const char* out = "checkpoints/doudizhu_cand_scorer.json";
+    const char* out = "checkpoints/doudizhu_cand_scorer.bin";   // 统一 bin (v4 参数无损)
     if (!org.save_checkpoint_json(out)) { fprintf(stderr, "[错误] 保存失败\n"); return 1; }
     {
         CellularOrganism rt;
-        if (!load_scorer_json(out, rt)) return 1;
+        if (!load_scorer_model(out, rt)) return 1;
         size_t sh2 = find_head_by_channel(rt, 0.0);
         long mismatch = 0;
         for (size_t si = 0; si < data.size() && si < 50; ++si) {
@@ -1025,7 +1078,7 @@ static int eval_cand_games(int games, const char* policy_arg) {
     // 模型路径由外部变量传递 (eval_model_path)
     extern std::string g_eval_model_path;
     if (use_model) {
-        if (!load_scorer_json(g_eval_model_path.c_str(), org)) return 1;
+        if (!load_scorer_model(g_eval_model_path.c_str(), org)) return 1;
         score_head = find_head_by_channel(org, 0.0);
         if (score_head == (size_t)-1) { fprintf(stderr, "[错误] 找不到分数头\n"); return 1; }
     } else if (!use_teacher) {
@@ -1094,7 +1147,7 @@ static int eval_cand_games(int games, const char* policy_arg) {
            live_steps, 100.0 * live_pass / std::max(1L, live_steps));
     return 0;
 }
-std::string g_eval_model_path = "checkpoints/doudizhu_cand_scorer.json";
+std::string g_eval_model_path = "checkpoints/doudizhu_cand_scorer.bin";
 
 int main(int argc, char** argv) {
     std::string mode = argc > 1 ? argv[1] : "train";
@@ -1105,7 +1158,7 @@ int main(int argc, char** argv) {
     }
     if (mode == "gen_cand_dagger") {
         gen_dataset_cand_dagger(argc > 2 ? std::atoi(argv[2]) : 2000, "/tmp/opencode/doudizhu_cand_dagger.bin",
-                                argc > 3 ? argv[3] : "checkpoints/doudizhu_cand_scorer.json");
+                                argc > 3 ? argv[3] : "checkpoints/doudizhu_cand_scorer.bin");
         return 0;
     }
     if (mode == "gen_cand") {
@@ -1166,7 +1219,7 @@ int main(int argc, char** argv) {
     if (mode == "eval_cand") {
         int games = argc > 2 ? std::atoi(argv[2]) : 500;
         std::string pol = argc > 3 ? argv[3] : "model";
-        if (pol == "model") g_eval_model_path = argc > 4 ? argv[4] : "checkpoints/doudizhu_cand_scorer.json";
+        if (pol == "model") g_eval_model_path = argc > 4 ? argv[4] : "checkpoints/doudizhu_cand_scorer.bin";
         eval_cand_games(games, pol.c_str());
         return 0;
     }
