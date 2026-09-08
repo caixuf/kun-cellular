@@ -23,3 +23,5 @@ checkpoints/*_champion.json
 checkpoints/vehicle_cortex_champion.json
 scratch/
 dist/
+r8-native-test-*.db
+*.db-journal
