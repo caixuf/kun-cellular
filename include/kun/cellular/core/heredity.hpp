@@ -253,8 +253,15 @@ public:
     uint64_t next_random() { return rng_(); }
 
     // 出生本能: 执行/代谢/生命周期/生长全部内生, 调用方零接线。
-    core::CompiledExecutor& executor() { return *executor_; }
-    const core::CompiledExecutor& executor() const { return *executor_; }
+    // 生长提交图编辑后, 执行视图本能自愈 (检测 plan 失配 → 自动重备),
+    // 个体永远执行自己的当前形态。
+    core::CompiledExecutor& executor() {
+        if (executor_->plan() != runtime_->plan()) {
+            auto reprepared = core::CompiledExecutor::prepare(runtime_->plan());
+            if (reprepared.ok()) executor_ = std::move(reprepared.executor);
+        }
+        return *executor_;
+    }
     core::CellularGrowthController& growth() { return *growth_; }
     const core::CellularGrowthController& growth() const { return *growth_; }
 

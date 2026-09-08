@@ -146,6 +146,19 @@ public:
         result.tick = runtime_->tick() == std::numeric_limits<uint64_t>::max()
             ? runtime_->tick()
             : runtime_->tick() + 1;
+        // 本能自愈: 个体形态被生长/编辑推进后, 执行视图随之重备 —
+        // 个体永远执行自己的当前形态, 不允许绑死旧 revision。
+        if (executor_->plan() != runtime_->plan()) {
+            auto reprepared = CompiledExecutor::prepare(runtime_->plan());
+            if (!reprepared.ok()) {
+                result.error = failure(
+                    LifecycleErrorCode::ExecutorPrepareFailed,
+                    reprepared.error ? std::string(reprepared.error->reason)
+                                     : "executor re-preparation failed");
+                return result;
+            }
+            executor_ = std::move(reprepared.executor);
+        }
         if (const auto error = check_binding()) {
             result.error = error;
             return result;
