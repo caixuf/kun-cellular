@@ -450,6 +450,11 @@ public:
         obs.push_back(partner_cards);
         obs.push_back(landlord_cards);
 
+        // [U0.1 obs v4] 全量记牌器补全: 3..10 点数未见量 (原 32 维只有 J 以上 7 通道,
+        // 3-Q 已出量不可见 — 业务选手的基本功在旧观测里结构性缺失)
+        for (int r = 0; r < 8; ++r)
+            obs.push_back(std::clamp(static_cast<float>(lattice_.unseen[r]) / 4.0f, 0.0f, 1.0f));
+
         return obs;
     }
 
@@ -1802,7 +1807,7 @@ inline CellularOrganism build_doudizhu_64cell_rank_cortex() {
  */
 inline CellularOrganism build_doudizhu_candidate_scorer() {
     CellularOrganism org;
-    for (int d = 0; d < 48; ++d)   // 36 obs (32 + 4 座次) + 12 候选交互特征 (会诊裁决 b)
+    for (int d = 0; d < 56; ++d)   // [U0.1] 44 obs (32 旧 + 8 全量记牌 + 4 座次) + 12 候选交互
         org.cells.push_back({(uint32_t)d, CellType::SENSE_CHANNEL, 1.0, (double)d, 0.0, 0.0, false, 0.0, 0, 0, 10.0f, (float)d * 2.0f, 0.0f});
     uint32_t lcg = 0x5DEECE66u;
     auto rnd01 = [&]() {           // [0,1) 均匀 (修复: 原 (int32_t)(lcg>>8) 非负 → 权重全正)
@@ -1812,13 +1817,13 @@ inline CellularOrganism build_doudizhu_candidate_scorer() {
     auto rnd_sym = [&](double scale) { return scale * (2.0 * rnd01() - 1.0); };   // ±scale
     auto rnd_receptor = [&]() -> uint32_t {
         lcg = lcg * 1664525u + 1013904223u;
-        return (uint32_t)((lcg >> 8) % 48u);
+        return (uint32_t)((lcg >> 8) % 56u);
     };
     for (int f = 0; f < 24; ++f) {
         uint32_t cid = 100 + (uint32_t)f;
         CellType t = (f % 2 == 0) ? CellType::OP_SUM : CellType::OP_ABS;
         org.cells.push_back({cid, t, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 60.0f, (float)f * 3.0f, 0.0f});
-        for (int j = 0; j < 10; ++j)
+        for (int j = 0; j < 14; ++j)   // [U0.1] 扇入随输入维度补偿 (56 输入, 10 路曾致 init 51%)
             org.synapses.push_back({rnd_receptor(), cid, 0, rnd_sym(0.4), true, 50.0f, -1.0f});
     }
     uint32_t head_id = 200;   // 分数头 (channel 0)

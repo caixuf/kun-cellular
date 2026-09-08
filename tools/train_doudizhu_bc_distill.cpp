@@ -608,7 +608,7 @@ static int train_rank_grpo(int iters, int group) {
 static int gen_dataset_cand(int games, const char* path) {
     std::ofstream f(path, std::ios::binary);
     const char magic[4] = {'D','D','Z','C'};
-    int32_t ver = 3;
+    int32_t ver = 4;
     f.write(magic, 4); f.write((char*)&ver, 4);
     int32_t hdr = games; f.write((char*)&hdr, 4);
     long samples = 0, skipped = 0;
@@ -620,7 +620,7 @@ static int gen_dataset_cand(int games, const char* path) {
         auto write_sample = [&](const std::vector<float>& obs, const std::vector<DouDiZhuCardGameTask::CandPlay>& cs,
                                 const std::vector<std::vector<float>>& feats, int label, int32_t gid) {
             std::vector<char> rec;
-            rec.insert(rec.end(), (char*)obs.data(), (char*)obs.data() + 144);   // 36 floats (v3)
+            rec.insert(rec.end(), (char*)obs.data(), (char*)obs.data() + 176);   // 44 floats (v4)
             int32_t K = (int32_t)cs.size();
             rec.insert(rec.end(), (char*)&K, (char*)&K + 4);
             for (auto& cf : feats) rec.insert(rec.end(), (char*)cf.data(), (char*)cf.data() + 48);
@@ -677,9 +677,9 @@ static size_t find_head_by_channel(const CellularOrganism& org, double ch) {
     return (size_t)-1;
 }
 static void build_scorer_input(const std::vector<float>& obs, const std::vector<float>& cf, std::vector<double>& in) {
-    in.resize(48);   // v3: 36 obs (32 + 4 座次) + 12 候选交互
-    for (int d = 0; d < 36; ++d) in[d] = obs[d];
-    for (int d = 0; d < 12; ++d) in[36 + d] = cf[d];
+    in.resize(56);   // v4: 44 obs (32 + 8 全量记牌 + 4 座次) + 12 候选交互
+    for (int d = 0; d < 44; ++d) in[d] = obs[d];
+    for (int d = 0; d < 12; ++d) in[44 + d] = cf[d];
     // 受控消融 (会诊裁决): V5_ZERO_SEAT=1 → 座次 4 通道置零 (原图接线完全一致, 仅信息缺失)
     if (std::getenv("V5_ZERO_SEAT"))
         for (int d = 32; d < 36; ++d) in[d] = 0.0;
@@ -728,7 +728,7 @@ static int gen_dataset_cand_dagger(int games, const char* path, const char* mode
     if (score_head == (size_t)-1) { fprintf(stderr, "[错误] 找不到分数头\n"); return 1; }
     std::ofstream f(path, std::ios::binary);
     const char magic[4] = {'D','D','Z','C'};
-    int32_t ver = 3;
+    int32_t ver = 4;
     f.write(magic, 4); f.write((char*)&ver, 4);
     int32_t hdr = games; f.write((char*)&hdr, 4);
     long samples = 0, skipped = 0;
@@ -739,7 +739,7 @@ static int gen_dataset_cand_dagger(int games, const char* path, const char* mode
         auto write_sample = [&](const std::vector<float>& obs, const std::vector<DouDiZhuCardGameTask::CandPlay>& cs,
                                 const std::vector<std::vector<float>>& feats, int label, int32_t gid) {
             std::vector<char> rec;
-            rec.insert(rec.end(), (char*)obs.data(), (char*)obs.data() + 144);   // 36 floats (v3)
+            rec.insert(rec.end(), (char*)obs.data(), (char*)obs.data() + 176);   // 44 floats (v4)
             int32_t K = (int32_t)cs.size();
             rec.insert(rec.end(), (char*)&K, (char*)&K + 4);
             for (auto& cf : feats) rec.insert(rec.end(), (char*)cf.data(), (char*)cf.data() + 48);
@@ -803,17 +803,17 @@ static int train_bc_cand(const char* path) {
     char magic[4]; int32_t ver = 0;
     f.read(magic, 4); f.read((char*)&ver, 4);
     if (ver == 0 && std::memcmp(magic, "DDZC", 4) != 0) {
-        // 旧格式 (无版本) — 显式拒绝 (会诊 Task 3.3)
-        fprintf(stderr, "[错误] 旧版无版本数据 (需 v3 DDZC): %s\n", path); return 1;
+        fprintf(stderr, "[错误] 旧版无版本数据 (需 v4 DDZC): %s\n", path); return 1;
     }
-    if (ver != 3) { fprintf(stderr, "[错误] 数据版本 %d != 3\n", ver); return 1; }
+    if (ver != 4) { fprintf(stderr, "[错误] 数据版本 %d != 4 (旧版不兼容, 重生成)\n", ver); return 1; }
     int32_t games; f.read((char*)&games, 4);
-    struct Sample { std::array<float, 32> obs; std::array<float, 4> seat; std::vector<std::array<float, 12>> cands; int label; int32_t gid; int won; bool dagger{false}; };
+    struct Sample { std::array<float, 32> obs; std::array<float, 12> tail; std::vector<std::array<float, 12>> cands; int label; int32_t gid; int won; bool dagger{false}; };
+    // tail = [ unseen0..7 (8) + 座次 (4) ] — v4 obs 44 维的后 12 维
     std::vector<Sample> data;
     while (f.good()) {
         Sample s;
         f.read((char*)s.obs.data(), 128);
-        f.read((char*)s.seat.data(), 16);
+        f.read((char*)s.tail.data(), 48);   // v4: 8 记牌 + 4 座次
         int32_t K; f.read((char*)&K, 4);
         if (!f.good() || K <= 0 || K > 64) break;
         s.cands.resize(K);
@@ -830,13 +830,13 @@ static int train_bc_cand(const char* path) {
     if (const char* extra = std::getenv("V5_TEACHER_DATA")) {
         std::ifstream f2(extra, std::ios::binary);
         char m2[4]; int32_t v2; f2.read(m2, 4); f2.read((char*)&v2, 4);
-        if (v2 != 3) { fprintf(stderr, "[错误] 教师混合数据非 v3\n"); return 1; }
+        if (v2 != 4) { fprintf(stderr, "[错误] 教师混合数据非 v4\n"); return 1; }
         int32_t g2; f2.read((char*)&g2, 4);
         long extra_n = 0;
         while (f2.good()) {
             Sample s;
             f2.read((char*)s.obs.data(), 128);
-            f2.read((char*)s.seat.data(), 16);
+            f2.read((char*)s.tail.data(), 48);
             int32_t K; f2.read((char*)&K, 4);
             if (!f2.good() || K <= 0 || K > 64) break;
             s.cands.resize(K);
@@ -857,8 +857,8 @@ static int train_bc_cand(const char* path) {
     size_t value_head = find_head_by_channel(org, 1.0);
     auto obs_of = [](const Sample* s) {
         std::vector<float> o(s->obs.begin(), s->obs.end());
-        for (float v : s->seat) o.push_back(v);
-        return o;   // 36 维
+        for (float v : s->tail) o.push_back(v);
+        return o;   // 44 维 (v4)
     };
     // 初始基线
     {
@@ -876,10 +876,10 @@ static int train_bc_cand(const char* path) {
         printf("[v5初始基线] 单步复现 %.1f%%\n", 100.0 * correct0 / data.size());
     }
     double ce_sum = 0; long ce_cnt = 0;
-    const int EPOCHS = std::getenv("V5_EPOCHS") ? std::atoi(std::getenv("V5_EPOCHS")) : 15;
-    const float LR = std::getenv("V5_LR") ? (float)std::atof(std::getenv("V5_LR")) : 0.02f;
+    const int EPOCHS = std::getenv("V5_EPOCHS") ? std::atoi(std::getenv("V5_EPOCHS")) : 30;
+    const float LR = std::getenv("V5_LR") ? (float)std::atof(std::getenv("V5_LR")) : 0.004f;   // 冠军配方默认 (事故教训)
     const size_t MAXD = std::getenv("V5_MAXD") ? (size_t)std::atoll(std::getenv("V5_MAXD")) : data.size();
-    const bool LISTWISE = std::getenv("V5_LOSS") && std::string(std::getenv("V5_LOSS")) == "ce";
+    const bool LISTWISE = !(std::getenv("V5_LOSS") && std::string(std::getenv("V5_LOSS")) == "mse");   // 默认 listwise CE (事故教训: 配方默认值必须安全)
     const float DAGGER_W = std::getenv("V5_DAGGER_W") ? (float)std::atof(std::getenv("V5_DAGGER_W")) : 1.0f;   // DAgger 样本权重网格 0/0.1/0.25/0.5
     if (MAXD < data.size()) { data.resize(MAXD); printf("[微型] 截取 %zu 决策\n", MAXD); }
     std::mt19937 rng(42);
@@ -991,7 +991,7 @@ static int train_bc_cand(const char* path) {
         auto key_of = [](const Sample* s) {
             char k[1024]; int off = 0;
             for (int d = 0; d < 32; ++d) off += snprintf(k + off, sizeof(k) - off, "%d,", (int)std::lround(s->obs[d] * 1000));
-            for (float v : s->seat) off += snprintf(k + off, sizeof(k) - off, "%d,", (int)std::lround(v * 1000));
+            for (float v : s->tail) off += snprintf(k + off, sizeof(k) - off, "%d,", (int)std::lround(v * 1000));
             std::vector<std::string> cks;
             for (auto& c : s->cands) {
                 char ck[64];
@@ -1174,6 +1174,110 @@ int main(int argc, char** argv) {
         train_bc_cand(argc > 2 ? argv[2] : "/tmp/opencode/doudizhu_cand.bin");
         return 0;
     }
+    if (mode == "trace_cand") {
+        // 思考链路提取 (会诊方向): 静态概念骨架 + 逐候选打分归因
+        CellularOrganism org;
+        if (!load_scorer_model(argc > 2 ? argv[2] : "checkpoints/doudizhu_cand_scorer.bin", org)) return 1;
+        size_t sh = find_head_by_channel(org, 0.0);
+        auto chname = [](int d) -> const char* {
+            static char buf[8][32]; static int idx = 0; char* p = buf[idx++ % 8];
+            if (d < 15) snprintf(p, 32, "手牌%d(%d)", d, 3 + d);
+            else if (d < 22) snprintf(p, 32, "未见%d(%d)", d, 3 + d - 15 + 8);
+            else if (d == 22) snprintf(p, 32, "台面牌型");
+            else if (d == 23) snprintf(p, 32, "台面牌力");
+            else if (d == 24) snprintf(p, 32, "台面张数");
+            else if (d == 25) snprintf(p, 32, "我控台");
+            else if (d == 26) snprintf(p, 32, "友控台");
+            else if (d == 27) snprintf(p, 32, "敌控台");
+            else if (d == 28) snprintf(p, 32, "我是地主");
+            else if (d == 29) snprintf(p, 32, "我余牌");
+            else if (d == 30) snprintf(p, 32, "友余牌");
+            else if (d == 31) snprintf(p, 32, "敌余牌");
+            else if (d < 36) snprintf(p, 32, "座次%d", d - 32);
+            else if (d == 36) snprintf(p, 32, "候选:单张");
+            else if (d == 37) snprintf(p, 32, "候选:对子");
+            else if (d == 38) snprintf(p, 32, "候选:炸弹");
+            else if (d == 39) snprintf(p, 32, "候选:火箭");
+            else if (d == 40) snprintf(p, 32, "候选:过牌");
+            else if (d == 41) snprintf(p, 32, "候选:点数");
+            else if (d == 42) snprintf(p, 32, "候选:张数");
+            else if (d == 43) snprintf(p, 32, "候选:持有量");
+            else if (d == 44) snprintf(p, 32, "候选:压制余量");
+            else if (d == 45) snprintf(p, 32, "候选:同型压制");
+            else if (d == 46) snprintf(p, 32, "候选:炸压非炸");
+            else snprintf(p, 32, "候选:火压非火");
+            return p;
+        };
+        // === 1. 静态思考骨架 ===
+        printf("═══ 思考骨架: 分数头最强概念通路 (概念细胞 ← 最强感知扇入) ═══\n");
+        std::vector<std::pair<double, size_t>> head_in;
+        for (auto& s : org.compiled_synapses_)
+            if (s.to_idx == sh) head_in.push_back({std::abs(s.weight), s.from_idx});
+        std::sort(head_in.rbegin(), head_in.rend());
+        for (size_t r = 0; r < head_in.size() && r < 8; ++r) {
+            size_t ci = head_in[r].second;
+            const char* t = (org.cells[ci].type == CellType::OP_ABS) ? "ABS" :
+                            (org.cells[ci].type == CellType::OP_SUM) ? "SUM" :
+                            (org.cells[ci].type == CellType::SENSE_CHANNEL) ? "直连" : "?";
+            double w = 0; for (auto& s : org.compiled_synapses_) if (s.to_idx == sh && s.from_idx == ci) w = s.weight;
+            printf("  [%s细胞%zu] w=%+.3f ← 扇入:", t, ci, w);
+            std::vector<std::pair<double, int>> fins;
+            for (auto& s : org.compiled_synapses_)
+                if (s.to_idx == ci) {
+                    int ch = (int)std::lround(org.cells[s.from_idx].param2);
+                    fins.push_back({std::abs(s.weight), ch});
+                }
+            std::sort(fins.rbegin(), fins.rend());
+            for (size_t k = 0; k < fins.size() && k < 3; ++k)
+                printf(" %s(%.2f)", chname(fins[k].second), fins[k].first);
+            printf("\n");
+        }
+        // === 2. 逐候选打分归因 (合成受控局面) ===
+        // 局面: 我是农民, 手持 对8(2张) + A(1) + K(2), 台面: 对5 (对手出的)
+        printf("\n═══ 反应链路演示: 台面=对5, 我持 88 A KK, 候选逐个过脑 ═══\n");
+        auto feature_of = [&](int type, int rank, int count, bool pass) {
+            std::vector<float> f(12, 0.0f);
+            if (pass) { f[4] = 1.0f; return f; }
+            if (type == 1) f[0] = 1; else if (type == 2) f[1] = 1; else if (type == 3) f[2] = 1;
+            f[5] = rank / 14.0f; f[6] = count / 4.0f;
+            f[7] = (type == 3) ? 1.0f : (count / 4.0f);
+            f[8] = ((float)rank - 5.0f / 14.0f * 14.0f / 14.0f) / 14.0f;   // 对5 rank=5 → (rank-5)/14
+            f[8] = ((float)rank - 5.0f) / 14.0f;
+            if (type == 2) f[9] = 1.0f;   // 同型压制
+            return f;
+        };
+        struct Cand { int type, rank, count; bool pass; const char* name; };
+        Cand cands[] = {{2, 6, 2, false, "对6 (拆开丢)"}, {2, 8, 2, false, "对8 (压对5)"},
+                        {1, 13, 1, false, "小王单张 (过杀)"}, {2, 11, 2, false, "对A? (无, 演示)"},
+                        {0, -1, 0, true, "过牌 (让给队友?)"}};
+        for (auto& c : cands) {
+            std::vector<float> obs(36, 0.0f);
+            obs[7] = 1.0f; obs[8] = 2.0f / 4.0f;          // 手牌: 对8
+            obs[11] = 1.0f;                                // 手牌: A 一张
+            obs[10] = 2.0f / 4.0f;                         // 手牌: 对K
+            obs[22] = 2.0f / 4.0f;                         // 台面: 对子
+            obs[23] = 5.0f / 14.0f;                        // 台面: 点5
+            obs[24] = 0.5f;
+            obs[28] = 0.0f;                                // 我是农民
+            obs[29] = 0.25f;                               // 我剩5张
+            auto f = feature_of(c.type, c.rank, c.count, c.pass);
+            std::vector<double> in(48);
+            for (int d = 0; d < 36; ++d) in[d] = obs[d];
+            for (int d = 0; d < 12; ++d) in[36 + d] = f[d];
+            org.reset_state(false);
+            org.forward_nd(in.data(), in.size(), false);
+            printf("  [%s] → 分数 %+.3f | 票源:", c.name, org.cells[sh].output_val);
+            std::vector<std::pair<double, size_t>> contrib;
+            for (auto& s : org.compiled_synapses_)
+                if (s.to_idx == sh)
+                    contrib.push_back({s.weight * org.cells[s.from_idx].output_val, s.from_idx});
+            std::sort(contrib.rbegin(), contrib.rend());
+            for (size_t k = 0; k < contrib.size() && k < 3; ++k)
+                printf(" %s细胞%zu(%+.2f)", (contrib[k].first >= 0 ? "+" : "-"), contrib[k].second, contrib[k].first);
+            printf("\n");
+        }
+        return 0;
+    }
     if (mode == "audit_conflicts") {
         // 会诊裁决: e_alias = Σ(n_g - max_a n_g,a)/N, 键 = 量化obs + 规范候选集合, 标签=(type,rank,count)
         std::ifstream f(argc > 2 ? argv[2] : "/tmp/opencode/doudizhu_cand.bin", std::ios::binary);
@@ -1183,16 +1287,16 @@ int main(int argc, char** argv) {
         std::map<std::string, std::map<std::string, long>> groups;   // 决策键 → 标签键 → 计数
         long N = 0;
         while (f.good()) {
-            float ob[36]; int32_t K, label, gid, won;
-            f.read((char*)ob, 144);
+            float ob[44]; int32_t K, label, gid, won;
+            f.read((char*)ob, 176);
             f.read((char*)&K, 4);
             if (!f.good() || K <= 0 || K > 64) break;
             std::vector<std::array<float, 12>> cs(K);
             for (int i = 0; i < K; ++i) f.read((char*)cs[i].data(), 48);
             f.read((char*)&label, 4); f.read((char*)&gid, 4); f.read((char*)&won, 4);
             if (!f.good()) break;
-            char key[512]; int off = 0;
-            for (int d = 0; d < 36; ++d) off += snprintf(key + off, sizeof(key) - off, "%d,", (int)std::lround(ob[d] * 1000));
+            char key[1024]; int off = 0;
+            for (int d = 0; d < 44; ++d) off += snprintf(key + off, sizeof(key) - off, "%d,", (int)std::lround(ob[d] * 1000));
             std::vector<std::string> cand_keys;
             for (int i = 0; i < K; ++i) {
                 char ck[64];
