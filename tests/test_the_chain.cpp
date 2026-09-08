@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <cstdio>
+#include <cstdio>
 #include <cmath>
 #include <random>
 #include <vector>
@@ -123,6 +124,7 @@ double probe_loss(core::RuntimeState& rt, core::CompiledExecutor& ex,
 
 int main() {
     setvbuf(stdout, nullptr, _IONBF, 0);
+    std::remove("/tmp/opencode/chain_library.sqlite3");  // 每次运行全新图书馆
     std::mt19937 rng(20260908);
     const auto train_stream = make_stream(rng, 24);
     std::mt19937 rng2(777);
