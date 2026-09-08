@@ -304,8 +304,12 @@ int main() {
         { /* 编辑后回放使用编辑后执行器 */ } trace_b = replay(rig_b, stream, false);
         const double dist_b = trace_distance(trace_b, trace_c);
         recovery = (dist_a > 0.0) ? 1.0 - dist_b / dist_a : 0.0;
-        printf("[B 恢复] 结构基线差异=%.4f → 学习后差异=%.4f (loss %.4f), 恢复比例=%.3f\n",
-               dist_b_struct, dist_b, last_loss, recovery);
+        // 位序纪律: BPTT 只是参数代谢工具, 贡献必须分解呈现
+        const double recovery_struct = (dist_a > 0.0) ? 1.0 - dist_b_struct / dist_a : 0.0;
+        printf("[B 恢复分解] 结构/代谢重建: %.3f | BPTT 参数代谢增量: %.3f | 合计: %.3f\n",
+               recovery_struct, recovery - recovery_struct, recovery);
+        printf("[B 恢复] 结构基线差异=%.4f → 学习后差异=%.4f (loss %.4f)\n",
+               dist_b_struct, dist_b, last_loss);
     }
     assert(recovery > 0.0);  // 预注册: 恢复机制非空转
 
