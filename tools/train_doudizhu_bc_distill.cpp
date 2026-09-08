@@ -1325,6 +1325,32 @@ int main(int argc, char** argv) {
                100.0 * dup_n / std::max(1L, N));
         return 0;
     }
+    if (mode == "serve_cand") {
+        // 陪练桥服务: stdin 协议 (44 obs 浮点 + K + K×12 候选特征) → stdout 选中候选索引
+        CellularOrganism org;
+        if (!load_scorer_model(argc > 2 ? argv[2] : "checkpoints/doudizhu_cand_scorer.bin", org)) return 1;
+        size_t sh = find_head_by_channel(org, 0.0);
+        if (sh == (size_t)-1) { fprintf(stderr, "[serve_cand] 找不到分数头\n"); return 1; }
+        std::ios::sync_with_stdio(false);
+        double v0;
+        while (std::cin >> v0) {
+            std::vector<double> in(56);
+            in[0] = v0;
+            for (int d = 1; d < 44; ++d) std::cin >> in[d];
+            int K; std::cin >> K;
+            if (K <= 0 || K > 64) { std::cout << 0 << std::endl; continue; }
+            float best = -1e30f; int bi = 0;
+            for (int i = 0; i < K; ++i) {
+                std::vector<float> cf(12);
+                for (int d = 0; d < 12; ++d) { double x; std::cin >> x; cf[d] = (float)x; }
+                std::vector<float> obs(in.begin(), in.begin() + 44);
+                double sc = score_candidate(org, sh, obs, cf);
+                if (std::isfinite(sc) && sc > best) { best = (float)sc; bi = i; }
+            }
+            std::cout << bi << std::endl << std::flush;
+        }
+        return 0;
+    }
     if (mode == "eval_cand") {
         int games = argc > 2 ? std::atoi(argv[2]) : 500;
         std::string pol = argc > 3 ? argv[3] : "model";
