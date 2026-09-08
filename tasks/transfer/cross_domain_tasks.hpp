@@ -1819,16 +1819,18 @@ inline CellularOrganism build_doudizhu_candidate_scorer() {
         lcg = lcg * 1664525u + 1013904223u;
         return (uint32_t)((lcg >> 8) % 56u);
     };
-    for (int f = 0; f < 24; ++f) {
+    // [U0.3 扩容] 特征层 24 -> 48 (宪章尺度真理: 更大特征层承载更细的点数/牌理概念)
+    constexpr int kFeatureCells = 48;
+    for (int f = 0; f < kFeatureCells; ++f) {
         uint32_t cid = 100 + (uint32_t)f;
         CellType t = (f % 2 == 0) ? CellType::OP_SUM : CellType::OP_ABS;
         org.cells.push_back({cid, t, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 60.0f, (float)f * 3.0f, 0.0f});
-        for (int j = 0; j < 14; ++j)   // [U0.1] 扇入随输入维度补偿 (56 输入, 10 路曾致 init 51%)
+        for (int j = 0; j < 14; ++j)   // [U0.1] 扇入随输入维度补偿
             org.synapses.push_back({rnd_receptor(), cid, 0, rnd_sym(0.4), true, 50.0f, -1.0f});
     }
     uint32_t head_id = 200;   // 分数头 (channel 0)
     org.cells.push_back({head_id, CellType::ACT_CHANNEL, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 90.0f, 0.0f, 0.0f});
-    for (int f = 0; f < 24; ++f)
+    for (int f = 0; f < kFeatureCells; ++f)
         org.synapses.push_back({(uint32_t)(100 + f), head_id, 0, rnd_sym(0.25), true, 50.0f, -1.0f});
     // [U0.2 修复] 直连线对齐 v4 布局: 旧版仍接 32-43 (座次+记牌), 候选编码 44-55 无直连
     // (点数/压制余量等关键判别特征此前只能经特征层绕行)
@@ -1836,7 +1838,7 @@ inline CellularOrganism build_doudizhu_candidate_scorer() {
         org.synapses.push_back({(uint32_t)d, head_id, 0, rnd_sym(0.4), true, 50.0f, -1.0f});
     uint32_t value_id = 201;   // 价值头 (channel 1): 整局 MC 回报回归 (v5b 价值盲修复)
     org.cells.push_back({value_id, CellType::ACT_CHANNEL, 1.0, 1.0, 0.0, 0.0, false, 0.0, 0, 0, 90.0f, 4.0f, 0.0f});
-    for (int f = 0; f < 24; ++f)
+    for (int f = 0; f < kFeatureCells; ++f)
         org.synapses.push_back({(uint32_t)(100 + f), value_id, 0, 0.0, true, 50.0f, -1.0f});   // 零初始化残差
     for (int d = 0; d < 32; ++d)   // 状态直连: 余牌/角色/记牌器
         if (d >= 15) org.synapses.push_back({(uint32_t)d, value_id, 0, 0.2, true, 50.0f, -1.0f});
