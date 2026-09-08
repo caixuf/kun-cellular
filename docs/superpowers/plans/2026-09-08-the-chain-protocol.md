@@ -10,11 +10,11 @@
 |---|----|----------------|------|------|
 | 1 | 从零出生 | 随机种子个体诞生，出生表现 ≈ 随机水平 | ✅ U3 机制级 | — |
 | 2 | 独立学习 | 无外部权重注入，仅任务信号，loss 收敛 | ✅ U3 机制级 | — |
-| 3 | 未见泛化 | holdout loss 与 train loss 同量级（比率 < 3） | ❌ 未测 | 需 train/holdout 划分评测 |
+| 3 | 未见泛化 | holdout loss 与 train loss 同量级（比率 < 3） | ✅ 单种子机制级 | 需多种子、OOD 与预注册统计 |
 | 4 | 结构/参数真实改变 | 付费建造（paid_cost>0）+ revision 推进 + 参数位级变化 | ✅ U2.2/U2.3 机制级 | 任务级真数据版待做 |
-| 5 | 死亡后知识继承 | 个体学习 → 同化 → **个体销毁** → 同 germline 再出生 → 出生即继承（出生 loss ≈ 死者终局 loss） | ❌ 未测 | 需显式死亡步骤（U3 缺死亡动作） |
-| 6 | 无血缘借阅 | A 出版 → 图书馆验证 → **无血缘** B 冷边界借阅（adopt_at_cold_boundary）→ B 获得新能力（其出生图无法表达） | ❌ 未测 | R8 API 在，实验缺 |
-| 7 | 代际超越 | G_n 达到固定 loss 门的 epoch 数单调不增；G_{n+1} 终局 loss ≤ G_n | ❌ 未测 | 需代际序列实验 |
+| 5 | 死亡后知识继承 | 个体学习 → 同化 → **个体销毁** → 同 germline 再出生 → 出生即继承（出生 loss ≈ 死者终局 loss） | ✅ 单种子机制级 | 需验证非 runtime/tape/optimizer 偷渡 |
+| 6 | 无血缘借阅 | A 出版 → 图书馆验证 → **无血缘** B 冷边界借阅（adopt_at_cold_boundary）→ B 获得新能力（其出生图无法表达） | ✅ 单种子机制级 | 需无书/错书/随机注入对照与多谱系重复 |
+| 7 | 代际超越 | G_n 达到固定 loss 门的 epoch 数单调不增；G_{n+1} 终局 loss ≤ G_n | ✅ 单条谱系机制级 | 需多种子，排除训练预算和初始化混淆 |
 
 ## 执行纪律
 
@@ -30,3 +30,33 @@
 - U4 消融 manifest（2026-09-08-u4-ablation-manifest.md）：环 3/4 的任务级证据
 - U 线方案位序纪律：本链为其组织框架的具体化
 - R8 状态文档：环 6 的 API 依据（germline_library / knowledge_adoption）
+
+## 2026-09-08 首次实测
+
+`build/test_the_chain` 在当前固定实验配置下七环全部通过：
+
+```text
+birth train L1=14.6357
+G0 gate epoch=16, final loss=3.73e-4
+holdout/train=1.21
+death inheritance: 0.8975 -> 0.8975
+generation gate epochs: 16 -> 8 -> 4
+paid growth: 2.0, cells 6 -> 7, revision 1 -> 2
+unrelated adoption: 0.435 -> 0.348, paid 7.2
+```
+
+这是一项机制级单种子闭合，不是统计学上的进化优势证明。下一项验证应固定训练预算、
+扩展出生/谱系 seed，并加入无书、错误书、只复制 runtime、无同化和结构锁定对照。
+
+## 同轮负结果
+
+为避免只保留成功样本，同轮复跑结果也纳入记录：
+
+- `test_flow_temporal_memory_evolution`：3 个 delay seed 的演化留出分数为
+  `0.536458 / 0.530409 / 0.561544`，均未超过参考解，报告
+  `EVOLUTION_DISCOVERY=FAIL`。
+- `test_flow_maze_navigation`：训练集、ID holdout、OOD holdout 的严格 M1
+  门禁报告 `FAILED (Unqualified)`；测试通过只表示协议和隔离检查正常，不表示任务性能达标。
+
+这两个结果当前应视为待诊断的任务级失败，不应通过放宽门禁、筛选 seed 或改写
+参考基线来转化为成功。后续实验必须先给出失败分类和独立修复，再重新锁定评测集。
