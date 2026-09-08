@@ -1830,7 +1830,9 @@ inline CellularOrganism build_doudizhu_candidate_scorer() {
     org.cells.push_back({head_id, CellType::ACT_CHANNEL, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 90.0f, 0.0f, 0.0f});
     for (int f = 0; f < 24; ++f)
         org.synapses.push_back({(uint32_t)(100 + f), head_id, 0, rnd_sym(0.25), true, 50.0f, -1.0f});
-    for (int d = 32; d < 44; ++d)   // 候选编码直连线 (含交互)
+    // [U0.2 修复] 直连线对齐 v4 布局: 旧版仍接 32-43 (座次+记牌), 候选编码 44-55 无直连
+    // (点数/压制余量等关键判别特征此前只能经特征层绕行)
+    for (int d = 32; d < 56; ++d)
         org.synapses.push_back({(uint32_t)d, head_id, 0, rnd_sym(0.4), true, 50.0f, -1.0f});
     uint32_t value_id = 201;   // 价值头 (channel 1): 整局 MC 回报回归 (v5b 价值盲修复)
     org.cells.push_back({value_id, CellType::ACT_CHANNEL, 1.0, 1.0, 0.0, 0.0, false, 0.0, 0, 0, 90.0f, 4.0f, 0.0f});
