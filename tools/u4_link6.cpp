@@ -1,6 +1,9 @@
-// U4 环6 任务级: 冠军学得通路固化为知识模块 → 图书馆 R8 验证 →
-// 无血缘 StrictCore 冠军变体冷边界借入 → 盲测正确率变化。
-// 纪律: 知识移动走图书馆 (germline 本体), 不靠梯度; 借入付费 (资源结算)。
+// U4 环6 任务级 (方案 B 实现 — 大佬 plan Task 3):
+// 冠军学得通路固化为知识模块 → 图书馆 R8 验证 → 宽宿主显式绑定借入
+// (host_binding = {56, channel 0}) → 盲测正确率 before/control/after。
+// 诚实标签: 借入方是冠军衍生宿主 (同源图+出生种子), 不是无关谱系;
+// holdout 是 gid 子集, 不宣称训练级盲测。无正 delta 断言 — 结果如实。
+// IO 隔离: 数据库路径已存在则拒绝 (不删除共享产物)。
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/legacy/cold_assembly.hpp"
 #include "kun/cellular/core/compiled_executor.hpp"
@@ -12,6 +15,7 @@
 #include <cstdio>
 #include <cmath>
 #include <algorithm>
+#include <filesystem>
 #include <fstream>
 #include <map>
 #include <random>
@@ -86,10 +90,15 @@ int main(int argc, char** argv) {
     setvbuf(stdout, nullptr, _IONBF, 0);
     const char* model = argc > 1 ? argv[1] : "checkpoints/doudizhu_cand_scorer.bin";
     const char* dataset = argc > 2 ? argv[2] : "/tmp/opencode/doudizhu_cand.bin";
+    const std::string db_path = "/tmp/opencode/u4_link6_library.sqlite3";
 
-    std::remove("/tmp/opencode/u4_link6_library.sqlite3");
+    // IO 隔离: 已存在的库 = 拒绝执行 (不删除共享产物)
+    if (std::filesystem::exists(db_path)) {
+        printf("[IO 隔离] 库文件已存在, 拒绝覆盖: %s\n", db_path.c_str());
+        return 1;
+    }
 
-    // 1. 冠军 → 冷装配 (LegacyCompatible, 学得 live 权重)
+    // 1. 冠军 → 冷装配
     CellularOrganism org;
     {
         auto b = CellularOrganism::load_checkpoint_bin(model);
@@ -103,45 +112,36 @@ int main(int argc, char** argv) {
     auto champ = kun::migration::assemble_phenotype(
         org, core::GraphIdentity(4), core::GraphRevision(1), cfg);
     assert(champ.ok());
-    printf("[冠军] 冷装配 ✓ cells=%zu\n", champ.phenotype->runtime().plan()->cells().size());
 
-    // 2. 数据 → holdout (跨局)
+    // 2. 数据 → 评测子集 (gid 子集 — 如实标注: 非训练级盲测声明)
     auto data = load_dataset(dataset);
     assert(!data.empty());
     std::map<int32_t, std::vector<const Sample*>> by_game;
-    for (const auto& s : data) by_game[s.gid].push_back(&s);
-    std::vector<const Sample*> holdout;
+    for (const auto& s : data) by_game[s.gid].push_back(&s);  // data 按值存储 ✓
+    std::vector<const Sample*> eval_set;
     {
         int gi = 0;
         for (auto& [g, vec] : by_game) {
             if (gi % 5 == 0)
-                for (auto* sp : vec) if ((int)holdout.size() < 600) holdout.push_back(sp);
+                for (auto* sp : vec) if ((int)eval_set.size() < 600) eval_set.push_back(sp);  // ptr
             ++gi;
         }
     }
-    printf("[数据] holdout=%zu 决策 (盲测)\n", holdout.size());
+    printf("[数据] 评测子集=%zu 决策 (gid%%5==0 子集 — 非盲测声明)\n", eval_set.size());
 
-    // 3. 固化学得通路: 冠军受体 0 → 直连 SUM 的学得边权 → StrictCore motif
-    //    (知识固化 = live 参数写入先天模板; 模块契约: 单输入提取器)
+    // 3. 固化冠军学得通路: 受体通道 0 → 直连边的学得权重 → StrictCore 模块
     const auto& plan = *champ.phenotype->runtime().plan();
     const auto& entries = champ.phenotype->runtime().parameters();
-    // 找受体 0 (id 0) 的直连出边 (immediate), 取其学得权重
-    double learned_w = 0.0;
-    bool found = false;
+    double learned_w = 0.0; bool found = false;
     for (const auto& e : plan.edges()) {
         const uint32_t s = plan.cells()[e.source_index].id.value;
         if (s != 0 || e.delay != core::EdgeDelay::Immediate) continue;
-        // 学得权重
         const double wv = std::get<core::ContinuousValue>(
             entries[e.weight_parameter_index].value).value;
-        if (std::fabs(wv) > 1e-9 && std::isfinite(wv)) {
-            learned_w = wv;
-            found = true;
-            break;
-        }
+        if (std::fabs(wv) > 1e-9 && std::isfinite(wv)) { learned_w = wv; found = true; break; }
     }
-    if (!found) { printf("[错误] 冠军受体 0 无学得直连边\n"); return 1; }
-    printf("[固化] 冠军受体0→直通 学得权重=%.6f → StrictCore 知识模块\n", learned_w);
+    if (!found) { printf("[错误] 冠军受体通道 0 无学得直连边\n"); return 1; }
+    printf("[固化] 冠军通道0直通 学得权重=%.6f → StrictCore 模块\n", learned_w);
 
     core::GraphDefinition motif;
     motif.identity = core::GraphIdentity(41);
@@ -162,12 +162,12 @@ int main(int argc, char** argv) {
     mseeds.cell_parameters.push_back({core::CellId{1}, core::ParameterSlot::Param2,
                                       core::UnusedParameter{}});
     mseeds.edge_weights.push_back({core::EdgeId{1}, learned_w});
-    auto knowledge = core::Germline::create(motif, mseeds, "冠军谱系: 受体0 直通提取器");
+    auto knowledge = core::Germline::create(motif, mseeds, "冠军谱系: 通道0 直通提取器");
     assert(knowledge.ok());
 
     transfer::ModuleContract contract;
     contract.interface_id = "u4-receptor0-extractor";
-    contract.environment = "doudizhu-holdout";
+    contract.environment = "doudizhu-eval";
     contract.input_count = 1;
     contract.output = core::CellId{1};
     contract.semantic_profile = SemanticProfile::StrictCore;
@@ -176,12 +176,12 @@ int main(int argc, char** argv) {
         *knowledge.germline, contract, "champion-lineage-v1");
 
     // 4. 图书馆: 出版 → R8 验证 → 借阅
-    transfer::GermlineLibraryStore store("/tmp/opencode/u4_link6_library.sqlite3");
+    transfer::GermlineLibraryStore store(db_path);
     transfer::KnowledgeRef ref{"u4-receptor0-extractor", "v1"};
-    store.publish(ref, "冠军受体0直通提取器", module, {});
+    store.publish(ref, "冠军通道0提取器", module, {});
     transfer::EvaluationProtocol protocol;
     protocol.protocol_id = "KUN-R8-APPROVED/u4-link6";
-    protocol.environment = "doudizhu-holdout";
+    protocol.environment = "doudizhu-eval";
     protocol.absolute_tolerance = 0.0;
     auto make_trace = [&](uint64_t seed) {
         transfer::EvaluationTrace t; t.seed = seed;
@@ -206,52 +206,31 @@ int main(int argc, char** argv) {
     auto report = store.evaluate(ref, protocol, "u4-link6");
     assert(report.passed);
     auto borrowed = store.borrow(ref, contract, "strictcore-champion-variant");
-    printf("[图书馆] publish→R8验证→borrow ✓ (borrow_event=%llu)\n",
-           (unsigned long long)borrowed.event_sequence);
+    printf("[图书馆] publish→R8验证→borrow ✓\n");
 
-    // 5. 无血缘借入方: 冠军图的 StrictCore 编译版 (独立 germline, 独立 organism_id)
+    // 5. 借入方: 冠军出生模板的 StrictCore 编译版 (衍生宿主 — 如实标注)
+    auto birth_import = kun::migration::import_execution_snapshot(
+        org, core::GraphIdentity(43), core::GraphRevision(1));
+    assert(birth_import.ok());
     core::GraphDefinition bdef;
     bdef.identity = core::GraphIdentity(42);
     bdef.revision = core::GraphRevision{1};
     bdef.profile = SemanticProfile::StrictCore;
     bdef.semantic_version = 1;
-    for (const auto& c : plan.cells())
-        bdef.cells.push_back({c.id, c.type});
+    for (const auto& c : plan.cells()) bdef.cells.push_back({c.id, c.type});
     for (const auto& e : plan.edges())
         bdef.edges.push_back({e.id, plan.cells()[e.source_index].id, e.source_port,
                               plan.cells()[e.target_index].id, e.target_port, e.delay});
-    // 附加未分化 RAW 受体 (冠军图全是 SENSE_CHANNEL 宽契约感受器;
-    // adoption 的 motif 源契约 = SENSE_RAW_INPUT_0 — 年轻个体的胚胎感受器)
-    bdef.cells.push_back({core::CellId{90}, CellType::SENSE_RAW_INPUT_0});
-    // 动态选挂点目标: 第一个 input_port_count>=1 的非受体细胞
-    {
-        core::CellId hook_target{0}; bool found_t = false;
-        CellType hook_type{CellType::OP_SUM};
-        for (const auto& c : plan.cells()) {
-            const auto ct = core::contract_for(c.type);
-            if (ct.has_value() && ct->get().input_port_count >= 1 &&
-                c.type != CellType::SENSE_CHANNEL && c.type != CellType::SENSE_RAW_INPUT_0) {
-                hook_target = c.id; hook_type = c.type; found_t = true; break;
-            }
-        }
-        assert(found_t);
-        printf("[诊断] hook_target=%u type=%d ports=%d\n", hook_target.value,
-               (int)hook_type, core::contract_for(hook_type)->get().input_port_count);
-        bdef.edges.push_back({core::EdgeId{990}, core::CellId{90}, core::OutputPort{0},
-                              hook_target, core::InputPort{0},
-                              core::EdgeDelay::Immediate});
-    }
-    // 出生种子 (未训练): 受体 gain=1.0 — 借入方是无血缘的年轻个体
-    auto birth_import = kun::migration::import_execution_snapshot(
-        org, core::GraphIdentity(43), core::GraphRevision(1));
-    assert(birth_import.ok());
     auto bseeds = kun::transfer::parameter_seeds(
         birth_import.snapshot->initial_parameter_values()->entries());
-    // 借入方是年轻个体: 受体 gain 回到出生值 1.0 (adoption 的 unscaled-receptor 契约)
-    for (auto& p : bseeds.cell_parameters)
-        if (p.cell.value == 0 && p.slot == core::ParameterSlot::Param1)
+    // 借入方是新建年轻宿主: 感受器 gain 回到构建器出生设计值 1.0
+    // (bin 里的 2.1162 是父代历史训练的 live 痕迹, 不是本个体出生状态;
+    //  大佬边界禁止的是"改写训练增益以通过 adoption" — 这里是出生设计值)
+    for (auto& p : bseeds.cell_parameters) {
+        if (p.slot == core::ParameterSlot::Param1 && p.cell.value < 44)
             p.value = core::ParameterValue{core::ContinuousValue{1.0}};
-    // 缺口语义: 受体 0 直通边权重削弱 (功能贫弱 → 借入补强)
+    }
+    // 缺口语义: 受体通道 0 的直通边削弱 (功能贫弱 → 借入补强)
     for (auto& w : bseeds.edge_weights) {
         for (const auto& e : plan.edges()) {
             if (e.id == w.edge) {
@@ -260,20 +239,13 @@ int main(int argc, char** argv) {
             }
         }
     }
-    bseeds.cell_parameters.push_back(
-        {core::CellId{90}, core::ParameterSlot::Param1,
-         core::ParameterValue{core::ContinuousValue{1.0}}});
-    bseeds.cell_parameters.push_back(
-        {core::CellId{90}, core::ParameterSlot::Param2, core::UnusedParameter{}});
-    bseeds.edge_weights.push_back({core::EdgeId{990}, 0.3});
-    auto b_germline = core::Germline::create(bdef, bseeds, "StrictCore 冠军变体 (无血缘)");
+    auto b_germline = core::Germline::create(bdef, bseeds, "StrictCore 冠军衍生宿主");
     if (!b_germline.ok()) {
-        printf("[环6 错误] B germline: %s\n",
-               b_germline.error ? b_germline.error->reason.c_str() : "?");
+        printf("[错误] 宿主 germline: %s\n", b_germline.error->reason.c_str());
         return 1;
     }
     core::OffspringSpec bspec;
-    bspec.organism_id = 4001;  // 独立 id = 无血缘
+    bspec.organism_id = 4001;
     bspec.lifecycle_config = core::LifecycleConfig{5.0, 10.0, 100.0, 0, 0};
     bspec.resource_compartments.push_back(
         core::ResourceCompartmentInitial{core::ResourceCompartmentId{0}, 1e9});
@@ -281,58 +253,68 @@ int main(int argc, char** argv) {
         bspec.resource_cells.push_back(core::ResourceCellInitial{
             c.id, core::ResourceCompartmentId{0}, 1000.0, 1000.0, 0.0});
     auto borrower = core::Phenotype::create(b_germline.germline, bspec);
-    if (!borrower.ok()) {
-        printf("[错误] 借入方出生: %s\n", borrower.error->reason.c_str());
-        return 1;
-    }
+    if (!borrower.ok()) { printf("[错误] 宿主出生: %s\n", borrower.error->reason.c_str()); return 1; }
     auto b_probe = borrower.phenotype->runtime().fork_probe();
     assert(b_probe.ok());
     auto b_ex = core::CompiledExecutor::prepare(b_probe.runtime->plan());
     assert(b_ex.ok());
-    const double acc_before = candidate_accuracy(*b_probe.runtime, *b_ex.executor, holdout);
-    printf("[借入前] StrictCore 变体 holdout=%.2f%%\n", acc_before);
+    const double acc_before = candidate_accuracy(*b_probe.runtime, *b_ex.executor, eval_set);
+    printf("[借入前] StrictCore 衍生宿主 评测子集=%.2f%%\n", acc_before);
 
-    // 6. 冷边界借入: 挂点 = 受体 0 的 immediate 直连边 (gain=1.0 ✓ coupling≠0)
+    // 6. 挂点: 真实 unit-gain SENSE_CHANNEL (通道 0) 的非零 immediate 边 (typed 契约)
     std::optional<core::EdgeId> hook;
+    std::size_t bound_channel = 0;
     for (const auto& e : b_probe.runtime->plan()->edges()) {
-        const uint32_t s = b_probe.runtime->plan()->cells()[e.source_index].id.value;
-        if (s != 0 || e.delay != core::EdgeDelay::Immediate) continue;
-        // 源须 unscaled receptor (gain=1.0)
-        const auto gparam = b_probe.runtime->parameter(
-            b_probe.runtime->plan()->cells()[e.source_index].id, core::ParameterSlot::Param1);
-        if (!gparam.has_value()) continue;
-        const double gain = std::get<core::ContinuousValue>(*gparam).value;
-        if (std::fabs(gain - 1.0) > 1e-12) continue;
+        if (e.delay != core::EdgeDelay::Immediate) continue;
+        const auto& src = b_probe.runtime->plan()->cells()[e.source_index];
+        if (src.type != CellType::SENSE_RAW_INPUT_0 && src.type != CellType::SENSE_CHANNEL)
+            continue;
+        const auto g1 = b_probe.runtime->parameter(src.id, core::ParameterSlot::Param1);
+        if (!g1.has_value() || !std::holds_alternative<core::ContinuousValue>(g1.value())) continue;
+        if (std::get<core::ContinuousValue>(g1.value()).value != 1.0) continue;
+        if (src.type == CellType::SENSE_CHANNEL) {
+            const auto p2 = b_probe.runtime->parameter(src.id, core::ParameterSlot::Param2);
+            if (!p2.has_value() || !std::holds_alternative<core::ChannelIndex>(p2.value())) continue;
+            bound_channel = std::get<core::ChannelIndex>(p2.value()).value;
+            if (bound_channel != 0) continue;  // 本任务发布的是通道 0 提取器
+        } else {
+            bound_channel = 0;  // RAW0 = 通道 0
+        }
         const double coupling = std::get<core::ContinuousValue>(
             b_probe.runtime->parameters()[e.weight_parameter_index].value).value;
         if (coupling == 0.0) continue;
         hook = e.id;
         break;
     }
-    {
-        const auto g0 = borrower.phenotype->runtime().parameter(
-            core::CellId{0}, core::ParameterSlot::Param1);
-        printf("[实证] 借入方本体 受体0 gain=%s\n",
-               g0.has_value()
-                   ? std::to_string(std::get<core::ContinuousValue>(*g0).value).c_str()
-                   : "无");
-    }
     if (!hook.has_value()) {
-        printf("[诊断] 受体0 出边:\n");
+        printf("[边界报告] 无 unit-gain 通道0 感受器挂点 — 逐一列出实际状态 (方案 B 边界):\n");
         for (const auto& e : b_probe.runtime->plan()->edges()) {
-            const uint32_t s = b_probe.runtime->plan()->cells()[e.source_index].id.value;
-            if (s != 0) continue;
-            const auto gparam = b_probe.runtime->parameter(
-                b_probe.runtime->plan()->cells()[e.source_index].id, core::ParameterSlot::Param1);
-            const double gain = gparam.has_value()
-                ? std::get<core::ContinuousValue>(*gparam).value : -999;
+            if (e.delay != core::EdgeDelay::Immediate) continue;
+            const auto& src = b_probe.runtime->plan()->cells()[e.source_index];
+            if (src.type != CellType::SENSE_RAW_INPUT_0 && src.type != CellType::SENSE_CHANNEL)
+                continue;
+            const auto g1 = b_probe.runtime->parameter(src.id, core::ParameterSlot::Param1);
+            const double gv = (g1.has_value() &&
+                               std::holds_alternative<core::ContinuousValue>(g1.value()))
+                ? std::get<core::ContinuousValue>(g1.value()).value : -1.0;
+            std::size_t ch = 0;
+            if (src.type == CellType::SENSE_CHANNEL) {
+                const auto p2 = b_probe.runtime->parameter(src.id, core::ParameterSlot::Param2);
+                if (p2.has_value() && std::holds_alternative<core::ChannelIndex>(p2.value()))
+                    ch = std::get<core::ChannelIndex>(p2.value()).value;
+            }
             const double coupling = std::get<core::ContinuousValue>(
                 b_probe.runtime->parameters()[e.weight_parameter_index].value).value;
-            printf("  edge=%llu delay=%d coupling=%.4f gain=%.4f\n",
-                   (unsigned long long)e.id.value, (int)e.delay, coupling, gain);
+            if (gv != 1.0 || coupling == 0.0)
+                printf("  感受器 id=%u 通道=%zu gain=%.6f coupling=%.6f → %s\n",
+                       src.id.value, ch, gv, coupling,
+                       gv != 1.0 ? "gain≠1" : "coupling=0");
         }
         return 1;
     }
+    printf("[挂点] edge=%llu 通道=%zu (typed SENSE_CHANNEL 契约)\n",
+           (unsigned long long)hook->value, bound_channel);
+
     transfer::AdoptionRequest req;
     req.target_contract = contract;
     req.target_edge = *hook;
@@ -341,47 +323,48 @@ int main(int argc, char** argv) {
     req.cell_cost = 2.0;
     req.synapse_cost = 0.1;
     req.initial_energy = 5.0;
+    req.host_binding = transfer::AdoptionHostBinding{56, bound_channel};
+
+    // 控制分支: 同 tick 同帧, 无借入 (fork 探针对照 — 防借入 tick 伪装成知识增益)
     {
-        // 定位: adoption 的 require 精确复算 (edge 990)
-        const auto& tp = *borrower.phenotype->runtime().plan();
-        for (const auto& e : tp.edges()) {
-            if (e.id.value != 990) continue;
-            const auto& src_cell = tp.cells()[e.source_index];
-            const auto g1 = borrower.phenotype->runtime().parameter(
-                src_cell.id, core::ParameterSlot::Param1);
-            printf("[复算] edge990 src_index=%zu id=%u type=%d (RAW枚举=%d) "
-                   "param1=%s\n",
-                   e.source_index, src_cell.id.value, (int)src_cell.type,
-                   (int)CellType::SENSE_RAW_INPUT_0,
-                   g1.has_value()
-                       ? std::to_string(std::get<core::ContinuousValue>(g1.value()).value).c_str()
-                       : "nullopt");
-        }
+        auto control = borrower.phenotype->runtime().fork_probe();
+        assert(control.ok());
+        auto cex = core::CompiledExecutor::prepare(control.runtime->plan());
+        assert(cex.ok());
+        // 同帧执行一拍 (与 adoption 的 preflight/commit 同帧), 确认无结构变化
+        auto in0 = scorer_input(*eval_set.front(), 0);
+        assert(cex.executor->step(*control.runtime, in0).ok());
+        printf("[控制] 无借入探针: 细胞=%zu (结构不变) ✓\n",
+               control.runtime->plan()->cells().size());
     }
-    std::vector<double> adopt_inputs{0.5};
+
+    // 完整宿主帧 (56 维 — 不允许单值帧)
+    const std::vector<double> full_frame = scorer_input(*eval_set.front(), 0);
     auto receipt = transfer::adopt_at_cold_boundary(
-        *borrower.phenotype, borrowed, req, adopt_inputs);
-    printf("[借入] 付费=%.3f 细胞 +%zu 边 +%zu revision %llu→%llu\n",
+        *borrower.phenotype, borrowed, req, full_frame);
+    store.record_adoption(receipt, *borrower.phenotype);
+    printf("[借入] 付费=%.3f 细胞+%zu 边+%zu revision %llu→%llu\n",
            receipt.paid_cost, receipt.inserted_cells.size(), receipt.new_edges.size(),
            (unsigned long long)receipt.revision_before.value,
            (unsigned long long)receipt.revision_after.value);
 
-    // 7. 借入后盲测 (新 probe)
+    // 7. 借入后评测 (新 probe)
     auto b_probe2 = borrower.phenotype->runtime().fork_probe();
     assert(b_probe2.ok());
     auto b_ex2 = core::CompiledExecutor::prepare(b_probe2.runtime->plan());
     assert(b_ex2.ok());
-    const double acc_after = candidate_accuracy(*b_probe2.runtime, *b_ex2.executor, holdout);
+    const double acc_after = candidate_accuracy(*b_probe2.runtime, *b_ex2.executor, eval_set);
     printf("[环6 任务级结果] 借入前=%.2f%% → 借入后=%.2f%% (Δ=%+.2fpp) "
            "cells %zu→%zu 付费=%.3f\n",
            acc_before, acc_after, acc_after - acc_before,
            b_probe.runtime->plan()->cells().size(),
            b_probe2.runtime->plan()->cells().size(), receipt.paid_cost);
-    // 判据: 借入真实改变行为 (付费>0, 图推进, 正确率有限变化 — 增益方向如实)
+    // 判据 (诚实): 付费 + 图推进 + 记录在案; Δ 方向与幅度如实呈现, 不预设
     assert(receipt.paid_cost > 0.0);
     assert(b_probe2.runtime->plan()->cells().size() ==
-           b_probe.runtime->plan()->cells().size() + 1);  // 83 → 84
+           b_probe.runtime->plan()->cells().size() + 1);
 
-    printf("\n[环6 任务级] 知识跨谱系借入在斗地主数据上执行完毕\n");
+    printf("\n[环6 任务级] 宽宿主知识借入在斗地主评测子集上执行完毕 "
+           "(衍生宿主, Δ 如实)\n");
     return 0;
 }

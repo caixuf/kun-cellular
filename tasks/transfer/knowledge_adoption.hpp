@@ -4,6 +4,15 @@
 
 namespace kun::transfer {
 
+// Opt-in wide-host composition binding (option B): the module's single input
+// slot 0 maps to host source_channel; the host frame declares its own width.
+// The stored ModuleContract, artifact, digest, evidence and schema are
+// unchanged. Without this binding the legacy RAW0-only scalar path applies.
+struct AdoptionHostBinding {
+    std::size_t input_count;
+    std::size_t source_channel;
+};
+
 struct AdoptionRequest {
     ModuleContract target_contract;
     EdgeId target_edge;
@@ -12,7 +21,9 @@ struct AdoptionRequest {
     double cell_cost;
     double synapse_cost;
     double initial_energy;
+    std::optional<AdoptionHostBinding> host_binding{};
 };
+
 struct AdoptionWork {
     uint64_t attempts{0}, failed_attempts{0}, graph_executions{0}, cell_visits{0}, edge_visits{0};
 };
@@ -54,9 +65,19 @@ inline AdoptionReceipt adopt_at_cold_boundary(
                 target.runtime().plan()->semantic_version() == module.germline().graph()->semantic_version(),
                 "adoption semantic mismatch");
         require(target.runtime().tick() == request.expected_tick, "stale cold learning boundary");
-        require(inputs.size() == request.target_contract.input_count &&
-                std::all_of(inputs.begin(), inputs.end(), [](double v) { return std::isfinite(v); }),
-                "adoption tick input interface mismatch");
+        if (request.host_binding.has_value()) {
+            const auto& hb = *request.host_binding;
+            require(hb.input_count > 0 && inputs.size() == hb.input_count &&
+                    hb.source_channel < hb.input_count &&
+                    std::all_of(inputs.begin(), inputs.end(),
+                                [](double v) { return std::isfinite(v); }),
+                    "adoption tick input interface mismatch (wide-host binding)");
+        } else {
+            require(inputs.size() == request.target_contract.input_count &&
+                    std::all_of(inputs.begin(), inputs.end(),
+                                [](double v) { return std::isfinite(v); }),
+                    "adoption tick input interface mismatch");
+        }
         require(std::isfinite(request.cell_cost) && request.cell_cost > 0 &&
                 std::isfinite(request.synapse_cost) && request.synapse_cost > 0 &&
                 std::isfinite(request.initial_energy) && request.initial_energy > 0,
@@ -79,10 +100,41 @@ inline AdoptionReceipt adopt_at_cold_boundary(
             [&](const auto& e) { return e.id == request.target_edge; });
         require(link != target_plan.edges().end() && link->delay == EdgeDelay::Immediate,
                 "live adoption requires an existing immediate target edge");
-        require(target_plan.cells()[link->source_index].type == CellType::SENSE_RAW_INPUT_0 &&
-                std::get<ContinuousValue>(*target.runtime().parameter(
-                    target_plan.cells()[link->source_index].id, ParameterSlot::Param1)).value == 1.0,
-                "motif boundary requires an unscaled scalar receptor");
+        // Motif boundary: the host source must be an unscaled (gain exactly 1.0)
+        // scalar receptor. Wide-host binding additionally accepts SENSE_CHANNEL
+        // whose typed Param2 channel matches the declared source_channel.
+        const auto& src_cell = target_plan.cells()[link->source_index];
+        const auto host_gain = target.runtime().parameter(src_cell.id, ParameterSlot::Param1);
+        const double host_gain_value =
+            host_gain.has_value() &&
+                    std::holds_alternative<ContinuousValue>(*host_gain)
+                ? std::get<ContinuousValue>(*host_gain).value
+                : std::numeric_limits<double>::quiet_NaN();
+        std::string channel_note;
+        if (request.host_binding.has_value()) {
+            const auto& hb = *request.host_binding;
+            if (src_cell.type == CellType::SENSE_CHANNEL) {
+                const auto p2 = target.runtime().parameter(src_cell.id, ParameterSlot::Param2);
+                const bool channel_ok = p2.has_value() &&
+                    std::holds_alternative<ChannelIndex>(*p2) &&
+                    std::get<ChannelIndex>(*p2).value == hb.source_channel;
+                require(channel_ok, "host SENSE_CHANNEL Param2 channel does not match "
+                                    "the declared host_binding.source_channel");
+                channel_note = " wide-host SENSE_CHANNEL mapped to module slot 0 via "
+                               "host_binding.source_channel=" + std::to_string(hb.source_channel);
+            } else if (src_cell.type != CellType::SENSE_RAW_INPUT_0) {
+                require(false, "host_binding source must be SENSE_RAW_INPUT_0 or "
+                               "SENSE_CHANNEL; actual source type: " +
+                               std::to_string(static_cast<int>(src_cell.type)));
+            }
+        } else {
+            require(src_cell.type == CellType::SENSE_RAW_INPUT_0,
+                    "motif boundary requires an unscaled scalar receptor");
+        }
+        require(host_gain_value == 1.0,
+                "motif boundary requires an unscaled scalar receptor (actual gain " +
+                std::to_string(host_gain_value) + ")" + channel_note);
+
         const auto resources = target.ledger().snapshot();
         for (const auto& state : target.lifecycle().states())
             require(state.state == LifecycleState::Active &&

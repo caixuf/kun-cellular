@@ -4,6 +4,7 @@
 #include <cassert>
 #include <filesystem>
 #include <iostream>
+#include <iomanip>
 #include <limits>
 #include <thread>
 #include <unistd.h>
@@ -274,6 +275,95 @@ int main() {
         assert(db.entry({"absolute", "2"}).failures == failed_before);
         exec_sql(path, "DROP TRIGGER reject_event");
     }
+    // ── Wide-host adoption binding (option B) + edge-selection regression ──
+    {
+        // StrictCore host: SENSE_CHANNEL (ch55) + RAW0 + SUM; gains exactly 1.0.
+        // Edge 10 = channel host edge; edge 990 = RAW host edge. Both unit-gain sources.
+        GraphDefinition host{GraphIdentity{900}, GraphRevision{1},
+                             SemanticProfile::StrictCore, 1, {}, {}};
+        InitialParameterSeeds hs;
+        host.cells.push_back({CellId{55}, CellType::SENSE_CHANNEL});
+        hs.cell_parameters.push_back({CellId{55}, ParameterSlot::Param1, ContinuousValue{1.0}});
+        hs.cell_parameters.push_back({CellId{55}, ParameterSlot::Param2, ChannelIndex{55}});
+        host.cells.push_back({CellId{90}, CellType::SENSE_RAW_INPUT_0});
+        hs.cell_parameters.push_back({CellId{90}, ParameterSlot::Param1, ContinuousValue{1.0}});
+        hs.cell_parameters.push_back({CellId{90}, ParameterSlot::Param2, UnusedParameter{}});
+        host.cells.push_back({CellId{100}, CellType::OP_SUM});
+        hs.cell_parameters.push_back({CellId{100}, ParameterSlot::Param1, UnusedParameter{}});
+        hs.cell_parameters.push_back({CellId{100}, ParameterSlot::Param2, UnusedParameter{}});
+        host.edges.push_back({EdgeId{10}, CellId{55}, OutputPort{0}, CellId{100},
+                              InputPort{0}, EdgeDelay::Immediate});
+        hs.edge_weights.push_back({EdgeId{10}, 0.3});
+        host.edges.push_back({EdgeId{990}, CellId{90}, OutputPort{0}, CellId{100},
+                              InputPort{0}, EdgeDelay::Immediate});
+        hs.edge_weights.push_back({EdgeId{990}, 0.5});
+        const auto host_germline = Germline::create(host, hs, "wide-host");
+        assert(host_germline.ok());
+
+        GermlineLibraryStore wide_db(path);
+        wide_db.publish({"wide", "1"}, "Wide-host fixture (gain=2)", module(2), {});
+        assert(wide_db.evaluate({"wide", "1"}, protocol(2), "wide-evaluator").passed);
+        auto borrowed2 = wide_db.borrow({"wide", "1"}, contract(), "wide-host");
+        auto wmodule = borrowed2.module;  // gain=2 scalar motif
+        // 借入方: 出生于 host 图 (无血缘个体, 独立 organism id)
+        auto whost = host_germline.germline->spawn_offspring(spec(*host_germline.germline, 600)).phenotype;
+        assert(whost);
+        // 控制帧: 56 宽度, 通道 55 = 3 (帧必须完整覆盖宿主声明通道)
+        std::vector<double> frame(56, 0.0);
+        frame[55] = 3.0;
+        const auto before_tick = whost->runtime().tick();
+        const auto before_plan = whost->runtime().plan();
+
+        AdoptionRequest channel_req{contract(), EdgeId{10}, before_tick,
+            {CellId{55}, ResourceCompartmentId{1}}, 1.0, 0.25, 1.0};
+        channel_req.host_binding = AdoptionHostBinding{56, 55};
+
+        // 无 host_binding 时: CHANNEL 源被拒 (legacy RAW0-only 路径)
+        {
+            AdoptionRequest legacy = channel_req; legacy.host_binding.reset();
+            rejects([&] { adopt_at_cold_boundary(*whost, borrowed2, legacy, frame); });
+            assert(whost->runtime().plan() == before_plan && whost->runtime().tick() == before_tick);
+        }
+        // 宽宿主绑定: CHANNEL 源 (ch55, gain 1.0) + 完整帧 → 成功
+        // 组合: incoming = module_gain(1)×module_weight(2)=2; outgoing = coupling(0.3)
+        // 借入后 C(100) = outgoing × motif(3) = 0.3 × 2×3 = 1.8
+        auto receipt = adopt_at_cold_boundary(*whost, borrowed2, channel_req, frame);
+        assert(receipt.paid_cost == 2.5);
+        assert(whost->runtime().plan()->cells().size() == 4);  // 3 + 1 inserted
+        assert(whost->runtime().tick() == before_tick + 1);
+        // 同帧对照: 借入后下游值 = 0.3 × 2 × 3 = 1.8
+        auto wprobe = whost->runtime().fork_probe();
+        assert(wprobe.ok());
+        auto wex = CompiledExecutor::prepare(wprobe.runtime->plan());
+        assert(wex.ok());
+        double acc = 0.0;
+        for (const auto& f : frame) {
+            std::vector<double> one{f};
+            // 宿主外部通道由帧本身供给 (帧即完整输入)
+            (void)one;
+        }
+        std::vector<double> wide_frame = frame;
+        assert(wex.executor->step(*wprobe.runtime, wide_frame).ok());
+        // 找 inserted 细胞输出下游 (SUM 100)
+        for (const auto& e : whost->runtime().plan()->edges()) {
+            const uint32_t s = whost->runtime().plan()->cells()[e.source_index].id.value;
+            const uint32_t t = whost->runtime().plan()->cells()[e.target_index].id.value;
+            double w = -999;
+            for (const auto& p : whost->runtime().parameters())
+                if (p.binding.kind == ParameterBindingKind::EdgeWeight && p.binding.edge == e.id)
+                    w = std::get<ContinuousValue>(p.value).value;
+            std::cerr << "post-adopt edge " << e.id.value << ": " << s << "->" << t
+                      << " w=" << w << "\n";
+        }
+        const double downstream = whost->runtime().cell_state(CellId{100})->output_val;
+        (void)acc;
+        if (std::abs(downstream - 1.8) >= 1e-9)
+            std::cerr << std::setprecision(17) << "wide-host downstream=" << downstream << "\n";
+        // StrictCore DefaultLeaf 策略是 float 转换 — 数值容差按 float 精度 (大佬: "within numeric tolerance")
+        assert(std::abs(downstream - 1.8) < 1e-6);
+        std::cout << "wide-host binding: module reads host channel 55, downstream 1.8: passed\n";
+    }
+
     exec_sql(path, "PRAGMA user_version=999");
     rejects([&] { GermlineLibraryStore unknown(path); });
     exec_sql(path, "PRAGMA user_version=3");
