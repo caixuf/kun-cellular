@@ -194,7 +194,7 @@ int main(int argc, char** argv) {
         auto pex = core::CompiledExecutor::prepare(probe.runtime->plan());
         assert(pex.ok());
         auto [ep, loss] = train_dms(*probe.runtime, *pex.executor, organism_id,
-                                    train_set, 200, 0.02);
+                                    train_set, 400, 0.02);
         if (ep < 0) return 1;
         const double acc = dms_accuracy(*probe.runtime, *pex.executor, test_set);
         printf("[G%d] 学习后 test 正确率=%.1f%% (loss=%.4f, cells=%zu)\n",
@@ -249,10 +249,26 @@ int main(int argc, char** argv) {
         sp.proposal_id = gen + 1;
         sp.split.edge = split_edge;
         const uint32_t new_id = 100 + (uint32_t)gen;
-        sp.split.inserted = core::CellBirth{core::CellId{new_id}, new_type,
-            std::array<core::ParameterValue, 2>{
-                core::ParameterValue{core::ContinuousValue{0.4}},
-                core::UnusedParameter{}}};
+        // 类型分派出生参数 (typed schema 契约 — 每类型有自己的参数形态)
+        std::array<core::ParameterValue, 2> birth_params;
+        switch (new_type) {
+            case CellType::OP_EMA:
+                birth_params = {core::ParameterValue{core::ContinuousValue{0.4}},
+                                core::UnusedParameter{}};   // alpha=0.4
+                break;
+            case CellType::OP_DELAY_N:
+                birth_params = {core::ParameterValue{core::DelayTicks{6}},
+                                core::UnusedParameter{}};   // typed: 6 拍延迟
+                break;
+            case CellType::GATE_HYSTERESIS:
+                birth_params = {core::ParameterValue{core::ContinuousValue{0.05}},
+                                core::ParameterValue{core::ContinuousValue{-0.05}}};
+                break;
+            default:  // 代数类型参数 Unused
+                birth_params = {core::UnusedParameter{}, core::UnusedParameter{}};
+                break;
+        }
+        sp.split.inserted = core::CellBirth{core::CellId{new_id}, new_type, birth_params};
         sp.split.source_to_new = core::EdgeId{1000 + gen * 2};
         sp.split.new_to_target = core::EdgeId{1001 + gen * 2};
         sp.split.new_input_port = core::InputPort{0};
@@ -276,11 +292,11 @@ int main(int argc, char** argv) {
         auto c_ex = core::CompiledExecutor::prepare(c_probe.runtime->plan());
         assert(c_ex.ok());
         auto [ep2, loss2] = train_dms(*c_probe.runtime, *c_ex.executor,
-                                      organism_id + 100, train_set, 200, 0.02);
+                                      organism_id + 100, train_set, 400, 0.02);
         if (ep2 < 0) return 1;
         const double acc2 = dms_accuracy(*c_probe.runtime, *c_ex.executor, test_set);
         printf("[G%d] 变异(%s) 后 test=%.1f%% (付费=%.1f) — %s\n",
-               gen, cell_type_name(new_type).c_str(), acc2,
+               gen, cell_type_name(new_type), acc2,
                gres.growth_report ? gres.growth_report->cumulative_growth_cost : 0.0,
                acc2 > acc ? "选择保留" : "选择回滚");
         if (acc2 > acc && acc2 > best_acc) {
