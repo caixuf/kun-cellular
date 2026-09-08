@@ -236,6 +236,35 @@ void test_learning_window_rejects_structural_revision_and_resets_once() {
     assert(!window.validate(phenotype->runtime()).ok());
 }
 
+void test_learning_window_applies_only_declared_continuous_updates() {
+    const auto germline = make_germline();
+    auto phenotype_result = germline->spawn_offspring(offspring_spec(450));
+    assert(phenotype_result.ok());
+    auto phenotype = std::move(phenotype_result.phenotype);
+    const auto binding = phenotype->runtime().parameters()[4].binding;
+    auto window = LearningWindow::open(
+        phenotype->organism_id(), phenotype->runtime(), {binding});
+
+    const auto update = window.apply_sgd(
+        phenotype->runtime(),
+        std::array<LearningGradient, 1>{
+            LearningGradient{binding, 2.0}},
+        0.25);
+    assert(update.ok());
+    assert(update.report.updated_values == 1);
+    assert(std::get<ContinuousValue>(
+               *phenotype->runtime().parameter_at(binding.index)).value == 0.5);
+
+    const auto forbidden = phenotype->runtime().parameters()[0].binding;
+    const auto rejected = window.apply_sgd(
+        phenotype->runtime(),
+        std::array<LearningGradient, 1>{
+            LearningGradient{forbidden, 1.0}},
+        0.25);
+    assert(!rejected.ok());
+    assert(rejected.error->code == LearningWindowErrorCode::ParameterNotAllowed);
+}
+
 void test_checkpoint_exact_resume_and_atomic_rejection() {
     const auto germline = make_germline();
     auto original_result = germline->spawn_offspring(offspring_spec(500));
@@ -312,6 +341,7 @@ int main() {
     test_default_offspring_is_fresh_and_template_only();
     test_assimilation_is_explicit_and_declared();
     test_learning_window_rejects_structural_revision_and_resets_once();
+    test_learning_window_applies_only_declared_continuous_updates();
     test_checkpoint_exact_resume_and_atomic_rejection();
     test_optimizer_mode_is_explicitly_unsupported();
     return 0;

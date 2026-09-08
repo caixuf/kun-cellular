@@ -3,6 +3,7 @@
 #include "kun/cellular/core/lifecycle_controller.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <initializer_list>
 #include <memory>
@@ -290,6 +291,23 @@ struct LearningWindowResetResult {
     explicit operator bool() const { return ok(); }
 };
 
+struct LearningGradient {
+    ParameterBinding binding{};
+    double value{0.0};
+};
+
+struct LearningUpdateReport {
+    std::size_t updated_values{0};
+    double learning_rate{0.0};
+};
+
+struct LearningUpdateResult {
+    LearningUpdateReport report{};
+    std::optional<LearningWindowError> error;
+    bool ok() const { return !error.has_value(); }
+    explicit operator bool() const { return ok(); }
+};
+
 class LearningWindow final {
 public:
     static LearningWindow open(
@@ -353,6 +371,60 @@ public:
             }
         }
         return {};
+    }
+
+    LearningUpdateResult apply_sgd(
+        RuntimeState& runtime,
+        std::span<const LearningGradient> gradients,
+        double learning_rate) {
+        if (const auto result = validate(runtime); !result.ok()) {
+            return {{}, result.error};
+        }
+        if (!std::isfinite(learning_rate) || learning_rate <= 0.0) {
+            return {{}, LearningWindowError{
+                LearningWindowErrorCode::InvalidBinding,
+                "learning rate must be finite and positive"}};
+        }
+        std::vector<ParameterBinding> bindings;
+        bindings.reserve(gradients.size());
+        for (const auto& gradient : gradients) {
+            if (!std::isfinite(gradient.value)) {
+                return {{}, LearningWindowError{
+                    LearningWindowErrorCode::InvalidBinding,
+                    "learning gradient must be finite"}};
+            }
+            bindings.push_back(gradient.binding);
+        }
+        if (const auto result = validate_parameters(runtime, bindings);
+            !result.ok()) {
+            return {{}, result.error};
+        }
+        for (const auto& gradient : gradients) {
+            const auto current = runtime.parameter_at(gradient.binding.index);
+            if (!current || !std::holds_alternative<ContinuousValue>(*current)) {
+                return {{}, LearningWindowError{
+                    LearningWindowErrorCode::ParameterNotAllowed,
+                    "learning gradient targets a non-continuous parameter"}};
+            }
+            const double updated =
+                std::get<ContinuousValue>(*current).value -
+                learning_rate * gradient.value;
+            if (!std::isfinite(updated)) {
+                return {{}, LearningWindowError{
+                    LearningWindowErrorCode::InvalidBinding,
+                    "learning update produced a non-finite parameter"}};
+            }
+            if (const auto result = runtime.set_parameter(
+                    gradient.binding,
+                    ParameterValue{ContinuousValue{updated}});
+                !result.ok()) {
+                return {{}, LearningWindowError{
+                    LearningWindowErrorCode::InvalidBinding,
+                    result.error ? result.error->reason
+                                 : "runtime rejected learning update"}};
+            }
+        }
+        return {LearningUpdateReport{gradients.size(), learning_rate}, std::nullopt};
     }
 
     LearningWindowResetResult consume_after_graph_edit(
