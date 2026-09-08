@@ -53,7 +53,7 @@ void test_doudizhu_1024_master_checkpoint() {
     assert(version == 2);
     assert(num_cells == 1024);
     assert(num_synapses == 196608);
-    assert(in_dim == 40);
+    assert(in_dim == 32);   // 1024 旧 checkpoint 的记录值 (文件内容不变)
     assert(out_dim == 7);
 }
 
