@@ -3,11 +3,14 @@
 #undef NDEBUG
 #endif
 #include <cassert>
+#include <array>
 #include <vector>
 #include <cmath>
 
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/cellular_bptt.hpp"
+#include "kun/cellular/core/graph_compiler.hpp"
+#include "kun/cellular/core/runtime_migration.hpp"
 
 using namespace kun;
 
@@ -29,6 +32,73 @@ inline Synapse make_synapse(uint32_t from_id, uint32_t to_id, uint8_t port, doub
     s.initial_weight = weight;
     s.is_active = true;
     return s;
+}
+
+core::InitialParameterSeeds make_core_seeds(const core::GraphDefinition& graph) {
+    core::InitialParameterSeeds seeds;
+    for (const auto& cell : graph.cells) {
+        const auto contract = core::contract_for(cell.type);
+        assert(contract.has_value());
+        for (size_t slot = 0; slot < 2; ++slot) {
+            const auto& descriptor = contract->get().parameters[slot];
+            core::ParameterValue value = core::UnusedParameter{};
+            switch (descriptor.value_type) {
+                case core::ParameterValueType::Continuous:
+                    value = core::ContinuousValue{1.0};
+                    break;
+                case core::ParameterValueType::ChannelIndex:
+                    value = core::ChannelIndex{0};
+                    break;
+                case core::ParameterValueType::DelayTicks:
+                    value = core::DelayTicks{1};
+                    break;
+                case core::ParameterValueType::MinMaxMode:
+                    value = core::MinMaxMode::Min;
+                    break;
+                case core::ParameterValueType::Unused:
+                    break;
+            }
+            seeds.cell_parameters.push_back(
+                core::CellParameterSeed{
+                    cell.id, static_cast<core::ParameterSlot>(slot), value});
+        }
+    }
+    for (const auto& edge : graph.edges) {
+        seeds.edge_weights.push_back(core::EdgeParameterSeed{edge.id, 1.0});
+    }
+    return seeds;
+}
+
+core::GraphDefinition make_core_bptt_graph(core::GraphRevision revision = core::GraphRevision{1}) {
+    core::GraphDefinition graph;
+    graph.identity = core::GraphIdentity{910};
+    graph.revision = revision;
+    graph.profile = SemanticProfile::LegacyCompatible;
+    graph.cells = {
+        {core::CellId{1}, CellType::SENSE_RAW_INPUT_0},
+        {core::CellId{2}, CellType::OP_SUM},
+        {core::CellId{3}, CellType::ACT_PRIMARY_POSITIVE},
+    };
+    graph.edges = {
+        {core::EdgeId{1}, core::CellId{1}, core::OutputPort{0},
+         core::CellId{2}, core::InputPort{0}, core::EdgeDelay::Immediate},
+        {core::EdgeId{2}, core::CellId{2}, core::OutputPort{0},
+         core::CellId{3}, core::InputPort{0}, core::EdgeDelay::Immediate},
+    };
+    return graph;
+}
+
+core::ParameterBinding core_edge_binding(
+    const core::RuntimeState& runtime,
+    core::EdgeId edge) {
+    for (const auto& parameter : runtime.parameters()) {
+        if (parameter.binding.kind == core::ParameterBindingKind::EdgeWeight &&
+            parameter.binding.edge == edge) {
+            return parameter.binding;
+        }
+    }
+    assert(false);
+    return {};
 }
 
 // 1. 验证 CSR 环形录带与基础反向传播
@@ -209,6 +279,102 @@ void test_end_to_end_bptt_optimization() {
     assert(final_loss < initial_loss * 0.10f); // 至少降低 90%
 }
 
+void test_core_runtime_bptt_learning_window_binding() {
+    std::cout << "[BPTT Test 5] 验证 Core RuntimeState 录带、梯度与 LearningWindow/Adam 绑定...\n";
+    const auto graph = make_core_bptt_graph();
+    const auto seeds = make_core_seeds(graph);
+    auto compiled = core::GraphCompiler{}.compile(graph, seeds);
+    assert(compiled.ok());
+    auto runtime_result =
+        core::RuntimeState::create(compiled.graph, compiled.initial_values);
+    assert(runtime_result.ok());
+    auto runtime = std::move(runtime_result.runtime);
+    auto prepared = core::CompiledExecutor::prepare(compiled.graph);
+    assert(prepared.ok());
+    auto executor = std::move(prepared.executor);
+
+    const auto edge_binding = core_edge_binding(*runtime, core::EdgeId{1});
+    auto window = core::LearningWindow::open(
+        910, *runtime, {edge_binding});
+    CoreCellularBPTTEngine engine(8);
+    for (int t = 0; t < 4; ++t) {
+        const double input = 0.4 + 0.1 * t;
+        assert(engine.record_step(
+            *runtime, *executor, std::span<const double>(&input, 1)).ok());
+    }
+
+    CoreBPTTGradients gradients;
+    const std::vector<std::vector<double>> targets(
+        4, std::vector<double>{0.2});
+    const auto backward = engine.backward(*runtime, targets, gradients, &window);
+    assert(backward.ok());
+    assert(backward.loss > 0.0);
+    assert(gradients.gradients.size() == 1);
+    assert(gradients.gradients[0].binding.edge == core::EdgeId{1});
+    assert(std::isfinite(gradients.gradients[0].value));
+
+    const std::array<double, 4> inputs{0.4, 0.5, 0.6, 0.7};
+    const auto trajectory_loss = [&](double weight) {
+        auto probe_result = runtime->fork_probe();
+        assert(probe_result.ok());
+        auto probe = std::move(probe_result.runtime);
+        assert(probe->reset_episode().ok());
+        assert(probe->set_parameter(
+            edge_binding, core::ParameterValue{core::ContinuousValue{weight}})
+                   .ok());
+        double loss = 0.0;
+        for (const double input : inputs) {
+            assert(executor->step(
+                *probe, std::span<const double>(&input, 1)).ok());
+            double prediction = 0.0;
+            for (const auto& cell : executor->last_measurement().cells) {
+                if (cell.cell == core::CellId{3}) prediction = cell.output;
+            }
+            const double diff = prediction - 0.2;
+            loss += diff * diff;
+        }
+        return loss / static_cast<double>(inputs.size());
+    };
+    const double weight = std::get<core::ContinuousValue>(
+        *runtime->parameter_at(edge_binding.index)).value;
+    const double epsilon = 1e-5;
+    const double finite_difference =
+        (trajectory_loss(weight + epsilon) -
+         trajectory_loss(weight - epsilon)) /
+        (2.0 * epsilon);
+    assert(std::abs(
+               finite_difference - gradients.gradients[0].value) < 1e-3);
+
+    const double before = std::get<core::ContinuousValue>(
+        *runtime->parameter_at(edge_binding.index)).value;
+    const auto update = engine.step_adam(*runtime, window, gradients, 0.05);
+    assert(update.ok());
+    assert(update.updated_values == 1);
+    const double after = std::get<core::ContinuousValue>(
+        *runtime->parameter_at(edge_binding.index)).value;
+    assert(after != before);
+
+    CoreBPTTGradients forbidden = gradients;
+    forbidden.gradients.push_back(
+        {runtime->parameters()[0].binding, 1.0});
+    const auto rejected = engine.step_adam(
+        *runtime, window, forbidden, 0.05);
+    assert(!rejected.ok());
+    assert(rejected.error->code == CoreBPTTErrorCode::InvalidLearningWindow);
+
+    const auto revised_graph = make_core_bptt_graph(core::GraphRevision{2});
+    const auto revised_seeds = make_core_seeds(revised_graph);
+    const auto revised = core::GraphCompiler{}.compile(revised_graph, revised_seeds);
+    assert(revised.ok());
+    const auto migrated = core::RuntimeMigration::rebind(
+        *runtime, revised.graph, revised.initial_values);
+    assert(migrated.ok());
+    const auto stale_update = engine.step_adam(
+        *runtime, window, gradients, 0.05);
+    assert(!stale_update.ok());
+    assert(stale_update.error->code == CoreBPTTErrorCode::InvalidLearningWindow);
+}
+
 int main() {
     std::cout << "===================================================================\n";
     std::cout << " SDSCC CSR 图 BPTT 反向传播内核与李雅普诺夫投影验证套件\n";
@@ -218,7 +384,8 @@ int main() {
     test_recurrent_synapse_gradient_parity();
     test_lyapunov_manifold_projection();
     test_end_to_end_bptt_optimization();
+    test_core_runtime_bptt_learning_window_binding();
 
-    std::cout << "\n🎉 全部 4 组 BPTT 可微内核与李雅普诺夫稳定投影测试全部通过!\n";
+    std::cout << "\n🎉 全部 5 组 BPTT 可微内核与李雅普诺夫稳定投影测试全部通过!\n";
     return 0;
 }

@@ -7,8 +7,17 @@
 #include <cstring>
 #include <iostream>
 #include <functional>
+#include <limits>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
 
 #include "kun/cellular/cellular_genome.hpp"
+#include "kun/cellular/core/compiled_executor.hpp"
+#include "kun/cellular/core/heredity.hpp"
+#include "kun/cellular/core/kernel_bridge.hpp"
+#include "kun/cellular/core/runtime_state.hpp"
 #include "kun/cellular/sdsc_primitives.h"
 #include "kun/cellular/sdsc_primitives_vjp.h"
 #include "kun/cellular/generated_ops.hpp"
@@ -583,6 +592,578 @@ public:
     float apply_lyapunov_projection(CellularOrganism& org, float max_allowable_gain = 0.95f) {
         org.enforce_lyapunov_stability(static_cast<double>(max_allowable_gain));
         return static_cast<float>(org.check_lyapunov_stability().max_loop_gain);
+    }
+};
+
+/**
+ * Core RuntimeState BPTT adapter.
+ *
+ * This deliberately lives beside the legacy engine instead of changing its
+ * CellularOrganism ABI.  The tape is populated from RuntimeState snapshots and
+ * CompiledExecutor measurements, so gradients are taken through the same
+ * kernels and typed live parameters used by production execution.
+ *
+ * Current core-native scope is the differentiable MSE path.  Other legacy loss
+ * modes and the legacy Lyapunov projection remain available through
+ * CellularBPTTEngine until their core contracts have first-class equivalents.
+ */
+struct CoreBPTTTapeStep {
+    std::vector<double> inputs;
+    std::vector<double> port_inputs;
+    std::vector<core::InitialParameterValue> parameters;
+    std::vector<core::RuntimeCellState> state_pre;
+    std::vector<core::RuntimeCellState> state_post;
+    core::GraphIdentity identity{};
+    core::GraphRevision revision{};
+    uint32_t semantic_version{0};
+};
+
+struct CoreBPTTGradients {
+    std::vector<core::LearningGradient> gradients;
+    double loss{0.0};
+
+    void clear() {
+        gradients.clear();
+        loss = 0.0;
+    }
+};
+
+enum class CoreBPTTErrorCode : uint8_t {
+    InvalidRuntime,
+    InvalidExecutor,
+    StaleTape,
+    InvalidTargets,
+    UnsupportedLoss,
+    InvalidLearningWindow,
+};
+
+struct CoreBPTTError {
+    CoreBPTTErrorCode code{CoreBPTTErrorCode::InvalidRuntime};
+    std::string reason;
+};
+
+struct CoreBPTTResult {
+    double loss{0.0};
+    std::size_t updated_values{0};
+    std::optional<CoreBPTTError> error;
+
+    bool ok() const { return !error.has_value(); }
+    explicit operator bool() const { return ok(); }
+};
+
+class CoreCellularBPTTEngine final {
+public:
+    size_t window_size{64};
+    std::vector<CoreBPTTTapeStep> tape;
+    size_t current_tape_len{0};
+
+    std::vector<double> m_parameters;
+    std::vector<double> v_parameters;
+    uint64_t adam_step{0};
+    double beta1{0.9};
+    double beta2{0.999};
+    double eps_adam{1e-8};
+    double grad_clip_norm{1.0};
+
+    explicit CoreCellularBPTTEngine(size_t max_window = 64)
+        : window_size(max_window), tape(window_size) {}
+
+    void reset_tape() {
+        current_tape_len = 0;
+    }
+
+    void init_optimizer(const core::RuntimeState& runtime) {
+        m_parameters.assign(runtime.parameters().size(), 0.0);
+        v_parameters.assign(runtime.parameters().size(), 0.0);
+        adam_step = 0;
+    }
+
+    CoreBPTTResult record_step(
+        core::RuntimeState& runtime,
+        core::CompiledExecutor& executor,
+        std::span<const double> inputs) {
+        if (!executor.plan() || !runtime.bound_to(*executor.plan())) {
+            return failure(
+                CoreBPTTErrorCode::InvalidExecutor,
+                "runtime and compiled executor are not bound to the same plan");
+        }
+        if (!inputs.empty() && inputs.data() == nullptr) {
+            return failure(
+                CoreBPTTErrorCode::InvalidRuntime,
+                "non-empty input span has a null data pointer");
+        }
+
+        const auto before = runtime.snapshot();
+        const auto executed = executor.step(runtime, inputs);
+        if (!executed.ok()) {
+            return failure(
+                CoreBPTTErrorCode::InvalidRuntime,
+                std::string(executed.error->reason));
+        }
+        const auto after = runtime.snapshot();
+        const auto measurement = executed.measurement;
+
+        if (current_tape_len >= window_size) {
+            for (size_t t = 1; t < window_size; ++t) {
+                tape[t - 1] = std::move(tape[t]);
+            }
+            current_tape_len = window_size - 1;
+        }
+
+        auto& step = tape[current_tape_len];
+        const size_t cells = runtime.plan()->cells().size();
+        step.inputs.assign(inputs.begin(), inputs.end());
+        step.port_inputs.assign(cells * 2, 0.0);
+        step.parameters.assign(
+            before.parameters().begin(), before.parameters().end());
+        step.state_pre.assign(before.cells().begin(), before.cells().end());
+        step.state_post.assign(after.cells().begin(), after.cells().end());
+        step.identity = runtime.identity();
+        step.revision = runtime.revision();
+        step.semantic_version = runtime.plan()->semantic_version();
+        for (const auto& port : measurement.ports) {
+            const auto index = cell_index(*runtime.plan(), port.cell);
+            if (index.has_value() && port.port.value < 2) {
+                step.port_inputs[*index * 2 + port.port.value] =
+                    port.reduced_input;
+            }
+        }
+        ++current_tape_len;
+        return {};
+    }
+
+    CoreBPTTResult forward_sequence(
+        core::RuntimeState& runtime,
+        core::CompiledExecutor& executor,
+        const std::vector<std::vector<double>>& inputs) {
+        reset_tape();
+        for (const auto& input : inputs) {
+            const auto result = record_step(
+                runtime,
+                executor,
+                std::span<const double>(input.data(), input.size()));
+            if (!result.ok()) return result;
+        }
+        return {};
+    }
+
+    CoreBPTTResult backward(
+        const core::RuntimeState& runtime,
+        const std::vector<std::vector<double>>& target_outputs,
+        CoreBPTTGradients& gradients,
+        const core::LearningWindow* window = nullptr) const {
+        if (!runtime.plan()) {
+            return failure(
+                CoreBPTTErrorCode::InvalidRuntime,
+                "BPTT requires a runtime with an owned compiled plan");
+        }
+        if (current_tape_len == 0) {
+            gradients.clear();
+            return {};
+        }
+        if (target_outputs.size() < current_tape_len) {
+            return failure(
+                CoreBPTTErrorCode::InvalidTargets,
+                "core BPTT requires one target row per recorded step");
+        }
+        if (window) {
+            if (const auto valid = window->validate(runtime); !valid.ok()) {
+                return failure(
+                    CoreBPTTErrorCode::InvalidLearningWindow,
+                    valid.error->reason);
+            }
+        }
+        const auto& first = tape[0];
+        if (first.state_pre.size() != runtime.plan()->cells().size()) {
+            return failure(
+                CoreBPTTErrorCode::StaleTape,
+                "core BPTT tape dimensions do not match the runtime plan");
+        }
+        for (size_t t = 0; t < current_tape_len; ++t) {
+            if (tape[t].state_pre.size() != first.state_pre.size() ||
+                tape[t].state_post.size() != first.state_pre.size()) {
+                return failure(
+                    CoreBPTTErrorCode::StaleTape,
+                    "core BPTT tape contains inconsistent graph dimensions");
+            }
+        }
+
+        const auto plan = runtime.plan();
+        if (first.state_post.size() != plan->cells().size()) {
+            return failure(
+                CoreBPTTErrorCode::StaleTape,
+                "core BPTT tape is not bound to the current graph");
+        }
+        for (size_t t = 0; t < current_tape_len; ++t) {
+            if (tape[t].identity != runtime.identity() ||
+                tape[t].revision != runtime.revision() ||
+                tape[t].semantic_version != plan->semantic_version()) {
+                return failure(
+                    CoreBPTTErrorCode::StaleTape,
+                    "core BPTT tape graph identity or revision is stale");
+            }
+        }
+        gradients.clear();
+        const size_t cell_count = plan->cells().size();
+        const size_t parameter_count = runtime.parameters().size();
+        std::vector<double> grad_by_parameter(parameter_count, 0.0);
+        std::vector<float> delta_out(cell_count, 0.0f);
+        std::vector<float> delta_ports(cell_count * 2, 0.0f);
+        std::vector<float> delta_state(cell_count, 0.0f);
+        std::vector<float> delta_aux(cell_count, 0.0f);
+        std::vector<float> next_delta_state(cell_count, 0.0f);
+        std::vector<float> next_delta_aux(cell_count, 0.0f);
+        std::vector<float> next_delta_ports(cell_count * 2, 0.0f);
+
+        auto allowed = [window](const core::ParameterBinding& binding) {
+            if (!window) return true;
+            return std::find_if(
+                       window->allowed_parameters().begin(),
+                       window->allowed_parameters().end(),
+                       [&](const auto& candidate) {
+                           return same_binding(candidate, binding);
+                       }) != window->allowed_parameters().end();
+        };
+        auto add_gradient = [&](const core::ParameterBinding& binding, double value) {
+            if (binding.index >= grad_by_parameter.size() || !allowed(binding)) {
+                return;
+            }
+            if (std::isfinite(value)) grad_by_parameter[binding.index] += value;
+        };
+        auto continuous_value = [](const CoreBPTTTapeStep& step, size_t index)
+            -> std::optional<double> {
+            if (index >= step.parameters.size()) return std::nullopt;
+            const auto& value = step.parameters[index].value;
+            if (const auto* continuous = std::get_if<core::ContinuousValue>(&value)) {
+                return continuous->value;
+            }
+            return core::legacy_kernel_parameter(value);
+        };
+
+        double total_loss = 0.0;
+        size_t loss_count = 0;
+        for (int t = static_cast<int>(current_tape_len) - 1; t >= 0; --t) {
+            const auto& step = tape[static_cast<size_t>(t)];
+            if (step.parameters.size() != parameter_count) {
+                return failure(
+                    CoreBPTTErrorCode::StaleTape,
+                    "core BPTT tape parameter bindings do not match the runtime");
+            }
+            std::fill(delta_out.begin(), delta_out.end(), 0.0f);
+            std::fill(delta_ports.begin(), delta_ports.end(), 0.0f);
+
+            std::vector<float> predictions;
+            std::vector<size_t> effector_indices;
+            for (size_t i = 0; i < cell_count; ++i) {
+                const auto& cell = plan->cells()[i];
+                if (!is_effector_cell(cell.type)) continue;
+                const auto channel = effector_channel(step, cell);
+                if (!channel.has_value()) continue;
+                if (*channel >= predictions.size()) {
+                    predictions.resize(*channel + 1, 0.0f);
+                    effector_indices.resize(
+                        *channel + 1,
+                        static_cast<size_t>(-1));
+                }
+                predictions[*channel] =
+                    static_cast<float>(step.state_post[i].output_val);
+                effector_indices[*channel] = i;
+            }
+            const auto& targets = target_outputs[static_cast<size_t>(t)];
+            for (size_t channel = 0;
+                 channel < predictions.size() && channel < targets.size();
+                 ++channel) {
+                const float diff =
+                    predictions[channel] - static_cast<float>(targets[channel]);
+                total_loss += static_cast<double>(diff) * diff;
+                const size_t index = effector_indices[channel];
+                if (index < cell_count) delta_out[index] += 2.0f * diff;
+            }
+            if (!predictions.empty()) ++loss_count;
+
+            if (t + 1 < static_cast<int>(current_tape_len)) {
+                for (const auto& edge : plan->edges()) {
+                    if (edge.delay != core::EdgeDelay::PreviousTick) continue;
+                    const float d_port =
+                        next_delta_ports[edge.target_index * 2 +
+                                         edge.target_port.value];
+                    const auto weight =
+                        continuous_value(step, edge.weight_parameter_index);
+                    if (!weight) continue;
+                    delta_out[edge.source_index] +=
+                        static_cast<float>(*weight) * d_port;
+                    add_gradient(
+                        runtime.parameters()[edge.weight_parameter_index].binding,
+                        step.state_post[edge.source_index].output_val * d_port);
+                }
+            }
+
+            for (int reverse = static_cast<int>(plan->execution_order().size()) - 1;
+                 reverse >= 0; --reverse) {
+                const size_t i = plan->execution_order()[static_cast<size_t>(reverse)];
+                const auto& cell = plan->cells()[i];
+                for (const auto& edge : plan->edges()) {
+                    if (edge.source_index != i ||
+                        edge.delay != core::EdgeDelay::Immediate) {
+                        continue;
+                    }
+                    const float d_port =
+                        delta_ports[edge.target_index * 2 +
+                                    edge.target_port.value];
+                    const auto weight =
+                        continuous_value(step, edge.weight_parameter_index);
+                    if (!weight) continue;
+                    delta_out[i] += static_cast<float>(*weight) * d_port;
+                    add_gradient(
+                        runtime.parameters()[edge.weight_parameter_index].binding,
+                        step.state_post[i].output_val * d_port);
+                }
+
+                if (is_effector_cell(cell.type)) {
+                    delta_ports[i * 2] += delta_out[i];
+                    continue;
+                }
+                if (is_receptor_cell(cell.type)) {
+                    const auto channel = parameter_channel(step, cell);
+                    const size_t input_channel =
+                        channel.has_value() ? *channel : static_cast<size_t>(
+                            cell.type == CellType::SENSE_RAW_INPUT_1
+                                ? 1
+                                : cell.type == CellType::SENSE_RAW_INPUT_2
+                                    ? 2
+                                    : cell.type == CellType::SENSE_RAW_INPUT_3 ? 3 : 0);
+                    const double input =
+                        input_channel < step.inputs.size() ? step.inputs[input_channel] : 0.0;
+                    add_gradient(
+                        runtime.parameters()[cell.parameter_indices[0]].binding,
+                        delta_out[i] * input);
+                    continue;
+                }
+
+                const auto gain =
+                    continuous_value(step, cell.parameter_indices[0]);
+                if (!gain) continue;
+                const float x0 = static_cast<float>(step.port_inputs[i * 2]);
+                const float x1 = static_cast<float>(step.port_inputs[i * 2 + 1]);
+                float x_prim = x0;
+                if (cell.type == CellType::OP_SUM) x_prim = x0 + x1;
+                else if (cell.type == CellType::OP_SUB) x_prim = x0 - x1;
+                else if (cell.type == CellType::OP_MULTIPLY) x_prim = x0 * x1;
+
+                const auto& pre = step.state_pre[i];
+                const auto& post = step.state_post[i];
+                const auto vjp = sdsc_primitive_vjp(
+                    cell_type_to_sdsc_opcode(cell.type),
+                    static_cast<float>(*gain),
+                    x_prim,
+                    static_cast<float>(pre.state_val),
+                    static_cast<float>(pre.aux_state),
+                    static_cast<float>(post.output_val),
+                    static_cast<float>(post.state_val),
+                    static_cast<float>(post.aux_state),
+                    delta_out[i],
+                    next_delta_state[i],
+                    next_delta_aux[i]);
+
+                if (cell.type == CellType::OP_SUM) {
+                    delta_ports[i * 2] += vjp.dx;
+                    delta_ports[i * 2 + 1] += vjp.dx;
+                } else if (cell.type == CellType::OP_SUB) {
+                    delta_ports[i * 2] += vjp.dx;
+                    delta_ports[i * 2 + 1] -= vjp.dx;
+                } else if (cell.type == CellType::OP_MULTIPLY) {
+                    delta_ports[i * 2] += vjp.dx * x1;
+                    delta_ports[i * 2 + 1] += vjp.dx * x0;
+                } else {
+                    delta_ports[i * 2] += vjp.dx;
+                }
+                delta_state[i] = vjp.ds_prev;
+                delta_aux[i] = vjp.da_prev;
+                add_gradient(
+                    runtime.parameters()[cell.parameter_indices[0]].binding,
+                    vjp.dg);
+            }
+
+            next_delta_state = delta_state;
+            next_delta_aux = delta_aux;
+            next_delta_ports = delta_ports;
+        }
+
+        if (loss_count > 0) {
+            const double inverse = 1.0 / static_cast<double>(loss_count);
+            gradients.loss = total_loss * inverse;
+            for (size_t index = 0; index < grad_by_parameter.size(); ++index) {
+                grad_by_parameter[index] *= inverse;
+            }
+        }
+        for (const auto& parameter : runtime.parameters()) {
+            if (parameter.binding.kind == core::ParameterBindingKind::EdgeWeight) {
+            if (allowed(parameter.binding)) {
+                gradients.gradients.push_back(
+                    {parameter.binding, grad_by_parameter[parameter.binding.index]});
+            }
+            continue;
+        }
+            const auto cell = find_cell(*plan, parameter.binding.cell);
+            if (!cell.has_value()) continue;
+            const auto contract = core::contract_for(plan->cells()[*cell].type);
+            if (contract.has_value() &&
+                core::is_continuous_trainable(
+                    contract->get().parameters[
+                        static_cast<size_t>(parameter.binding.slot)])) {
+                if (allowed(parameter.binding)) {
+                    gradients.gradients.push_back(
+                        {parameter.binding, grad_by_parameter[parameter.binding.index]});
+                }
+            }
+        }
+        return {gradients.loss, 0, std::nullopt};
+    }
+
+    CoreBPTTResult step_adam(
+        core::RuntimeState& runtime,
+        core::LearningWindow& window,
+        const CoreBPTTGradients& gradients,
+        double learning_rate = 0.005) {
+        if (const auto valid = window.validate(runtime); !valid.ok()) {
+            return failure(
+                CoreBPTTErrorCode::InvalidLearningWindow,
+                valid.error->reason);
+        }
+        if (!std::isfinite(learning_rate) || learning_rate <= 0.0) {
+            return failure(
+                CoreBPTTErrorCode::InvalidLearningWindow,
+                "learning rate must be finite and positive");
+        }
+        std::vector<core::ParameterBinding> bindings;
+        bindings.reserve(gradients.gradients.size());
+        for (const auto& gradient : gradients.gradients) {
+            bindings.push_back(gradient.binding);
+            if (!std::isfinite(gradient.value) ||
+                gradient.binding.index >= runtime.parameters().size()) {
+                return failure(
+                    CoreBPTTErrorCode::InvalidLearningWindow,
+                    "core BPTT gradient is non-finite or unbound");
+            }
+        }
+        if (const auto valid = window.validate_parameters(runtime, bindings);
+            !valid.ok()) {
+            return failure(
+                CoreBPTTErrorCode::InvalidLearningWindow,
+                valid.error->reason);
+        }
+        if (m_parameters.size() != runtime.parameters().size() ||
+            v_parameters.size() != runtime.parameters().size()) {
+            init_optimizer(runtime);
+        }
+        double norm_squared = 0.0;
+        for (const auto& gradient : gradients.gradients) {
+            norm_squared += gradient.value * gradient.value;
+        }
+        const double norm = std::sqrt(norm_squared);
+        const double clip =
+            norm > grad_clip_norm && norm > std::numeric_limits<double>::epsilon()
+                ? grad_clip_norm / norm
+                : 1.0;
+        ++adam_step;
+        const double correction1 = 1.0 - std::pow(beta1, static_cast<double>(adam_step));
+        const double correction2 = 1.0 - std::pow(beta2, static_cast<double>(adam_step));
+        std::vector<core::LearningGradient> normalized;
+        normalized.reserve(gradients.gradients.size());
+        for (const auto& gradient : gradients.gradients) {
+            const size_t index = gradient.binding.index;
+            const double clipped = gradient.value * clip;
+            m_parameters[index] = beta1 * m_parameters[index] +
+                                  (1.0 - beta1) * clipped;
+            v_parameters[index] = beta2 * v_parameters[index] +
+                                 (1.0 - beta2) * clipped * clipped;
+            const double m_hat = m_parameters[index] / correction1;
+            const double v_hat = v_parameters[index] / correction2;
+            normalized.push_back({
+                gradient.binding,
+                m_hat / (std::sqrt(v_hat) + eps_adam)});
+        }
+        const auto updated = window.apply_sgd(
+            runtime,
+            std::span<const core::LearningGradient>(
+                normalized.data(), normalized.size()),
+            learning_rate);
+        if (!updated.ok()) {
+            return failure(
+                CoreBPTTErrorCode::InvalidLearningWindow,
+                updated.error->reason);
+        }
+        return {gradients.loss, updated.report.updated_values, std::nullopt};
+    }
+
+private:
+    static CoreBPTTResult failure(
+        CoreBPTTErrorCode code,
+        std::string reason) {
+        return {0.0, 0, CoreBPTTError{code, std::move(reason)}};
+    }
+
+    static bool same_binding(
+        const core::ParameterBinding& lhs,
+        const core::ParameterBinding& rhs) {
+        return lhs.kind == rhs.kind &&
+               lhs.index == rhs.index &&
+               lhs.cell == rhs.cell &&
+               lhs.edge == rhs.edge &&
+               lhs.slot == rhs.slot;
+    }
+
+    static std::optional<size_t> cell_index(
+        const core::CompiledGraph& plan,
+        core::CellId id) {
+        const auto cells = plan.cells();
+        const auto it = std::lower_bound(
+            cells.begin(), cells.end(), id,
+            [](const core::CompiledCell& cell, core::CellId sought) {
+                return cell.id < sought;
+            });
+        if (it == cells.end() || it->id != id) return std::nullopt;
+        return static_cast<size_t>(it - cells.begin());
+    }
+
+    static std::optional<size_t> find_cell(
+        const core::CompiledGraph& plan,
+        core::CellId id) {
+        return cell_index(plan, id);
+    }
+
+    static std::optional<size_t> effector_channel(
+        const CoreBPTTTapeStep& step,
+        const core::CompiledCell& cell) {
+        switch (cell.type) {
+            case CellType::ACT_PRIMARY_POSITIVE: return 0;
+            case CellType::ACT_PRIMARY_NEGATIVE: return 1;
+            case CellType::ACT_DEFENSIVE_RESET: return 2;
+            case CellType::ACT_IMMUNE_BLOCK: return 3;
+            case CellType::ACT_CHANNEL: {
+                if (cell.parameter_indices[1] >= step.parameters.size()) {
+                    return std::nullopt;
+                }
+                const auto& value = step.parameters[cell.parameter_indices[1]].value;
+                const auto* channel =
+                    std::get_if<core::ChannelIndex>(&value);
+                return channel ? std::optional<size_t>{channel->value}
+                               : std::nullopt;
+            }
+            default:
+                return std::nullopt;
+        }
+    }
+
+    static std::optional<size_t> parameter_channel(
+        const CoreBPTTTapeStep& step,
+        const core::CompiledCell& cell) {
+        if (cell.parameter_indices[1] >= step.parameters.size()) {
+            return std::nullopt;
+        }
+        const auto& value = step.parameters[cell.parameter_indices[1]].value;
+        const auto* channel = std::get_if<core::ChannelIndex>(&value);
+        return channel ? std::optional<size_t>{channel->value} : std::nullopt;
     }
 };
 
