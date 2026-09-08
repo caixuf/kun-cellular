@@ -13,7 +13,7 @@ using namespace kun;
 void test_doudizhu_initialization() {
     DouDiZhuCardGameTask task(30, 123);
     auto obs = task.current_observation();
-    assert(obs.size() == 32);
+    assert(obs.size() == 40);   // U0.1: 32 旧 + 8 全量记牌 (3..10 未见量)
     assert(obs[0] >= 0.0f && obs[0] <= 1.0f);
     assert(obs[29] > 0.0f);
 }
@@ -53,7 +53,7 @@ void test_doudizhu_1024_master_checkpoint() {
     assert(version == 2);
     assert(num_cells == 1024);
     assert(num_synapses == 196608);
-    assert(in_dim == 32);
+    assert(in_dim == 40);
     assert(out_dim == 7);
 }
 
@@ -69,7 +69,7 @@ void test_doudizhu_64cell_recurrent_cortex() {
 
     DouDiZhuCardGameTask task(30, 42);
     auto obs = task.current_observation();
-    assert(obs.size() == 32);
+    assert(obs.size() == 40);   // U0.1: 32 旧 + 8 全量记牌 (3..10 未见量)
     std::vector<double> inps(obs.begin(), obs.end());
 
     RelaxationConfig cfg;
