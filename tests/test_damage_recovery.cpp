@@ -294,8 +294,7 @@ int main() {
         auto window = core::LearningWindow::open(7, *rig_b.runtime, allowed);
         CoreCellularBPTTEngine engine(32);
         engine.init_optimizer(*rig_b.runtime);
-        // 教师轨迹: C 组全细胞输出 (需要从 trace_c 之外的完整快照录制)
-        // 重录教师: rig_c (无损, 10细胞) 重放并抓全部细胞输出
+        // 教师轨迹: C 组无损重放, 行 = effector 通道目标 (CoreBPTT targets 语义)
         std::vector<std::vector<double>> teacher;
         {
             auto probe_t = rig_c.runtime->fork_probe();
@@ -303,9 +302,12 @@ int main() {
             for (const auto& input : stream) {
                 auto r = rig_c.executor->step(*probe_t.runtime, input);
                 assert(r.ok());
-                std::vector<double> row;
-                for (const auto& c : probe_t.runtime->cell_states())
-                    row.push_back(c.output_val);
+                std::vector<double> row(4, 0.0);
+                size_t slot = 0;
+                for (const auto& c : probe_t.runtime->cell_states()) {
+                    if (c.type == CellType::ACT_CHANNEL && slot < 4)
+                        row[slot++] = c.output_val;  // ACT 序即通道槽 (param2 语义)
+                }
                 teacher.push_back(row);
             }
         }
@@ -315,25 +317,12 @@ int main() {
             auto reset = rig_b.runtime->reset_episode();
             assert(!reset.error.has_value());
             engine.reset_tape();
-            std::vector<std::vector<double>> targets;
             for (size_t t = 0; t < stream.size(); ++t) {
                 auto rec = engine.record_step(*rig_b.runtime, *rig_b.executor, stream[t]);
                 assert(rec.ok());
-                // 教师行对齐: 损伤图 10 细胞 (删除 5), 教师图 10 细胞 — 按 id 映射
-                std::vector<double> row(rig_b.runtime->cell_states().size(), 0.0);
-                std::map<uint32_t, size_t> t_idx;
-                size_t ci = 0;
-                for (const auto& c : rig_c.runtime->cell_states())
-                    t_idx[c.cell.value] = ci++;
-                for (size_t i = 0; i < rig_b.runtime->cell_states().size(); ++i) {
-                    const uint32_t id = rig_b.runtime->cell_states()[i].cell.value;
-                    const auto it = t_idx.find(id);
-                    if (it != t_idx.end()) row[i] = teacher[t][it->second];
-                }
-                targets.push_back(row);
             }
             CoreBPTTGradients grads;
-            auto back = engine.backward(*rig_b.runtime, targets, grads, &window);
+            auto back = engine.backward(*rig_b.runtime, teacher, grads, &window);
             if (!back.ok()) {
                 printf("[B 错误] backward: %s\n", back.error->reason.c_str());
                 return 1;
