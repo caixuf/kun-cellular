@@ -92,6 +92,10 @@ foreach(TEST_SRC ${TEST_SOURCES})
         target_link_libraries(${TEST_NAME} PRIVATE kun_cellular)
         target_compile_options(${TEST_NAME} PRIVATE -UNDEBUG)
         add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+        # 并行负载下时序 flaky (单跑/串行满分): flow 消融实验长跑, 强制串行隔离
+        if(TEST_NAME STREQUAL "test_flow_seed_ablation")
+            set_tests_properties(${TEST_NAME} PROPERTIES RUN_SERIAL TRUE)
+        endif()
     endif()
 endforeach()
 
