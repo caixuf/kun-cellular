@@ -275,13 +275,16 @@ private:
             syn.weight = dist_w(rng_);
         }
         // 分裂并插入一个全新量子门控细胞
-        uint16_t new_id = static_cast<uint16_t>(org.cells.size() + 100);
-        Cell quantum_cell{new_id, CellType::GATE_HYSTERESIS, 0.05, -0.05};
+        const auto new_id = org.allocate_cell_id();
+        if (!new_id.has_value()) return;
+        Cell quantum_cell{
+            *new_id, CellType::GATE_HYSTERESIS, 0.05, -0.05};
         quantum_cell.x = 0.0f; quantum_cell.y = 0.0f; quantum_cell.z = 0.0f;
         org.cells.push_back(quantum_cell);
 
         if (!org.cells.empty()) {
-            org.synapses.push_back({org.cells[0].id, new_id, 0, 1.2, true, 60.0f, -1.0f});
+            org.synapses.push_back(
+                {org.cells[0].id, *new_id, 0, 1.2, true, 60.0f, -1.0f});
         }
         org.compile();
     }

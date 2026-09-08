@@ -14,6 +14,7 @@ import os
 import sys
 import subprocess
 import ctypes
+import copy
 import numpy as np
 import pytest
 
@@ -21,6 +22,31 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, REPO_ROOT)
 
 import tools.kun_cellular_ops as kops
+import tools.gen_ops as gen_ops
+
+
+@pytest.mark.parametrize(
+    "mutation, expected",
+    [
+        (lambda spec: spec["cell_types"][0].pop("contract"), "missing contract"),
+        (lambda spec: spec["cell_types"][1].__setitem__("code", 0), "duplicate cell code"),
+        (lambda spec: spec["cell_types"][1].__setitem__("name", "SENSE_RAW_INPUT_0"), "duplicate cell name"),
+        (lambda spec: spec["cell_types"][0].__setitem__("sdsc_op", "UNKNOWN_OPCODE"), "unknown mapped opcode"),
+        (lambda spec: spec["cell_types"][0]["contract"]["parameters"][0].__setitem__("kind", "bad"),
+         "invalid kind"),
+        (lambda spec: spec["cell_types"][0]["contract"]["parameters"][0].__setitem__("domain", {"min": 0.0}),
+         "continuous domain"),
+        (lambda spec: spec["cell_types"][0]["contract"]["parameters"][1].__setitem__(
+            "trainable_continuous", True), "cannot be trainable_continuous"),
+        (lambda spec: spec["cell_types"][0].__setitem__("code", 256), "code must be an integer"),
+        (lambda spec: spec["cell_types"][0].__setitem__("code", True), "code must be an integer"),
+    ],
+)
+def test_cell_contract_schema_rejects_malformed_entries(mutation, expected):
+    spec = copy.deepcopy(gen_ops.load_ops_spec())
+    mutation(spec)
+    with pytest.raises(ValueError, match=expected):
+        gen_ops.validate_ops_spec(spec)
 
 def test_ops_codegen_cleanliness():
     """门禁 1: 确保代码库中的生成文件与 ops.yaml 100% 严格一致，无任何手动篡改或版本漂移"""
@@ -150,7 +176,7 @@ def test_three_way_bit_parity_c11_cpp_gpu():
 
     print(f"  [PASS] 全部 27 种原子原语在 C11 与 C++ 间实现完全位级对齐 (max_err < 1e-7)！")
 
-def test_cellular_organism_dispatch_parity():
+def test_cellular_organism_dispatch_parity(tmp_path):
     """门禁 4: 验证 CellularOrganism (dispatch_cell_forward) 与 sdsc_primitive_eval 对账一致性"""
     test_src = f"""
     #include "kun/cellular/cellular_genome.hpp"
@@ -180,13 +206,16 @@ def test_cellular_organism_dispatch_parity():
         }}
     }}
     """
-    tmp_c_path = "/tmp/test_org_dispatch_harness.cpp"
-    tmp_so_path = "/tmp/libtest_org_dispatch_harness.so"
+    tmp_c_path = tmp_path / "test_org_dispatch_harness.cpp"
+    tmp_so_path = tmp_path / "libtest_org_dispatch_harness.so"
     with open(tmp_c_path, "w") as f:
         f.write(test_src)
 
-    compile_cmd = f"g++ -O3 -fPIC -shared -I {REPO_ROOT}/include {tmp_c_path} -o {tmp_so_path} -lm"
-    res = subprocess.run(compile_cmd, shell=True, capture_output=True, text=True)
+    compile_cmd = [
+        "g++", "-O3", "-fPIC", "-shared", "-I", f"{REPO_ROOT}/include",
+        str(tmp_c_path), "-o", str(tmp_so_path), "-lm",
+    ]
+    res = subprocess.run(compile_cmd, capture_output=True, text=True)
     assert res.returncode == 0, f"编译 Organism Dispatch Harness 失败:\n{res.stderr}"
 
     lib = ctypes.CDLL(tmp_so_path)
@@ -246,4 +275,3 @@ def test_cellular_organism_dispatch_parity():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
-

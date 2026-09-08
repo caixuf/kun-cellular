@@ -16,6 +16,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <optional>
+#include <limits>
 #include <cmath>
 #include <random>
 #include <memory>
@@ -337,8 +338,27 @@ public:
     std::vector<size_t> out_edges_;   // compiled_synapses_ 的出边索引 (按 from_idx 分桶)
     mutable std::vector<double> flat_port_inputs_; // [cell_idx * 2 + port]
     mutable SpatialHashGrid3D spatial_grid_;       // 3D 空间哈希网格 (O(N) 多体力场)
+    uint64_t next_generated_cell_id_{0};
     bool is_compiled_{false};
     bool is_compiled() const { return is_compiled_; }
+
+    // Stable legacy-topology allocator. It advances monotonically across
+    // compile/delete cycles and validates against the live graph.
+    std::optional<uint32_t> allocate_cell_id() {
+        uint64_t max_live_id = 0;
+        for (const auto& cell : cells) {
+            max_live_id = std::max(
+                max_live_id, static_cast<uint64_t>(cell.id) + 1);
+        }
+        next_generated_cell_id_ =
+            std::max(next_generated_cell_id_, max_live_id);
+        if (next_generated_cell_id_ > std::numeric_limits<uint32_t>::max()) {
+            return std::nullopt;
+        }
+        const auto result = static_cast<uint32_t>(next_generated_cell_id_);
+        ++next_generated_cell_id_;
+        return result;
+    }
 
     // === 六大内生现代大模型机制器官 (Endogenous Modern LLM Architectural Organs) ===
     size_t relaxation_steps_{1};
@@ -373,6 +393,7 @@ public:
           out_edges_(other.out_edges_),
           flat_port_inputs_(other.flat_port_inputs_),
           spatial_grid_(other.spatial_grid_),
+          next_generated_cell_id_(other.next_generated_cell_id_),
           is_compiled_(other.is_compiled_),
           relaxation_steps_(other.relaxation_steps_),
           relaxation_damping_(other.relaxation_damping_),
@@ -410,6 +431,7 @@ public:
         out_edges_ = other.out_edges_;
         flat_port_inputs_ = other.flat_port_inputs_;
         spatial_grid_ = other.spatial_grid_;
+        next_generated_cell_id_ = other.next_generated_cell_id_;
         is_compiled_ = other.is_compiled_;
         relaxation_steps_ = other.relaxation_steps_;
         relaxation_damping_ = other.relaxation_damping_;
@@ -732,6 +754,13 @@ public:
 
     // 拓扑排序与扁平执行编译 (Flat Array Compilation: 消除所有运行期堆分配)
     bool compile() {
+        uint64_t max_live_id = 0;
+        for (const auto& cell : cells) {
+            max_live_id = std::max(
+                max_live_id, static_cast<uint64_t>(cell.id) + 1);
+        }
+        next_generated_cell_id_ =
+            std::max(next_generated_cell_id_, max_live_id);
         if (cells.empty()) {
             compiled_synapses_.clear();
             compiled_actions_.clear();
@@ -885,9 +914,9 @@ public:
         return true;
     }
 
-    // 胚胎分形发育生长函数 (从种子细胞快速发育扩增至 target_cells 规模，受 max_limit 预算硬上限保护)
-    void develop_to_scale(size_t target_cells, size_t max_limit = 10000000) {
-        target_cells = std::min(target_cells, max_limit);
+    // 胚胎分形发育生长函数。目标规模由调用者显式给出；本底不
+    // 注入隐藏的细胞数量上限，实际可行性由资源、分配与系统内存决定。
+    void develop_to_scale(size_t target_cells) {
         if (target_cells <= cells.size()) return;
         size_t needed = target_cells - cells.size();
         uint32_t current_id = static_cast<uint32_t>(cells.size());
@@ -1065,6 +1094,8 @@ public:
 
         // 2. 严格 12-6 兰纳-琼斯多体非键结势能力场 (3D 近斥中吸远无)
         const size_t num_cells = cells.size();
+        // This is a performance-only dispatch. Both paths evaluate the same
+        // force law; the threshold is not a graph-capacity or growth rule.
         if (num_cells <= 64) {
             for (size_t i = 0; i < num_cells; ++i) {
                 auto& ci = cells[i];

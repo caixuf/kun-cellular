@@ -9,6 +9,8 @@
 #define KUN_CELLULAR_SDSC_PRIMITIVES_H_
 
 #include <math.h>
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -49,26 +51,27 @@ typedef enum {
     SDSC_OP_ACCUMULATOR      = 27   /* 真积分累加器 (Pure Accumulator): s = clamp(s + x*g, -16, 16), out = s (时序工作记忆核) */
 } SdscOpType;
 
-/**
- * 核心原语单步前向推演函数 (无堆分配、纯浮点寄存器、李雅普诺夫有界保证)
- * 
- * @param op_type  原语算子枚举
- * @param g        可演化增益参数 (gain)
- * @param x        当前输入突触加权和
- * @param state    细胞私有累积状态槽 1 (指针，原位读写)
- * @param aux      细胞私有辅助状态槽 2 (指针，原位读写)
- * @return float   本拍单步激发输出 u(t)
- */
-SDSC_INLINE float sdsc_primitive_eval(
+/* The strict policy uses the same generated equation switch as legacy.
+ * It validates intermediates before saturating/clamping operators can mask
+ * non-finite values; legacy calls keep the original success behavior. */
+SDSC_INLINE float sdsc_primitive_eval_profile(
     uint8_t op_type,
     float g,
     float x,
     float* state,
-    float* aux
+    float* aux,
+    bool strict,
+    bool* valid
 ) {
     float out = 0.0f;
     float s = *state;
     float a = *aux;
+    bool ok = true;
+
+#define SDSC_STRICT_CHECK_FINITE(value) \
+    do { if (strict && !isfinite(value)) { ok = false; goto sdsc_primitive_invalid; } } while (0)
+#define SDSC_STRICT_CHECK_NONZERO(value) \
+    do { if (strict && (value) == 0.0f) { ok = false; goto sdsc_primitive_invalid; } } while (0)
 
     switch (op_type) {
         case SDSC_OP_SENSE_0: { // opcode 0
@@ -92,16 +95,24 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_INTEGRATE: { // opcode 5
-            s = s * 0.85f + x * 0.15f;
-            out = tanhf(s * g);
+            float next_s = s * 0.85f + x * 0.15f;
+            SDSC_STRICT_CHECK_FINITE(next_s);
+            s = next_s;
+            float drive = s * g;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            out = tanhf(drive);
             break;
         }
         case SDSC_OP_AMPLIFY: { // opcode 6
-            out = tanhf(x * g * 2.5f);
+            float drive = x * g * 2.5f;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            out = tanhf(drive);
             break;
         }
         case SDSC_OP_INVERT: { // opcode 7
-            out = -tanhf(x * g);
+            float drive = x * g;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            out = -tanhf(drive);
             break;
         }
         case SDSC_OP_DAMPER: { // opcode 8
@@ -110,11 +121,15 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_CLIP: { // opcode 9
-            out = fminf(fmaxf(x * g, -1.0f), 1.0f);
+            float drive = x * g;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            out = fminf(fmaxf(drive, -1.0f), 1.0f);
             break;
         }
         case SDSC_OP_ABS: { // opcode 10
-            out = fabsf(tanhf(x * g));
+            float drive = x * g;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            out = fabsf(tanhf(drive));
             break;
         }
         case SDSC_OP_MULTIPLY: { // opcode 11
@@ -122,7 +137,9 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_DIFF: { // opcode 12
-            out = x - s;
+            float difference = x - s;
+            SDSC_STRICT_CHECK_FINITE(difference);
+            out = difference;
             s = x;
             break;
         }
@@ -131,8 +148,15 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_RATIO: { // opcode 14
-            s = s * 0.85f + fabsf(x) * 0.15f;
-            out = fminf(fmaxf(x / (s + 0.1f), -2.0f), 2.0f);
+            float next_s = s * 0.85f + fabsf(x) * 0.15f;
+            SDSC_STRICT_CHECK_FINITE(next_s);
+            s = next_s;
+            float denominator = s + 0.1f;
+            SDSC_STRICT_CHECK_FINITE(denominator);
+            SDSC_STRICT_CHECK_NONZERO(denominator);
+            float ratio = x / denominator;
+            SDSC_STRICT_CHECK_FINITE(ratio);
+            out = fminf(fmaxf(ratio, -2.0f), 2.0f);
             break;
         }
         case SDSC_OP_THRESHOLD: { // opcode 15
@@ -150,8 +174,16 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_INHIBIT: { // opcode 18
-            s = s * 0.80f + fabsf(x) * 0.20f;
-            out = tanhf(x * g) * fmaxf(0.0f, 1.0f - s);
+            float next_s = s * 0.80f + fabsf(x) * 0.20f;
+            SDSC_STRICT_CHECK_FINITE(next_s);
+            s = next_s;
+            float drive = x * g;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            float remaining = fmaxf(0.0f, 1.0f - s);
+            SDSC_STRICT_CHECK_FINITE(remaining);
+            float gated = tanhf(drive) * remaining;
+            SDSC_STRICT_CHECK_FINITE(gated);
+            out = gated;
             break;
         }
         case SDSC_OP_AND: { // opcode 19
@@ -165,11 +197,15 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_ACT_POS: { // opcode 21
-            out = fminf(fmaxf(x * g, 0.0f), 1.0f);
+            float drive = x * g;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            out = fminf(fmaxf(drive, 0.0f), 1.0f);
             break;
         }
         case SDSC_OP_ACT_NEG: { // opcode 22
-            out = fminf(fmaxf(-x * g, 0.0f), 1.0f);
+            float drive = -x * g;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            out = fminf(fmaxf(drive, 0.0f), 1.0f);
             break;
         }
         case SDSC_OP_ACT_RESET: { // opcode 23
@@ -177,14 +213,32 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_CORRELATION: { // opcode 24
-            s = s * 0.90f + (x * a) * 0.10f;
+            float product = x * a;
+            SDSC_STRICT_CHECK_FINITE(product);
+            float next_s = s * 0.90f + product * 0.10f;
+            SDSC_STRICT_CHECK_FINITE(next_s);
+            s = next_s;
             a = x;
-            out = tanhf(s * g);
+            float drive = s * g;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            out = tanhf(drive);
             break;
         }
         case SDSC_OP_FATIGUE: { // opcode 25
-            s = fminf(2.0f, s + fabsf(x) * 0.15f) * 0.96f;
-            out = tanhf(x * g) / (1.0f + s);
+            float raw = s + fabsf(x) * 0.15f;
+            SDSC_STRICT_CHECK_FINITE(raw);
+            float capped = fminf(2.0f, raw);
+            SDSC_STRICT_CHECK_FINITE(capped);
+            s = capped * 0.96f;
+            SDSC_STRICT_CHECK_FINITE(s);
+            float drive = x * g;
+            SDSC_STRICT_CHECK_FINITE(drive);
+            float denominator = 1.0f + s;
+            SDSC_STRICT_CHECK_FINITE(denominator);
+            SDSC_STRICT_CHECK_NONZERO(denominator);
+            float response = tanhf(drive) / denominator;
+            SDSC_STRICT_CHECK_FINITE(response);
+            out = response;
             break;
         }
         case SDSC_OP_PASSTHRU: { // opcode 26
@@ -192,7 +246,11 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
         }
         case SDSC_OP_ACCUMULATOR: { // opcode 27
-            s = fminf(fmaxf(s + x * g, -16.0f), 16.0f);
+            float increment = x * g;
+            SDSC_STRICT_CHECK_FINITE(increment);
+            float next_s = s + increment;
+            SDSC_STRICT_CHECK_FINITE(next_s);
+            s = fminf(fmaxf(next_s, -16.0f), 16.0f);
             out = s;
             break;
         }
@@ -201,9 +259,24 @@ SDSC_INLINE float sdsc_primitive_eval(
             break;
     }
 
+sdsc_primitive_invalid:
+#undef SDSC_STRICT_CHECK_NONZERO
+#undef SDSC_STRICT_CHECK_FINITE
+
     *state = s;
     *aux   = a;
+    if (valid != NULL) *valid = ok;
     return out;
+}
+
+SDSC_INLINE float sdsc_primitive_eval(
+    uint8_t op_type,
+    float g,
+    float x,
+    float* state,
+    float* aux
+) {
+    return sdsc_primitive_eval_profile(op_type, g, x, state, aux, false, NULL);
 }
 
 /* 包含全图反向伴随方程与直通梯度 (VJP) 算子头文件 */

@@ -19,6 +19,14 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 endif()
 
 find_package(Threads REQUIRED)
+option(KUN_BUILD_KNOWLEDGE "Build peripheral R8 native knowledge library and experiment" ON)
+if(KUN_BUILD_KNOWLEDGE)
+    find_package(SQLite3 REQUIRED)
+    find_package(OpenSSL REQUIRED COMPONENTS Crypto)
+    add_library(kun_knowledge INTERFACE)
+    target_link_libraries(kun_knowledge INTERFACE SQLite::SQLite3 OpenSSL::Crypto)
+endif()
+include(CheckCXXCompilerFlag)
 
 add_library(kun_cellular INTERFACE)
 target_include_directories(kun_cellular INTERFACE
@@ -59,6 +67,9 @@ find_library(NVRTC_LIB nvrtc
 file(GLOB TEST_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_*.cpp")
 foreach(TEST_SRC ${TEST_SOURCES})
     get_filename_component(TEST_NAME ${TEST_SRC} NAME_WE)
+    if(TEST_NAME STREQUAL "test_germline_library_cpp" AND NOT KUN_BUILD_KNOWLEDGE)
+        continue()
+    endif()
     if(TEST_NAME STREQUAL "test_assert_canary")
         add_executable(${TEST_NAME} ${TEST_SRC})
         target_link_libraries(${TEST_NAME} PRIVATE kun_cellular)
@@ -84,12 +95,39 @@ foreach(TEST_SRC ${TEST_SOURCES})
     endif()
 endforeach()
 
+if(KUN_BUILD_KNOWLEDGE)
+    if(TARGET test_germline_library_cpp)
+        target_link_libraries(test_germline_library_cpp PRIVATE kun_knowledge)
+    endif()
+    add_executable(knowledge_transfer_demo tasks/transfer/knowledge_transfer_demo.cpp)
+    target_link_libraries(knowledge_transfer_demo PRIVATE kun_cellular kun_knowledge)
+endif()
+
+if(TARGET test_cellular_core_kernel)
+    target_sources(test_cellular_core_kernel PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cellular_core_kernel_c_bridge.c")
+endif()
+if(TARGET test_cellular_core_kernel_header)
+    target_compile_options(test_cellular_core_kernel_header PRIVATE -pedantic-errors)
+endif()
+if(TARGET test_cellular_core_strict_kernel)
+    target_sources(test_cellular_core_strict_kernel PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cellular_core_kernel_c_bridge.c")
+    target_compile_options(test_cellular_core_strict_kernel PRIVATE -pedantic-errors)
+endif()
+check_cxx_compiler_flag("-mlong-double-64" KUN_HAS_MLONG_DOUBLE_64)
+if(TARGET test_cellular_core_bridge AND KUN_HAS_MLONG_DOUBLE_64)
+    target_compile_options(test_cellular_core_bridge PRIVATE -mlong-double-64)
+endif()
+
 # 2. 编译运行纯 C11 硬件级核心原语、通用运行时与连续流体介质测试 (Single Source of Truth)
 set(C_TEST_SOURCES
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_core_primitives.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_universal_runtime.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_multiphase_fluid_stress.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_binary_runtime_scale.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cellular_core_kernel_c.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_cellular_core_strict_kernel_c.c"
 )
 foreach(C_TEST_SRC ${C_TEST_SOURCES})
     if(EXISTS ${C_TEST_SRC})
@@ -97,6 +135,10 @@ foreach(C_TEST_SRC ${C_TEST_SOURCES})
         add_executable(${TEST_NAME} ${C_TEST_SRC})
         target_link_libraries(${TEST_NAME} PRIVATE kun_cellular m)
         target_compile_options(${TEST_NAME} PRIVATE -UNDEBUG)
+        if(TEST_NAME STREQUAL "test_cellular_core_kernel_c" OR
+           TEST_NAME STREQUAL "test_cellular_core_strict_kernel_c")
+            target_compile_options(${TEST_NAME} PRIVATE -pedantic-errors)
+        endif()
         add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
     endif()
 endforeach()

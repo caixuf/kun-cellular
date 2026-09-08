@@ -39,9 +39,11 @@ from tools.cellular_c_runtime import (
     NativeCellularDynamicsEngine,
     NativeOrganExecutor
 )
+from tools.germline_library import GermlineLibrary, LibraryError
 
 FRONTEND_DIR = os.path.join(ROOT_DIR, "frontend")
 BUSINESS_MANIFEST_PATH = os.path.join(ROOT_DIR, "models", "business_lifeforms", "manifest.json")
+GERMLINE_LIBRARY_PATH = os.path.join(ROOT_DIR, "library", "germline_library.db")
 
 def load_business_lifeform_manifest():
     if not os.path.exists(BUSINESS_MANIFEST_PATH):
@@ -3111,6 +3113,7 @@ class SiliconLifeformLibrary:
     硅基生命体真实工程技术规格与实证门禁数据库 (100% 真实来自 C/C++ 底座、二进制实体与 Git 谱系，零编造)
     """
     def __init__(self):
+        self.germline_library = GermlineLibrary(GERMLINE_LIBRARY_PATH)
         self.reload_books()
 
     def reload_books(self):
@@ -3317,6 +3320,7 @@ class SiliconLifeformLibrary:
                             mb = json.load(f)
                             mb["file_path"] = f"library/motifs/{fname}"
                             mb["badge"] = "MOTIF BOOK"
+                            mb["record_type"] = "legacy_motif"
                             self.motif_books.append(mb)
                     except Exception:
                         pass
@@ -5321,6 +5325,19 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/library"):
+            try:
+                native_library = silicon_library.germline_library.snapshot()
+            except LibraryError as error:
+                body = json.dumps({
+                    "status": "error", "support": "native-r8-read-only",
+                    "error": str(error),
+                }, ensure_ascii=False).encode("utf-8")
+                self.send_response(503)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             docs_list = [
                 {"id": k, "title": v["title"], "file": v["file"], "category": v["category"], "description": v.get("description", "")}
                 for k, v in DOCS_REGISTRY.items()
@@ -5332,6 +5349,10 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
                 "total_books": len(silicon_library.books),
                 "books": silicon_library.books,
                 "motif_books": silicon_library.motif_books,
+                "germline_entries": native_library["entries"],
+                "germline_audit_log": native_library["audit_log"],
+                "native_knowledge_support": native_library["support"],
+                "native_knowledge_available": native_library["available"],
                 "documents": docs_list
             }, ensure_ascii=False).encode("utf-8")
             self.send_response(200)

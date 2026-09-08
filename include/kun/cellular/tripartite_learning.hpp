@@ -367,13 +367,14 @@ public:
         }
 
         // 2. 添加细胞 (Add Node / Split Synapse)
-        if (p_dist(rng) < mut_rate && !org.synapses.empty() && org.cells.size() < 64) {
+        if (p_dist(rng) < mut_rate && !org.synapses.empty()) {
             size_t syn_idx = rng() % org.synapses.size();
             auto old_syn = org.synapses[syn_idx];
 
-            uint32_t new_cell_id = static_cast<uint32_t>(org.cells.size() + 100);
+            const auto new_cell_id = org.allocate_cell_id();
+            if (!new_cell_id.has_value()) return;
             Cell new_cell;
-            new_cell.id = new_cell_id;
+            new_cell.id = *new_cell_id;
             new_cell.type = CellType::OP_INTEGRAL;
             new_cell.param1 = 0.1f;
             new_cell.param2 = 1.0f;
@@ -384,12 +385,12 @@ public:
 
             Synapse syn1;
             syn1.from_cell_id = old_syn.from_cell_id;
-            syn1.to_cell_id = new_cell_id;
+            syn1.to_cell_id = *new_cell_id;
             syn1.to_port = 0;
             syn1.weight = 1.0f;
 
             Synapse syn2;
-            syn2.from_cell_id = new_cell_id;
+            syn2.from_cell_id = *new_cell_id;
             syn2.to_cell_id = old_syn.to_cell_id;
             syn2.to_port = old_syn.to_port;
             syn2.weight = old_syn.weight;

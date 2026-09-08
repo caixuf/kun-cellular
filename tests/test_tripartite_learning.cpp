@@ -1,6 +1,7 @@
 #include <iostream>
 #include <vector>
 #include <cmath>
+#include <algorithm>
 
 #ifdef NDEBUG
 #undef NDEBUG
@@ -108,6 +109,51 @@ void test_tripartite_learning_stack_loop() {
               << " -> 5 代后最优适应度: " << stack.population[0].composite_fitness << "\n";
 }
 
+void test_neat_structural_mutation_grows_past_64_with_unique_id() {
+    CellularOrganism org;
+    for (uint32_t id = 0; id < 64; ++id) {
+        org.cells.push_back(
+            Cell{id, CellType::OP_INTEGRAL, 0.1, 1.0, 0.0, 0.0,
+                 false, 0.0, 0, 0, 0.0f, 0.0f, 0.0f});
+    }
+    org.synapses.push_back({0, 1, 0, 1.0, true, 60.0f, -1.0f});
+    org.compile();
+
+    TripartiteLearningStack stack(1, 777);
+    stack.apply_neat_structural_mutation(org, 1.0f);
+
+    assert(org.cells.size() > 64);
+    std::vector<uint32_t> ids;
+    ids.reserve(org.cells.size());
+    for (const auto& cell : org.cells) ids.push_back(cell.id);
+    std::sort(ids.begin(), ids.end());
+    assert(std::adjacent_find(ids.begin(), ids.end()) == ids.end());
+    assert(org.cells.back().id >= 64);
+}
+
+void test_force_field_dispatch_preserves_capacity_neutrality() {
+    CellularOrganism small;
+    CellularOrganism large;
+    for (uint32_t id = 0; id < 64; ++id) {
+        const Cell cell{
+            id, CellType::OP_INTEGRAL, 0.1, 1.0, 0.0, 0.0,
+            false, 0.0, 0, 0, static_cast<float>(id) * 100.0f, 0.0f, 0.0f};
+        small.cells.push_back(cell);
+        large.cells.push_back(cell);
+    }
+    large.cells.push_back(
+        Cell{64, CellType::OP_INTEGRAL, 0.1, 1.0, 0.0, 0.0,
+             false, 0.0, 0, 0, 100000.0f, 0.0f, 0.0f});
+
+    small.step_force_field_physics();
+    large.step_force_field_physics();
+    for (std::size_t i = 0; i < small.cells.size(); ++i) {
+        assert(std::abs(small.cells[i].fx - large.cells[i].fx) < 1e-5f);
+        assert(std::abs(small.cells[i].fy - large.cells[i].fy) < 1e-5f);
+        assert(std::abs(small.cells[i].fz - large.cells[i].fz) < 1e-5f);
+    }
+}
+
 int main() {
     std::cout << "===================================================================\n";
     std::cout << " SDSCC 三权分立学习栈 (NEAT结构 + BPTT参数 + Ridge读出) 单元测试\n";
@@ -115,6 +161,8 @@ int main() {
 
     test_ridge_readout_solver();
     test_tripartite_learning_stack_loop();
+    test_neat_structural_mutation_grows_past_64_with_unique_id();
+    test_force_field_dispatch_preserves_capacity_neutrality();
 
     std::cout << "\n🎉 全部三权分立学习栈 (NEAT + BPTT + Ridge + PBT) 闭环测试通过!\n";
     return 0;

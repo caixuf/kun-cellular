@@ -51,16 +51,20 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 5: { // SDSC_OP_INTEGRATE
-            s = s * 0.85f + x * 0.15f;
-            out = tanhf(s * g);
+            float next_s = s * 0.85f + x * 0.15f;
+            s = next_s;
+            float drive = s * g;
+            out = tanhf(drive);
             break;
         }
         case 6: { // SDSC_OP_AMPLIFY
-            out = tanhf(x * g * 2.5f);
+            float drive = x * g * 2.5f;
+            out = tanhf(drive);
             break;
         }
         case 7: { // SDSC_OP_INVERT
-            out = -tanhf(x * g);
+            float drive = x * g;
+            out = -tanhf(drive);
             break;
         }
         case 8: { // SDSC_OP_DAMPER
@@ -69,11 +73,13 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 9: { // SDSC_OP_CLIP
-            out = fminf(fmaxf(x * g, -1.0f), 1.0f);
+            float drive = x * g;
+            out = fminf(fmaxf(drive, -1.0f), 1.0f);
             break;
         }
         case 10: { // SDSC_OP_ABS
-            out = fabsf(tanhf(x * g));
+            float drive = x * g;
+            out = fabsf(tanhf(drive));
             break;
         }
         case 11: { // SDSC_OP_MULTIPLY
@@ -81,7 +87,8 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 12: { // SDSC_OP_DIFF
-            out = x - s;
+            float difference = x - s;
+            out = difference;
             s = x;
             break;
         }
@@ -90,8 +97,11 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 14: { // SDSC_OP_RATIO
-            s = s * 0.85f + fabsf(x) * 0.15f;
-            out = fminf(fmaxf(x / (s + 0.1f), -2.0f), 2.0f);
+            float next_s = s * 0.85f + fabsf(x) * 0.15f;
+            s = next_s;
+            float denominator = s + 0.1f;
+            float ratio = x / denominator;
+            out = fminf(fmaxf(ratio, -2.0f), 2.0f);
             break;
         }
         case 15: { // SDSC_OP_THRESHOLD
@@ -109,8 +119,12 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 18: { // SDSC_OP_INHIBIT
-            s = s * 0.80f + fabsf(x) * 0.20f;
-            out = tanhf(x * g) * fmaxf(0.0f, 1.0f - s);
+            float next_s = s * 0.80f + fabsf(x) * 0.20f;
+            s = next_s;
+            float drive = x * g;
+            float remaining = fmaxf(0.0f, 1.0f - s);
+            float gated = tanhf(drive) * remaining;
+            out = gated;
             break;
         }
         case 19: { // SDSC_OP_AND
@@ -124,11 +138,13 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 21: { // SDSC_OP_ACT_POS
-            out = fminf(fmaxf(x * g, 0.0f), 1.0f);
+            float drive = x * g;
+            out = fminf(fmaxf(drive, 0.0f), 1.0f);
             break;
         }
         case 22: { // SDSC_OP_ACT_NEG
-            out = fminf(fmaxf(-x * g, 0.0f), 1.0f);
+            float drive = -x * g;
+            out = fminf(fmaxf(drive, 0.0f), 1.0f);
             break;
         }
         case 23: { // SDSC_OP_ACT_RESET
@@ -136,14 +152,22 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 24: { // SDSC_OP_CORRELATION
-            s = s * 0.90f + (x * a) * 0.10f;
+            float product = x * a;
+            float next_s = s * 0.90f + product * 0.10f;
+            s = next_s;
             a = x;
-            out = tanhf(s * g);
+            float drive = s * g;
+            out = tanhf(drive);
             break;
         }
         case 25: { // SDSC_OP_FATIGUE
-            s = fminf(2.0f, s + fabsf(x) * 0.15f) * 0.96f;
-            out = tanhf(x * g) / (1.0f + s);
+            float raw = s + fabsf(x) * 0.15f;
+            float capped = fminf(2.0f, raw);
+            s = capped * 0.96f;
+            float drive = x * g;
+            float denominator = 1.0f + s;
+            float response = tanhf(drive) / denominator;
+            out = response;
             break;
         }
         case 26: { // SDSC_OP_PASSTHRU
@@ -151,7 +175,9 @@ SDSC_CUDA_DEVICE float sdsc_cuda_eval_primitive(
             break;
         }
         case 27: { // SDSC_OP_ACCUMULATOR
-            s = fminf(fmaxf(s + x * g, -16.0f), 16.0f);
+            float increment = x * g;
+            float next_s = s + increment;
+            s = fminf(fmaxf(next_s, -16.0f), 16.0f);
             out = s;
             break;
         }
@@ -201,16 +227,20 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 5: { // SDSC_OP_INTEGRATE
-            s = s * 0.85f + x * 0.15f;
-            out = tanhf(s * g);
+            float next_s = s * 0.85f + x * 0.15f;
+            s = next_s;
+            float drive = s * g;
+            out = tanhf(drive);
             break;
         }
         case 6: { // SDSC_OP_AMPLIFY
-            out = tanhf(x * g * 2.5f);
+            float drive = x * g * 2.5f;
+            out = tanhf(drive);
             break;
         }
         case 7: { // SDSC_OP_INVERT
-            out = -tanhf(x * g);
+            float drive = x * g;
+            out = -tanhf(drive);
             break;
         }
         case 8: { // SDSC_OP_DAMPER
@@ -219,11 +249,13 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 9: { // SDSC_OP_CLIP
-            out = fminf(fmaxf(x * g, -1.0f), 1.0f);
+            float drive = x * g;
+            out = fminf(fmaxf(drive, -1.0f), 1.0f);
             break;
         }
         case 10: { // SDSC_OP_ABS
-            out = fabsf(tanhf(x * g));
+            float drive = x * g;
+            out = fabsf(tanhf(drive));
             break;
         }
         case 11: { // SDSC_OP_MULTIPLY
@@ -231,7 +263,8 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 12: { // SDSC_OP_DIFF
-            out = x - s;
+            float difference = x - s;
+            out = difference;
             s = x;
             break;
         }
@@ -240,8 +273,11 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 14: { // SDSC_OP_RATIO
-            s = s * 0.85f + fabsf(x) * 0.15f;
-            out = fminf(fmaxf(x / (s + 0.1f), -2.0f), 2.0f);
+            float next_s = s * 0.85f + fabsf(x) * 0.15f;
+            s = next_s;
+            float denominator = s + 0.1f;
+            float ratio = x / denominator;
+            out = fminf(fmaxf(ratio, -2.0f), 2.0f);
             break;
         }
         case 15: { // SDSC_OP_THRESHOLD
@@ -259,8 +295,12 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 18: { // SDSC_OP_INHIBIT
-            s = s * 0.80f + fabsf(x) * 0.20f;
-            out = tanhf(x * g) * fmaxf(0.0f, 1.0f - s);
+            float next_s = s * 0.80f + fabsf(x) * 0.20f;
+            s = next_s;
+            float drive = x * g;
+            float remaining = fmaxf(0.0f, 1.0f - s);
+            float gated = tanhf(drive) * remaining;
+            out = gated;
             break;
         }
         case 19: { // SDSC_OP_AND
@@ -274,11 +314,13 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 21: { // SDSC_OP_ACT_POS
-            out = fminf(fmaxf(x * g, 0.0f), 1.0f);
+            float drive = x * g;
+            out = fminf(fmaxf(drive, 0.0f), 1.0f);
             break;
         }
         case 22: { // SDSC_OP_ACT_NEG
-            out = fminf(fmaxf(-x * g, 0.0f), 1.0f);
+            float drive = -x * g;
+            out = fminf(fmaxf(drive, 0.0f), 1.0f);
             break;
         }
         case 23: { // SDSC_OP_ACT_RESET
@@ -286,14 +328,22 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 24: { // SDSC_OP_CORRELATION
-            s = s * 0.90f + (x * a) * 0.10f;
+            float product = x * a;
+            float next_s = s * 0.90f + product * 0.10f;
+            s = next_s;
             a = x;
-            out = tanhf(s * g);
+            float drive = s * g;
+            out = tanhf(drive);
             break;
         }
         case 25: { // SDSC_OP_FATIGUE
-            s = fminf(2.0f, s + fabsf(x) * 0.15f) * 0.96f;
-            out = tanhf(x * g) / (1.0f + s);
+            float raw = s + fabsf(x) * 0.15f;
+            float capped = fminf(2.0f, raw);
+            s = capped * 0.96f;
+            float drive = x * g;
+            float denominator = 1.0f + s;
+            float response = tanhf(drive) / denominator;
+            out = response;
             break;
         }
         case 26: { // SDSC_OP_PASSTHRU
@@ -301,7 +351,9 @@ __device__ __forceinline__ float sdsc_cuda_eval_primitive(
             break;
         }
         case 27: { // SDSC_OP_ACCUMULATOR
-            s = fminf(fmaxf(s + x * g, -16.0f), 16.0f);
+            float increment = x * g;
+            float next_s = s + increment;
+            s = fminf(fmaxf(next_s, -16.0f), 16.0f);
             out = s;
             break;
         }
