@@ -2616,7 +2616,8 @@ public:
         for (uint32_t i = 0; i < num_cells; ++i) {
             const uint8_t* rec = cell_bytes.data() + i * cell_rec;
             uint8_t op = rec[0];
-            uint8_t flags = is_v4 ? rec[11] : rec[3];
+            // [修复] v4 记录 10 字节: op(0) p1(1-4) p2(5-8) flags(9); 旧读 rec[11] 越界踩下一条记录
+            uint8_t flags = is_v4 ? rec[9] : rec[3];
 
             org.cells[i].id = i;
             org.cells[i].type = (hdr.version >= 3)
