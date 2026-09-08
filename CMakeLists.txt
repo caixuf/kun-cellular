@@ -83,6 +83,8 @@ foreach(TEST_SRC ${TEST_SOURCES})
             target_link_libraries(${TEST_NAME} PRIVATE kun_cellular ${CUDA_DRIVER_LIB} ${NVRTC_LIB})
             target_compile_options(${TEST_NAME} PRIVATE -UNDEBUG)
             add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+            # CUDA 重载测试并行偶发闪断 (单跑满分): 串行隔离
+            set_tests_properties(${TEST_NAME} PROPERTIES RUN_SERIAL TRUE)
             if(EXISTS "$ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib")
                 set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT "LD_LIBRARY_PATH=$ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib:$ENV{LD_LIBRARY_PATH}")
             endif()

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "kun/cellular/core/lifecycle_controller.hpp"
+#include "kun/cellular/core/growth_controller.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -61,6 +62,8 @@ struct OffspringSpec {
     ResourceLedgerConfig resource_config{};
     std::vector<ResourceCellInitial> resource_cells;
     std::vector<ResourceCompartmentInitial> resource_compartments;
+    // 生长是出生本能: 建造代价随出生声明 (默认零代价 = 开放生长)
+    GrowthConfig growth_config{};
 };
 
 enum class AssimilationField : uint8_t {
@@ -197,6 +200,7 @@ public:
                 prepared.error ? std::string(prepared.error->reason)
                                 : "offspring executor preparation failed"}};
         }
+        auto executor = prepared.executor;
         auto lifecycle = CellularLifecycleController::create(
             *runtime_result.runtime,
             std::move(prepared.executor),
@@ -208,10 +212,20 @@ public:
                 lifecycle.error ? lifecycle.error->reason
                                  : "offspring lifecycle creation failed"}};
         }
+        auto growth = CellularGrowthController::create(
+            *lifecycle.controller, spec.growth_config);
+        if (!growth.ok()) {
+            return {nullptr, HeredityError{
+                HeredityErrorCode::InvalidOffspring,
+                growth.error ? growth.error->reason
+                             : "offspring growth instinct creation failed"}};
+        }
         auto result = std::unique_ptr<Phenotype>(new Phenotype(
             std::move(germline),
             std::move(runtime_result.runtime),
+            std::move(executor),
             std::move(lifecycle.controller),
+            std::move(growth.controller),
             spec.organism_id,
             spec.rng_seed));
         return {std::move(result), std::nullopt};
@@ -238,22 +252,34 @@ public:
     uint64_t organism_id() const { return organism_id_; }
     uint64_t next_random() { return rng_(); }
 
+    // 出生本能: 执行/代谢/生命周期/生长全部内生, 调用方零接线。
+    core::CompiledExecutor& executor() { return *executor_; }
+    const core::CompiledExecutor& executor() const { return *executor_; }
+    core::CellularGrowthController& growth() { return *growth_; }
+    const core::CellularGrowthController& growth() const { return *growth_; }
+
 private:
     Phenotype(
         std::shared_ptr<const Germline> germline,
         std::shared_ptr<RuntimeState> runtime,
+        std::shared_ptr<core::CompiledExecutor> executor,
         std::unique_ptr<CellularLifecycleController> lifecycle,
+        std::unique_ptr<CellularGrowthController> growth,
         uint64_t organism_id,
         uint64_t rng_seed)
         : germline_(std::move(germline)),
           runtime_(std::move(runtime)),
+          executor_(std::move(executor)),
           lifecycle_(std::move(lifecycle)),
+          growth_(std::move(growth)),
           organism_id_(organism_id),
           rng_(rng_seed) {}
 
     std::shared_ptr<const Germline> germline_;
     std::shared_ptr<RuntimeState> runtime_;
+    std::shared_ptr<core::CompiledExecutor> executor_;
     std::unique_ptr<CellularLifecycleController> lifecycle_;
+    std::unique_ptr<CellularGrowthController> growth_;
     uint64_t organism_id_{0};
     std::mt19937_64 rng_;
 

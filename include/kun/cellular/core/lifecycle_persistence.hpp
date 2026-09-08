@@ -842,10 +842,22 @@ public:
             GermlineVersion{*germline_version},
             germline_compiled.graph,
             germline_compiled.initial_values));
+        auto persisted_executor = prepared.executor;  // 与 lifecycle 共享同一执行视图
+        auto persisted_growth = CellularGrowthController::create(
+            *lifecycle.controller, GrowthConfig{});
+        if (!persisted_growth.ok()) {
+            return {{}, persistence_detail::failure(
+                PersistenceErrorCode::Corrupt,
+                persisted_growth.error
+                    ? persisted_growth.error->reason
+                    : "persisted growth instinct failed")};
+        }
         auto candidate = std::unique_ptr<Phenotype>(new Phenotype(
             std::move(germline),
             std::move(runtime_result.runtime),
+            std::move(persisted_executor),
             std::move(lifecycle.controller),
+            std::move(persisted_growth.controller),
             *organism_id,
             0));
         candidate->rng_ = rng;

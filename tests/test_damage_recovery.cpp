@@ -10,7 +10,9 @@
 #include "kun/cellular/core/resource_ledger.hpp"
 #include "kun/cellular/core/lifecycle_controller.hpp"
 #include "kun/cellular/core/growth_controller.hpp"
+#include "kun/cellular/legacy/cold_assembly.hpp"
 #include "kun/cellular/cellular_bptt.hpp"
+#include "kun/cellular/legacy/cold_assembly.hpp"
 
 #include <cassert>
 #include <cstdio>
@@ -21,6 +23,33 @@
 using namespace kun;
 
 namespace {
+
+// 默认装配: 一个调用 (冷装配缝) — 底座内化 runtime/ledger/lifecycle/executor/growth
+struct Rig {
+    std::shared_ptr<core::RuntimeState> runtime;
+    std::unique_ptr<core::Phenotype> phenotype;
+    core::CellularGrowthController* growth{nullptr};  // 内生生长本能
+    std::shared_ptr<core::CompiledExecutor> phenotype_executor;  // 图编辑后重绑
+};
+
+Rig assemble(const CellularOrganism& org) {
+    kun::migration::ColdAssemblyConfig cfg;
+    cfg.organism_id = 7;
+    cfg.lifecycle_config = core::LifecycleConfig{5.0, 10.0, 100.0, 0, 0};
+    cfg.growth_config = core::GrowthConfig{2.0, 0.1, 5.0, 10.0, 0.0};
+    auto assembled = kun::migration::assemble_phenotype(
+        org, core::GraphIdentity(1), core::GraphRevision(1), cfg);
+    if (!assembled.ok()) {
+        printf("[装配失败] %s\n", assembled.diagnostic.c_str());
+        assert(false && "cold assembly failed");
+    }
+    Rig rig;
+    rig.phenotype = std::move(assembled.phenotype);
+    rig.runtime = std::shared_ptr<core::RuntimeState>(
+        &rig.phenotype->runtime(), [](core::RuntimeState*) {});
+    rig.growth = &rig.phenotype->growth();
+    return rig;
+}
 
 inline Cell make_cell(uint32_t id, CellType type, double param1 = 1.0, double param2 = 0.0) {
     Cell c;
@@ -66,76 +95,6 @@ CellularOrganism build_decision_organism() {
     return org;
 }
 
-// 装配 (不含 growth, 可选)
-struct Rig {
-    std::shared_ptr<const core::CompiledGraph> plan;
-    std::shared_ptr<const core::InitialParameterValues> params;
-    std::shared_ptr<core::RuntimeState> runtime;
-    std::shared_ptr<core::CompiledExecutor> executor;
-    std::unique_ptr<core::ResourceLedger> ledger;
-    std::unique_ptr<core::CellularLifecycleController> lifecycle;
-    std::unique_ptr<core::CellularGrowthController> growth;
-};
-
-Rig assemble(const CellularOrganism& org) {
-    auto imported = kun::migration::import_execution_snapshot(
-        org, core::GraphIdentity(1), core::GraphRevision(1));
-    assert(imported.ok());
-    const auto& snap = *imported.snapshot;
-    std::vector<core::RuntimeCellState> cells;
-    for (const auto& s : snap.cell_states()) {
-        core::RuntimeCellState rc;
-        rc.cell = s.cell; rc.type = s.type;
-        rc.state_val = s.state_val; rc.aux_state = s.aux_state;
-        rc.prev_input = s.prev_input; rc.output_val = s.output_val;
-        rc.prev_output_val = s.prev_output_val;
-        rc.delay_buffer = s.delay_buffer; rc.delay_idx = s.delay_idx;
-        rc.latch_state = s.latch_state; rc.activation_count = s.activation_count;
-        rc.initialized = true;
-        cells.push_back(rc);
-    }
-    auto created = core::RuntimeState::from_imported_state(
-        snap.compiled_plan(), snap.current_parameter_values(), cells, 0);
-    assert(created.ok());
-    Rig rig;
-    rig.plan = snap.compiled_plan();
-    rig.params = snap.current_parameter_values();
-    rig.runtime = std::move(created.runtime);
-    auto compiled = core::CompiledExecutor::prepare(rig.plan);
-    assert(compiled.ok());
-    rig.executor = std::move(compiled.executor);
-
-    core::ResourceLedgerConfig lcfg;
-    lcfg.maintenance_cost = 0.01;
-    lcfg.activity_cost = 0.05;
-    std::vector<core::ResourceCellInitial> rcells;
-    for (const auto& c : rig.runtime->cell_states())
-        rcells.push_back({c.cell, core::ResourceCompartmentId{0}, 100.0, 100.0, 0.0});
-    std::vector<core::ResourceCompartmentInitial> rcomps;
-    rcomps.push_back({core::ResourceCompartmentId{0}, 1e9});
-    auto ledger = core::ResourceLedger::attach(*rig.runtime, lcfg, rcells, rcomps);
-    assert(ledger.ok());
-    rig.ledger = std::move(ledger.ledger);
-
-    core::LifecycleConfig lccfg;
-    lccfg.apoptotic_resource = 5.0;
-    lccfg.dormant_enter_resource = 10.0;
-    lccfg.dormant_exit_resource = 100.0;
-    auto life = core::CellularLifecycleController::create(
-        *rig.runtime, rig.executor, std::move(rig.ledger), lccfg);
-    assert(life.ok());
-
-    core::GrowthConfig gcfg;
-    gcfg.cell_birth_cost = 2.0;
-    gcfg.synapse_birth_cost = 0.1;
-    gcfg.initial_energy = 5.0;
-    gcfg.initial_capacity = 10.0;
-    auto growth = core::CellularGrowthController::create(std::move(life.controller), gcfg);
-    assert(growth.ok());
-    rig.growth = std::move(growth.controller);
-    return rig;
-}
-
 // 回放输入流, 记录 4 通道 ACT 输出序列
 std::vector<std::array<double, 4>> replay(
     Rig& rig, const std::vector<std::vector<double>>& stream, bool via_growth_step) {
@@ -145,7 +104,9 @@ std::vector<std::array<double, 4>> replay(
             auto res = rig.growth->step(input);
             assert(res.ok());
         } else {
-            auto res = rig.executor->step(*rig.runtime, input);
+            core::CompiledExecutor* ex = rig.phenotype_executor
+                ? rig.phenotype_executor.get() : &rig.phenotype->executor();
+            auto res = ex->step(*rig.runtime, input);
             assert(res.ok());
         }
         std::array<double, 4> act{};
@@ -202,7 +163,7 @@ int main() {
             return 1;
         }
         printf("[A 受损] 枢纽删除: 细胞 %zu→%zu, revision %llu→%llu\n",
-               rig_c.plan->cells().size(), edited.graph->cells().size(),
+               rig_c.runtime->plan()->cells().size(), edited.graph->cells().size(),
                (unsigned long long)edited.report.old_revision.value,
                (unsigned long long)edited.report.new_revision.value);
         // probe 重新绑定编译图后回放
@@ -272,7 +233,7 @@ int main() {
         assert(edited.ok());
         auto compiled_b = core::CompiledExecutor::prepare(edited.graph);
         assert(compiled_b.ok());
-        rig_b.executor = std::move(compiled_b.executor);
+        rig_b.phenotype_executor = std::move(compiled_b.executor);
 
         // 结构恢复基线 (无学习)
         double dist_b_struct = trace_distance(replay(rig_b, stream, false), trace_c);
@@ -300,7 +261,7 @@ int main() {
             auto probe_t = rig_c.runtime->fork_probe();
             assert(probe_t.ok());
             for (const auto& input : stream) {
-                auto r = rig_c.executor->step(*probe_t.runtime, input);
+                auto r = rig_c.phenotype->executor().step(*probe_t.runtime, input);
                 assert(r.ok());
                 std::vector<double> row(4, 0.0);
                 size_t slot = 0;
@@ -318,7 +279,7 @@ int main() {
             assert(!reset.error.has_value());
             engine.reset_tape();
             for (size_t t = 0; t < stream.size(); ++t) {
-                auto rec = engine.record_step(*rig_b.runtime, *rig_b.executor, stream[t]);
+                auto rec = engine.record_step(*rig_b.runtime, *rig_b.phenotype_executor, stream[t]);
                 assert(rec.ok());
             }
             CoreBPTTGradients grads;
@@ -340,7 +301,7 @@ int main() {
         // 训练后回放
         auto reset2 = rig_b.runtime->reset_episode();
         assert(!reset2.error.has_value());
-        trace_b = replay(rig_b, stream, false);
+        { /* 编辑后回放使用编辑后执行器 */ } trace_b = replay(rig_b, stream, false);
         const double dist_b = trace_distance(trace_b, trace_c);
         recovery = (dist_a > 0.0) ? 1.0 - dist_b / dist_a : 0.0;
         printf("[B 恢复] 结构基线差异=%.4f → 学习后差异=%.4f (loss %.4f), 恢复比例=%.3f\n",
