@@ -30,6 +30,25 @@ struct EvaluationReport {
     wire::Bytes bytes;
 };
 
+inline bool approved_protocol(const EvaluationProtocol& p,
+                              const ModuleContract& contract) {
+    constexpr double kMaximumTolerance = 1e-9;
+    constexpr std::size_t kMinimumTracesPerSplit = 2;
+    constexpr std::size_t kMinimumFramesPerTrace = 2;
+    return p.protocol_id.starts_with("KUN-R8-APPROVED/") &&
+        p.environment == contract.environment &&
+        std::isfinite(p.absolute_tolerance) &&
+        p.absolute_tolerance >= 0 && p.absolute_tolerance <= kMaximumTolerance &&
+        p.train.size() >= kMinimumTracesPerSplit &&
+        p.ood.size() >= kMinimumTracesPerSplit &&
+        std::all_of(p.train.begin(), p.train.end(), [=](const auto& trace) {
+            return trace.frames.size() >= kMinimumFramesPerTrace;
+        }) &&
+        std::all_of(p.ood.begin(), p.ood.end(), [=](const auto& trace) {
+            return trace.frames.size() >= kMinimumFramesPerTrace;
+        });
+}
+
 inline wire::Bytes encode_protocol(const EvaluationProtocol& p, const ModuleContract& contract) {
     require(!p.protocol_id.empty() && p.environment == contract.environment,
             "evaluation protocol/environment mismatch");
@@ -60,6 +79,8 @@ inline wire::Bytes encode_protocol(const EvaluationProtocol& p, const ModuleCont
 
 // The library accepts protocols, not caller-authored 'passed' attestations.
 inline EvaluationReport evaluate_native(const KnowledgeModule& module, const EvaluationProtocol& p) {
+    require(approved_protocol(p, module.contract()),
+            "evaluation protocol is not in the native R8 approval registry");
     const auto start = std::chrono::steady_clock::now();
     const auto manifest = encode_protocol(p, module.contract());
     EvaluationReport result;

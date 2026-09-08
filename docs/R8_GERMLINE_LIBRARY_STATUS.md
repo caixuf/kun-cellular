@@ -24,7 +24,8 @@ generic cellular substrate.
   content-bound evidence, and append-only events. Python never creates tables
   or mutates the database.
 - Candidate objects become `research-validated` only after deterministic native
-  evaluation over disjoint nonempty train and OOD seed manifests. Failed
+  evaluation over disjoint nonempty train and OOD seed manifests accepted by
+  the built-in bounded `KUN-R8-APPROVED/` research protocol registry. Failed
   evaluations remain stored and keep the object at `candidate`. There is no
   deployment certification tier in this implementation.
 - `knowledge_adoption.hpp` provides fresh birth import and live cold-boundary
@@ -53,5 +54,7 @@ generic cellular substrate.
   rejection, failed low-resource adoption, and fresh birth import.
 
 The demo reports producer/evaluation/adoption work, failed attempts, bytes
-validated, and wall time. It makes no general speedup claim and does not claim
-production Replay, Shadow, or deployment certification.
+validated, and wall time. Native trace work is reported as attempted work; only
+live structural adoption is charged through the resource ledger in this phase.
+It makes no general speedup claim and does not claim production Replay, Shadow,
+or deployment certification.

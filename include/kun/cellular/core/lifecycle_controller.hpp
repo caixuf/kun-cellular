@@ -278,6 +278,7 @@ public:
     }
 
     std::span<const LifecycleCellState> states() const { return states_; }
+    GraphEditHistory edit_history() const { return editor_.history(); }
     const ResourceLedger& ledger() const { return *ledger_; }
     const std::shared_ptr<CompiledExecutor>& executor() const { return executor_; }
     const LifecycleConfig& config() const { return config_; }

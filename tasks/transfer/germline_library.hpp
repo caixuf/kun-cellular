@@ -274,7 +274,7 @@ public:
         tx.commit();
     }
     const LibraryWork& work() const { return work_; }
-    void record_adoption(const AdoptionReceipt& receipt);
+    void record_adoption(const AdoptionReceipt& receipt, const Phenotype& target);
 private:
     LibraryEntry load(const KnowledgeRef& ref) {
         database::Statement s(db_, "SELECT k.title,k.artifact,k.content_digest,k.environment,k.interface_id,k.producer_lineage,k.origin,s.status,s.borrows,s.failures FROM knowledge_objects k JOIN object_status s USING(object_id,version) WHERE k.object_id=? AND k.version=?");

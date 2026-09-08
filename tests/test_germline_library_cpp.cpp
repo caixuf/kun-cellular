@@ -4,6 +4,7 @@
 #include <cassert>
 #include <filesystem>
 #include <iostream>
+#include <limits>
 #include <thread>
 #include <unistd.h>
 
@@ -61,9 +62,11 @@ KnowledgeModule module(double gain = 2.0) {
 }
 
 EvaluationProtocol protocol(double gain = 2.0) {
-    return {"scale-trace/v1", "deterministic-scalars/v1", 1e-12,
-            {{11, {{{-2.0}, {-2.0 * gain}}, {{1.0}, {gain}}}}},
-            {{21, {{{-3.0}, {-3.0 * gain}}, {{0.5}, {0.5 * gain}}}}}};
+    return {"KUN-R8-APPROVED/scale-trace/v1", "deterministic-scalars/v1", 1e-12,
+            {{11, {{{-2.0}, {-2.0 * gain}}, {{1.0}, {gain}}}},
+             {12, {{{-1.5}, {-1.5 * gain}}, {{0.75}, {0.75 * gain}}}}},
+            {{21, {{{-3.0}, {-3.0 * gain}}, {{0.5}, {0.5 * gain}}}},
+             {22, {{{-4.0}, {-4.0 * gain}}, {{0.25}, {0.25 * gain}}}}}};
 }
 
 void exec_sql(const std::string& path, const char* sql) {
@@ -117,11 +120,19 @@ int main() {
         rejects([&] { db.evaluate(v1, invalid, "evaluator"); });
         invalid = protocol(); invalid.environment = "wrong";
         rejects([&] { db.evaluate(v1, invalid, "evaluator"); });
+        invalid = protocol(); invalid.protocol_id = "caller-authored";
+        rejects([&] { db.evaluate(v1, invalid, "evaluator"); });
+        invalid = protocol(); invalid.absolute_tolerance = std::numeric_limits<double>::max();
+        rejects([&] { db.evaluate(v1, invalid, "evaluator"); });
+        invalid = protocol(); invalid.train.resize(1);
+        rejects([&] { db.evaluate(v1, invalid, "evaluator"); });
+        invalid = protocol(); invalid.train.front().frames.resize(1);
+        rejects([&] { db.evaluate(v1, invalid, "evaluator"); });
         auto failed = db.evaluate(v1, protocol(3), "evaluator");
-        assert(!failed.passed && failed.graph_executions == 8);
-        assert(db.entry(v1).failures == 5);
+        assert(!failed.passed && failed.graph_executions == 16);
+        assert(db.entry(v1).failures == 9);
         auto passed = db.evaluate(v1, protocol(), "evaluator");
-        assert(passed.passed && passed.graph_executions == 8);
+        assert(passed.passed && passed.graph_executions == 16);
         assert(!passed.report_digest.empty());
         assert(db.entry(v1).status == "research-validated");
         assert(db.find(contract()).size() == 1);
@@ -146,8 +157,8 @@ int main() {
         auto stale = request; stale.expected_tick = 0;
         rejects([&] { adopt_at_cold_boundary(*target, borrowed, stale, {&x, 1}); });
         auto receipt = adopt_at_cold_boundary(*target, borrowed, request, {&x, 1});
-        db.record_adoption(receipt);
-        db.record_adoption(receipt); // retry is idempotent, not a second adoption
+        db.record_adoption(receipt, *target);
+        db.record_adoption(receipt, *target); // retry is idempotent, not a second adoption
         assert(receipt.source == v1 && receipt.paid_cost == 2.5);
         assert(receipt.inserted_cells.size() == 1 && receipt.new_edges.size() == 2);
         assert(receipt.work.graph_executions == 2);

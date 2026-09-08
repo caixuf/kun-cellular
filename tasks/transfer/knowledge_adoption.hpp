@@ -89,10 +89,14 @@ inline AdoptionReceipt adopt_at_cold_boundary(
                     resources.cell(state.cell)->energy > target.lifecycle().config().dormant_enter_resource,
                     "adoption requires an active cold structure boundary without pending death/dormancy");
 
+        const auto edit_history = target.lifecycle().edit_history();
         uint64_t cell_max = 0, edge_max = 0;
         for (const auto& c : target_plan.cells()) cell_max = std::max(cell_max, c.id.value);
         for (const auto& e : target_plan.edges()) edge_max = std::max(edge_max, e.id.value);
-        require(cell_max < UINT64_MAX && edge_max <= UINT64_MAX - 2, "stable ID namespace exhausted");
+        for (const auto id : edit_history.retired_cells) cell_max = std::max(cell_max, id.value);
+        for (const auto id : edit_history.retired_edges) edge_max = std::max(edge_max, id.value);
+        require(cell_max < UINT64_MAX && edge_max <= UINT64_MAX - 2,
+                "stable ID namespace exhausted");
         const CellId inserted{cell_max + 1};
         const EdgeId incoming{edge_max + 1}, outgoing{edge_max + 2};
         const auto fresh = module.fresh_runtime();
@@ -159,8 +163,26 @@ inline AdoptionReceipt adopt_at_cold_boundary(
 
 // Durable observatory receipt, not a live checkpoint. The caller retains the
 // receipt if persistence fails and can retry: SQLite and live RAM are not one transaction.
-inline void GermlineLibraryStore::record_adoption(const AdoptionReceipt& receipt) {
+inline void GermlineLibraryStore::record_adoption(const AdoptionReceipt& receipt,
+                                                  const Phenotype& target) {
     database::Transaction tx(db_);
+    require(receipt.organism_id == target.organism_id() &&
+            receipt.revision_after == target.runtime().revision(),
+            "adoption receipt does not match the live target");
+    require(receipt.paid_cost > 0 && std::isfinite(receipt.paid_cost) &&
+            std::isfinite(receipt.funding.conservation_residual) &&
+            std::abs(receipt.funding.conservation_residual) < 1e-9,
+            "adoption receipt has invalid payment accounting");
+    for (const auto id : receipt.inserted_cells)
+        require(std::any_of(target.runtime().plan()->cells().begin(),
+                            target.runtime().plan()->cells().end(),
+                            [&](const auto& cell) { return cell.id == id; }),
+                "adoption receipt references a missing inserted cell");
+    for (const auto id : receipt.new_edges)
+        require(std::any_of(target.runtime().plan()->edges().begin(),
+                            target.runtime().plan()->edges().end(),
+                            [&](const auto& edge) { return edge.id == id; }),
+                "adoption receipt references a missing inserted edge");
     const auto e = load(receipt.source);
     require(wire::digest(e.module.encode()) == receipt.content_digest, "adoption/source identity mismatch");
     database::Statement borrow(db_, "SELECT event,object_id,version FROM events WHERE sequence=?");

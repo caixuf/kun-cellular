@@ -11,7 +11,8 @@ research-only transfer path:
   never captures runtime state or resources.
 - `tasks/transfer/knowledge_evidence.hpp` evaluates each artifact with the
   native and reference executors over disjoint nonempty train/OOD seed
-  manifests. Reports bind content, environment, protocol, seeds, outputs, and
+  manifests accepted by the bounded `KUN-R8-APPROVED/` research protocol
+  registry. Reports bind content, environment, protocol, seeds, outputs, and
   work counts; failed reports are retained.
 - `tasks/transfer/germline_library.hpp` provides SQLite schema 3 as the C++
   authority: immutable versions, parent refs, candidate/research-validated
@@ -34,3 +35,5 @@ multi-environment attestation, and a deployment-certified status are not
 implemented and must not be inferred from the research validation evidence.
 The live composition path currently supports one explicitly validated
 receptor/unary motif; larger compatible modules use fresh birth import.
+Native trace work is reported as attempted work in this phase; only live
+structural adoption is charged through the resource ledger.

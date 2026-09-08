@@ -39,7 +39,7 @@ std::unique_ptr<Phenotype> born(uint64_t id, double gain) {
     return std::move(result.phenotype);
 }
 EvaluationProtocol protocol(double expected_gain) {
-    EvaluationProtocol p{"scale-gain-" + std::to_string(expected_gain) + "/v1",
+    EvaluationProtocol p{"KUN-R8-APPROVED/scale-gain-" + std::to_string(expected_gain) + "/v1",
                          interface().environment, 1e-12, {}, {}};
     // Explicit versioned seed-to-input mapping. OOD has unseen magnitudes.
     for (uint64_t seed : {11, 12, 101, 102}) {
@@ -163,7 +163,7 @@ int demo(const std::string& path) {
             "compatible native lookup failed");
     const auto borrowed = db.borrow({"scale", "1"}, interface(), "unrelated-B");
     const auto receipt_b = adopt_at_cold_boundary(*B, borrowed, request(*B), {&x, 1}, &adoption_work);
-    db.record_adoption(receipt_b);
+    db.record_adoption(receipt_b, *B);
     const double b_after = B->runtime().cell_state(CellId{2})->output_val;
     const auto b_search = learn(*B, receipt_b.new_edges.front(), 2, 3, work);
     step(*B, x, work);
@@ -183,7 +183,7 @@ int demo(const std::string& path) {
     const double c_before = C->runtime().cell_state(CellId{2})->output_val;
     const auto newer = db.borrow({"scale", "2"}, interface(), "unrelated-C");
     const auto receipt_c = adopt_at_cold_boundary(*C, newer, request(*C), {&x, 1}, &adoption_work);
-    db.record_adoption(receipt_c);
+    db.record_adoption(receipt_c, *C);
     const double c_after = C->runtime().cell_state(CellId{2})->output_val;
     auto birth_control = newer.module.spawn_birth(spec(newer.module.germline(), 40404));
     step(*birth_control, x, work);
