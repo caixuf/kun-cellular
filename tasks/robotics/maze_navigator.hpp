@@ -462,7 +462,9 @@ private:
 class MazeEvolutionEngine {
 public:
     explicit MazeEvolutionEngine(size_t population_size = 32, int maze_size = 21, uint32_t seed = 42, SeedInitMode init_mode = SeedInitMode::CONTRACT_PROGENITOR, float braid_prob = 0.15f)
-        : pop_size_(population_size), maze_(maze_size, maze_size, seed, braid_prob), morph_engine_(population_size, seed, init_mode) {
+        : pop_size_(population_size), braid_prob_(braid_prob),
+          maze_(maze_size, maze_size, seed, braid_prob),
+          morph_engine_(population_size, seed, init_mode) {
         reset_simulation();
     }
 
@@ -563,6 +565,25 @@ public:
         reset_simulation();
     }
 
+    // Train each generation against every registered training map. Evolving on
+    // one fixed maze and evaluating on a seed-disjoint split measures map
+    // memorization, not task learning.
+    void train_on_seeds(const std::vector<uint32_t>& train_seeds,
+                        int generations_per_seed = 1) {
+        if (train_seeds.empty() || generations_per_seed <= 0) return;
+        for (uint32_t seed : train_seeds) {
+            maze_ = MazeEnvironment(static_cast<int>(maze_.get_width()),
+                                    static_cast<int>(maze_.get_height()),
+                                    seed, braid_prob_);
+            for (int generation = 0; generation < generations_per_seed; ++generation) {
+                reset_simulation();
+                for (int step = 0; step < max_steps_per_gen_; ++step) {
+                    step_simulation();
+                }
+            }
+        }
+    }
+
     OOSReport evaluate_oos(const TaskDatasetSplit& split = TaskDatasetSplit::create_default_maze_split(), double gate_threshold = 0.70) {
         MazeTask train_task(split.train_map_size, split.train_map_size, 42, split.max_steps_per_episode);
         MazeTask id_task(split.train_map_size, split.train_map_size, 99, split.max_steps_per_episode);
@@ -631,6 +652,7 @@ public:
 private:
     size_t pop_size_{32};
     int max_steps_per_gen_{160};
+    float braid_prob_{0.15f};
     int step_count_{0};
     int generation_{1};
     float success_rate_{0.0f};

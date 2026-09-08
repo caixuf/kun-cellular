@@ -123,7 +123,6 @@ void test_dataset_split_and_train_holdout_isolation() {
 
 void test_oos_champion_reporting_and_gate_checking() {
     std::cout << "[Test 5] 验证 OOS 留出综合评测报告、WL 拓扑哈希与门禁判定 (M1 Gate)...\n";
-    auto org = CellularOrganism::create_seed_organism(505);
     auto split = TaskDatasetSplit::create_default_maze_split();
 
     // 缩减种子数加速单测
@@ -132,11 +131,12 @@ void test_oos_champion_reporting_and_gate_checking() {
     split.holdout_ood_seeds = {301, 302};
     split.max_steps_per_episode = 40;
 
-    MazeTask train_task(split.train_map_size, split.train_map_size, 42, split.max_steps_per_episode);
-    MazeTask id_task(split.train_map_size, split.train_map_size, 99, split.max_steps_per_episode);
-    MazeTask ood_task(split.ood_map_size, split.ood_map_size, 199, split.max_steps_per_episode * 2);
-
-    auto report = TaskEvaluator::evaluate_task_split(train_task, id_task, ood_task, org, split, 0.70);
+    // A fresh seed organism only exercises the reporter; it cannot support a
+    // claim about learning. Train a champion before evaluating the split.
+    MazeEvolutionEngine evolution(16, split.train_map_size, 505,
+                                  SeedInitMode::CONTRACT_PROGENITOR);
+    evolution.train_on_seeds(split.train_seeds, 4);
+    auto report = evolution.evaluate_oos(split, 0.70);
 
     assert(!report.topology_hash.empty());
     assert(report.topology_hash.find("WL-") != std::string::npos);
