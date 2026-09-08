@@ -31,11 +31,11 @@
         "GATE_DEADZONE",
         "OP_DAMPER"
       ],
-      "validation_report": "200局双盲对抗实测 55.5% 胜率 (地主 66.7% / 农民 54.0%)，Lyapunov 最大环路增益 ρ=0.0261874 < 1.0 证明收敛，50,000步位级无漂移形式化认证通过。"
+      "validation_report": "200局双盲对抗实测 55.5% 胜率 (地主 66.7% / 农民 54.0%)，Lyapunov 最大环路增益 ρ=0.0261874 < 1.0 表明收敛，50,000步位级无漂移回放测试通过。"
     },
     {
       "id": "adas_tripartite_champion",
-      "name": "具身智能驾驶 ASIL-D 三方稳态微柱 (18细胞·形式化认证)",
+      "name": "具身智能驾驶三方稳态微柱 (18细胞·通过回放测试套件)",
       "domain": "车规级李雅普诺夫稳态转向制动控制",
       "cells_scale": 18,
       "synapses_scale": 25,
@@ -58,7 +58,7 @@
         "GATE_HYSTERESIS",
         "GATE_DEADZONE"
       ],
-      "validation_report": "形式化认证通过 (adas_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.031 < 1.0，50,000 步位级精确零漂移，BIBO 严格有界稳定。"
+      "validation_report": "数值验证通过 (证书文件adas_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.031 < 1.0，50,000 步位级精确零漂移，BIBO 严格有界稳定。"
     },
     {
       "id": "adas_cortex_champion",
@@ -93,7 +93,7 @@
     },
     {
       "id": "quant_tripartite_champion",
-      "name": "高频量化三方稳态微柱 (9细胞·形式化认证)",
+      "name": "高频量化三方稳态微柱 (9细胞·数值验证)",
       "domain": "盘口滑点微积分与自组织风控对冲",
       "cells_scale": 9,
       "synapses_scale": 11,
@@ -116,7 +116,7 @@
         "GATE_HYSTERESIS",
         "GATE_DEADZONE"
       ],
-      "validation_report": "形式化认证通过 (quant_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.019 < 1.0，50,000 步位级零漂移，BIBO 严格收敛。"
+      "validation_report": "数值验证通过 (证书文件quant_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.019 < 1.0，50,000 步位级零漂移，BIBO 严格收敛。"
     },
     {
       "id": "quant_master_champion",
@@ -149,7 +149,7 @@
     },
     {
       "id": "maze_tripartite_champion",
-      "name": "具身空间趋化迷宫导航生命体 (21细胞·形式化认证)",
+      "name": "具身空间趋化迷宫导航生命体 (21细胞·数值验证)",
       "domain": "连续物理空间导航与趋化性脱困",
       "cells_scale": 21,
       "synapses_scale": 42,
@@ -173,11 +173,11 @@
         "GATE_DEADZONE",
         "OP_DAMPER"
       ],
-      "validation_report": "形式化认证通过 (maze_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.024 < 1.0，复杂多岔路死胡同 100% 自主逃逸，零原地死锁。"
+      "validation_report": "数值验证通过 (证书文件maze_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.024 < 1.0，复杂多岔路死胡同 100% 自主逃逸，零原地死锁。"
     },
     {
       "id": "household_coverage_champion",
-      "name": "全屋覆盖清洁机器人具身大脑 (11细胞·形式化认证)",
+      "name": "全屋覆盖清洁机器人具身大脑 (11细胞·数值验证)",
       "domain": "有限空间遍历覆盖与动态障碍避让",
       "cells_scale": 11,
       "synapses_scale": 11,
@@ -201,11 +201,11 @@
         "GATE_HYSTERESIS",
         "GATE_DEADZONE"
       ],
-      "validation_report": "形式化认证通过 (household_coverage_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.018 < 1.0，全屋地图空间覆盖率达到 98.4%，死角重复率降至 3.2%。"
+      "validation_report": "数值验证通过 (证书文件household_coverage_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.018 < 1.0，全屋地图空间覆盖率达到 98.4%，死角重复率降至 3.2%。"
     },
     {
       "id": "fluid_damper_champion",
-      "name": "多相流体动力学自适应阻尼器 (40细胞·形式化认证)",
+      "name": "多相流体动力学自适应阻尼器 (40细胞·数值验证)",
       "domain": "高频流体扰动抑制与涡旋耗散阻尼",
       "cells_scale": 40,
       "synapses_scale": 86,
@@ -230,11 +230,11 @@
         "OP_INTEGRAL",
         "GATE_HYSTERESIS"
       ],
-      "validation_report": "形式化认证通过 (fluid_damper_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.021 < 1.0，强湍流突变响应时间仅 4.2ms，振动能量衰减率提升 4.8x。"
+      "validation_report": "数值验证通过 (证书文件fluid_damper_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.021 < 1.0，强湍流突变响应时间仅 4.2ms，振动能量衰减率提升 4.8x。"
     },
     {
       "id": "cartpole_tripartite_champion",
-      "name": "倒立摆超稳态平衡控制器 (8细胞·形式化认证)",
+      "name": "倒立摆超稳态平衡控制器 (8细胞·数值验证)",
       "domain": "欠驱动刚体动力学摆杆姿态平衡",
       "cells_scale": 8,
       "synapses_scale": 14,
@@ -257,7 +257,7 @@
         "GATE_HYSTERESIS",
         "GATE_DEADZONE"
       ],
-      "validation_report": "形式化认证通过 (cartpole_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.015 < 1.0，50,000 步位级精确零漂移，极限扰动下 200ms 内回正。"
+      "validation_report": "数值验证通过 (证书文件cartpole_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.015 < 1.0，50,000 步位级精确零漂移，极限扰动下 200ms 内回正。"
     }
   ]
 }

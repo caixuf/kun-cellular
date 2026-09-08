@@ -460,7 +460,7 @@ class LiveVehicleSimulator:
                         self.champion_genome = None
                         self._init_shadow_cortex(bin_data)
                         loaded = True
-                        print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 纯二进制 (SDSC-BIN v2) 210-细胞 ASIL-D 驾驶皮层冠军模型: {bin_path}")
+                        print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 纯二进制 (SDSC-BIN v2) 210-细胞驾驶皮层冠军模型: {bin_path}")
                     else:
                         n_rec = 32
                         n_mot = 224 if num_cells == 1024 else max(2, bin_data.get("output_dim", 224))
@@ -723,7 +723,7 @@ class LiveVehicleSimulator:
             organ = getattr(self, "champion_genome", None)
 
             if nc == 210 or organ is None:
-                # 210-细胞 ASIL-D 冠军模型实测控制律：高精度连续前瞻与物理阿克曼前馈
+                # 210-细胞冠军模型控制律（经验标定，未经功能安全认证）：高精度连续前瞻与物理阿克曼前馈
                 k_cte = 0.28
                 k_heading = 1.35
                 steer_target = heading_err * k_heading - math.atan2(k_cte * signed_cte, max(1.0, self.v))
@@ -1586,7 +1586,7 @@ class SiliconCellularOrganism:
         self.init_cells()
         
     def init_cells(self):
-        """构建真实生命体流形 (默认加载具身智能驾驶 ASIL-D 210 细胞微柱皮层冠军)"""
+        """构建真实生命体流形 (默认加载具身智能驾驶 210 细胞微柱皮层冠军)"""
         return self.load_organism_by_id("adas_cortex_champion")
 
     def _refresh_macro_cells_ports(self):
@@ -1793,7 +1793,7 @@ class SiliconCellularOrganism:
         Stage 2: 因果聚合与小世界结网 (Mitosis & Causal Growth, 24 细胞小世界拓扑)
         Stage 3: 全脑高能放电涌现 (Plasma Discharge, 48 细胞高能动作电位雪崩)
         Stage 4: 白垩纪危机与大灭绝借用重组 (Chicxulub Extinction & Exaptation Splice, 60 细胞抗扰重组)
-        Stage 5: 自组织稳态重生 (BIBO Convergence, 挂载 210 细胞 ASIL-D 车规级驾驶皮层冠军)
+        Stage 5: 自组织稳态重生 (BIBO Convergence, 挂载 210 细胞驾驶皮层冠军)
         """
         stage_str = str(stage).strip().lower()
         with self.lock:
@@ -1969,7 +1969,7 @@ class SiliconCellularOrganism:
                 return {"stage": 4, "title": "白垩纪选择压力大灭绝与重组", "cells_count": len(self.cells), "synapses_count": len(self.synapses)}
 
             else:
-                # Stage 5 / Default: 挂载 ASIL-D 210 细胞驾驶皮层冠军
+                # Stage 5 / Default: 挂载 210 细胞驾驶皮层冠军
                 res = self.load_organism_by_id("adas_cortex_champion")
                 self.check_lyapunov_stability()
                 return {"stage": 5, "title": "李雅普诺夫稳态重组与成体皮层重生", "cells_count": len(self.cells), "synapses_count": len(self.synapses), "lyapunov": self.lyapunov_report}
@@ -2897,7 +2897,7 @@ class SiliconCellularOrganism:
         return self.load_organism_by_id("sdsc_mega_1million")
 
     def load_adas_1m_preset(self):
-        """挂载 ASIL-D 210 细胞真实微柱皮层 (替代旧 1M 假预设)"""
+        """挂载 210 细胞微柱皮层 (替代旧 1M 假预设)"""
         return self.load_organism_by_id("adas_cortex_champion")
 
     def load_mature_preset(self):
@@ -3197,8 +3197,8 @@ class SiliconLifeformLibrary:
                         steps = int(reg.get("steps", 0))
                         specs.append({
                             "book_id": f"{oid}_formal_cert",
-                            "title": f"形式化认证: Lyapunov ρ={gain:.4f} < 1.0",
-                            "badge": "形式化验证",
+                            "title": f"数值验证: Lyapunov ρ={gain:.4f} < 1.0",
+                            "badge": "数值验证",
                             "file_path": os.path.relpath(cert_file, ROOT_DIR),
                             "citations": steps,
                             "impact_score": "BIBO 稳态",

@@ -455,8 +455,8 @@ export async function loadPreset(type) {
       "1m": "SDSCC 旗舰微柱阵列全息大生命体",
       real: "三十年商品期货量化演化冠军",
       quant: "三十年商品期货量化演化冠军",
-      adas: "SDSCC 车规级 ASIL-D 微柱皮层",
-      vehicle: "SDSCC 车规级 ASIL-D 微柱皮层",
+      adas: "SDSCC 车规级微柱皮层",
+      vehicle: "SDSCC 车规级微柱皮层",
       primordial: "无目标原始进化生命体冠军"
     };
     const name = NAME_MAP[type] || s.organism_id || "SDSCC 冠军生命体";

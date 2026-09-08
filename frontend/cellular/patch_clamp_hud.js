@@ -67,7 +67,7 @@ export const PRIMITIVE_EQUATIONS = {
     category: "尺度代偿与信噪比增强",
     ode: "out = K · u",
     discrete: "out[t] = K · u[t]",
-    desc: "调整各反射弧通道权重增益，满足 ASIL-D 裕度契约。"
+    desc: "调整各反射弧通道权重增益，满足设计裕度契约。"
   }
 };
 

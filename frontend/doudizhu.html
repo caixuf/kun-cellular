@@ -670,7 +670,7 @@
             </div>
         </div>
 
-        <!-- 面板 2: 后台冠军皮层真实前向遥测 (C++20 底座 + doudizhu_evolved_champion.bin 形式化认证 + DeepSeek-GRPO 对齐) -->
+        <!-- 面板 2: 后台冠军皮层真实前向遥测 (C++20 底座 + doudizhu_evolved_champion.bin 数值验证证书 + DeepSeek-GRPO 对齐) -->
         <div class="side-box">
             <div class="panel-header">
                 <span>后台冠军皮层遥测 <span style="font-size:10px;color:#10b981;">[GRPO 对齐]</span> <span id="dzTeleSrc" style="font-size:10px;color:#64748b;">(连接中…)</span></span>
@@ -1639,7 +1639,7 @@ async function pulseCortexMeters() {
             if (srcEl) { srcEl.textContent = "(后端离线)"; }
             return;
         }
-        if (srcEl) { srcEl.textContent = "(C++20 形式化认证冠军 · 12细胞)"; }
+        if (srcEl) { srcEl.textContent = "(C++20 数值验证冠军 · 12细胞)"; }
         for (let i = 0; i < 4; ++i) {
             const v = Math.max(0, Math.min(100, d.columns[i].act));
             document.getElementById("actVal" + i).textContent = v.toFixed(1) + "%";
