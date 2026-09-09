@@ -213,6 +213,9 @@ target_link_libraries(train_doudizhu_bc_distill PRIVATE kun_cellular Threads::Th
   add_executable(bench_p9_speed "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_p9_speed.cpp")
   target_link_libraries(bench_p9_speed PRIVATE kun_cellular Threads::Threads m)
 
+  add_executable(p9_fuse "${CMAKE_CURRENT_SOURCE_DIR}/tools/p9_fuse.cpp")
+  target_link_libraries(p9_fuse PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(u5_growth_winner "${CMAKE_CURRENT_SOURCE_DIR}/tools/u5_growth_winner.cpp")
 target_link_libraries(u5_growth_winner PRIVATE kun_cellular Threads::Threads m)
 

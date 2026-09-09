@@ -131,8 +131,8 @@ int main(int argc, char** argv) {
     setvbuf(stdout, nullptr, _IONBF, 0);
     const char* model = "checkpoints/doudizhu_cand_scorer.bin";
     int games = 20000, eval_every = 200, holdout_n = 500, pool_every = 500;
-    double lr = 2e-4, r_max = 0.5, r_start = -1.0, value_w = 0.0;
-    int r_period = 1000;
+    double lr = 2e-4, r_max = 0.5, r_start = -1.0, value_w = 0.0, lr2 = 0.0;
+    int r_period = 1000, lr_after = -1, pool_cap = 128, max_collapses = 8;
     const char* pool_list = "";
     const char* final_out = "checkpoints/pool/p9_online_m2_final.bin";
     for (int i = 1; i < argc; ++i) {
@@ -149,6 +149,10 @@ int main(int argc, char** argv) {
         else if (!std::strcmp(argv[i], "--r-start")) r_start = std::atof(need("r-start"));
         else if (!std::strcmp(argv[i], "--r-period")) r_period = std::atoi(need("r-period"));
         else if (!std::strcmp(argv[i], "--value-w")) value_w = std::atof(need("value-w"));
+        else if (!std::strcmp(argv[i], "--lr-after")) lr_after = std::atoi(need("lr-after"));
+        else if (!std::strcmp(argv[i], "--lr2")) lr2 = std::atof(need("lr2"));
+        else if (!std::strcmp(argv[i], "--pool-cap")) pool_cap = std::atoi(need("pool-cap"));
+        else if (!std::strcmp(argv[i], "--max-collapses")) max_collapses = std::atoi(need("max-collapses"));
         else if (!std::strcmp(argv[i], "--pool-list")) pool_list = need("pool-list");
         else if (!std::strcmp(argv[i], "--final-out")) final_out = need("final-out");
         else if (!std::strcmp(argv[i], "--model")) model = need("model");
@@ -208,6 +212,7 @@ int main(int argc, char** argv) {
     std::vector<std::string> eval_log;
     bool aborted = false;
     std::string abort_reason;
+    int collapses = 0;
     long selfplay_decisions = 0, teacher_decisions = 0, student_decisions = 0;
 
     for (int g = 0; g < games && !aborted; ++g) {
@@ -342,18 +347,26 @@ int main(int argc, char** argv) {
                 for (size_t j = 0; j < sum.grad_gains.size(); ++j) sum.grad_gains[j] += one.grad_gains[j];
             }
         }
-        bptt.step_adam(org, sum, (float)lr);
+        bptt.step_adam(org, sum, (float)((lr_after > 0 && g >= lr_after) ? lr2 : lr));
 
-        // 池冻结 (每 pool_every 局)
+        // 池冻结 (每 pool_every 局, M6-scale: 质量门 + 容量上限)
         if ((g + 1) % pool_every == 0) {
-            const std::string path = "checkpoints/pool/m2_gen" + std::to_string(g + 1) + ".bin";
-            if (!org.save_checkpoint_bin(path)) { printf("[错误] 池冻结失败\n"); return 1; }
-            CellularOrganism loaded;
-            auto bl = CellularOrganism::load_checkpoint_bin(path.c_str());
-            if (!bl.cells.empty()) loaded = std::move(bl);
-            else loaded = CellularOrganism::load_checkpoint_json(path.c_str());
-            pool.push_back(std::move(loaded));
-            printf("[池] %s (池=%zu, r=%.2f)\n", path.c_str(), pool.size(), r);
+            EvalResult q = eval_family(org, score_head, 200, HOLD_BASE + 777u);
+            const double qr = 100.0 * q.wins / 200.0;
+            const double gate = 100.0 * t0.wins / holdout_n - 2.0;
+            if (qr >= gate) {
+                const std::string path = "checkpoints/pool/m2_gen" + std::to_string(g + 1) + ".bin";
+                if (!org.save_checkpoint_bin(path)) { printf("[错误] 池冻结失败\n"); return 1; }
+                CellularOrganism loaded;
+                auto bl = CellularOrganism::load_checkpoint_bin(path.c_str());
+                if (!bl.cells.empty()) loaded = std::move(bl);
+                else loaded = CellularOrganism::load_checkpoint_json(path.c_str());
+                pool.push_back(std::move(loaded));
+                if ((int)pool.size() > pool_cap) pool.erase(pool.begin());   // FIFO 驱逐最老
+                printf("[池] %s (池=%zu, r=%.2f, 快检=%.1f%%)\n", path.c_str(), pool.size(), r, qr);
+            } else {
+                printf("[池拒] @%d 快检 %.1f%% < 门 %.1f%% (退化形态不入池)\n", g + 1, qr, gate);
+            }
         }
 
         if ((g + 1) % eval_every == 0) {
@@ -378,13 +391,32 @@ int main(int argc, char** argv) {
                    << ",\"pass_rate\":" << pass_rate << ",\"mcnemar_p\":" << mres.p_value << "}";
                 eval_log.push_back(os.str());
             }
-            // 哨兵修正案五 (M5c, 预注册): 漂移哨兵只在上偏(坍缩)方向触发;
-            // 下偏由回退门兜底。九次运行证据: 改善=过牌下偏+胜率升, 退化=过牌上偏+胜率降
+            // 哨兵修正案五 + M6-scale 选择回退: 触发时回退最佳形态继续进化
+            // (变异→选择→遗传闭环), 坍缩超限或无最佳形态才终止
+            bool gate_fired = false;
+            const char* gate_why = "";
             if (rate < 100.0 * t0.wins / holdout_n - 8.0 || rate < 45.0) {
-                aborted = true; abort_reason = "回退门: holdout 点估计 < t0−8pp 或 < 45%"; break;
+                gate_fired = true; gate_why = "回退门: 点估计 < t0−8pp 或 < 45%";
+            } else if (pass_rate - 100.0 * t0.pass / std::max(1L, t0.steps) > 5.0) {
+                gate_fired = true; gate_why = "漂移哨兵: 过牌率上偏 > 5pp (坍缩方向)";
             }
-            if (pass_rate - 100.0 * t0.pass / std::max(1L, t0.steps) > 5.0) {
-                aborted = true; abort_reason = "漂移哨兵: 过牌率上偏 > 5pp (坍缩方向)"; break;
+            if (gate_fired) {
+                if (!best_path.empty() && collapses < max_collapses) {
+                    CellularOrganism elite;
+                    auto bl = CellularOrganism::load_checkpoint_bin(best_path.c_str());
+                    if (!bl.cells.empty()) elite = std::move(bl);
+                    else elite = CellularOrganism::load_checkpoint_json(best_path.c_str());
+                    if (!elite.cells.empty()) {
+                        org = std::move(elite);
+                        bptt.init_optimizer(org);   // Adam 状态随形态重置
+                        outcome_window.clear();
+                        collapses++;
+                        printf("[选择] 坍缩#%d (%s) → 回退精英 %s 继续\n",
+                               collapses, gate_why, best_path.c_str());
+                        continue;   // 跳过本轮冻结检查, 直接下一局
+                    }
+                }
+                aborted = true; abort_reason = gate_why; break;
             }
             if (ev.wins > best_wins) {
                 best_wins = ev.wins;
@@ -417,7 +449,8 @@ int main(int argc, char** argv) {
         f << "{\"model\":\"" << model << "\",\"lr\":" << lr << ",\"r_max\":" << r_max
           << ",\"games\":" << games << ",\"eval_every\":" << eval_every
           << ",\"holdout\":" << holdout_n
-          << ",\"t0_wins\":" << t0.wins << ",\"aborted\":" << (aborted ? 1 : 0)
+          << ",\"t0_wins\":" << t0.wins           << ",\"aborted\":" << (aborted ? 1 : 0)
+          << ",\"collapses\":" << collapses
           << ",\"abort_reason\":\"" << abort_reason << "\""
           << ",\"best\":\"" << best_path << "\",\"best_wins\":" << best_wins
           << ",\"final\":\"" << final_path << "\""
