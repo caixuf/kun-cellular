@@ -519,9 +519,13 @@ public:
 
             org.compiled_synapses_[i].weight = std::clamp(
                 static_cast<double>(org.compiled_synapses_[i].weight - delta), -10.0, 10.0);
-            // 同步回未编译基因组
-            if (i < org.synapses.size()) {
-                org.synapses[i].weight = org.compiled_synapses_[i].weight;
+            // 同步回未编译基因组 (经 raw_index 映射 — compile 过滤后索引错位,
+            // 直接 i→i 写回会静默污染错位的 raw 槽位)
+            {
+                const size_t raw_i = org.compiled_synapses_[i].raw_index;
+                if (raw_i < org.synapses.size()) {
+                    org.synapses[raw_i].weight = org.compiled_synapses_[i].weight;
+                }
             }
         }
 
@@ -553,14 +557,17 @@ public:
         if (any_nonfinite) {
             for (size_t i = 0; i < num_syn; ++i) {
                 org.compiled_synapses_[i].weight = weight_snapshot[i];
-                if (i < org.synapses.size()) org.synapses[i].weight = weight_snapshot[i];
+                const size_t raw_i = org.compiled_synapses_[i].raw_index;
+                if (raw_i < org.synapses.size()) org.synapses[raw_i].weight = weight_snapshot[i];
             }
             // 快照亦不干净时退化为初值 (基因始祖权重)
             for (size_t i = 0; i < num_syn; ++i) {
                 if (!std::isfinite(org.compiled_synapses_[i].weight)) {
-                    double init_w = org.synapses[i].initial_weight;
+                    const size_t raw_i = org.compiled_synapses_[i].raw_index;
+                    double init_w = (raw_i < org.synapses.size())
+                        ? org.synapses[raw_i].initial_weight : 0.0;
                     org.compiled_synapses_[i].weight = init_w;
-                    if (i < org.synapses.size()) org.synapses[i].weight = init_w;
+                    if (raw_i < org.synapses.size()) org.synapses[raw_i].weight = init_w;
                 }
             }
         }

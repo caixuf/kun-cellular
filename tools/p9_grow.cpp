@@ -361,6 +361,7 @@ int main(int argc, char** argv) {
     std::deque<std::vector<double>> act_buffer;   // M10: 最近决策输入 (活动测量)
     int collapses = 0;
     int growth_done = 0, growth_accepted = 0;
+    int climb_streak = 0, prev_eval_wins = -1;   // 相位耦合: 连续爬升检测
     int best_wins = -1;
     std::string best_path;
     std::vector<std::string> eval_log;
@@ -513,10 +514,16 @@ int main(int argc, char** argv) {
         }
         bptt.step_adam(org, sum, (float)((lr_after > 0 && g >= lr_after) ? lr2 : lr));
 
-        // M10 结构进化: 每 grow_every 局一次活动引导分裂尝试 (预算 grow_attempts)
-        if ((g + 1) % grow_every == 0 && growth_done < grow_attempts) {
+        // M10 结构进化 (相位耦合版): 仅在爬升相位 (连续两次 eval 提升) 触发生长,
+        // 且接受后保留 Adam 动量 (按 raw_index 重映射, 新参数零初始化)
+        if ((g + 1) % grow_every == 0 && growth_done < grow_attempts && climb_streak >= 2) {
             ++growth_done;
             CellularOrganism pre_grow = org;   // 回滚快照
+            // Adam 动量快照 (raw_index → m,v)
+            std::unordered_map<size_t, std::pair<float, float>> adam_by_raw;
+            for (size_t i = 0; i < org.compiled_synapses_.size() && i < bptt.m_synapses.size(); ++i)
+                adam_by_raw[org.compiled_synapses_[i].raw_index] =
+                    {bptt.m_synapses[i], bptt.v_synapses[i]};
             const size_t cells_before = org.cells.size();
             const int rc = attempt_structural_split(
                 org, score_head, act_buffer, 500 + (uint32_t)(growth_done * 10));
@@ -527,8 +534,22 @@ int main(int argc, char** argv) {
                 const double ref = 100.0 * t0.wins / holdout_n;
                 if (grate >= ref - accept_tol) {
                     ++growth_accepted;
-                    bptt.init_optimizer(org);   // 新躯体: Adam 状态重置
-                    printf("[生长✓ #%d] 细胞 %zu→%zu | 探测 %.1f%% (门 %.1f%%) | Adam 重置\n",
+                    // 保留 Adam 动量: 按 raw_index 重映射, 新参数零初始化
+                    {
+                        const size_t nsyn = org.compiled_synapses_.size();
+                        std::vector<float> nm(nsyn, 0.0f), nv(nsyn, 0.0f);
+                        for (size_t i = 0; i < nsyn; ++i) {
+                            auto it = adam_by_raw.find(org.compiled_synapses_[i].raw_index);
+                            if (it != adam_by_raw.end()) { nm[i] = it->second.first; nv[i] = it->second.second; }
+                        }
+                        bptt.m_synapses = std::move(nm);
+                        bptt.v_synapses = std::move(nv);
+                        if (bptt.m_gains.size() < org.cells.size()) {
+                            bptt.m_gains.resize(org.cells.size(), 0.0f);
+                            bptt.v_gains.resize(org.cells.size(), 0.0f);
+                        }
+                    }
+                    printf("[生长✓ #%d] 细胞 %zu→%zu | 探测 %.1f%% (门 %.1f%%) | Adam 动量保留\n",
                            growth_done, cells_before, org.cells.size(), grate, ref - accept_tol);
                 } else {
                     org = std::move(pre_grow);   // 回滚快照 (训练继续, 换靶再试)
@@ -574,6 +595,9 @@ int main(int argc, char** argv) {
                 else d++;
             }
             auto mres = kun::mcnemar_test(b, c, a, d);
+            // 相位耦合: 爬升 streak (连续两次 eval 提升)
+            climb_streak = (prev_eval_wins >= 0 && ev.wins > prev_eval_wins) ? climb_streak + 1 : 0;
+            prev_eval_wins = ev.wins;
             printf("[eval @%d] %.1f%% (%d/%d) Wilson 下界 %.1f%% | Δt0=%+d | 过牌 %.1f%% | McNemar b=%llu c=%llu p=%.3f\n",
                    g + 1, rate, ev.wins, holdout_n, 100.0 * wilson_lower(ev.wins, holdout_n),
                    ev.wins - t0.wins, pass_rate,

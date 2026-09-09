@@ -325,6 +325,8 @@ public:
         double hebbian_rate;
         double hebbian_decay;
         bool   is_recurrent;
+        size_t raw_index{0};   // 对应 raw synapses 槽位 (compile 过滤后索引会错位,
+                               // 活性写回/快照恢复必须经此映射 — 铁律: 无隐藏重排)
     };
     struct CompiledActionCell {
         size_t cell_idx;
@@ -869,7 +871,8 @@ public:
 
         // 编译有效突触 (自动区分前向突触与递归反馈突触)
         compiled_synapses_.clear();
-        for (const auto& syn : synapses) {
+        for (size_t raw_i = 0; raw_i < synapses.size(); ++raw_i) {
+            const auto& syn = synapses[raw_i];
             if (!syn.is_active) continue;
             if (active_cell_ids.find(syn.from_cell_id) == active_cell_ids.end() ||
                 active_cell_ids.find(syn.to_cell_id) == active_cell_ids.end()) {
@@ -886,7 +889,7 @@ public:
                     f_idx, t_idx, syn.to_port,
                     syn.weight, syn.weight,
                     syn.hebbian_rate, syn.hebbian_decay,
-                    is_loop
+                    is_loop, raw_i
                 });
             }
         }
