@@ -956,17 +956,17 @@ class CDouDiZhuTelemetry(ctypes.Structure):
 class DouDiZhuCortexLive:
     """
     斗地主真实演化冠军博弈脑实时遥测与在线决策服务:
-    - 权威检查点: checkpoints/doudizhu_evolved_champion.bin (12 细胞 / 10 突触, 形式化安全与李雅普诺夫稳定性双认证)
+    - 权威检查点: checkpoints/doudizhu_cand_scorer.bin (82 细胞 / 425 突触, 候选打分世系 U0.2 冠军)
     - 纯 C++ 原生运行内核: libkun_doudizhu_runtime.so (Native DouDiZhuCardGameTask + CellularOrganism)
-    - 天梯盲测胜率: 55.5% (地主 66.7%, 农民 54.0%, 彻底击穿启发式与随机盲选基线)
+    - 天梯盲测胜率: 57.0% (2000 局, Wilson95 下界 54.8%,地主 59.7%/农民 56.9%)
     """
     COLUMN_NAMES = [
-        "1. 记牌感知受体柱 (4 细胞 · 手牌/余牌/台面/高牌)",
-        "2. 结构因果解算柱 (2 细胞 · 相对压制差/高牌门控)",
-        "3. 迟滞时序记忆柱 (3 细胞 · 攻守迟滞/EMA低通/冲刺阈值)",
-        "4. 三态离散决断柱 (3 细胞 · 让牌/跟牌/冲刺夺权)"
+        "1. 记牌感知受体柱 (56 通道 · 手牌/未见/台面/角色/座次)",
+        "2. 特征解算层 (48 细胞 · SUM/ABS 牌理概念)",
+        "3. 价值头 channel 1 (整局回报 P(win) 回归)",
+        "4. 打分头 channel 0 (候选 argmax 决策)"
     ]
-    ACTION_NAMES = ["ACT_PASS 审慎让牌", "ACT_FOLLOW 合规跟牌", "ACT_SPRINT 强行夺权"]
+    ACTION_NAMES = ["过牌 (PASS)", "出牌·最优 (PLAY_BEST)", "出牌·次优 (PLAY_2ND)"]
 
     def __init__(self):
         self.lock = threading.Lock()
@@ -994,11 +994,11 @@ class DouDiZhuCortexLive:
             ]
             self.lib.doudizhu_c_decide.restype = ctypes.c_int32
 
-            ckpt_path = os.path.join(ROOT_DIR, "checkpoints", "doudizhu_evolved_champion.bin").encode("utf-8")
+            ckpt_path = os.path.join(ROOT_DIR, "checkpoints", "doudizhu_cand_scorer.bin").encode("utf-8")
             ok = self.lib.doudizhu_c_init(ckpt_path)
             if ok:
                 self.real = True
-                print("[DouDiZhuLive] 真实斗地主演化冠军博弈脑已挂载: 12 细胞 / 10 突触 (C++20 Native 硬件底座, 形式化双认证)")
+                print("[DouDiZhuLive] 真实斗地主演化冠军博弈脑已挂载: 82 细胞 / 425 突触 (候选打分世系, 57.0% 天梯)")
             else:
                 self.real = False
                 print("[DouDiZhuLive] 检查点加载失败，保持离线")
@@ -1035,7 +1035,7 @@ class DouDiZhuCortexLive:
                 "model_name": "离线",
                 "episodes": 0,
                 "wins": 0,
-                "win_rate": 55.5,
+                "win_rate": 57.0,
                 "last_action": "",
                 "columns": [{"name": self.COLUMN_NAMES[i], "act": 0.0} for i in range(4)],
                 "heads": [{"name": self.ACTION_NAMES[a], "act": 0.0} for a in range(3)],
@@ -1061,9 +1061,9 @@ class DouDiZhuCortexLive:
             }
             return {
                 "real": True,
-                "model_name": "斗地主演化冠军博弈脑 (12细胞·形式化安全认证)",
-                "checkpoint": "checkpoints/doudizhu_evolved_champion.bin",
-                "certified_win_rate": 55.5,
+                "model_name": "斗地主演化冠军博弈脑 (82细胞·425突触·候选打分世系)",
+                "checkpoint": "checkpoints/doudizhu_cand_scorer.bin",
+                "certified_win_rate": 57.0,
                 "episodes": t.episodes,
                 "wins": t.wins,
                 "win_rate": round(float(t.win_rate), 1),
