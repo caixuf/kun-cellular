@@ -86,7 +86,40 @@
         "GATE_DEADZONE",
         "GATE_INHIBIT"
       ],
-      "validation_report": "随仓冠军权重: 12训练场景+4留出场景 100% 满分通过，直道稳态 CTE 2.26cm (超越 Stanley 基准)，急弯超越 Stanley 1.2~1.5x，C11 与 Python 位级对账逐帧通过。"
+      "validation_report": "随仓冠军权重: 12训练场景+4留出场景 100% 满分通过，直道稳态 CTE 2.26cm (超越 Stanley 基准)，急弯超越 Stanley 1.2~1.5x，C11 与 Python 位级对账逐帧通过。六道实证门禁 (Gate1~6) 绑定此 210 细胞版本全部闭环。"
+    },
+    {
+      "id": "adas_cortex_champion_v3",
+      "name": "具身智能驾驶 1024细胞16微柱皮层 (实时车仿真在役·纳秒反射束)",
+      "domain": "具身物理控制与多微柱层次化运动规划",
+      "cells_scale": 1024,
+      "synapses_scale": 65720,
+      "checkpoint": "checkpoints/adas_cortex_champion_v3.bin",
+      "c_header": "include/kun/cellular/sdsc_cortex.h",
+      "test_suite": "tools/train_adas_multicolumn_cortex.py",
+      "input_signals": [
+        "归一化横向位置偏差 (CTE)",
+        "航向角实时偏差 (Heading Error)",
+        "道路前方曲率前瞻 (Kappa Ahead)",
+        "本车实时纵向车速 (Velocity)",
+        "巡航速度跟踪差 (Speed Err)",
+        "前车时距与急刹风险 (TTC Hazard)"
+      ],
+      "action_outputs": [
+        "正向舵角/油门效应器指令",
+        "反向舵角/刹车效应器指令",
+        "防御性运动复位 (ACT_RESET)"
+      ],
+      "primitive_motif": [
+        "OP_HYSTERESIS",
+        "OP_DEADZONE",
+        "OP_FATIGUE",
+        "OP_MULTIPLY",
+        "OP_CLIP",
+        "OP_SUM",
+        "OP_DAMPER"
+      ],
+      "validation_report": "16 微柱层次化架构 (感觉柱/迟滞抗抖柱/曲率适应柱/前运动汇聚柱/运动效应器柱 + 感觉-运动单步硬实时反射束)，C11 sdsc_binary_runtime 位级对账，后端 LiveVehicleSimulator 在役挂载 (1024 细胞 / 65720 突触实时前向)。注意: 六道门禁证书绑定 210 细胞版本，此 v3 为同世系实时仿真规模扩展版，无独立证书。"
     },
     {
       "id": "quant_tripartite_champion",
