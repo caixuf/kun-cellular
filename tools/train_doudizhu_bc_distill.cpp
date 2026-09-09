@@ -682,7 +682,7 @@ static void build_scorer_input(const std::vector<float>& obs, const std::vector<
     for (int d = 0; d < 12; ++d) in[44 + d] = cf[d];
     // 受控消融 (会诊裁决): V5_ZERO_SEAT=1 → 座次 4 通道置零 (原图接线完全一致, 仅信息缺失)
     if (std::getenv("V5_ZERO_SEAT"))
-        for (int d = 32; d < 36; ++d) in[d] = 0.0;
+        for (int d = 40; d < 44; ++d) in[d] = 0.0;   // v4 布局: 座次块在 40..43 (此前误零 32..35 记牌通道)
 }
 // 分数头专用 MSE (价值头导数恒 0 — 不用 target=0 冒充冻结)
 static const SubstrateLossFn kScoreOnlyLoss = [](const std::vector<float>& preds, const std::vector<float>& targets) -> SubstrateLossGrad {
@@ -1124,11 +1124,12 @@ static int eval_cand_games(int games, const char* policy_arg) {
                 pick = (size_t)((int)(rnd01() * (double)cands.size()) % cands.size());
             } else {
                 auto o = task.current_observation();
-                std::vector<float> obs32(o.begin(), o.end());
+                std::vector<float> obs44(o.begin(), o.end());
+                for (float v : task.seat_context()) obs44.push_back(v);   // v4: 44 维 = 40 obs + 4 座次 (与 p9_runner 一致)
                 float best = -1e30f;
                 for (size_t i = 0; i < cands.size(); ++i) {
                     auto cf = task.candidate_features(cands[i]);
-                    double sc = score_candidate(org, score_head, obs32, cf);
+                    double sc = score_candidate(org, score_head, obs44, cf);
                     if (!std::isfinite(sc)) { fprintf(stderr, "[错误] 非有限分数\n"); return 1; }
                     if (sc > best) { best = (float)sc; pick = i; }
                 }

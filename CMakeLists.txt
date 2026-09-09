@@ -192,8 +192,23 @@ target_link_libraries(bench_doudizhu_endogenous_60 PRIVATE kun_cellular Threads:
 add_executable(train_doudizhu_bc_distill "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_doudizhu_bc_distill.cpp")
 target_link_libraries(train_doudizhu_bc_distill PRIVATE kun_cellular Threads::Threads m)
 
-add_executable(p9_runner "${CMAKE_CURRENT_SOURCE_DIR}/tools/p9_runner.cpp")
-target_link_libraries(p9_runner PRIVATE kun_cellular Threads::Threads m)
+  add_executable(p9_runner "${CMAKE_CURRENT_SOURCE_DIR}/tools/p9_runner.cpp")
+  target_link_libraries(p9_runner PRIVATE kun_cellular Threads::Threads m)
+
+  add_executable(p9_disagree "${CMAKE_CURRENT_SOURCE_DIR}/tools/p9_disagree.cpp")
+  target_link_libraries(p9_disagree PRIVATE kun_cellular Threads::Threads m)
+
+  add_executable(p9_online "${CMAKE_CURRENT_SOURCE_DIR}/tools/p9_online.cpp")
+  target_link_libraries(p9_online PRIVATE kun_cellular Threads::Threads m)
+
+  add_executable(p9_online2 "${CMAKE_CURRENT_SOURCE_DIR}/tools/p9_online2.cpp")
+  target_link_libraries(p9_online2 PRIVATE kun_cellular Threads::Threads m)
+
+  add_executable(p9_paired "${CMAKE_CURRENT_SOURCE_DIR}/tools/p9_paired.cpp")
+  target_link_libraries(p9_paired PRIVATE kun_cellular Threads::Threads m)
+
+  add_executable(p9_online3 "${CMAKE_CURRENT_SOURCE_DIR}/tools/p9_online3.cpp")
+  target_link_libraries(p9_online3 PRIVATE kun_cellular Threads::Threads m)
 
 add_executable(u5_growth_winner "${CMAKE_CURRENT_SOURCE_DIR}/tools/u5_growth_winner.cpp")
 target_link_libraries(u5_growth_winner PRIVATE kun_cellular Threads::Threads m)

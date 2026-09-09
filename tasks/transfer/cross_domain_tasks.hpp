@@ -328,6 +328,7 @@ public:
     void record_card_played(int r, int count, int p) {
         lattice_.record_play(r, count, p);
         if (r >= 12) high_cards_played_ += count;
+        if (p >= 0 && p < 3) played_by_[p][r] += count;   // P2 自博弈: 座位视角记牌
     }
 
     void reset(uint32_t episode_seed) override {
@@ -383,6 +384,7 @@ public:
 
         // 4. 初始化 15 维记牌晶格
         lattice_.reset(hands_[0]);
+        for (auto& row : played_by_) row.fill(0);   // P2 自博弈: 座位视角记牌复位
         high_cards_played_ = 0;
         table_trick_ = Trick{TRICK_NONE, -1, -1};
         pass_count_ = 0;
@@ -560,15 +562,20 @@ std::vector<CandPlay> enumerate_candidates(int p) const {
 // 候选特征 (12 维): [solo, pair, bomb, rocket, is_pass, rank/14, count/4, 我方持此点数/4,
 //                     cover余量=(rank-trick)/14, 同型压制, 炸弹压非炸, 火箭压非火]
 std::vector<float> candidate_features(const CandPlay& c) const {
+    return candidate_features_for(0, c);   // v5b: 座 0 委托座位参数化版 (位级一致)
+}
+
+// 座位参数化候选特征 (P2 自博弈): f[7] 持有量读 hands_[p], 其余候选交互同构
+std::vector<float> candidate_features_for(int p, const CandPlay& c) const {
     float f[12] = {0};
     if (c.type == TRICK_NONE) { f[4] = 1.0f; return std::vector<float>(f, f + 12); }
     if (c.type == TRICK_SOLO) f[0] = 1.0f;
     else if (c.type == TRICK_PAIR) f[1] = 1.0f;
     else if (c.type == TRICK_BOMB) f[2] = 1.0f;
-    else if (c.type == TRICK_ROCKET) { f[3] = 1.0f; f[7] = (float)(hands_[0][13] + hands_[0][14]) / 2.0f; }
+    else if (c.type == TRICK_ROCKET) { f[3] = 1.0f; f[7] = (float)(hands_[p][13] + hands_[p][14]) / 2.0f; }
     f[5] = (c.rank >= 0) ? (float)c.rank / 14.0f : 0.0f;
     f[6] = (float)c.count / 4.0f;
-    if (c.type != TRICK_ROCKET) f[7] = (float)hands_[0][c.rank] / 4.0f;
+    if (c.type != TRICK_ROCKET) f[7] = (float)hands_[p][c.rank] / 4.0f;
     // 交互特征: 候选 vs 台面
     if (table_trick_.type == TRICK_NONE) {
         f[8] = -1.0f;   // 自由领出: 无需压制
@@ -579,6 +586,82 @@ std::vector<float> candidate_features(const CandPlay& c) const {
         if (c.type == TRICK_ROCKET && table_trick_.type != TRICK_ROCKET) f[11] = 1.0f;
     }
     return std::vector<float>(f, f + 12);
+}
+
+// v4 44 维观测 (座位参数化, P2 自博弈): 与 seat 0 current_observation+seat_context 同布局
+// 15 手牌 + 7 未见J+ + 6 台面 + 4 角色 + 8 未见3-10 + 4 座次
+std::vector<float> observation44_for(int p) const {
+    std::vector<float> obs;
+    obs.reserve(44);
+    for (int r = 0; r < 15; ++r) {
+        float max_c = (r < 13) ? 4.0f : 1.0f;
+        obs.push_back(std::clamp(static_cast<float>(hands_[p][r]) / max_c, 0.0f, 1.0f));
+    }
+    // 座位视角记牌: unseen_p = 总量 − 他座已出 − 己方手牌 (p=0 时与 lattice_.unseen 位级一致)
+    for (int r = 8; r < 15; ++r) {
+        float total = (r < 13) ? 4.0f : 1.0f;
+        float unseen = total - static_cast<float>(lattice_.played[r] - played_by_[p][r]) - static_cast<float>(hands_[p][r]);
+        obs.push_back(std::clamp(unseen / total, 0.0f, 1.0f));
+    }
+    float trick_type = static_cast<float>(table_trick_.type) / 4.0f;
+    float trick_rank = (table_trick_.type != TRICK_NONE && table_trick_.rank >= 0)
+                           ? (static_cast<float>(table_trick_.rank) / 14.0f) : 0.0f;
+    float trick_len = 0.0f;
+    if (table_trick_.type == TRICK_SOLO) trick_len = 1.0f / 4.0f;
+    else if (table_trick_.type == TRICK_PAIR) trick_len = 2.0f / 4.0f;
+    else if (table_trick_.type == TRICK_BOMB) trick_len = 4.0f / 4.0f;
+    else if (table_trick_.type == TRICK_ROCKET) trick_len = 2.0f / 4.0f;
+    int teammate = (p == landlord_) ? -1 : (3 - landlord_ - p);
+    float owner_self = (table_trick_.type != TRICK_NONE && table_trick_.owner == p) ? 1.0f : 0.0f;
+    float owner_partner = (table_trick_.type != TRICK_NONE && p != landlord_ && table_trick_.owner == teammate) ? 1.0f : 0.0f;
+    float owner_landlord = (table_trick_.type != TRICK_NONE && table_trick_.owner == landlord_) ? 1.0f : 0.0f;
+    obs.push_back(std::clamp(trick_type, 0.0f, 1.0f));
+    obs.push_back(std::clamp(trick_rank, 0.0f, 1.0f));
+    obs.push_back(std::clamp(trick_len, 0.0f, 1.0f));
+    obs.push_back(owner_self);
+    obs.push_back(owner_partner);
+    obs.push_back(owner_landlord);
+    float p_role = (p == landlord_) ? 1.0f : 0.0f;
+    float p_cards = std::clamp(static_cast<float>(cards_left_[p]) / 20.0f, 0.0f, 1.0f);
+    float partner_cards = (p != landlord_ && teammate >= 0) ? std::clamp(static_cast<float>(cards_left_[teammate]) / 20.0f, 0.0f, 1.0f) : 0.0f;
+    float l_cards = std::clamp(static_cast<float>(cards_left_[landlord_]) / 20.0f, 0.0f, 1.0f);
+    obs.push_back(p_role);
+    obs.push_back(p_cards);
+    obs.push_back(partner_cards);
+    obs.push_back(l_cards);
+    for (int r = 0; r < 8; ++r) {
+        float unseen = 4.0f - static_cast<float>(lattice_.played[r] - played_by_[p][r]) - static_cast<float>(hands_[p][r]);
+        obs.push_back(std::clamp(unseen / 4.0f, 0.0f, 1.0f));
+    }
+    int nxt = (p + 1) % 3, prv = (p + 2) % 3;
+    obs.push_back((nxt == landlord_) ? 1.0f : 0.0f);
+    obs.push_back((prv == landlord_) ? 1.0f : 0.0f);
+    obs.push_back(std::clamp(static_cast<float>(cards_left_[nxt]) / 20.0f, 0.0f, 1.0f));
+    obs.push_back(std::clamp(static_cast<float>(cards_left_[prv]) / 20.0f, 0.0f, 1.0f));
+    return obs;
+}
+
+int current_turn() const { return current_turn_; }
+
+// 座位参数化出候选 (P2 自博弈): 执行 + 轮转, 胜负由调用方按 cards_left 判定
+// (镜像 play_candidate 的 p 泛化; 过牌/火箭/常规三分支与座 0 执行器逐位一致)
+void play_candidate_at(int p, const CandPlay& c) {
+    if (c.type == TRICK_NONE) {
+        pass_count_++;
+        if (pass_count_ == 2) { current_turn_ = table_trick_.owner; table_trick_ = Trick{TRICK_NONE, -1, -1}; pass_count_ = 0; }
+        else current_turn_ = (p + 1) % 3;
+    } else if (c.type == TRICK_ROCKET) {
+        hands_[p][13]--; hands_[p][14]--; cards_left_[p] -= 2;
+        table_trick_ = Trick{TRICK_ROCKET, 14, p};
+        record_card_played(13, 1, p); record_card_played(14, 1, p);
+        pass_count_ = 0; current_turn_ = (p + 1) % 3;
+    } else {
+        hands_[p][c.rank] -= c.count;
+        cards_left_[p] -= c.count;
+        table_trick_ = Trick{(TrickType)c.type, c.rank, p};
+        record_card_played(c.rank, c.count, p);
+        pass_count_ = 0; current_turn_ = (p + 1) % 3;
+    }
 }
 
 // 出指定候选 (agent seat 0) + 统一结算
@@ -1551,6 +1634,7 @@ private:
     int cards_left_[3]{20, 17, 17};
     Trick table_trick_;
     CardCountingLattice lattice_;
+    std::array<std::array<int, 15>, 3> played_by_{};   // P2 自博弈: 各座已出张数 (座位视角记牌)
     int high_cards_played_{0};
     bool agent_won_{false};
     int total_wins_{0};
