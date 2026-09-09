@@ -378,12 +378,13 @@ int main(int argc, char** argv) {
                    << ",\"pass_rate\":" << pass_rate << ",\"mcnemar_p\":" << mres.p_value << "}";
                 eval_log.push_back(os.str());
             }
-            // 哨兵修正案四 (M2c 复跑, 预注册): 漂移 = 相对自身 t0 的变化, 非绝对水平
+            // 哨兵修正案五 (M5c, 预注册): 漂移哨兵只在上偏(坍缩)方向触发;
+            // 下偏由回退门兜底。九次运行证据: 改善=过牌下偏+胜率升, 退化=过牌上偏+胜率降
             if (rate < 100.0 * t0.wins / holdout_n - 8.0 || rate < 45.0) {
                 aborted = true; abort_reason = "回退门: holdout 点估计 < t0−8pp 或 < 45%"; break;
             }
-            if (std::abs(pass_rate - 100.0 * t0.pass / std::max(1L, t0.steps)) > 5.0) {
-                aborted = true; abort_reason = "漂移哨兵: 过牌率相对自身 t0 漂移 > 5pp"; break;
+            if (pass_rate - 100.0 * t0.pass / std::max(1L, t0.steps) > 5.0) {
+                aborted = true; abort_reason = "漂移哨兵: 过牌率上偏 > 5pp (坍缩方向)"; break;
             }
             if (ev.wins > best_wins) {
                 best_wins = ev.wins;
