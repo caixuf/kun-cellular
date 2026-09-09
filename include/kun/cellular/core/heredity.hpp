@@ -12,6 +12,7 @@
 #include <random>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -387,6 +388,31 @@ public:
         const RuntimeState& runtime,
         std::span<const ParameterBinding> bindings) const {
         if (const auto result = validate(runtime); !result.ok()) return result;
+        // 惰性索引缓存 (O(1) 命中 + 全绑定比较, 精确保留原线性匹配语义;
+        // allowed_ 中出现重复 index 时自动回退线性路径)
+        if (!index_cache_built_) {
+            index_cache_built_ = true;
+            for (const auto& allowed : allowed_) {
+                if (!index_cache_.emplace(allowed.index, &allowed).second)
+                    index_cache_unique_ = false;
+            }
+        }
+        if (index_cache_unique_) {
+            for (const auto& binding : bindings) {
+                const auto it = index_cache_.find(binding.index);
+                const bool ok = it != index_cache_.end() &&
+                                it->second->kind == binding.kind &&
+                                it->second->cell == binding.cell &&
+                                it->second->edge == binding.edge &&
+                                it->second->slot == binding.slot;
+                if (!ok) {
+                    return {LearningWindowError{
+                        LearningWindowErrorCode::ParameterNotAllowed,
+                        "gradient parameter is outside the declared learning set"}};
+                }
+            }
+            return {};
+        }
         for (const auto& binding : bindings) {
             const auto found = std::find_if(
                 allowed_.begin(), allowed_.end(),
@@ -495,6 +521,10 @@ private:
     GraphRevision revision_{};
     uint32_t semantic_version_{0};
     std::vector<ParameterBinding> allowed_;
+    // validate_parameters 索引缓存 (惰性构建; mutable 保持 const 契约)
+    mutable std::unordered_map<std::size_t, const ParameterBinding*> index_cache_;
+    mutable bool index_cache_built_{false};
+    mutable bool index_cache_unique_{true};
     bool consumed_{false};
     uint64_t reset_count_{0};
 };

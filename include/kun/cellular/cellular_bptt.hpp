@@ -12,6 +12,7 @@
 #include <optional>
 #include <span>
 #include <string>
+#include <unordered_map>
 
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/core/compiled_executor.hpp"
@@ -607,12 +608,20 @@ public:
  * modes and the legacy Lyapunov projection remain available through
  * CellularBPTTEngine until their core contracts have first-class equivalents.
  */
+struct CoreBPTTCellMicro {
+    double state_val{0.0};
+    double aux_state{0.0};
+    double output_val{0.0};
+};
+
 struct CoreBPTTTapeStep {
     std::vector<double> inputs;
     std::vector<double> port_inputs;
-    std::vector<core::InitialParameterValue> parameters;
-    std::vector<core::RuntimeCellState> state_pre;
-    std::vector<core::RuntimeCellState> state_post;
+    // 参数纪元共享: 同一学习更新间隔内的所有步共享一份参数值拷贝
+    // (值语义与逐步快照逐位一致; step_adam 结束时翻新纪元)
+    std::shared_ptr<const std::vector<core::InitialParameterValue>> parameters_epoch;
+    std::vector<CoreBPTTCellMicro> state_pre;
+    std::vector<CoreBPTTCellMicro> state_post;
     core::GraphIdentity identity{};
     core::GraphRevision revision{};
     uint32_t semantic_version{0};
@@ -665,6 +674,84 @@ public:
     double eps_adam{1e-8};
     double grad_clip_norm{1.0};
 
+    // ── 反传加速缓存 (位级等价: 累加顺序严格保持) ──
+    // 出边 CSR: 按源细胞索引立即边, 边序 = plan->edges() 顺序 (保浮点累加序)
+    struct PlanBackwardCache {
+        std::shared_ptr<const core::CompiledGraph> plan;
+        std::vector<uint32_t> out_begin;      // [cell_count + 1]
+        std::vector<uint32_t> out_list;       // immediate 边在 plan->edges() 中的索引
+        std::vector<uint8_t> trainable_param; // 终局收集: 每参数 index 是否连续可训 (plan 派生)
+    };
+    mutable PlanBackwardCache cache_;         // 键 = plan 指针身份 (plan 不可变)
+    mutable std::optional<std::unordered_map<std::size_t, core::ParameterBinding>> allowed_by_index_;
+    mutable const core::LearningWindow* allowed_window_{nullptr};
+    // 录带参数纪元 (record_step 捕获; step_adam 翻新)
+    std::shared_ptr<const std::vector<core::InitialParameterValue>> parameter_epoch_;
+
+    void invalidate_backward_cache() {
+        cache_ = PlanBackwardCache{};
+        allowed_by_index_.reset();
+        allowed_window_ = nullptr;
+    }
+
+    const PlanBackwardCache& backward_cache(const core::RuntimeState& runtime) const {
+        const auto plan = runtime.plan();
+        if (!(cache_.plan && cache_.plan == plan)) {
+            PlanBackwardCache c;
+            c.plan = plan;
+            const size_t cell_count = plan->cells().size();
+            c.out_begin.assign(cell_count + 1, 0);
+            // 第一遍: 计数 (保持 plan 边序, 供 CSR 顺序填充 → 累加序与全扫一致)
+            for (const auto& edge : plan->edges())
+                if (edge.delay == core::EdgeDelay::Immediate && edge.source_index < cell_count)
+                    ++c.out_begin[edge.source_index + 1];
+            for (size_t i = 0; i < cell_count; ++i) c.out_begin[i + 1] += c.out_begin[i];
+            c.out_list.resize(c.out_begin.back());
+            std::vector<uint32_t> cursor(c.out_begin.begin(), c.out_begin.end() - 1);
+            for (size_t e = 0; e < plan->edges().size(); ++e) {
+                const auto& edge = plan->edges()[e];
+                if (edge.delay == core::EdgeDelay::Immediate && edge.source_index < cell_count)
+                    c.out_list[cursor[edge.source_index]++] = static_cast<uint32_t>(e);
+            }
+            // 终局收集缓存: 参数 index → 是否连续可训 (只依赖 plan + 绑定, 与 window 无关)
+            c.trainable_param.assign(runtime.parameters().size(), 0);
+            for (const auto& parameter : runtime.parameters()) {
+                if (parameter.binding.kind == core::ParameterBindingKind::EdgeWeight) {
+                    c.trainable_param[parameter.binding.index] = 1;
+                    continue;
+                }
+                const auto cell = cell_index(*plan, parameter.binding.cell);
+                if (!cell.has_value()) continue;
+                const auto contract = core::contract_for(plan->cells()[*cell].type);
+                if (contract.has_value() &&
+                    core::is_continuous_trainable(
+                        contract->get().parameters[static_cast<size_t>(parameter.binding.slot)]))
+                    c.trainable_param[parameter.binding.index] = 1;
+            }
+            cache_ = std::move(c);
+        }
+        return cache_;
+    }
+
+    // window 允许参数 → index 哈希索引 (命中时仍做全绑定比较, 精确保留原语义)
+    bool allowed_lookup(
+        const core::ParameterBinding& binding) const {
+        if (!allowed_window_) return true;
+        const auto it = allowed_by_index_->find(binding.index);
+        return it != allowed_by_index_->end() && same_binding(it->second, binding);
+    }
+
+    void ensure_allowed_index(const core::LearningWindow* window) const {
+        if (window != allowed_window_ || !allowed_by_index_.has_value()) {
+            std::unordered_map<std::size_t, core::ParameterBinding> m;
+            if (window)
+                for (const auto& candidate : window->allowed_parameters())
+                    m[candidate.index] = candidate;
+            allowed_by_index_ = std::move(m);
+            allowed_window_ = window;
+        }
+    }
+
     explicit CoreCellularBPTTEngine(size_t max_window = 64)
         : window_size(max_window), tape(window_size) {}
 
@@ -693,15 +780,32 @@ public:
                 "non-empty input span has a null data pointer");
         }
 
-        const auto before = runtime.snapshot();
+        // 参数纪元: 同一学习更新间隔内共享一份拷贝 (record 前捕获)
+        if (!parameter_epoch_) {
+            parameter_epoch_ = std::make_shared<const std::vector<core::InitialParameterValue>>(
+                runtime.parameters().begin(), runtime.parameters().end());
+        }
+
+        // 微状态快照: 只拷贝反传消费的三个标量字段 (跳过整细胞结构体/延迟缓冲)
+        const size_t cells = runtime.plan()->cells().size();
+        std::vector<CoreBPTTCellMicro> pre_micro(cells);
+        {
+            const auto live = runtime.cell_states();
+            for (size_t i = 0; i < cells; ++i)
+                pre_micro[i] = {live[i].state_val, live[i].aux_state, live[i].output_val};
+        }
         const auto executed = executor.step(runtime, inputs);
         if (!executed.ok()) {
             return failure(
                 CoreBPTTErrorCode::InvalidRuntime,
                 std::string(executed.error->reason));
         }
-        const auto after = runtime.snapshot();
-        const auto measurement = executed.measurement;
+        std::vector<CoreBPTTCellMicro> post_micro(cells);
+        {
+            const auto live = runtime.cell_states();
+            for (size_t i = 0; i < cells; ++i)
+                post_micro[i] = {live[i].state_val, live[i].aux_state, live[i].output_val};
+        }
 
         if (current_tape_len >= window_size) {
             for (size_t t = 1; t < window_size; ++t) {
@@ -711,17 +815,15 @@ public:
         }
 
         auto& step = tape[current_tape_len];
-        const size_t cells = runtime.plan()->cells().size();
         step.inputs.assign(inputs.begin(), inputs.end());
         step.port_inputs.assign(cells * 2, 0.0);
-        step.parameters.assign(
-            before.parameters().begin(), before.parameters().end());
-        step.state_pre.assign(before.cells().begin(), before.cells().end());
-        step.state_post.assign(after.cells().begin(), after.cells().end());
+        step.parameters_epoch = parameter_epoch_;
+        step.state_pre = std::move(pre_micro);
+        step.state_post = std::move(post_micro);
         step.identity = runtime.identity();
         step.revision = runtime.revision();
         step.semantic_version = runtime.plan()->semantic_version();
-        for (const auto& port : measurement.ports) {
+        for (const auto& port : executed.measurement.ports) {
             const auto index = cell_index(*runtime.plan(), port.cell);
             if (index.has_value() && port.port.value < 2) {
                 step.port_inputs[*index * 2 + port.port.value] =
@@ -730,6 +832,11 @@ public:
         }
         ++current_tape_len;
         return {};
+    }
+
+    // 外部变更 runtime 参数后必须调用 (engine.step_adam 内部已自动翻新)
+    void refresh_parameter_epoch() {
+        parameter_epoch_.reset();
     }
 
     CoreBPTTResult forward_sequence(
@@ -815,15 +922,11 @@ public:
         std::vector<float> next_delta_aux(cell_count, 0.0f);
         std::vector<float> next_delta_ports(cell_count * 2, 0.0f);
 
-        auto allowed = [window](const core::ParameterBinding& binding) {
-            if (!window) return true;
-            return std::find_if(
-                       window->allowed_parameters().begin(),
-                       window->allowed_parameters().end(),
-                       [&](const auto& candidate) {
-                           return same_binding(candidate, binding);
-                       }) != window->allowed_parameters().end();
+        ensure_allowed_index(window);
+        auto allowed = [this](const core::ParameterBinding& binding) {
+            return allowed_lookup(binding);
         };
+        const auto& bc = backward_cache(runtime);
         auto add_gradient = [&](const core::ParameterBinding& binding, double value) {
             if (binding.index >= grad_by_parameter.size() || !allowed(binding)) {
                 return;
@@ -832,8 +935,9 @@ public:
         };
         auto continuous_value = [](const CoreBPTTTapeStep& step, size_t index)
             -> std::optional<double> {
-            if (index >= step.parameters.size()) return std::nullopt;
-            const auto& value = step.parameters[index].value;
+            if (!step.parameters_epoch ||
+                index >= step.parameters_epoch->size()) return std::nullopt;
+            const auto& value = (*step.parameters_epoch)[index].value;
             if (const auto* continuous = std::get_if<core::ContinuousValue>(&value)) {
                 return continuous->value;
             }
@@ -844,7 +948,8 @@ public:
         size_t loss_count = 0;
         for (int t = static_cast<int>(current_tape_len) - 1; t >= 0; --t) {
             const auto& step = tape[static_cast<size_t>(t)];
-            if (step.parameters.size() != parameter_count) {
+            if (!step.parameters_epoch ||
+                step.parameters_epoch->size() != parameter_count) {
                 return failure(
                     CoreBPTTErrorCode::StaleTape,
                     "core BPTT tape parameter bindings do not match the runtime");
@@ -902,11 +1007,9 @@ public:
                  reverse >= 0; --reverse) {
                 const size_t i = plan->execution_order()[static_cast<size_t>(reverse)];
                 const auto& cell = plan->cells()[i];
-                for (const auto& edge : plan->edges()) {
-                    if (edge.source_index != i ||
-                        edge.delay != core::EdgeDelay::Immediate) {
-                        continue;
-                    }
+                // 出边 CSR (plan 边序保持 → 浮点累加序与全扫逐位一致)
+                for (uint32_t k = bc.out_begin[i]; k < bc.out_begin[i + 1]; ++k) {
+                    const auto& edge = plan->edges()[bc.out_list[k]];
                     const float d_port =
                         delta_ports[edge.target_index * 2 +
                                     edge.target_port.value];
@@ -1004,13 +1107,8 @@ public:
             }
             continue;
         }
-            const auto cell = find_cell(*plan, parameter.binding.cell);
-            if (!cell.has_value()) continue;
-            const auto contract = core::contract_for(plan->cells()[*cell].type);
-            if (contract.has_value() &&
-                core::is_continuous_trainable(
-                    contract->get().parameters[
-                        static_cast<size_t>(parameter.binding.slot)])) {
+            // 终局收集缓存: plan 派生可训位图 (与 window 无关), 精确保留原契约
+            if (!bc.trainable_param.empty() && bc.trainable_param[parameter.binding.index]) {
                 if (allowed(parameter.binding)) {
                     gradients.gradients.push_back(
                         {parameter.binding, grad_by_parameter[parameter.binding.index]});
@@ -1093,6 +1191,7 @@ public:
                 CoreBPTTErrorCode::InvalidLearningWindow,
                 updated.error->reason);
         }
+        parameter_epoch_.reset();   // 参数已变: 下次 record_step 捕获新纪元
         return {gradients.loss, updated.report.updated_values, std::nullopt};
     }
 
@@ -1141,10 +1240,12 @@ private:
             case CellType::ACT_DEFENSIVE_RESET: return 2;
             case CellType::ACT_IMMUNE_BLOCK: return 3;
             case CellType::ACT_CHANNEL: {
-                if (cell.parameter_indices[1] >= step.parameters.size()) {
+                if (!step.parameters_epoch ||
+                    cell.parameter_indices[1] >= step.parameters_epoch->size()) {
                     return std::nullopt;
                 }
-                const auto& value = step.parameters[cell.parameter_indices[1]].value;
+                const auto& value =
+                    (*step.parameters_epoch)[cell.parameter_indices[1]].value;
                 const auto* channel =
                     std::get_if<core::ChannelIndex>(&value);
                 return channel ? std::optional<size_t>{channel->value}
@@ -1158,10 +1259,12 @@ private:
     static std::optional<size_t> parameter_channel(
         const CoreBPTTTapeStep& step,
         const core::CompiledCell& cell) {
-        if (cell.parameter_indices[1] >= step.parameters.size()) {
+        if (!step.parameters_epoch ||
+            cell.parameter_indices[1] >= step.parameters_epoch->size()) {
             return std::nullopt;
         }
-        const auto& value = step.parameters[cell.parameter_indices[1]].value;
+        const auto& value =
+            (*step.parameters_epoch)[cell.parameter_indices[1]].value;
         const auto* channel = std::get_if<core::ChannelIndex>(&value);
         return channel ? std::optional<size_t>{channel->value} : std::nullopt;
     }
