@@ -86,7 +86,7 @@
         "GATE_DEADZONE",
         "GATE_INHIBIT"
       ],
-      "validation_report": "随仓冠军权重: 12训练场景+4留出场景 100% 满分通过，直道稳态 CTE 2.26cm (超越 Stanley 基准)，急弯超越 Stanley 1.2~1.5x，C11 与 Python 位级对账逐帧通过。六道实证门禁 (Gate1~6) 绑定此 210 细胞版本全部闭环 (2026-09-10 复测通过)。重训复现实验: 60 代同种子重训产物门禁5回放 CTE 41.27cm 超阈值 (40cm) 被拒，正在执行 120 代加深重训对照。"
+      "validation_report": "2026-09-10 120 代重训冠军: 六道实证门禁 (Gate1~6) 100% 闭环实测 — 门禁5回放 CTE 30.44cm (阈值40cm)，影子对账四工况 CTE {s_curve 33.3 / curve 20.5 / highway 51.7 / stop_go 9.8}cm，平均转向抖动 3.83 mrad (<车规10)，速度跟踪偏差 0.55 m/s，泛化差距 0.66x；Lyapunov 认证与 50,000 步位级零漂移证书签发通过。如实对账: 相比前代冠军，转向抖动与速度跟踪更优，综合 CTE 略高 (前代 19.9cm vs 本代 28.8cm)，前代冠军备份留存于 /tmp/opencode/champion_backup_0910/。"
     },
     {
       "id": "adas_cortex_champion_v3",
