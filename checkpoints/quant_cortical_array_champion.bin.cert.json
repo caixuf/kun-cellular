@@ -1,24 +1,24 @@
 {
   "schema": "SDSC-Formal-Cert-v1.0",
-  "organism_bin": "checkpoints/cartpole_balance_champion.bin",
-  "wl_canonical_hash": "0x9fb33390495460e1",
+  "organism_bin": "checkpoints/quant_cortical_array_champion.bin",
+  "wl_canonical_hash": "0x67d5785d311d9133",
   "topology": {
-    "num_cells": 12,
-    "num_synapses": 21,
-    "core_nodes": 12,
-    "core_edges": 21
+    "num_cells": 1032,
+    "num_synapses": 1634,
+    "core_nodes": 473,
+    "core_edges": 645
   },
   "lyapunov_certificate": {
     "status": "CERTIFIED_BIBO_STABLE",
-    "max_loop_gain": 0,
-    "stability_margin": 1,
+    "max_loop_gain": 0.0280929,
+    "stability_margin": 0.971907,
     "has_unstable_cycles": false
   },
   "bit_exact_regression": {
     "status": "BIT_EXACT_ZERO_DRIFT",
     "steps": 50000,
-    "fnv1a_checksum": "0x842f65f86fb8344c",
-    "max_action_peak": 9.7676
+    "fnv1a_checksum": "0xf18a3ae9cd0d0441",
+    "max_action_peak": 1.77318
   },
   "operator_safety_proof": {
     "bounds_check": "ALL_CELLS_BOUNDED",

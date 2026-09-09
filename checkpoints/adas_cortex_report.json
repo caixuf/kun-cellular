@@ -1,0 +1,145 @@
+{
+  "trainer": "train_adas_cortex.py",
+  "trained_time_seconds": 771.82,
+  "generations": 60,
+  "population": 24,
+  "seed": 20260903,
+  "champion_cost": 42.0409,
+  "all_scenarios_passed": true,
+  "hidden": 192,
+  "val_cost": 32.7784,
+  "val_all_passed": true,
+  "val_metrics": {
+    "val_s_curve": {
+      "avg_cte": 0.398618,
+      "max_cte": 0.977966,
+      "avg_verr": 0.99868,
+      "avg_dsteer": 0.002899,
+      "steps": 480,
+      "total": 480
+    },
+    "val_curve": {
+      "avg_cte": 0.241034,
+      "max_cte": 0.6,
+      "avg_verr": 0.275409,
+      "avg_dsteer": 0.001573,
+      "steps": 400,
+      "total": 400
+    },
+    "val_highway": {
+      "avg_cte": 0.742714,
+      "max_cte": 1.703121,
+      "avg_verr": 3.015581,
+      "avg_dsteer": 0.002761,
+      "steps": 400,
+      "total": 400
+    },
+    "val_stop_go": {
+      "avg_cte": 0.091666,
+      "max_cte": 0.610466,
+      "avg_verr": 0.515864,
+      "avg_dsteer": 0.004555,
+      "steps": 440,
+      "total": 440
+    }
+  },
+  "metrics": {
+    "straight_cruise": {
+      "avg_cte": 0.070113,
+      "max_cte": 0.6,
+      "avg_verr": 0.280366,
+      "avg_dsteer": 0.002837,
+      "steps": 400,
+      "total": 400
+    },
+    "gentle_s": {
+      "avg_cte": 0.115949,
+      "max_cte": 0.664757,
+      "avg_verr": 0.428809,
+      "avg_dsteer": 0.002908,
+      "steps": 440,
+      "total": 440
+    },
+    "s_curve": {
+      "avg_cte": 0.16698,
+      "max_cte": 0.589949,
+      "avg_verr": 0.719065,
+      "avg_dsteer": 0.002047,
+      "steps": 500,
+      "total": 500
+    },
+    "s_curve_mid": {
+      "avg_cte": 0.207852,
+      "max_cte": 0.647469,
+      "avg_verr": 0.74965,
+      "avg_dsteer": 0.002698,
+      "steps": 440,
+      "total": 440
+    },
+    "s_curve_hard": {
+      "avg_cte": 0.206172,
+      "max_cte": 0.769821,
+      "avg_verr": 0.729756,
+      "avg_dsteer": 0.00275,
+      "steps": 440,
+      "total": 440
+    },
+    "curve_easy": {
+      "avg_cte": 0.288494,
+      "max_cte": 0.6,
+      "avg_verr": 0.3377,
+      "avg_dsteer": 0.001436,
+      "steps": 400,
+      "total": 400
+    },
+    "tight_curve": {
+      "avg_cte": 0.12279,
+      "max_cte": 0.6,
+      "avg_verr": 0.354399,
+      "avg_dsteer": 0.00351,
+      "steps": 400,
+      "total": 400
+    },
+    "tight_curve_max": {
+      "avg_cte": 0.182753,
+      "max_cte": 0.6,
+      "avg_verr": 0.576027,
+      "avg_dsteer": 0.006107,
+      "steps": 400,
+      "total": 400
+    },
+    "stop_go": {
+      "avg_cte": 0.095707,
+      "max_cte": 0.591269,
+      "avg_verr": 0.534736,
+      "avg_dsteer": 0.004531,
+      "steps": 440,
+      "total": 440
+    },
+    "follow": {
+      "avg_cte": 0.131499,
+      "max_cte": 0.637692,
+      "avg_verr": 0.466107,
+      "avg_dsteer": 0.00432,
+      "steps": 440,
+      "total": 440
+    },
+    "highway": {
+      "avg_cte": 0.173337,
+      "max_cte": 1.079843,
+      "avg_verr": 0.382562,
+      "avg_dsteer": 0.001749,
+      "steps": 440,
+      "total": 440
+    },
+    "ramp_merge": {
+      "avg_cte": 0.153442,
+      "max_cte": 1.153001,
+      "avg_verr": 0.510088,
+      "avg_dsteer": 0.003414,
+      "steps": 440,
+      "total": 440
+    }
+  },
+  "checkpoint": "/home/caixuf/code/kun-cellular/checkpoints/adas_cortex_champion.bin"
+}

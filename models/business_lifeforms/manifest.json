@@ -55,7 +55,7 @@
         "GATE_HYSTERESIS",
         "GATE_DEADZONE"
       ],
-      "validation_report": "数值验证通过 (证书文件adas_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.031 < 1.0，50,000 步位级精确零漂移，BIBO 严格有界稳定。"
+      "validation_report": "数值验证通过 (证书文件adas_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.031 < 1.0，50,000 步位级精确零漂移，BIBO 严格有界稳定。如实对账: 50 种子盲测 Harness 中该 18 细胞版完赛率低于最强调参 Stanley (其权重仅宣称稳定性，未宣称赛道性能超越；赛道性能冠军为 210 细胞版与 1024 细胞 v3 版)。"
     },
     {
       "id": "adas_cortex_champion",
@@ -86,7 +86,7 @@
         "GATE_DEADZONE",
         "GATE_INHIBIT"
       ],
-      "validation_report": "随仓冠军权重: 12训练场景+4留出场景 100% 满分通过，直道稳态 CTE 2.26cm (超越 Stanley 基准)，急弯超越 Stanley 1.2~1.5x，C11 与 Python 位级对账逐帧通过。六道实证门禁 (Gate1~6) 绑定此 210 细胞版本全部闭环。"
+      "validation_report": "随仓冠军权重: 12训练场景+4留出场景 100% 满分通过，直道稳态 CTE 2.26cm (超越 Stanley 基准)，急弯超越 Stanley 1.2~1.5x，C11 与 Python 位级对账逐帧通过。六道实证门禁 (Gate1~6) 绑定此 210 细胞版本全部闭环 (2026-09-10 复测通过)。重训复现实验: 60 代同种子重训产物门禁5回放 CTE 41.27cm 超阈值 (40cm) 被拒，正在执行 120 代加深重训对照。"
     },
     {
       "id": "adas_cortex_champion_v3",
@@ -119,7 +119,7 @@
         "OP_SUM",
         "OP_DAMPER"
       ],
-      "validation_report": "16 微柱层次化架构 (感觉柱/迟滞抗抖柱/曲率适应柱/前运动汇聚柱/运动效应器柱 + 感觉-运动单步硬实时反射束)，C11 sdsc_binary_runtime 位级对账，后端 LiveVehicleSimulator 在役挂载 (1024 细胞 / 65720 突触实时前向)。注意: 六道门禁证书绑定 210 细胞版本，此 v3 为同世系实时仿真规模扩展版，无独立证书。"
+      "validation_report": "16 微柱层次化架构 (感觉柱/迟滞抗抖柱/曲率适应柱/前运动汇聚柱/运动效应器柱 + 感觉-运动单步硬实时反射束)，C11 sdsc_binary_runtime 位级对账，后端 LiveVehicleSimulator 在役挂载。2026-09-10 形式化证书签发通过：Lyapunov 最大环路增益 ρ=0.199 < 1.0，50,000 步位级零漂移。如实记录: 同种子重训 (GPU 30代) 产物拓扑微变 (65782 突触) 且 ρ=1.0 被 Lyapunov 认证拒绝，故保留通过认证的在役冠军。"
     },
     {
       "id": "quant_tripartite_champion",
@@ -175,7 +175,7 @@
         "GATE_DEADZONE",
         "OP_SUM"
       ],
-      "validation_report": "43 大宗商品期货 30 年 43 微柱皮层阵列 (1,032 细胞 / 1,634 突触)：5,252 次交易实证，样本外卡玛比率 1.042，净收益 +29.8%，夏普 0.415，两道实证门禁通过。"
+      "validation_report": "43 大宗商品期货 30 年 43 微柱皮层阵列 (1,032 细胞 / 1,634 突触)：2026-09 重训刷新 (数据更新至 2016-2026 全期)，样本外盲测年化夏普 0.22，累计收益 +13.55% (1,000,000 → 1,135,468 元)，最大回撤 20.11%，卡玛比率 0.67，换手 1,141 次 (旧卡玛 1.042/+29.8% 为旧数据期产物，已如实刷新)。"
     },
     {
       "id": "maze_tripartite_champion",
@@ -203,7 +203,7 @@
         "GATE_DEADZONE",
         "OP_DAMPER"
       ],
-      "validation_report": "数值验证通过 (证书文件maze_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.024 < 1.0，复杂多岔路死胡同 100% 自主逃逸，零原地死锁。"
+      "validation_report": "数值验证通过 (证书文件maze_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.024 < 1.0。可复现实测 (当前门禁 Harness, 2026-09-10 对账)：ID 21×21 44% (22/50)，OOD 严苛限时 33.5% (BFS 教师 34.5%)，OOD 极限长程 76.5% (BFS 教师 100%)，回归 11×11 82%。重训复现实验: 共享任务头文件历经斗地主迭代后环境漂移，当前固定种子重训退化至 0%，故保留通过当前门禁的在役冠军并如实标注 (旧'100%自主逃逸'宣称不可复现，已修正)。"
     },
     {
       "id": "household_coverage_champion",
@@ -231,7 +231,7 @@
         "GATE_HYSTERESIS",
         "GATE_DEADZONE"
       ],
-      "validation_report": "数值验证通过 (证书文件household_coverage_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.018 < 1.0，全屋地图空间覆盖率达到 98.4%，死角重复率降至 3.2%。"
+      "validation_report": "数值验证通过 (证书文件household_coverage_champion.bin.cert.json)：Lyapunov 最大增益 ρ<1.0，50,000 步位级零漂移。可复现实测 (训练器固定种子门禁)：ID 50 种子平均覆盖率 75.8%，OOD 异构大户型 71.8%，安全回充率 100%，碰撞 0 (旧 98.4% 宣称不可由当前训练器复现，已如实修正)。"
     },
     {
       "id": "fluid_damper_champion",

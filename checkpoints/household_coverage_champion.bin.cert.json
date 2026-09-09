@@ -1,28 +1,28 @@
 {
   "schema": "SDSC-Formal-Cert-v1.0",
   "organism_bin": "checkpoints/household_coverage_champion.bin",
-  "wl_canonical_hash": "0xc4aa596c438a0714",
+  "wl_canonical_hash": "0x0000000000000000",
   "topology": {
     "num_cells": 11,
-    "num_synapses": 11,
-    "core_nodes": 11,
-    "core_edges": 11
+    "num_synapses": 10,
+    "core_nodes": 0,
+    "core_edges": 0
   },
   "lyapunov_certificate": {
     "status": "CERTIFIED_BIBO_STABLE",
-    "max_loop_gain": 0.0501556,
-    "stability_margin": 0.949844,
+    "max_loop_gain": 0.10032,
+    "stability_margin": 0.89968,
     "has_unstable_cycles": false
   },
   "bit_exact_regression": {
     "status": "BIT_EXACT_ZERO_DRIFT",
-    "steps": 1000,
-    "fnv1a_checksum": "0xa04ab8cbbfce7765",
-    "max_action_peak": 10.0187
+    "steps": 50000,
+    "fnv1a_checksum": "0x61b94018df3e37a5",
+    "max_action_peak": 0
   },
   "operator_safety_proof": {
     "bounds_check": "ALL_CELLS_BOUNDED",
     "source_of_truth": "ops.yaml-v2.0.0"
   },
-  "certified_at": "Sun Sep  6 19:27:20 2026"
+  "certified_at": "Thu Sep 10 01:06:02 2026"
 }

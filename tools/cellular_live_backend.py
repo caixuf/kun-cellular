@@ -18,6 +18,7 @@ import json
 import random
 import socket
 import socketserver
+import urllib.parse
 import struct
 import hashlib
 import base64
@@ -4810,7 +4811,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         # 硬件对齐纯二进制流形接口 (零堆内存、零序列化损耗)
         if self.path.startswith("/api/manifold"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             oid = qs.get("id", [getattr(organism, "current_organism_id", "adas_cortex_champion")])[0]
             mtype = qs.get("type", ["cell"])[0]
@@ -4845,7 +4845,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         # 白垩纪大灭绝算子触发接口
         if self.path.startswith("/api/extinction/trigger"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             wipeout_ratio = float(qs.get("wipeout_ratio", ["0.8"])[0])
             shock_scale = float(qs.get("shock_scale", ["2.5"])[0])
@@ -4861,7 +4860,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         # 跨物种器官冷冻库借用剪裁接口
         if self.path.startswith("/api/organ/splice"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             organ_name = qs.get("name", qs.get("organ_name", ["schmitt_damping_column"]))[0]
             from_id = int(qs["from_id"][0]) if "from_id" in qs else None
@@ -4899,7 +4897,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/lyapunov/enforce"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             max_gain = float(qs.get("max_gain", ["0.95"])[0])
             res = organism.enforce_lyapunov_stability(max_gain)
@@ -4913,7 +4910,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/dialogue"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             prompt = qs.get("q", qs.get("text", qs.get("prompt", ["你好"])))[0]
             data = answer_cellular_dialogue(prompt)
@@ -4940,7 +4936,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/doc/read") or self.path.startswith("/api/docs/read"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             target = qs.get("file", qs.get("id", ["paper_zh"]))[0]
             
@@ -4992,7 +4987,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/organism/switch") or self.path.startswith("/api/organism/select"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             org_id = qs.get("id", ["adas_cortex_champion"])[0]
             res = organism.load_organism_by_id(org_id)
@@ -5005,7 +4999,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/story/stage"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             stage_str = qs.get("stage", ["1"])[0]
             res = organism.step_epic_stage(stage_str)
@@ -5078,7 +5071,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/loco/warp") or self.path.startswith("/api/locomotion/warp"):
             try:
-                import urllib.parse
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 speed = int(qs.get("speed", ["5"])[0])
                 live_loco.warp_speed = max(1, min(50, speed))
@@ -5116,7 +5108,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/eco/warp"):
             try:
-                import urllib.parse
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 speed = int(qs.get("speed", ["5"])[0])
                 live_eco.warp_speed = max(1, min(50, speed))
@@ -5154,7 +5145,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/immune/warp"):
             try:
-                import urllib.parse
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 speed = int(qs.get("speed", ["5"])[0])
                 live_immune.warp_speed = max(1, min(50, speed))
@@ -5192,7 +5182,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/slingshot/warp"):
             try:
-                import urllib.parse
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 speed = int(qs.get("speed", ["5"])[0])
                 live_slingshot.warp_speed = max(1, min(50, speed))
@@ -5230,7 +5219,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/vehicle/warp"):
             try:
-                import urllib.parse
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 speed = int(qs.get("speed", ["5"])[0])
                 live_veh.warp_speed = max(1, min(50, speed))
@@ -5246,7 +5234,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/vehicle/train_fast"):
             try:
-                import urllib.parse
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 gens = int(qs.get("generations", ["50"])[0])
             except Exception:
@@ -5282,7 +5269,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/maze/warp"):
             try:
-                import urllib.parse
                 qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
                 speed = int(qs.get("speed", ["5"])[0])
                 live_maze.warp_speed = max(1, min(50, speed))
@@ -5378,7 +5364,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/doudizhu/decide"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             obs0 = float(qs.get("obs0", [0.5])[0])
             obs1 = float(qs.get("obs1", [0.8])[0])
@@ -5521,7 +5506,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
                 post_data = {}
 
         if self.path.startswith("/api/extinction/trigger"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             wipeout_ratio = float(post_data.get("wipeout_ratio", qs.get("wipeout_ratio", ["0.8"])[0]))
             shock_scale = float(post_data.get("shock_scale", qs.get("shock_scale", ["2.5"])[0]))
@@ -5536,7 +5520,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/organ/splice"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             organ_name = post_data.get("name", post_data.get("organ_name", qs.get("name", qs.get("organ_name", ["schmitt_damping_column"]))[0]))
             from_id = post_data.get("from_id", int(qs["from_id"][0]) if "from_id" in qs else None)
@@ -5552,7 +5535,6 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/lyapunov/enforce"):
-            import urllib.parse
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             max_gain = float(post_data.get("max_gain", qs.get("max_gain", ["0.95"])[0]))
             res = organism.enforce_lyapunov_stability(max_gain)

@@ -1,7 +1,7 @@
 {
   "schema": "SDSC-Formal-Cert-v1.0",
   "organism_bin": "checkpoints/adas_tripartite_champion.bin",
-  "wl_canonical_hash": "0x5fb2480553439e8b",
+  "wl_canonical_hash": "0x3eccd190f0a1eeba",
   "topology": {
     "num_cells": 18,
     "num_synapses": 25,
@@ -10,19 +10,19 @@
   },
   "lyapunov_certificate": {
     "status": "CERTIFIED_BIBO_STABLE",
-    "max_loop_gain": 0.038759,
-    "stability_margin": 0.961241,
+    "max_loop_gain": 0.0395487,
+    "stability_margin": 0.960451,
     "has_unstable_cycles": false
   },
   "bit_exact_regression": {
     "status": "BIT_EXACT_ZERO_DRIFT",
     "steps": 50000,
-    "fnv1a_checksum": "0xdf8c410c5620efee",
-    "max_action_peak": 0.905674
+    "fnv1a_checksum": "0xfe9263f08ec697fb",
+    "max_action_peak": 0.981467
   },
   "operator_safety_proof": {
     "bounds_check": "ALL_CELLS_BOUNDED",
     "source_of_truth": "ops.yaml-v2.0.0"
   },
-  "certified_at": "Sat Sep  5 21:50:55 2026"
+  "certified_at": "Thu Sep 10 00:47:49 2026"
 }

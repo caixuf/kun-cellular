@@ -16,13 +16,13 @@
   },
   "bit_exact_regression": {
     "status": "BIT_EXACT_ZERO_DRIFT",
-    "steps": 1000000,
-    "fnv1a_checksum": "0x6334dfb980453d25",
+    "steps": 50000,
+    "fnv1a_checksum": "0x61b94018df3e37a5",
     "max_action_peak": 0
   },
   "operator_safety_proof": {
     "bounds_check": "ALL_CELLS_BOUNDED",
     "source_of_truth": "ops.yaml-v2.0.0"
   },
-  "certified_at": "Sun Sep  6 19:19:47 2026"
+  "certified_at": "Thu Sep 10 00:50:41 2026"
 }

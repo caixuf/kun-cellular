@@ -1,28 +1,28 @@
 {
   "schema": "SDSC-Formal-Cert-v1.0",
   "organism_bin": "checkpoints/maze_tripartite_champion.bin",
-  "wl_canonical_hash": "0x6ce9394cc8746706",
+  "wl_canonical_hash": "0xb8419c1f435298f0",
   "topology": {
-    "num_cells": 21,
-    "num_synapses": 42,
-    "core_nodes": 20,
-    "core_edges": 41
+    "num_cells": 11,
+    "num_synapses": 14,
+    "core_nodes": 11,
+    "core_edges": 14
   },
   "lyapunov_certificate": {
     "status": "CERTIFIED_BIBO_STABLE",
-    "max_loop_gain": 0.56513,
-    "stability_margin": 0.43487,
+    "max_loop_gain": 0,
+    "stability_margin": 1,
     "has_unstable_cycles": false
   },
   "bit_exact_regression": {
     "status": "BIT_EXACT_ZERO_DRIFT",
     "steps": 50000,
-    "fnv1a_checksum": "0x3dca4cb222b4a671",
-    "max_action_peak": 35.4009
+    "fnv1a_checksum": "0xa4cccdf4aa7ffb1b",
+    "max_action_peak": 5.03014
   },
   "operator_safety_proof": {
     "bounds_check": "ALL_CELLS_BOUNDED",
     "source_of_truth": "ops.yaml-v2.0.0"
   },
-  "certified_at": "Sun Sep  6 12:44:15 2026"
+  "certified_at": "Thu Sep 10 00:49:04 2026"
 }
