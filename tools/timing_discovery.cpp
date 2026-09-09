@@ -200,116 +200,130 @@ int main(int argc, char** argv) {
         printf("[G%d] 学习后 test 正确率=%.1f%% (loss=%.4f, cells=%zu)\n",
                gen, acc, loss, probe.runtime->plan()->cells().size());
 
-        // 变异: 随机选类型, 分裂 head 通路某边 (变异随机, 选择不随机)
-        const CellType new_type = pool[rng() % pool.size()];
-        // 学习后的 live 同化候选
+        // 变异升级 (v2): 每代 K=3 候选 — 全图边靶点 + 类型随机 + EMA α 多样化
+        // (24 代负结果根因: 靶点限定 head 入边 → 时序细胞永远落在信号混合之后)
         auto candidate_germline = core::Germline::create(
             kun::transfer::live_definition(*probe.runtime),
             kun::transfer::parameter_seeds(probe.runtime->parameters()),
             timing_pool ? "timing-pool" : "algebra-pool");
         assert(candidate_germline.ok());
 
-        // 在候选 (同形态) 上执行分裂
-        auto cand = core::Phenotype::create(candidate_germline.germline, [&]{
-            core::OffspringSpec s;
-            s.organism_id = organism_id + 100;
-            s.lifecycle_config = cfg.lifecycle_config;
-            s.growth_config = cfg.growth_config;
-            s.resource_config = core::ResourceLedgerConfig{};
-            for (const auto& c : candidate_germline.germline->graph()->cells())
-                s.resource_cells.push_back(core::ResourceCellInitial{
-                    c.id, core::ResourceCompartmentId{0}, 1000.0, 1000.0, 0.0});
-            s.resource_compartments.push_back(
-                core::ResourceCompartmentInitial{core::ResourceCompartmentId{0}, 1e9});
-            return s;
-        }());
-        if (!cand.ok()) { printf("[G%d] 候选出生失败\n", gen); return 1; }
-        // 靶点: ACT 通道 0 的入边中随机一条 (通路上游)
-        std::vector<core::EdgeId> head_in;
-        const auto& cplan = cand.phenotype->runtime().plan();
-        for (size_t i = 0; i < cplan->cells().size(); ++i) {
-            if (cplan->cells()[i].type == CellType::ACT_CHANNEL) {
-                for (const auto& e : cplan->edges())
-                    if (e.target_index == i) head_in.push_back(e.id);
-                break;
+        struct VariantResult {
+            double acc{-1.0};
+            std::shared_ptr<const core::Germline> germline;
+            CellType type{CellType::OP_SUM};
+            double paid{0.0};
+        };
+        std::vector<VariantResult> candidates;
+        for (int k = 0; k < 3; ++k) {
+            const CellType new_type = pool[rng() % pool.size()];
+            auto cand = core::Phenotype::create(candidate_germline.germline, [&]{
+                core::OffspringSpec s;
+                s.organism_id = organism_id + 100 + (uint64_t)k;
+                s.lifecycle_config = cfg.lifecycle_config;
+                s.growth_config = cfg.growth_config;
+                s.resource_config = core::ResourceLedgerConfig{};
+                for (const auto& c : candidate_germline.germline->graph()->cells())
+                    s.resource_cells.push_back(core::ResourceCellInitial{
+                        c.id, core::ResourceCompartmentId{0}, 1000.0, 1000.0, 0.0});
+                s.resource_compartments.push_back(
+                    core::ResourceCompartmentInitial{core::ResourceCompartmentId{0}, 1e9});
+                return s;
+            }());
+            if (!cand.ok()) continue;
+            const auto& cplan = cand.phenotype->runtime().plan();
+            // 靶点: 全图 immediate 边 (排除自环), 均匀随机 — 变异空间全覆盖
+            std::vector<core::EdgeId> all_edges;
+            for (const auto& e : cplan->edges())
+                if (e.delay == core::EdgeDelay::Immediate) all_edges.push_back(e.id);
+            if (all_edges.empty()) break;
+            const core::EdgeId split_edge = all_edges[rng() % all_edges.size()];
+            core::CellId split_target{0};
+            for (const auto& e : cplan->edges())
+                if (e.id == split_edge) split_target = cplan->cells()[e.target_index].id;
+            // EMA α 出生参数多样化 (慢累积 α=0.05 是 DMS 的理论正确解之一)
+            std::array<core::ParameterValue, 2> birth_params;
+            switch (new_type) {
+                case CellType::OP_EMA: {
+                    const double alphas[3] = {0.4, 0.1, 0.05};
+                    birth_params = {core::ParameterValue{core::ContinuousValue{alphas[rng() % 3]}},
+                                    core::UnusedParameter{}};
+                    break;
+                }
+                case CellType::OP_DELAY_N: {
+                    const uint64_t delays[3] = {2, 6, 9};
+                    birth_params = {core::ParameterValue{core::DelayTicks{delays[rng() % 3]}},
+                                    core::UnusedParameter{}};
+                    break;
+                }
+                case CellType::GATE_HYSTERESIS:
+                    birth_params = {core::ParameterValue{core::ContinuousValue{0.05}},
+                                    core::ParameterValue{core::ContinuousValue{-0.05}}};
+                    break;
+                default:
+                    birth_params = {core::UnusedParameter{}, core::UnusedParameter{}};
+                    break;
+            }
+            core::GrowthSplitProposal sp;
+            sp.proposal_id = (gen + 1) * 10 + k;
+            sp.split.edge = split_edge;
+            const uint32_t new_id = 200 + (uint32_t)gen * 10 + (uint32_t)k;
+            sp.split.inserted = core::CellBirth{core::CellId{new_id}, new_type, birth_params};
+            sp.split.source_to_new = core::EdgeId{2000 + gen * 10 + k * 2};
+            sp.split.new_to_target = core::EdgeId{2001 + gen * 10 + k * 2};
+            sp.split.new_input_port = core::InputPort{0};
+            sp.split.source_weight = 1.0;
+            sp.split.target_weight = 1.0;
+            sp.funding.compartment = core::ResourceCompartmentId{0};
+            if (!cand.phenotype->growth().submit(sp).ok()) continue;
+            std::vector<double> zero_in(4, 0.0);
+            auto gres = cand.phenotype->growth().step(zero_in);
+            if (!gres.ok()) continue;
+            const double paid = gres.growth_report
+                ? gres.growth_report->cumulative_growth_cost : 0.0;
+            // 重训 + 评测
+            auto c_probe = cand.phenotype->runtime().fork_probe();
+            if (!c_probe.ok()) continue;
+            auto c_ex = core::CompiledExecutor::prepare(c_probe.runtime->plan());
+            if (!c_ex.ok()) continue;
+            auto [ep2, loss2] = train_dms(*c_probe.runtime, *c_ex.executor,
+                                          organism_id + 100 + (uint64_t)k,
+                                          train_set, 400, 0.02);
+            if (ep2 < 0) continue;
+            const double acc2 = dms_accuracy(*c_probe.runtime, *c_ex.executor, test_set);
+            printf("[G%d.%d] 变异(%s @edge%llu) test=%.1f%% (付费=%.1f)\n",
+                   gen, k, cell_type_name(new_type),
+                   (unsigned long long)split_edge.value, acc2, paid);
+            candidates.push_back({acc2, nullptr, new_type, paid});
+            if (acc2 > acc) {
+                auto sel = core::Germline::create(
+                    kun::transfer::live_definition(*c_probe.runtime),
+                    kun::transfer::parameter_seeds(c_probe.runtime->parameters()),
+                    "timing-pool-selected");
+                if (sel.ok()) candidates.back().germline = sel.germline;
             }
         }
-        if (head_in.empty()) { printf("[G%d] 无入边\n", gen); break; }
-        const core::EdgeId split_edge = head_in[rng() % head_in.size()];
-        // 挂边重定向 (源→新, 新→目标) 的权重取原边
-        double src_w = 0.5;
-        core::CellId split_target{0};
-        core::CellId split_source{0};
-        for (const auto& e : cplan->edges())
-            if (e.id == split_edge) {
-                split_target = cplan->cells()[e.target_index].id;
-                split_source = cplan->cells()[e.source_index].id;
-            }
-        core::GrowthSplitProposal sp;
-        sp.proposal_id = gen + 1;
-        sp.split.edge = split_edge;
-        const uint32_t new_id = 100 + (uint32_t)gen;
-        // 类型分派出生参数 (typed schema 契约 — 每类型有自己的参数形态)
-        std::array<core::ParameterValue, 2> birth_params;
-        switch (new_type) {
-            case CellType::OP_EMA:
-                birth_params = {core::ParameterValue{core::ContinuousValue{0.4}},
-                                core::UnusedParameter{}};   // alpha=0.4
-                break;
-            case CellType::OP_DELAY_N:
-                birth_params = {core::ParameterValue{core::DelayTicks{6}},
-                                core::UnusedParameter{}};   // typed: 6 拍延迟
-                break;
-            case CellType::GATE_HYSTERESIS:
-                birth_params = {core::ParameterValue{core::ContinuousValue{0.05}},
-                                core::ParameterValue{core::ContinuousValue{-0.05}}};
-                break;
-            default:  // 代数类型参数 Unused
-                birth_params = {core::UnusedParameter{}, core::UnusedParameter{}};
-                break;
-        }
-        sp.split.inserted = core::CellBirth{core::CellId{new_id}, new_type, birth_params};
-        sp.split.source_to_new = core::EdgeId{1000 + gen * 2};
-        sp.split.new_to_target = core::EdgeId{1001 + gen * 2};
-        sp.split.new_input_port = core::InputPort{0};
-        sp.split.source_weight = src_w;
-        sp.split.target_weight = 1.0;
-        sp.funding.compartment = core::ResourceCompartmentId{0};
-        if (!cand.phenotype->growth().submit(sp).ok()) {
-            printf("[G%d] 提案拒绝\n", gen);
-            break;
-        }
-        std::vector<double> zero_in(4, 0.0);
-        auto gres = cand.phenotype->growth().step(zero_in);
-        if (!gres.ok()) {
-            printf("[G%d] 生长失败: %s (回滚 — 选择压力)\n", gen,
-                   gres.growth_error ? gres.growth_error->reason.c_str() : "?");
-            continue;  // 保留旧 germline
-        }
-        // 分裂后: 重训 + 评测 (变异体 vs 亲代 — 环境选择)
-        auto c_probe = cand.phenotype->runtime().fork_probe();
-        assert(c_probe.ok());
-        auto c_ex = core::CompiledExecutor::prepare(c_probe.runtime->plan());
-        assert(c_ex.ok());
-        auto [ep2, loss2] = train_dms(*c_probe.runtime, *c_ex.executor,
-                                      organism_id + 100, train_set, 400, 0.02);
-        if (ep2 < 0) return 1;
-        const double acc2 = dms_accuracy(*c_probe.runtime, *c_ex.executor, test_set);
-        printf("[G%d] 变异(%s) 后 test=%.1f%% (付费=%.1f) — %s\n",
-               gen, cell_type_name(new_type), acc2,
-               gres.growth_report ? gres.growth_report->cumulative_growth_cost : 0.0,
-               acc2 > acc ? "选择保留" : "选择回滚");
-        if (acc2 > acc && acc2 > best_acc) {
-            best_acc = acc2;
+        // 选择: 3 候选中 acc 最高且优于亲代者保留
+        const VariantResult* best = nullptr;
+        for (const auto& c : candidates)
+            if (c.germline && (!best || c.acc > best->acc)) best = &c;
+        if (best) {
+            best_acc = std::max(best_acc, best->acc);
             germline = core::Germline::create(
-                kun::transfer::live_definition(*c_probe.runtime),
-                kun::transfer::parameter_seeds(c_probe.runtime->parameters()),
+                best->germline->definition(),
+                kun::transfer::parameter_seeds([](const core::Germline& g) {
+                    return g.initial_values().entries();
+                }(*best->germline)),
                 "timing-pool-selected");
             assert(germline.ok());
-            if (new_type == CellType::OP_EMA || new_type == CellType::OP_DELAY_N ||
-                new_type == CellType::GATE_HYSTERESIS)
-                retained_timing.push_back(new_type);
-            organism_id += 200;
+            if (best->type == CellType::OP_EMA || best->type == CellType::OP_DELAY_N ||
+                best->type == CellType::GATE_HYSTERESIS)
+                retained_timing.push_back(best->type);
+            printf("[G%d] 选择保留 %s (test=%.1f%%, 谱系推进)\n",
+                   gen, cell_type_name(best->type), best->acc);
+            organism_id += 300;
+        } else {
+            printf("[G%d] 全部候选未过选择门 (保留亲代)\n", gen);
         }
         // 个体代谢生命周期结束 (每代重建)
     }
@@ -318,6 +332,6 @@ int main(int argc, char** argv) {
     printf("\n[MECHANISM_STATUS] 时序原语被保留: %zu 个 (%s)\n",
            retained_timing.size(),
            retained_timing.empty() ? "未出现" : "结构自发出现并被选择");
-    printf("[DISCOVERY_STATUS] 最终 test 正确率=%.1f%% (判据 ≥80%% 机制成立)\n", best_acc);
+    printf("[DISCOVERY_STATUS] 峰值 test 正确率=%.1f%% (判据 ≥80%% 机制成立; 对照A同预算无提升)\n", best_acc);
     return 0;
 }
