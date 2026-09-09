@@ -192,6 +192,9 @@ target_link_libraries(bench_doudizhu_endogenous_60 PRIVATE kun_cellular Threads:
 add_executable(train_doudizhu_bc_distill "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_doudizhu_bc_distill.cpp")
 target_link_libraries(train_doudizhu_bc_distill PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(u5_growth_winner "${CMAKE_CURRENT_SOURCE_DIR}/tools/u5_growth_winner.cpp")
+target_link_libraries(u5_growth_winner PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(u4_ablation "${CMAKE_CURRENT_SOURCE_DIR}/tools/u4_ablation.cpp")
 target_link_libraries(u4_ablation PRIVATE kun_cellular Threads::Threads m)
 
