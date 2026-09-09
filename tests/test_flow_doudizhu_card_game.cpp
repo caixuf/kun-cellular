@@ -36,25 +36,28 @@ void test_doudizhu_step_and_fitness() {
     assert(task.current_fitness() >= 0.0);
 }
 
-void test_doudizhu_1024_master_checkpoint() {
-    std::ifstream f("checkpoints/doudizhu_game_champion.bin", std::ios::binary);
+void test_doudizhu_cand_scorer_checkpoint() {
+    // U0.2 权威冠军 (57.0% 基线): v4 JSON 格式检查点, 82 细胞 / 425 突触
+    std::ifstream f("checkpoints/doudizhu_cand_scorer.bin", std::ios::binary);
     if (!f.is_open()) {
-        f.open("../checkpoints/doudizhu_game_champion.bin", std::ios::binary);
+        f.open("../checkpoints/doudizhu_cand_scorer.bin", std::ios::binary);
     }
     assert(f.is_open());
-    uint32_t magic = 0, version = 0, num_cells = 0, num_synapses = 0, in_dim = 0, out_dim = 0;
-    f.read(reinterpret_cast<char*>(&magic), 4);
-    f.read(reinterpret_cast<char*>(&version), 4);
-    f.read(reinterpret_cast<char*>(&num_cells), 4);
-    f.read(reinterpret_cast<char*>(&num_synapses), 4);
-    f.read(reinterpret_cast<char*>(&in_dim), 4);
-    f.read(reinterpret_cast<char*>(&out_dim), 4);
-    assert(magic == 0x53445343);
-    assert(version == 2);
-    assert(num_cells == 1024);
-    assert(num_synapses == 196608);
-    assert(in_dim == 32);   // 1024 旧 checkpoint 的记录值 (文件内容不变)
-    assert(out_dim == 7);
+    f.close();
+
+    CellularOrganism org = CellularOrganism::load_checkpoint_json("checkpoints/doudizhu_cand_scorer.bin");
+    if (org.cells.empty()) {
+        org = CellularOrganism::load_checkpoint_json("../checkpoints/doudizhu_cand_scorer.bin");
+    }
+    assert(org.cells.size() == 82);
+    int sense = 0, act = 0;
+    for (const auto& c : org.cells) {
+        if (is_receptor_cell(c.type)) sense++;
+        else if (is_effector_cell(c.type)) act++;
+    }
+    assert(sense == 56);    // 记牌感知受体柱 (56 通道)
+    assert(act == 2);       // 打分头 channel0 + 价值头 channel1
+    assert(org.synapses.size() == 425);
 }
 
 void test_doudizhu_64cell_recurrent_cortex() {
@@ -85,7 +88,7 @@ void test_doudizhu_64cell_recurrent_cortex() {
 int main() {
     test_doudizhu_initialization();
     test_doudizhu_step_and_fitness();
-    test_doudizhu_1024_master_checkpoint();
+    test_doudizhu_cand_scorer_checkpoint();
     test_doudizhu_64cell_recurrent_cortex();
     std::cout << "[PASS] test_flow_doudizhu_card_game all assertions passed!" << std::endl;
     return 0;

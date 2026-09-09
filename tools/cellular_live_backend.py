@@ -2382,22 +2382,14 @@ class SiliconCellularOrganism:
                         SymbioticMacroCell(2, "AdaptiveDampingCortex", core_ids or list(range(min(6, len(self.cells)), max(min(6, len(self.cells)), len(self.cells) - 2))), color="#34d399"),
                         SymbioticMacroCell(3, "AntiSlipEffectorCore", act_ids or list(range(max(0, len(self.cells) - 2), len(self.cells))), color="#f43f5e")
                     ]
-                elif oid in ("doudizhu_game_champion", "doudizhu_evolved_champion"):
-                    if len(self.cells) >= 1024:
-                        self.symbiotic_macro_cells = [
-                            SymbioticMacroCell(1, "FullDeckSensoryArch", list(range(0, 32)), color="#22d3ee"),
-                            SymbioticMacroCell(2, "BayesianCardCountingCortex", list(range(32, 224)), color="#3b82f6"),
-                            SymbioticMacroCell(3, "CombinatorialBombCortex", list(range(224, 416)), color="#10b981"),
-                            SymbioticMacroCell(4, "GameTempoRegulatorCortex", list(range(416, 608)), color="#f59e0b"),
-                            SymbioticMacroCell(5, "CounterfactualDecisionCortex", list(range(608, 800)), color="#a855f7"),
-                            SymbioticMacroCell(6, "ActionPolicyEffectorArray", list(range(800, 1024)), color="#f43f5e")
-                        ]
-                    else:
-                        self.symbiotic_macro_cells = [
-                            SymbioticMacroCell(1, "CardLatticeSensory", sense_ids or list(range(min(4, len(self.cells)))), color="#22d3ee"),
-                            SymbioticMacroCell(2, "GameTheoryDecisionCore", core_ids or list(range(min(4, len(self.cells)), max(min(4, len(self.cells)), len(self.cells) - 3))), color="#34d399"),
-                            SymbioticMacroCell(3, "ActionSprintEffector", act_ids or list(range(max(0, len(self.cells) - 3), len(self.cells))), color="#f43f5e")
-                        ]
+                elif oid == "doudizhu_cand_scorer":
+                    # 真实候选打分世系 (82细胞/425突触): 按细胞索引映射 4 功能柱
+                    self.symbiotic_macro_cells = [
+                        SymbioticMacroCell(1, "记牌感知受体柱 (56通道)", list(range(0, 56)), color="#22d3ee"),
+                        SymbioticMacroCell(2, "特征解算层 (48细胞)", list(range(56, 104)), color="#3b82f6"),
+                        SymbioticMacroCell(3, "打分头 channel0 (argmax 决策)", [104], color="#f59e0b"),
+                        SymbioticMacroCell(4, "价值头 channel1 (P(win))", [105], color="#a855f6")
+                    ]
                 elif oid in ("quant_master_champion", "quant_futures_champion", "real_trained_champion", "quant_tripartite_champion") or oid.startswith("quant_"):
                     self.symbiotic_macro_cells = [
                         SymbioticMacroCell(1, "MomentumSensoryCore", sense_ids or list(range(min(32, len(self.cells)))), color="#22d3ee"),
@@ -2455,7 +2447,7 @@ class SiliconCellularOrganism:
                 ]
 
             # 3. 斗地主非完全信息离散博弈生命体 (9 细胞)
-            elif oid == "doudizhu_game_champion":
+            elif oid == "doudizhu_cand_scorer":
                 raw_cells = ckpt.get("cells", [])
                 raw_syns = ckpt.get("synapses", [])
                 self.generation = ckpt.get("generation", 25)
@@ -2835,7 +2827,7 @@ class SiliconCellularOrganism:
                         SymbioticMacroCell(2, "QuantArbitrageManifold", core_ids or list(range(min(16, len(self.cells)), max(min(16, len(self.cells)), len(self.cells) - 8))), color="#34d399"),
                         SymbioticMacroCell(3, "QuantExecutionRing", act_ids or list(range(max(0, len(self.cells) - 8), len(self.cells))), color="#f43f5e")
                     ]
-                elif oid == "doudizhu_game_champion":
+                elif oid == "doudizhu_cand_scorer":
                     if len(self.cells) >= 1024:
                         self.symbiotic_macro_cells = [
                             SymbioticMacroCell(1, "FullDeckSensoryArch", list(range(0, 32)), color="#22d3ee"),
@@ -5397,7 +5389,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
                 "action": act,
                 "action_name": live_dz_cortex.ACTION_NAMES[act] if 0 <= act < len(live_dz_cortex.ACTION_NAMES) else "",
                 "heads": heads,
-                "model": "doudizhu_evolved_champion"
+                "model": "doudizhu_cand_scorer"
             }
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
@@ -5485,7 +5477,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             if ptype == "seed": organism.load_seed_preset()
             elif ptype in ("mega", "1m"): organism.load_mega_1m_preset()
             elif ptype == "maze": organism.load_organism_by_id("maze_navigation_champion")
-            elif ptype == "doudizhu": organism.load_organism_by_id("doudizhu_game_champion")
+            elif ptype == "doudizhu": organism.load_organism_by_id("doudizhu_cand_scorer")
             elif ptype == "fluid": organism.load_organism_by_id("fluid_damper_champion")
             elif ptype == "quant": organism.load_organism_by_id("quant_master_champion")
             elif ptype in ("adas", "vehicle"): organism.load_organism_by_id("adas_cortex_champion")
@@ -5583,7 +5575,7 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
                 "action": act,
                 "action_name": live_dz_cortex.ACTION_NAMES[act] if 0 <= act < len(live_dz_cortex.ACTION_NAMES) else "",
                 "heads": heads,
-                "model": "doudizhu_evolved_champion"
+                "model": "doudizhu_cand_scorer"
             }
             body = json.dumps(data, ensure_ascii=False).encode("utf-8")
             self.send_response(200)

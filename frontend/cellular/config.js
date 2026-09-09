@@ -102,7 +102,7 @@ export const HARDWARE_COSMIC_SPECS = {
 };
 
 export const LIFEFORM_SCALES = {
-  doudizhu_evolved_champion: 12,
+  doudizhu_cand_scorer: 82,
   adas_tripartite_champion: 18,
   adas_cortex_champion: 210,
   quant_tripartite_champion: 9,

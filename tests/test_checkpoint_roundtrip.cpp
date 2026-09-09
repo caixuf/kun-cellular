@@ -248,18 +248,19 @@ void test_legacy_v2_checkpoint_backward_compatibility() {
         assert(sum == 192 && "adas_cortex 线性运算细胞数必须为 192，绝不能被错译为受体！");
     }
 
-    // 2. doudizhu_game_champion.bin 历史形态学普查
+    // 2. doudizhu_cand_scorer.bin (U0.2 权威冠军, v4 JSON 格式) 形态学普查
     {
-        CellularOrganism org = CellularOrganism::load_checkpoint_bin(find_ckpt_path("checkpoints/doudizhu_game_champion.bin"));
-        assert(org.cells.size() == 1024);
+        CellularOrganism org = CellularOrganism::load_checkpoint_json(find_ckpt_path("checkpoints/doudizhu_cand_scorer.bin"));
+        assert(org.cells.size() == 82);
         int sense = 0, act = 0;
         for (const auto& c : org.cells) {
             if (is_receptor_cell(c.type)) sense++;
             else if (is_effector_cell(c.type)) act++;
         }
-        std::cout << "  ✓ doudizhu_game_champion.bin: cells=1024, sense=" << sense << ", act=" << act << std::endl;
-        assert(sense == 32 && "doudizhu 受体数必须为 32！");
-        assert(act == 266 && "doudizhu 效应器数必须为 266！");
+        std::cout << "  ✓ doudizhu_cand_scorer.bin: cells=82, sense=" << sense << ", act=" << act << std::endl;
+        assert(sense == 56 && "doudizhu_cand_scorer 受体数必须为 56！");
+        assert(act == 2 && "doudizhu_cand_scorer 效应器数必须为 2！");
+        assert(org.synapses.size() == 425 && "doudizhu_cand_scorer 突触数必须为 425！");
     }
 
     // 3. cartpole_balance_champion.bin 历史形态学普查

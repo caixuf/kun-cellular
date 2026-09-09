@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KunCellular // 斗地主国手级高维认知皮层对弈沙盒 · DouDiZhu Master Battle</title>
+    <title>KunCellular // 斗地主生命体对战沙盒 · 82细胞候选打分世系</title>
     <style>
         :root {
             --bg-base: #06090e;
@@ -387,7 +387,7 @@
         .stat-label { font-size: 10px; color: var(--text-dim); }
         .stat-val { font-size: 13px; font-weight: 700; color: var(--text-main); margin-top: 2px; }
 
-        /* 1024 细胞微柱放电指示 */
+        /* 82 细胞生命体放电指示 */
         .cortex-telemetry {
             padding: 8px;
             display: flex;
@@ -487,8 +487,8 @@
     <div class="brand">
         <span>KunCellular</span>
         <span style="color:var(--text-dim)">//</span>
-        <span>斗地主国手级高维认知皮层对战沙盒</span>
-        <span class="brand-badge">1024-CELL MASTER CORTEX</span>
+        <span>斗地主生命体对战沙盒 (82细胞候选打分世系)</span>
+        <span class="brand-badge">82-CELL CANDIDATE SCORER</span>
         <span class="brand-badge" style="background:rgba(16,185,129,0.15);border-color:#10b981;color:#34d399;">DEEPSEEK-GRPO</span>
     </div>
     <div class="nav-links">
@@ -507,8 +507,8 @@
             <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                 <span>对战模式:</span>
                 <select id="modeSelect" class="btn" style="padding:2px 6px;font-size:11px;">
-                    <option value="human">人机实时对弈 (玩家 vs 1024细胞超脑)</option>
-                    <option value="auto">AI 全自动观战 (3大1024微柱皮层博弈)</option>
+                    <option value="human">人机实时对弈 (玩家 vs 82细胞生命体)</option>
+                    <option value="auto">AI 全自动观战 (82细胞生命体对战)</option>
                 </select>
 
                 <span>玩家身份:</span>
@@ -593,7 +593,7 @@
                 <div class="action-bar" id="playActionBar">
                     <button id="btnDeselect" class="btn">重选 (Clear)</button>
                     <button id="btnPass" class="btn btn-danger">过牌 (Pass)</button>
-                    <button id="btnHint" class="btn">国手提示 (Hint)</button>
+                    <button id="btnHint" class="btn">生命体提示 (Hint)</button>
                     <button id="btnPlay" class="btn btn-primary">出牌 (Play)</button>
                 </div>
                 <div class="action-bar" id="biddingActionBar" style="display:none;">
@@ -634,7 +634,7 @@
         </div>
     </div>
 
-    <!-- 右侧面板: 1024-细胞认知皮层遥测与全景记牌 -->
+    <!-- 右侧面板: 82细胞生命体皮层遥测与全景记牌 -->
     <div class="sidebar">
         <!-- 面板 1: 对局核心统计 -->
         <div class="side-box">
@@ -725,7 +725,7 @@
                 <span>博弈策略因果流 (CAUSAL INFERENCE STREAM)</span>
             </div>
             <div class="causal-log" id="causalLog">
-                <div class="log-entry play">系统启动完成: 已加载 1024 物理细胞 / 196,608 突触国手级博弈脑。</div>
+                <div class="log-entry play">系统启动完成: 已挂载 82 物理细胞 / 425 突触候选打分世系生命体。</div>
                 <div class="log-entry">标准斗地主全牌型引擎就绪: 支持顺子、连对、飞机、三带一/二、炸弹与王炸。</div>
             </div>
         </div>
@@ -734,7 +734,7 @@
 
 <script>
 /**
- * 斗地主国手级认知皮层对战引擎 (完整标准规则 + 全牌型识别 + 实时人机对战)
+ * 斗地主生命体对战引擎 (完整标准规则 + 全牌型识别 + 实时人机对战)
  */
 const RANKS = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2", "小王", "大王"];
 const SUITS = ["♠", "♥", "♣", "♦"];
@@ -917,10 +917,10 @@ function triggerBiddingStep() {
 
         // 微柱皮层牌力评估：>= 6 分叫地主，< 6 分不叫
         if (strength >= 6) {
-            addLog(`🧠 [${getSeatName(currentSeat)}] 1024-微柱神经皮层评估起手势能: ${strength}分 (>=6 临界阈值)，果断发起【👑 叫地主】！`, "bomb");
+            addLog(`🧠 [${getSeatName(currentSeat)}] 82细胞生命体皮层评估起手势能: ${strength}分 (>=6 临界阈值)，果断发起【👑 叫地主】！`, "bomb");
             finalizeLandlord(currentSeat);
         } else {
-            addLog(`🧠 [${getSeatName(currentSeat)}] 1024-微柱神经皮层评估起手势能: ${strength}分 (<6 阈值)，胜率不足选择【🏳️ 不叫】`, "info");
+            addLog(`🧠 [${getSeatName(currentSeat)}] 82细胞生命体皮层评估起手势能: ${strength}分 (<6 阈值)，胜率不足选择【🏳️ 不叫】`, "info");
             handleBidPass(currentSeat);
         }
     }, GameState.autoSpeed);
@@ -1086,7 +1086,7 @@ function updateUI() {
         if (bidBar) bidBar.style.display = (GameState.bidTurn === 0 && GameState.mode === "human") ? "flex" : "none";
 
         if (GameState.mode === "auto") {
-            document.getElementById("gameStatusText").textContent = `>> 观战竞价: [${getSeatName(GameState.bidTurn)}] 正在进行1024-微柱起手牌力推演...`;
+            document.getElementById("gameStatusText").textContent = `>> 观战竞价: [${getSeatName(GameState.bidTurn)}] 正在进行82细胞生命体起手牌力推演...`;
         } else {
             document.getElementById("gameStatusText").textContent = (GameState.bidTurn === 0) 
                 ? ">> 轮到您的回合：请根据起手牌力决定「👑 叫地主」还是「🏳️ 不叫」" 
@@ -1139,9 +1139,9 @@ function updateUI() {
         document.getElementById("btnDeselect").disabled = !isUserTurn || (selectedUserCards.size === 0);
 
         if (GameState.mode === "auto") {
-            document.getElementById("gameStatusText").textContent = `>> 观战模式: 1024-微柱神经皮层自动推演中 [席位 ${GameState.currentTurn === 0 ? '玩家位' : (GameState.currentTurn === 1 ? '左位AI' : '右位地主')}]...`;
+            document.getElementById("gameStatusText").textContent = `>> 观战模式: 82细胞生命体皮层自动推演中 [席位 ${GameState.currentTurn === 0 ? '玩家位' : (GameState.currentTurn === 1 ? '左位AI' : '右位地主')}]...`;
         } else {
-            document.getElementById("gameStatusText").textContent = isUserTurn ? ">> 轮到您的回合，请选牌后点击「出牌」或「过牌」" : `>> 1024-微柱神经皮层博弈解算中 (席位 ${GameState.currentTurn === 1 ? '左位AI' : '右位地主'})...`;
+            document.getElementById("gameStatusText").textContent = isUserTurn ? ">> 轮到您的回合，请选牌后点击「出牌」或「过牌」" : `>> 82细胞生命体皮层博弈解算中 (席位 ${GameState.currentTurn === 1 ? '左位AI' : '右位地主'})...`;
         }
     }
 
@@ -1364,7 +1364,7 @@ function canBeat(newTrick, prevTrick) {
 }
 
 /**
- * 1024 物理细胞高维认知皮层 AI 决策器 (平衡版 — 公平博弈)
+ * 82细胞候选打分世系 AI 决策器 (平衡版 — 公平博弈)
  *
  * 策略核心:
  *   地主 (playerIdx === landlordIdx): 激进出牌，尽快清空手牌
@@ -1921,9 +1921,9 @@ window.addEventListener("DOMContentLoaded", () => {
                 const found = GameState.hands[0].find(h => h.id === c.id);
                 if (found) selectedUserCards.add(found);
             });
-            addLog(`1024 认知皮层提示: 打出 [${hintCards.map(c => c.rankStr).join(' ')}]`);
+            addLog(`82细胞皮层提示: 打出 [${hintCards.map(c => c.rankStr).join(' ')}]`);
         } else {
-            addLog("1024 认知皮层评估: 建议战略让牌 (Pass)");
+            addLog("82细胞皮层评估: 建议战略让牌 (Pass)");
         }
         updateUI();
     };
@@ -1952,7 +1952,7 @@ window.addEventListener("DOMContentLoaded", () => {
         if (GameState.mode === "auto") {
             speedBtn.style.display = "inline-block";
             speedLbl.style.display = "inline-block";
-            addLog("已开启 [AI全自动观战模式]，3 大 1024-微柱认知皮层自主对弈。");
+            addLog("已开启 [AI全自动观战模式]，3 大 82细胞生命体自主对弈。");
             checkTurnTrigger();
         } else {
             speedBtn.style.display = "none";

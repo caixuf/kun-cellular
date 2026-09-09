@@ -4,34 +4,31 @@
   "standard": "Non-von Neumann Morphogenetic Cellular Automaton (C++20 Native Substrate)",
   "lifeforms": [
     {
-      "id": "doudizhu_evolved_champion",
-      "name": "斗地主演化冠军博弈脑 (DouDiZhu Grand Master · 55.5%~66.7%实战胜率)",
-      "domain": "非完全信息博弈与多微柱牌局推理",
-      "cells_scale": 12,
-      "synapses_scale": 10,
-      "checkpoint": "checkpoints/doudizhu_evolved_champion.bin",
+      "id": "doudizhu_cand_scorer",
+      "name": "斗地主候选打分世系生命体 (82细胞·57.0%天梯基线)",
+      "domain": "非完全信息博弈与候选牌型打分推理",
+      "cells_scale": 82,
+      "synapses_scale": 425,
+      "checkpoint": "checkpoints/doudizhu_cand_scorer.bin",
       "c_header": "tasks/transfer/cross_domain_tasks.hpp",
       "test_suite": "tests/test_flow_doudizhu_card_game.cpp",
       "input_signals": [
-        "15点数全手牌分布矩阵 (Card Lattice 3-Joker)",
-        "三家剩余手牌比率与地主位 (Card Ratios)",
-        "桌面牌型与牌力压制威胁 (Table Trick)",
-        "历史打出与王牌炸弹衰减积分 (Played History)"
+        "56 维全谱感知 (手牌/记牌/台面/座次)",
+        "候选牌型枚举特征解算 (48 细胞)",
+        "台面压制与节奏张力信号",
+        "历史打出与炸弹衰减积分"
       ],
       "action_outputs": [
-        "战略让牌保大牌决策 (ACT_PASS)",
-        "结构性跟牌压制 (ACT_FOLLOW)",
-        "残局斩杀冲刺指令 (ACT_SPRINT)"
+        "候选牌型打分头 channel0 (argmax 决策)",
+        "价值头 channel1 (P(win) 胜率估计)"
       ],
       "primitive_motif": [
-        "OP_EMA",
-        "OP_INTEGRATE",
-        "OP_DIFF",
-        "GATE_HYSTERESIS",
-        "GATE_DEADZONE",
-        "OP_DAMPER"
+        "Sense_Channel",
+        "OP_SUM",
+        "OP_ABS",
+        "Act_Channel"
       ],
-      "validation_report": "200局双盲对抗实测 55.5% 胜率 (地主 66.7% / 农民 54.0%)，Lyapunov 最大环路增益 ρ=0.0261874 < 1.0 表明收敛，50,000步位级无漂移回放测试通过。"
+      "validation_report": "2000 局天梯胜率 57.0% (1139/2000, Wilson95 下界 54.8%)，对手为启发式策略+完整规则引擎 (地主 61.2% / 农民 56.8%)；对教师配对 McNemar p=0.13 (统计持平)。旧 1024 细胞 82.5% 宣称已撤回 (简化合成仿真，无参考价值)。"
     },
     {
       "id": "adas_tripartite_champion",

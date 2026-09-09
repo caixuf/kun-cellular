@@ -23,8 +23,6 @@ int main(void) {
     const char* candidate_paths[] = {
         "checkpoints/sdsc_mega_1million.bin",
         "../checkpoints/sdsc_mega_1million.bin",
-        "checkpoints/doudizhu_game_champion.bin",
-        "../checkpoints/doudizhu_game_champion.bin",
         "checkpoints/adas_track_champion.bin",
         "../checkpoints/adas_track_champion.bin",
         "checkpoints/real_trained_champion.bin",

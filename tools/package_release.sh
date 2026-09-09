@@ -24,7 +24,7 @@ echo "======================================================================"
 if [[ ! -f "${ROOT_DIR}/build/libkun_cellular_runtime.so" ]]; then
     echo "[!] libkun_cellular_runtime.so not found. Building now..."
     cmake -B "${ROOT_DIR}/build" -S "${ROOT_DIR}" -DCMAKE_BUILD_TYPE=Release
-    cmake --build "${ROOT_DIR}/build" --target kun_cellular_runtime train_doudizhu_champion train_maze_navigator -j$(nproc)
+    cmake --build "${ROOT_DIR}/build" --target kun_cellular_runtime train_maze_navigator -j$(nproc)
 fi
 
 # 2. 清理并创建 staging 目录
@@ -45,7 +45,7 @@ cp "${ROOT_DIR}/build/libkun_cellular_runtime.so" "${STAGE_DIR}/lib/"
 cp "${ROOT_DIR}/build/libkun_cellular_runtime.so" "${STAGE_DIR}/build/"
 cp "${ROOT_DIR}/build/libkun_cellular_runtime.so" "${STAGE_DIR}/bin/"
 
-for bin_name in train_doudizhu_champion train_maze_navigator train_multi_asset_quant_master train_flagship_voxel test_flow_doudizhu_card_game test_universal_runtime; do
+for bin_name in train_maze_navigator train_multi_asset_quant_master train_flagship_voxel test_flow_doudizhu_card_game test_universal_runtime; do
     if [[ -f "${ROOT_DIR}/build/${bin_name}" ]]; then
         cp "${ROOT_DIR}/build/${bin_name}" "${STAGE_DIR}/bin/"
         cp "${ROOT_DIR}/build/${bin_name}" "${STAGE_DIR}/build/"
@@ -72,7 +72,6 @@ cp -r "${ROOT_DIR}/frontend/cellular/"* "${STAGE_DIR}/frontend/cellular/"
 echo "[*] Copying live backend server and runtime bindings..."
 cp "${ROOT_DIR}/tools/cellular_live_backend.py" "${STAGE_DIR}/tools/"
 cp "${ROOT_DIR}/tools/cellular_c_runtime.py" "${STAGE_DIR}/tools/"
-cp "${ROOT_DIR}/tools/train_doudizhu_master_cortex.py" "${STAGE_DIR}/tools/"
 
 # 8. 拷贝文档与说明
 cp "${ROOT_DIR}/README.md" "${STAGE_DIR}/"
