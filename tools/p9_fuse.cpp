@@ -135,6 +135,7 @@ int main(int argc, char** argv) {
         else if (!std::strcmp(argv[i], "--dz-max")) dz_max = std::atoi(need("dz-max"));
         else if (!std::strcmp(argv[i], "--dz-reverse")) dz_reverse = std::atoi(need("dz-reverse"));
         else if (!std::strcmp(argv[i], "--dz-remap")) dz_reverse = std::atoi(need("dz-remap"));
+        else if (!std::strcmp(argv[i], "--dz-data")) dz_data = need("dz-data");
         else if (!std::strcmp(argv[i], "--out")) out = need("out");
     }
 
