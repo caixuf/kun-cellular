@@ -89,8 +89,10 @@ std::vector<core::ParameterBinding> full_bindings(const core::RuntimeState& rt) 
     return out;
 }
 
+// streaming=true: 同局决策连续喂入 (EMA 可捕获同局前序); false: 打乱 (对照)
 double finetune(core::RuntimeState& rt, core::CompiledExecutor& ex, uint64_t organism_id,
-                const std::vector<const Sample*>& train, int epochs, double lr) {
+                const std::vector<const Sample*>& train, int epochs, double lr,
+                bool streaming = true, std::mt19937* rng = nullptr) {
     auto w = core::LearningWindow::open(organism_id, rt, full_bindings(rt));
     CoreCellularBPTTEngine engine(64);
     engine.init_optimizer(rt);
@@ -98,8 +100,10 @@ double finetune(core::RuntimeState& rt, core::CompiledExecutor& ex, uint64_t org
     for (int epoch = 0; epoch < epochs; ++epoch) {
         auto reset = rt.reset_episode();
         engine.reset_tape();
+        std::vector<const Sample*> order = train;
+        if (!streaming && rng) std::shuffle(order.begin(), order.end(), *rng);
         std::vector<std::vector<double>> targets;
-        for (const auto* sp : train) {
+        for (const auto* sp : order) {
             for (size_t i = 0; i < sp->cands.size(); ++i) {
                 auto in = scorer_input(*sp, i);
                 auto rec = engine.record_step(rt, ex, in);
@@ -123,8 +127,9 @@ int main(int argc, char** argv) {
     setvbuf(stdout, nullptr, _IONBF, 0);
     const uint32_t seed = argc > 1 ? (uint32_t)std::atoi(argv[1]) : 2026;
     const int generations = argc > 2 ? std::atoi(argv[2]) : 6;
-    const char* model = argc > 3 ? argv[3] : "checkpoints/doudizhu_cand_scorer.bin";
-    const char* dataset = argc > 4 ? argv[4] : "/tmp/opencode/doudizhu_cand.bin";
+    const bool streaming = argc > 3 ? std::string(argv[3]) == "stream" : true;
+    const char* model = argc > 4 ? argv[4] : "checkpoints/doudizhu_cand_scorer.bin";
+    const char* dataset = argc > 5 ? argv[5] : "/tmp/opencode/doudizhu_cand.bin";
     std::mt19937 rng(seed);
 
     CellularOrganism org;
@@ -186,9 +191,10 @@ int main(int argc, char** argv) {
         assert(probe.ok());
         auto pex = core::CompiledExecutor::prepare(probe.runtime->plan());
         assert(pex.ok());
-        finetune(*probe.runtime, *pex.executor, organism_id, train, 2, 0.01);
+        finetune(*probe.runtime, *pex.executor, organism_id, train, 8, 0.01, streaming, &rng);
         const double acc = candidate_accuracy(*probe.runtime, *pex.executor, holdout);
-        printf("[G%d] 学习后 holdout=%.2f%% (cells=%zu)\n", gen, acc,
+        printf("[G%d][%s] 学习后 holdout=%.2f%% (cells=%zu)\n", gen,
+               streaming ? "流式" : "打乱", acc,
                probe.runtime->plan()->cells().size());
         best_acc = std::max(best_acc, acc);
 
@@ -257,7 +263,7 @@ int main(int argc, char** argv) {
             auto c_ex = core::CompiledExecutor::prepare(c_probe.runtime->plan());
             if (!c_ex.ok()) continue;
             finetune(*c_probe.runtime, *c_ex.executor,
-                     organism_id + 100 + (uint64_t)k, train, 3, 0.01);
+                     organism_id + 100 + (uint64_t)k, train, 8, 0.01, streaming, &rng);
             const double acc2 = candidate_accuracy(*c_probe.runtime, *c_ex.executor, holdout);
             printf("[G%d.%d] 变异(%s @e%llu) holdout=%.2f%% (付费=%.1f)\\n",
                    gen, k, new_type == CellType::OP_EMA ? "EMA" :

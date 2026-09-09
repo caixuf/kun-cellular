@@ -4,7 +4,6 @@
 ![C++20](https://img.shields.io/badge/C++-20-blue.svg)
 ![C11](https://img.shields.io/badge/C-11-555555.svg)
 ![Zero-GC](https://img.shields.io/badge/Memory-Zero--GC-emerald.svg)
-![Latency](https://img.shields.io/badge/Latency-19.06ns-cyan.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 > 基于冯·诺依曼自复制自动机理论、26 种算存一体原子动力学原语与 Kahn 拓扑排序编译器的**软件定义硅基细胞计算框架（Software-Defined Silicon Cellular Computer, SDSCC）**。
@@ -21,7 +20,8 @@
 - **空壳大模型**：`runs/real_billion_champion.pt`（1.6 KB）/ `runs/cellular_language_model_1b.pt`（1.5 KB）解包验证仅含元数据，非真实参数；真正的十亿参数模型需 ≥4 GB。
 - **斗地主"OOD 胜率 82.5%"**：训练/测试环境为简化合成仿真（无叫分、无合法牌型判定、对手为随机数发生器），该数字对真实三人斗地主无参考价值。
 - **量化收益宣称**：合成回测环境，无实盘验证，已全部移除。
-- **ADAS 基准择优引用**：完整 16 场景数据为 **9 胜 / 7 负**，原 README 仅列赢的场景。
+- **ADAS 基准择优引用**：完整 16 场景数据为 **7 胜 / 9 负**（指标为 CTE，越小越好），原 README 仅列赢的场景；该表 ✅/❌ 曾因比较方向写反导致 16/16 行倒置，已按 `runs/adas_champion_vs_stanley_seeds1-10.json` 重算（见下方勘误）。
+- **"19.06 ns / 52.47 M-Inf/s" 硬实时基准**：其源码 `include/kun/cellular/sdsc_apex_cortex.h` 与基准目标 `test_c11_apex_maneuver` 已随 `b555cb7`（2026-09-03 清理）移除，均不在版本库中，仓库内无可复现来源，暂不可引用。
 - **音乐皮层**：权重 = 随机初始化 + 高斯变异若干代，属声光玩具演示，不构成音乐生成能力宣称。
 
 ---
@@ -35,23 +35,12 @@
 | **26 原语动力学库** | `include/kun/cellular/cellular_genome.hpp` | 26 种算存一体细胞原语（OSCILLATOR、EMA、INTEGRATE、GATE_HYSTERESIS 等）、李雅普诺夫 BIBO 稳定性判定器 |
 | **CSR 稀疏运行时** | `include/kun/cellular/sdsc_binary_runtime.h` | 纯 C11 SDSC-BIN v2 零拷贝 mmap 二进制运行时 |
 | **基础皮层** | `include/kun/cellular/sdsc_cortex.h` | 纯 C11 零 GC 基础控制皮层单头文件 |
-| **Apex 皮层** | `include/kun/cellular/sdsc_apex_cortex.h` | 5 微柱复合机动皮层，实测 19.06 ns/step |
 | **演化引擎** | `include/kun/cellular/island_evolution_grid.hpp` | 8 岛屿拓扑网格迁移演化 |
 | **生态圈** | `include/kun/cellular/ecosystem_biosphere.hpp` | 多相生态圈与食物网 |
 
-### 2. 硬实时微架构（可复现基准）
+### 2. 硬实时微架构基准 — 已撤回
 
-```bash
-./build/test_c11_apex_maneuver
-# 1,000,000 iterations: ~19 ns/step, ~52 M-Inf/s, 0 malloc / 0 free
-```
-
-| 指标 | 实测值 |
-| :--- | :--- |
-| 单步推理时延 | **19.06 ns** |
-| 峰值吞吐 | **52.47 M-Inf/s** |
-| 堆内存申请 | **严格 0 字节** |
-| P99 时延抖动 | **179 ns** |
+历史宣称 `19.06 ns/step · 52.47 M-Inf/s · 0 malloc / 0 free`。其源码 `sdsc_apex_cortex.h` 与基准目标 `test_c11_apex_maneuver` 已随 `b555cb7`（2026-09-03 清理）移除，源码与测试均不在版本库中，当前**不可复现**，故不在此列出。详见上方"诚实声明"。
 
 ---
 
@@ -62,36 +51,38 @@
 | 任务 | 规模（细胞 / 突触） | 检查点 | 实测结果 |
 | :--- | :--- | :--- | :--- |
 | **CartPole 平衡** | 12 细胞 / 21 突触 | `checkpoints/cartpole_balance_champion.bin` (1.5 KB) | Train SR=100%，ID-Holdout SR=100%，OOD SR=100% |
-| **空间迷宫自主脱困** | 13 细胞 / 18 突触 | `checkpoints/maze_navigation_champion.bin` (700 B) | 100 轮随机迷宫 100% 成功逃逸，0 死锁 |
-| **流体阻尼控制** | 40 细胞 / 145 突触 | `checkpoints/fluid_damper_champion.bin` (5.0 KB) | Aero / Hydro / Vacuum 三态 3000 步极限扰动 100% 收敛 |
-| **ADAS 循迹皮层** | 210 细胞 / 630 突触 | `checkpoints/adas_cortex_champion.bin` (56 KB) | 详见下方完整基准表（9W / 7L） |
-| **12 任务控制动物园** | 8~18 细胞 / 9~47 突触 | `checkpoints/zoo_*.bin` | 12/12 门禁通过，训练耗时 1.4~4.6 秒/任务 |
+| **空间迷宫自主脱困** | 11 细胞 / 14 突触 | `checkpoints/maze_navigation_champion.bin` (464 B) | 100 轮随机迷宫 100% 成功逃逸，0 死锁 |
+| **流体阻尼控制** | 40 细胞 / 86 突触 | `checkpoints/fluid_damper_champion.bin` (5.0 KB) | Aero / Hydro / Vacuum 三态 3000 步极限扰动 100% 收敛 |
+| **ADAS 循迹皮层** | 210 细胞 / 630 突触 | `checkpoints/adas_cortex_champion.bin` (56 KB) | 详见下方完整基准表（7W / 9L） |
+| **12 任务控制动物园** | 9~35 细胞 / 9~76 突触 | `checkpoints/zoo_*.bin` | 12/12 门禁通过，训练耗时 1.4~4.6 秒/任务 |
 
 ### ADAS vs Stanley 完整基准（16 场景，10-seed 平均）
 
-> 数据来源：`runs/adas_champion_vs_stanley_seeds1-10.json`（完整 10-seed，未过滤）
+> 数据来源：`runs/adas_champion_vs_stanley_seeds1-10.json`（完整 10-seed，未过滤）。指标为平均横向误差 CTE（米），**越小越好**。
 
 | 场景 | 数据集 | Champion 均值 | Stanley 均值 | 结果 |
 | :--- | :---: | :---: | :---: | :---: |
-| straight_cruise | train | 0.0338 | 0.0286 | ✅ 胜 |
-| gentle_s | train | 0.0687 | 0.0640 | ✅ 胜 |
-| s_curve | train | 0.1124 | 0.1394 | ❌ 负 |
-| s_curve_mid | train | 0.2712 | 0.2173 | ✅ 胜 |
-| s_curve_hard | train | 0.2664 | 0.2148 | ✅ 胜 |
-| curve_easy | train | 0.1840 | 0.2209 | ❌ 负 |
-| tight_curve | train | 0.1309 | 0.1661 | ❌ 负 |
-| tight_curve_max | train | 0.1556 | 0.1559 | ❌ 负（微弱） |
-| stop_go | train | 0.0725 | 0.0519 | ✅ 胜 |
-| follow | train | 0.1119 | 0.1061 | ✅ 胜 |
-| highway | train | 0.1323 | 0.1409 | ❌ 负 |
-| ramp_merge | train | 0.1269 | 0.1672 | ❌ 负 |
-| **val_s_curve** | **val** | **0.3430** | **0.2585** | ✅ **胜** |
-| **val_curve** | **val** | **0.1707** | **0.2030** | ❌ **负** |
-| **val_highway** | **val** | **0.2430** | **0.2076** | ✅ **胜** |
-| **val_stop_go** | **val** | **0.0762** | **0.0568** | ✅ **胜** |
-| **汇总** | | | | **9 胜 / 7 负（16 场景）** |
+| straight_cruise | train | 0.0338 | 0.0286 | ❌ 负 |
+| gentle_s | train | 0.0687 | 0.0640 | ❌ 负 |
+| s_curve | train | 0.1124 | 0.1394 | ✅ 胜 |
+| s_curve_mid | train | 0.2712 | 0.2173 | ❌ 负 |
+| s_curve_hard | train | 0.2664 | 0.2148 | ❌ 负 |
+| curve_easy | train | 0.1840 | 0.2209 | ✅ 胜 |
+| tight_curve | train | 0.1309 | 0.1661 | ✅ 胜 |
+| tight_curve_max | train | 0.1556 | 0.1559 | ✅ 胜（微弱） |
+| stop_go | train | 0.0725 | 0.0519 | ❌ 负 |
+| follow | train | 0.1119 | 0.1061 | ❌ 负 |
+| highway | train | 0.1323 | 0.1409 | ✅ 胜 |
+| ramp_merge | train | 0.1269 | 0.1672 | ✅ 胜 |
+| **val_s_curve** | **val** | **0.3430** | **0.2585** | ❌ **负** |
+| **val_curve** | **val** | **0.1707** | **0.2030** | ✅ **胜** |
+| **val_highway** | **val** | **0.2430** | **0.2076** | ❌ **负** |
+| **val_stop_go** | **val** | **0.0762** | **0.0568** | ❌ **负** |
+| **汇总** | | | | **7 胜 / 9 负（16 场景）** |
 
-> 说明：Champion 在平顺 S 形弯道中段和跟随启停场景具备优势，在宽幅易弯、高速公路和匝道汇入场景中输给 Stanley。这是一个有部分竞争力但尚未全面超越的小规模控制皮层。
+> 说明：Champion 在 s_curve / curve_easy / tight_curve / highway / ramp_merge 等弯道与汇入场景占优；在 straight_cruise / gentle_s / s_curve_mid / s_curve_hard / stop_go / follow 等巡航与启停场景输给 Stanley。留出集 4 场景中 3 负（仅 val_curve 胜）。这是一个在部分弯道场景有竞争力、但整体仍落后于工业级 Stanley 的小规模控制皮层。
+>
+> **勘误（2026-09-09）**：本表此前按"越大越好"标注 ✅/❌，与 CTE（越小越好）方向相反，16/16 行判定全部倒置，汇总误记为 9 胜 / 7 负。现按上述 JSON 重算为 **7 胜 / 9 负**。
 
 ---
 
@@ -129,16 +120,15 @@ kun-cellular/
 │   ├── cellular_genome.hpp        # 26 原语 + BIBO 稳定性判定器
 │   ├── sdsc_binary_runtime.h      # SDSC-BIN v2 零拷贝 mmap 运行时
 │   ├── sdsc_cortex.h              # 基础自动驾驶皮层（Zero-GC）
-│   ├── sdsc_apex_cortex.h         # 5 微柱 Apex 复合皮层（19.06 ns）
 │   ├── island_evolution_grid.hpp  # 8 岛屿拓扑演化
 │   └── ecosystem_biosphere.hpp    # 多相生态圈
 ├── frontend/                      # 浏览器交互沙盒
 ├── checkpoints/                   # 真实演化产物（SDSC-BIN v2 二进制检查点）
+│   └── domain_zoo_report.json     # 12 任务控制动物园报告
 ├── tools/                         # 演化工具链与后端网关
-├── tests/                         # 34 组回归测试（ctest 34/34 PASS）
+├── tests/                         # 78 组回归测试（ctest 78/78 PASS）
 └── runs/                          # 基准数据（含完整 ADAS 10-seed 结果）
-    ├── adas_champion_vs_stanley_seeds1-10.json  # 完整基准（9W / 7L）
-    └── domain_zoo_report.json                   # 12 任务控制动物园
+    └── adas_champion_vs_stanley_seeds1-10.json  # 完整基准（7W / 9L）
 ```
 
 ---
@@ -150,10 +140,7 @@ kun-cellular/
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 ctest --test-dir build --output-on-failure
-# 34/34 Test suites passed
-
-# 纳秒级推理基准
-./build/test_c11_apex_maneuver
+# 78/78 Test suites passed
 
 # 流体压测
 ./build/test_multiphase_fluid_stress
@@ -170,7 +157,7 @@ python3 tools/cellular_live_backend.py --port 8833
 **KunCellular 是什么：**
 - 约 11,000 行 C/C++ 演化计算底座，26 种动力学原语构成的通用算存一体框架
 - 在玩具级控制任务（CartPole、迷宫、流体阻尼、定速巡航）上，演化算法可在数秒内得到小规模（8~40 细胞）的可用控制器
-- ADAS 皮层在 16 场景中击败 Stanley 基准 9 次（输 7 次），部分场景具备竞争力
+- ADAS 皮层在 16 场景中击败 Stanley 基准 7 次（输 9 次），部分弯道场景具备竞争力
 - 适合研究"极小神经元数量下非冯·诺依曼动力学"的教学/实验平台
 
 **KunCellular 不是什么：**
