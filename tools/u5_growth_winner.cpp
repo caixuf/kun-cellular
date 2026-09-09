@@ -103,7 +103,12 @@ double finetune(core::RuntimeState& rt, core::CompiledExecutor& ex, uint64_t org
         std::vector<const Sample*> order = train;
         if (!streaming && rng) std::shuffle(order.begin(), order.end(), *rng);
         std::vector<std::vector<double>> targets;
+        int32_t prev_gid = -1;
         for (const auto* sp : order) {
+            if (streaming && sp->gid != prev_gid) {
+                rt.reset_episode();  // 局边界 reset — EMA 状态不跨局污染
+                prev_gid = sp->gid;
+            }
             for (size_t i = 0; i < sp->cands.size(); ++i) {
                 auto in = scorer_input(*sp, i);
                 auto rec = engine.record_step(rt, ex, in);
@@ -191,7 +196,7 @@ int main(int argc, char** argv) {
         assert(probe.ok());
         auto pex = core::CompiledExecutor::prepare(probe.runtime->plan());
         assert(pex.ok());
-        finetune(*probe.runtime, *pex.executor, organism_id, train, 8, 0.01, streaming, &rng);
+        finetune(*probe.runtime, *pex.executor, organism_id, train, 10, 0.01, streaming, &rng);
         const double acc = candidate_accuracy(*probe.runtime, *pex.executor, holdout);
         printf("[G%d][%s] 学习后 holdout=%.2f%% (cells=%zu)\n", gen,
                streaming ? "流式" : "打乱", acc,
@@ -263,7 +268,7 @@ int main(int argc, char** argv) {
             auto c_ex = core::CompiledExecutor::prepare(c_probe.runtime->plan());
             if (!c_ex.ok()) continue;
             finetune(*c_probe.runtime, *c_ex.executor,
-                     organism_id + 100 + (uint64_t)k, train, 8, 0.01, streaming, &rng);
+                     organism_id + 100 + (uint64_t)k, train, 10, 0.01, streaming, &rng);
             const double acc2 = candidate_accuracy(*c_probe.runtime, *c_ex.executor, holdout);
             printf("[G%d.%d] 变异(%s @e%llu) holdout=%.2f%% (付费=%.1f)\\n",
                    gen, k, new_type == CellType::OP_EMA ? "EMA" :
