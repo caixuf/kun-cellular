@@ -218,6 +218,11 @@ target_link_libraries(train_multi_asset_quant_master PRIVATE kun_cellular Thread
 
 add_executable(train_multi_asset_cortical_array "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_multi_asset_cortical_array.cpp")
 target_link_libraries(train_multi_asset_cortical_array PRIVATE kun_cellular Threads::Threads m)
+target_include_directories(train_multi_asset_cortical_array PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+
+add_executable(train_quant_population_ecology "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_population_ecology.cpp")
+target_link_libraries(train_quant_population_ecology PRIVATE kun_cellular Threads::Threads m)
+target_include_directories(train_quant_population_ecology PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tools")
 
 add_executable(train_multi_asset_quant_l3 "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_multi_asset_quant_l3.cpp")
 target_link_libraries(train_multi_asset_quant_l3 PRIVATE kun_cellular Threads::Threads m)

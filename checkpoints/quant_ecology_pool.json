@@ -1,0 +1,15 @@
+{
+  "organism_id": "quant_ecology_pool",
+  "pool_size": 5,
+  "pool_sharpe": 0.195264,
+  "pool_calmar": 0.249048,
+  "pool_mdd": 0.0527657,
+  "protocol_note": "val-selected(2013-2016,frozen-consts), OOS single-shot; K=5 equal-weight signal fusion",
+  "members": [
+    {"checkpoint_path": "checkpoints/quant_pool_member_d2.bin", "niche_tag": "r+ r+ r+", "val_sharpe": 1.11666, "val_return": 0.23115, "val_mdd": 0.0690866, "score": 0.690486},
+    {"checkpoint_path": "checkpoints/quant_pool_member_d1.bin", "niche_tag": "r+ r+ r-", "val_sharpe": 0.633388, "val_return": 0.0761114, "val_mdd": 0.0688208, "score": 0.122723},
+    {"checkpoint_path": "checkpoints/quant_pool_member_d0.bin", "niche_tag": "r+ r+ r-", "val_sharpe": 0.608046, "val_return": 0.0788838, "val_mdd": 0.0813682, "score": 0.117805},
+    {"checkpoint_path": "checkpoints/quant_pool_member_d7.bin", "niche_tag": "r+ r- r+", "val_sharpe": 0.642004, "val_return": 0.0669202, "val_mdd": 0.0545425, "score": 0.0746302},
+    {"checkpoint_path": "checkpoints/quant_pool_member_d3.bin", "niche_tag": "r- r+ r+", "val_sharpe": 0.279294, "val_return": 0.0210473, "val_mdd": 0.0696964, "score": -0.0799743}
+  ]
+}

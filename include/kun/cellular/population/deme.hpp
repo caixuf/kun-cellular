@@ -52,10 +52,12 @@ public:
     }
 
     // 适应度评估 (评估委托由任务层实现; 逐个体调用)
+    // OpenMP 并行: 评估委托必须线程安全 (任务拷贝共享不可变预计算, 状态全局部)
     template <typename Eval>
     void evaluate(Eval&& eval) {
         fitness_.assign(individuals_.size(), -1e18);
-        for (size_t i = 0; i < individuals_.size(); ++i) {
+        #pragma omp parallel for schedule(dynamic)
+        for (int64_t i = 0; i < static_cast<int64_t>(individuals_.size()); ++i) {
             double f = eval(individuals_[i]);
             fitness_[i] = std::isfinite(f) ? f : -1e18;
         }
