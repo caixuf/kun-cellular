@@ -2,16 +2,22 @@
  * app.js - SDSCC 全息细胞观测台主调度器与装配入口
  * ============================================================ */
 import * as THREE from 'three';
-import { T, FAMILY, FAMILY_COLOR, MUT_CANDIDATES } from './config.js';
-import { org, compile, forward, stepPhysics, mitosis, rewire, apoptosis, seedOrganism } from './organism_model.js';
+import { FAMILY, FAMILY_COLOR } from './config.js';
+import { org, compile } from './organism_model.js';
 import { currentOrganismBounds, updateOrganismBounds } from './spatial_bounds.js';
 import { scene, camera, renderer, cellPointLight, airParticleCloud, updateAirParticles } from './scene_setup.js';
 import { initPostprocessing, setVisualBloomMode, renderScene, resizePostprocessing } from './postprocessing.js';
 import { camState, updateCamera, setCameraDistance, setCameraTarget, focusOnCell, setCameraPreset, toggleAutoOrbit, initCameraController, cameraShake } from './camera_controller.js';
-import { views, lodPointsMesh, rebuildViews, updateDetailLOD } from './lod_system.js';
+import { views, lodPointsMesh, rebuildViews, updateDetailLOD, setActivePresentationMode } from './lod_system.js';
+import { frameBus } from './frame_bus.js';
+import { hudSet, hudFlush } from './hud_bus.js';
+import {
+  startSimEngine, setSimPaused, setSimMode, pushOrgToWorker, setSimMarketHints,
+  simCommand, simWorkerActive, simFallbackMain, simMainThreadTick, simMainThreadMarketAcc
+} from './sim_client.js';
 import { initBioAudio, toggleBioAcoustics, playIonizationSpark, playChicxulubAtmosphericThunder } from './audio_system.js';
 import { triggerGlobalLifeEvent, playLifeEpicStory, triggerManualDischargeBurst, togglePlasmaStorm, triggerChicxulubExtinction, triggerOrganSplice, triggerLyapunovEnforce } from './life_events.js';
-import { serverOnline, wsConnected, clientWarpMultiplier, lastPrice, realPrice, totalActs, log, fetchRealPrice, marketTick, setWarp, setStress, pollIslands, pollBiosphere, bioViews, bioLayerVisible, radPlane, radRays, radUniforms, radVisible, connectWebSocket, syncBackendState, sendBackendCommand, toggleBioLayer, toggleRadLayer } from './network_sync.js';
+import { serverOnline, wsConnected, clientWarpMultiplier, lastPrice, realPrice, log, fetchRealPrice, setWarp, setStress, pollIslands, pollBiosphere, bioViews, bioLayerVisible, radPlane, radRays, radUniforms, radVisible, connectWebSocket, syncBackendState, sendBackendCommand, toggleBioLayer, toggleRadLayer } from './network_sync.js';
 import { openDocReader, closeDocReader, escapeHtml } from './document_reader.js';
 import { toggleDialogueDeck, sendQuickPrompt, sendDialogueMsg } from './dialogue_system.js';
 import { startAutoTour, showTourStep, nextTourStep, prevTourStep, endAutoTour, initTooltipEngine, TOUR_STAGES } from './tour_system.js';
@@ -26,13 +32,19 @@ import { updateManifoldSystem } from './manifold_system.js';
 initPostprocessing(renderer, scene, camera);
 initCameraController(renderer, camera, () => org, () => views, () => currentOrganismBounds, log);
 
-// 2. 初始构建全景流形与微观视图
+// 2. 初始构建全景流形与微观视图（默认仪器模式）
 compile(org);
 updateOrganismBounds(null, org);
+setActivePresentationMode('instrument');
 rebuildViews(scene, org, currentOrganismBounds);
+frameBus.publish(org);
+setVisualBloomMode('off', renderer, null);
+
+// 3. 启动 Worker Model 线程（失败则主线程降级）
+startSimEngine({ log });
 
 let paused = false;
-let tickTimer = 0;
+let lastServerOnline = null;
 const clock = new THREE.Clock();
 let frameCount = 0;
 let lastFpsTime = performance.now();
@@ -46,37 +58,47 @@ function animate() {
   frameCount++;
   if (now - lastFpsTime >= 500) {
     const fps = (frameCount * 1000) / (now - lastFpsTime);
-    const fpsEl = document.getElementById('st-fps');
-    if (fpsEl) fpsEl.textContent = fps.toFixed(1);
+    hudSet('st-fps', fps.toFixed(1));
     frameCount = 0;
     lastFpsTime = now;
   }
 
   const dt = Math.min(clock.getDelta(), 0.05);
-  if (!paused) {
-    tickTimer += dt;
-    if (tickTimer >= 0.6) {
-      tickTimer = 0;
-      marketTick();
-    }
-    stepPhysics(org);
+  const instrument = currentRenderMode === 'instrument';
+
+  // 后端在线时 Worker 切 mirror，避免与权威状态双写
+  if (lastServerOnline !== serverOnline) {
+    lastServerOnline = serverOnline;
+    setSimMode(serverOnline ? 'mirror' : 'owner');
+    if (serverOnline) pushOrgToWorker();
   }
 
-  // 1. 相机动力学更新与阻尼插值
+  // ── MODEL：Worker 异步产出帧；仅降级时主线程步进 ──
+  if (simWorkerActive && !simFallbackMain) {
+    setSimMarketHints({ realPrice, lastPrice });
+  } else if (!paused && !serverOnline) {
+    const doMarket = simMainThreadMarketAcc(dt);
+    simMainThreadTick(dt, { paused: false, doMarket, lastPrice, realPrice });
+  } else if (!simWorkerActive || simFallbackMain) {
+    frameBus.publish(org);
+  }
+
+  const snap = frameBus.latest() || frameBus.publish(org);
+
+  // ── VIEW（只消费快照 + 相机）──
   updateCamera(dt, camera);
 
-  // 2. 视锥裁剪准备
   _projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
   _frustum.setFromProjectionMatrix(_projScreenMatrix);
 
   const closeLook = camState.camR < Math.max(160, (currentOrganismBounds.microDist || 220) * 0.85);
-  const totalCellCount = org && org.cells ? org.cells.length : 0;
+  const totalCellCount = snap.cellCount;
   const macroScale = (currentOrganismBounds && currentOrganismBounds.cellScale) || totalCellCount;
   const isLargeScale = (macroScale >= 100000) || (totalCellCount > 3000);
   const isDiscrete = !isLargeScale;
 
   let showPointCloud = true;
-  if (currentRenderMode === "puremesh") {
+  if (instrument || currentRenderMode === "puremesh") {
     showPointCloud = false;
   } else if (currentRenderMode === "lod") {
     showPointCloud = isLargeScale || (views.cells.length === 0) || !closeLook;
@@ -86,8 +108,8 @@ function animate() {
 
   if (lodPointsMesh && lodPointsMesh.material) {
     const hasSolid = views.cells && views.cells.length > 0;
-    if (isLargeScale) {
-      lodPointsMesh.visible = false;
+    if (isLargeScale || instrument) {
+      lodPointsMesh.visible = instrument ? false : (isLargeScale ? false : showPointCloud);
     } else {
       lodPointsMesh.visible = showPointCloud;
       lodPointsMesh.material.opacity = hasSolid ? (closeLook ? 0.25 : (currentRenderMode === "lod" ? 0.45 : 0.65)) : 0.90;
@@ -95,42 +117,42 @@ function animate() {
     }
   }
 
-  // 2.2 硬件级纯二进制高维流形 GLSL 材质时钟驱动
   const manifoldOpacity = !isLargeScale ? 0.0 : (views.cells && views.cells.length > 0 ? (closeLook ? 0.35 : 0.65) : 0.88);
-  updateManifoldSystem(now * 0.001, manifoldOpacity, showPointCloud && isLargeScale);
+  updateManifoldSystem(now * 0.001, instrument ? 0.0 : manifoldOpacity, !instrument && showPointCloud && isLargeScale);
 
-  // 3. 动态屏幕像素视锥实化 LOD
   updateDetailLOD(_frustum, scene, camera, org, currentOrganismBounds, currentRenderMode);
-
-  // 3.2 动态更新 3D 生物器官外包膜与共生微柱全息透视
-  updateOrganSystem(scene, org, now * 0.001, !closeLook);
+  updateOrganSystem(scene, org, now * 0.001, !instrument && !closeLook);
 
   let visibleMicroCount = 0;
   const isDenseCells = views.cells.length > 50;
-  const showMicroOrganelles = !isDenseCells || closeLook;
+  const showMicroOrganelles = !instrument && (!isDenseCells || closeLook);
 
   for (const v of views.cells) {
     visibleMicroCount++;
     v.group.visible = true;
+    const cellSnap = snap.cellById.get(v.cell && v.cell.id);
+    if (cellSnap) v.applySnapshot(cellSnap);
 
-    // 宏观远景下隐藏繁琐的大圆环/色带/线粒体/穿膜代谢流/内膜孔道，避免几何与CPU过载；特写近视距时才展示微观超精细内部结构
-    if (v.delayRing) v.delayRing.visible = showMicroOrganelles;
-    if (v.attrRibbon) v.attrRibbon.visible = showMicroOrganelles;
-    if (v.metabolicPoints) v.metabolicPoints.visible = closeLook;
-    if (v.innerMembraneMesh) v.innerMembraneMesh.visible = showMicroOrganelles;
-    if (v.poresMesh) v.poresMesh.visible = showMicroOrganelles;
-    if (v.cytoMesh) v.cytoMesh.visible = showMicroOrganelles;
-    if (v.organelles) {
-      for (const o of v.organelles) {
-        if (o.mesh) o.mesh.visible = showMicroOrganelles;
+    if (!instrument) {
+      if (v.delayRing) v.delayRing.visible = showMicroOrganelles;
+      if (v.attrRibbon) v.attrRibbon.visible = showMicroOrganelles;
+      if (v.metabolicPoints) v.metabolicPoints.visible = closeLook;
+      if (v.innerMembraneMesh) v.innerMembraneMesh.visible = showMicroOrganelles;
+      if (v.poresMesh) v.poresMesh.visible = showMicroOrganelles;
+      if (v.cytoMesh) v.cytoMesh.visible = showMicroOrganelles;
+      if (v.organelles) {
+        for (const o of v.organelles) {
+          if (o.mesh) o.mesh.visible = showMicroOrganelles;
+        }
       }
     }
 
     v.update(now * 0.001, clientWarpMultiplier);
 
-    // 标签显示：避免几十个巨大文字漂浮遮挡画面。只在近距特写或少量细胞下针对前排受体显示
     if (v.label) {
-      const showLabel = closeLook ? (visibleMicroCount <= 16) : (!isDenseCells && visibleMicroCount <= 8);
+      const showLabel = instrument
+        ? (closeLook ? visibleMicroCount <= 24 : visibleMicroCount <= 12)
+        : (closeLook ? (visibleMicroCount <= 16) : (!isDenseCells && visibleMicroCount <= 8));
       v.label.visible = showLabel;
       if (v.label.material) v.label.material.opacity = showLabel ? 0.90 : 0;
     }
@@ -140,7 +162,7 @@ function animate() {
   for (const v of views.syns) {
     v.group.visible = true;
     v.update(now * 0.001, clientWarpMultiplier);
-    // 大规模与密集突触网络下线条与光子轻盈微透（隐隐若现），避免强光刺眼糊屏
+    if (instrument) continue;
     if (isDenseSyn && !closeLook) {
       v.lineMat.opacity = 0.12;
       v.photon1.material.opacity = 0.32;
@@ -159,46 +181,34 @@ function animate() {
     }
   }
 
-  // 3.8 膜片钳实时电位示波与白质纤维束伴随光子流推进
-  patchClampHUD.update(now * 0.001);
-  tractography.update(now * 0.001, clientWarpMultiplier);
+  if (!instrument) {
+    patchClampHUD.update(now * 0.001);
+    tractography.update(now * 0.001, clientWarpMultiplier);
+  }
 
   const ptCount = (lodPointsMesh && lodPointsMesh.geometry && lodPointsMesh.geometry.attributes.position) ? lodPointsMesh.geometry.attributes.position.count : totalCellCount;
-  const realCellsEl = document.getElementById("st-real-cells");
-  if (realCellsEl) {
-    if (isDiscrete) {
-      realCellsEl.textContent = `${visibleMicroCount}/${totalCellCount} 实体全量 (100% 显微实化)`;
-    } else if (visibleMicroCount > 0) {
-      realCellsEl.textContent = `${visibleMicroCount} 实体视锥局部实化 / ${ptCount.toLocaleString()} 点云流形`;
-    } else {
-      realCellsEl.textContent = `${ptCount.toLocaleString()} 点云流形 (宏观亚像素，真实未放大)`;
-    }
-  }
-  const elScale = document.getElementById("st-pipe");
-  if (elScale) elScale.textContent = isDiscrete ? `实体 ${visibleMicroCount}/${totalCellCount} (100% 全量实化)` : `实体 ${visibleMicroCount} / 点云 ${ptCount.toLocaleString()} · 像素LOD实化`;
 
-  const vitalScaleEl = document.getElementById("vital-scale");
-  const vitalScaleSubEl = document.getElementById("vital-scale-sub");
-  if (vitalScaleEl) {
-    vitalScaleEl.textContent = macroScale.toLocaleString() + ' 细胞';
+  // ── UI（集中刷 DOM，类 Qt GUI 线程）──
+  if (isDiscrete) {
+    hudSet('st-real-cells', `${visibleMicroCount}/${totalCellCount} 实体全量 (100% 显微实化)`);
+    hudSet('st-pipe', `实体 ${visibleMicroCount}/${totalCellCount} (100% 全量实化)`);
+    hudSet('vital-scale-sub', instrument
+      ? `${snap.cellCount} 细胞 · ${snap.synCount} 突触 · rev ${snap.revision}`
+      : `${visibleMicroCount}/${totalCellCount} 实体全量晶化 · 30,000 星云`);
+  } else if (visibleMicroCount > 0) {
+    hudSet('st-real-cells', `${visibleMicroCount} 实体视锥局部实化 / ${ptCount.toLocaleString()} 点云流形`);
+    hudSet('st-pipe', `实体 ${visibleMicroCount} / 点云 ${ptCount.toLocaleString()} · 像素LOD实化`);
+    hudSet('vital-scale-sub', `${visibleMicroCount} 实体视锥实化 / ${ptCount.toLocaleString()} 点云`);
+  } else {
+    hudSet('st-real-cells', `${ptCount.toLocaleString()} 点云流形 (宏观亚像素，真实未放大)`);
+    hudSet('st-pipe', `实体 ${visibleMicroCount} / 点云 ${ptCount.toLocaleString()} · 像素LOD实化`);
+    hudSet('vital-scale-sub', `全视界 ${ptCount.toLocaleString()} 动力学流形点云 (LOD)`);
   }
-  if (vitalScaleSubEl) {
-    if (isDiscrete) {
-      vitalScaleSubEl.textContent = `${visibleMicroCount}/${totalCellCount} 实体全量晶化 · 30,000 星云`;
-    } else if (visibleMicroCount > 0) {
-      vitalScaleSubEl.textContent = `${visibleMicroCount} 实体视锥实化 / ${ptCount.toLocaleString()} 点云`;
-    } else {
-      vitalScaleSubEl.textContent = `全视界 ${ptCount.toLocaleString()} 动力学流形点云 (LOD)`;
-    }
-  }
-
-  const elCamR = document.getElementById("st-cam-r");
-  if (elCamR) elCamR.textContent = `${Math.round(camState.camR)} 单位`;
-
-  const elFocal = document.getElementById("st-focal");
-  if (elFocal) {
-    elFocal.textContent = `${visibleMicroCount}/${totalCellCount} 细胞可见 · 世界尺度未改`;
-  }
+  hudSet('vital-scale', macroScale.toLocaleString() + ' 细胞');
+  hudSet('st-cam-r', `${Math.round(camState.camR)} 单位`);
+  hudSet('st-focal', `${visibleMicroCount}/${totalCellCount} 细胞可见 · 世界尺度未改`);
+  hudSet('st-cells', String(snap.cellCount));
+  hudSet('st-syn', String(snap.synCount));
 
   if (bioLayerVisible) {
     const t = clock.elapsedTime;
@@ -214,30 +224,32 @@ function animate() {
     }
   }
 
-  // 流体微粒模拟
-  if (airParticleCloud && airParticleCloud.geometry && airParticleCloud.visible) {
+  if (!instrument && airParticleCloud && airParticleCloud.geometry && airParticleCloud.visible) {
     updateAirParticles(dt);
+  } else if (instrument && airParticleCloud) {
+    airParticleCloud.visible = false;
   }
 
-  // 离子电弧放电
-  const dischargeProb = window.plasmaStormActive ? 0.22 : 0.003;
-  if (views && views.cells && views.cells.length > 2 && Math.random() < dischargeProb) {
-    const c1 = views.cells[Math.floor(Math.random() * views.cells.length)];
-    const c2 = views.cells[Math.floor(Math.random() * views.cells.length)];
-    if (c1 !== c2) {
-      const v1 = new THREE.Vector3(c1.cell.x, c1.cell.y, c1.cell.z);
-      const v2 = new THREE.Vector3(c2.cell.x, c2.cell.y, c2.cell.z);
-      const dist = v1.distanceTo(v2);
-      if (dist > 20 && dist < 260) {
-        const colors = [0x38bdf8, 0xa855f7, 0x00f0ff, 0xfbbf24];
-        const col = colors[Math.floor(Math.random() * colors.length)];
-        spawnDielectricBreakdownArc(v1, v2, col, window.plasmaStormActive ? 0.9 : 0.45);
-        playIonizationSpark(window.plasmaStormActive ? 0.35 : 0.12);
+  if (!instrument) {
+    const dischargeProb = window.plasmaStormActive ? 0.22 : 0.003;
+    if (views && views.cells && views.cells.length > 2 && Math.random() < dischargeProb) {
+      const c1 = views.cells[Math.floor(Math.random() * views.cells.length)];
+      const c2 = views.cells[Math.floor(Math.random() * views.cells.length)];
+      if (c1 !== c2) {
+        const v1 = new THREE.Vector3(c1.cell.x, c1.cell.y, c1.cell.z);
+        const v2 = new THREE.Vector3(c2.cell.x, c2.cell.y, c2.cell.z);
+        const dist = v1.distanceTo(v2);
+        if (dist > 20 && dist < 260) {
+          const colors = [0x38bdf8, 0xa855f7, 0x00f0ff, 0xfbbf24];
+          const col = colors[Math.floor(Math.random() * colors.length)];
+          spawnDielectricBreakdownArc(v1, v2, col, window.plasmaStormActive ? 0.9 : 0.45);
+          playIonizationSpark(window.plasmaStormActive ? 0.35 : 0.12);
+        }
       }
     }
   }
 
-  // 最终渲染
+  hudFlush();
   renderScene(dt, renderer, scene, camera);
 }
 
@@ -260,7 +272,10 @@ window.triggerChicxulubExtinction = async () => { triggerExtinctionVisualShock(v
 window.triggerOrganSplice = async () => { const sel = document.getElementById("sel-frozen-organ"); const organName = sel ? sel.value : "schmitt_damping_column"; log(`[VAULT] 正在从冷冻库借用剪裁器官【${organName}】并接入中枢网络...`, true); triggerOrganSplice(views, currentOrganismBounds, log, null, () => sendBackendCommand('splice', { name: organName })); };
 window.setCameraPreset = (mode) => setCameraPreset(mode, currentOrganismBounds);
 window.toggleAutoOrbit = toggleAutoOrbit;
-window.setRenderMode = setRenderMode;
+window.setRenderMode = (mode) => {
+  setRenderMode(mode);
+  if (mode === 'instrument') setVisualBloomMode('off', renderer, null);
+};
 window.switchLOD = switchLOD;
 window.loadPreset = loadPreset;
 window.startAutoTour = () => startAutoTour(views, currentOrganismBounds);
@@ -287,9 +302,9 @@ window.log = log;
 
 // 绑定底座微观操作按钮
 const _bind = (id, fn) => { const el = document.getElementById(id); if (el) el.onclick = fn; };
-_bind('b-mito', () => { mitosis(org); rebuildViews(scene, org, currentOrganismBounds); });
-_bind('b-rewire', () => { rewire(org); rebuildViews(scene, org, currentOrganismBounds); });
-_bind('b-apop', () => { apoptosis(org); rebuildViews(scene, org, currentOrganismBounds); });
+_bind('b-mito', () => { simCommand('mitosis'); });
+_bind('b-rewire', () => { simCommand('rewire'); });
+_bind('b-apop', () => { simCommand('apoptosis'); });
 _bind('b-bio', e => {
   const vis = toggleBioLayer();
   e.target.textContent = vis ? ' 生态圈' : ' 生态圈(关)';
@@ -300,14 +315,11 @@ _bind('b-rad', e => {
 });
 _bind('b-pause', e => {
   paused = !paused;
+  setSimPaused(paused);
   e.target.textContent = paused ? '[RESUME] 继续' : '[PAUSE] 暂停';
 });
 _bind('b-reset', () => {
-  const seeded = seedOrganism();
-  org.cells = seeded.cells;
-  org.syns = seeded.syns;
-  compile(org);
-  rebuildViews(scene, org, currentOrganismBounds);
+  simCommand('reset');
   log('[RESET] 重置为种子形态生物 Genesis-0', true);
 });
 
@@ -323,8 +335,12 @@ setInterval(pollLibrary, 5000);
 setInterval(syncBackendState, 100);
 connectWebSocket();
 
-setInterval(() => { if (!paused && !serverOnline) { mitosis(org); rebuildViews(scene, org, currentOrganismBounds); } }, 14000);
-setInterval(() => { if (!paused && !serverOnline && org.cells.length > 16) { apoptosis(org); rebuildViews(scene, org, currentOrganismBounds); } }, 42000);
+setInterval(() => {
+  if (!paused && !serverOnline) simCommand('mitosis');
+}, 14000);
+setInterval(() => {
+  if (!paused && !serverOnline && org.cells.length > 16) simCommand('apoptosis');
+}, 42000);
 
 // 事件监听器
 window.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDocReader(); });
@@ -346,7 +362,8 @@ window.addEventListener('resize', () => {
 // 初始化新手 Smart Tooltips 引擎
 initTooltipEngine();
 
-log('形态发生细胞全息观测台已启动 — 拖拽旋转 · 滚轮缩放', true);
+log('仪器观测台已启动 — Worker Model / GUI View 分离 · 拖拽旋转 · 滚轮缩放', true);
+setRenderMode('instrument');
 
-// 启动动画渲染循环
+// 启动动画渲染循环（GUI 线程）
 animate();

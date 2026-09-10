@@ -9,6 +9,9 @@ import { currentOrganismBounds, updateOrganismBounds } from './spatial_bounds.js
 import { rebuildViews, views, lodPointsMesh } from './lod_system.js';
 import { camState } from './camera_controller.js';
 import { embodiedPIP } from './embodied_pip.js';
+import { hudSet } from './hud_bus.js';
+import { frameBus } from './frame_bus.js';
+import { simWorkerActive, simFallbackMain, setSimMarketHints, pushOrgToWorker, setSimMode } from './sim_client.js';
 
 export let serverOnline = false;
 export let wsConnected = false;
@@ -77,6 +80,12 @@ export async function fetchRealPrice() {
 }
 
 export function marketTick() {
+  // Worker 持有离线 Model 时，主线程只转发行情提示，不做 forward
+  if (simWorkerActive && !simFallbackMain && !serverOnline) {
+    setSimMarketHints({ realPrice, lastPrice });
+    return;
+  }
+
   if (realPrice) lastPrice += (realPrice - lastPrice) * 0.15 + (Math.random() - 0.5) * 1.2;
   else lastPrice += (Math.random() - 0.5) * 2.4;
   const vol = 4000 + Math.random() * 3000;
@@ -98,25 +107,16 @@ export function marketTick() {
   if (pxSrcEl) pxSrcEl.textContent = realPrice ? '(真实行情)' : '(合成游走)';
 
   if (!serverOnline) {
-    const genEl = document.getElementById('st-gen');
-    if (genEl) genEl.textContent = org.generation;
-    const cellsEl = document.getElementById('st-cells');
-    if (cellsEl) cellsEl.textContent = org.cells.length.toLocaleString();
-    const synEl = document.getElementById('st-syn');
-    if (synEl) synEl.textContent = org.syns.length.toLocaleString();
-    const physEl = document.getElementById('st-phys');
-    if (physEl) physEl.textContent = org.phySteps;
+    hudSet('st-gen', String(org.generation));
+    hudSet('st-cells', org.cells.length.toLocaleString());
+    hudSet('st-syn', org.syns.length.toLocaleString());
+    hudSet('st-phys', String(org.phySteps));
   }
-  const actEl = document.getElementById('st-act');
-  if (actEl) actEl.textContent = totalActs;
-  const set = (id, v) => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = v.toFixed(2);
-  };
-  set('v-buy', actions.buy);
-  set('v-sell', actions.sell);
-  const immEl = document.getElementById('v-immune');
-  if (immEl) immEl.textContent = actions.immune ? '熔断!' : '—';
+  hudSet('st-act', String(totalActs));
+  hudSet('v-buy', actions.buy.toFixed(2));
+  hudSet('v-sell', actions.sell.toFixed(2));
+  hudSet('v-immune', actions.immune ? '熔断!' : '—');
+  // 动作条仍直接写 style（非 textContent 热路径）；其余状态走 hud 总线
   const ab = document.getElementById('act-buy');
   const as = document.getElementById('act-sell');
   const ai = document.getElementById('act-immune');
@@ -600,6 +600,8 @@ export function updateFromBackendState(data) {
     compile(org);
     updateOrganismBounds(data);
     rebuildViews();
+    pushOrgToWorker();
+    setSimMode('mirror');
     if (isNewOrg) {
       camState.targetLookAt.copy(currentOrganismBounds.center);
       camState.targetCamR = currentOrganismBounds.macroDist;
@@ -769,6 +771,8 @@ export function updateFromBackendState(data) {
       }
     }
   }
+  // 后端权威帧写入 Model 镜像后，经 frameBus 交给 View（GUI 不直接当数据源）
+  frameBus.publish(org);
 
   // 具身画中画数字孪生实时渲染同步
   if (data.embodied_twin) {

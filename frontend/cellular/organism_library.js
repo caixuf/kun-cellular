@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { org } from './organism_model.js';
 import { currentOrganismBounds, updateOrganismBounds } from './spatial_bounds.js';
 import { camState } from './camera_controller.js';
-import { views, lodPointsMesh, rebuildViews } from './lod_system.js';
+import { views, lodPointsMesh, rebuildViews, setActivePresentationMode } from './lod_system.js';
 import { FAMILY, FAMILY_COLOR } from './config.js';
 import { log, syncBackendState, setCurrentSelectedOrgId, setPendingSwitchOrganism, clearPendingSwitchOrganism } from './network_sync.js';
 import { cellPointLight } from './scene_setup.js';
@@ -15,7 +15,7 @@ export let currentHighlightedBookId = null;
 let libraryInitialRenderDone = false;
 let activeSwitchAbortController = null;
 
-export let currentRenderMode = "symbiosis"; // "symbiosis" | "puremesh" | "lod"
+export let currentRenderMode = "instrument"; // "instrument" | "symbiosis" | "puremesh" | "lod"
 export let currentLOD = "1m";
 
 export const ORGAN_DESCRIPTIONS = {
@@ -496,14 +496,20 @@ export function switchLOD(mode) {
 
 export function setRenderMode(mode) {
   currentRenderMode = mode;
+  const bInst = document.getElementById("rmode-instrument");
   const bSym = document.getElementById("rmode-symbiosis");
   const bMesh = document.getElementById("rmode-puremesh");
   const bLod = document.getElementById("rmode-lod");
+  if (bInst) bInst.classList.toggle("active", mode === "instrument");
   if (bSym) bSym.classList.toggle("active", mode === "symbiosis");
   if (bMesh) bMesh.classList.toggle("active", mode === "puremesh");
   if (bLod) bLod.classList.toggle("active", mode === "lod");
 
-  if (mode === "symbiosis") {
+  setActivePresentationMode(mode === "instrument" ? "instrument" : mode);
+
+  if (mode === "instrument") {
+    log("[视界] 【仪器模式】：原语着色 + |out|/权重编码；装饰关闭；Model/View 分离渲染。", true);
+  } else if (mode === "symbiosis") {
     log("[视界] 开启【实体细胞 + 能量星云共生】：全天候呈现微观实体质膜与神经突触，外层环绕拓扑伴生点云星云！", true);
   } else if (mode === "puremesh") {
     log("[视界] 开启【纯净微观实体】：仅保留高精生物质膜、核仁与脉冲突触，隐藏点云！", true);

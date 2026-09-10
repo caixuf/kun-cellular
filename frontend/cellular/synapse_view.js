@@ -18,6 +18,8 @@ export class SynapseView {
     this.org = org;
     this.scene = scene;
     this.numSegments = 16;
+    /** @type {'instrument'|'symbiosis'|'puremesh'|'lod'} */
+    this.presentationMode = 'instrument';
 
     this.curvePoints = new Float32Array((this.numSegments + 1) * 3);
     this.geo = new THREE.BufferGeometry();
@@ -55,6 +57,15 @@ export class SynapseView {
 
     this.flowT1 = Math.random();
     this.flowT2 = (this.flowT1 + 0.5) % 1.0;
+    this.applyPresentationMode(this.presentationMode);
+  }
+
+  applyPresentationMode(mode) {
+    this.presentationMode = mode || 'instrument';
+    const instrument = this.presentationMode === 'instrument';
+    if (this.photon1) this.photon1.visible = !instrument;
+    if (this.photon2) this.photon2.visible = !instrument;
+    if (this.bouton) this.bouton.visible = !instrument;
   }
 
   updateSyn(syn, org) {
@@ -76,7 +87,9 @@ export class SynapseView {
     _tmpP2.set(b.x, b.y, b.z || 0);
     _tmpChord.subVectors(_tmpP2, _tmpP0);
     const dist = _tmpChord.length();
-    const arcHeight = Math.min(25, dist * 0.18);
+    const arcHeight = this.presentationMode === 'instrument'
+      ? Math.min(8, dist * 0.06)
+      : Math.min(25, dist * 0.18);
 
     if (Math.abs(_tmpChord.y) < 0.95 * dist) _tmpUp.set(0, 1, 0);
     else _tmpUp.set(1, 0, 0);
@@ -100,11 +113,18 @@ export class SynapseView {
     const hot = Math.abs(w) > 0.6;
     const synCount = (this.org && this.org.syns) ? this.org.syns.length : 10;
     const isDense = synCount > 80;
+    const actA = Math.min(2.0, Math.abs(a.out || 0) + (a.glow || 0));
+
+    if (this.presentationMode === 'instrument') {
+      this.lineMat.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);
+      this.lineMat.opacity = 0.18 + Math.min(0.55, Math.abs(w) * 0.35 + actA * 0.12);
+      return;
+    }
+
     const baseLineOp = isDense ? 0.14 : 0.28;
     this.lineMat.color.setHex(w >= 0 ? (hot ? 0x38bdf8 : 0x0284c7) : (hot ? 0xf43f5e : 0xbe123c));
     this.lineMat.opacity = baseLineOp + Math.min(0.18, Math.abs(w) * 0.12);
 
-    const actA = Math.min(2.0, Math.abs(a.out || 0) + (a.glow || 0));
     const speed = (0.014 + Math.min(0.065, actA * 0.038 + Math.abs(w) * 0.022)) * warpMultiplier;
     this.flowT1 = (this.flowT1 + speed) % 1.0;
     const tailT = (this.flowT1 - 0.07 + 1.0) % 1.0; // 孤子彗尾

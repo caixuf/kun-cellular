@@ -7,9 +7,11 @@
  * 4. 微管蛋白细胞骨架、16阶环形时滞轮盘、相空间极限环吸引子、核仁与线粒体
  * ============================================================ */
 import * as THREE from 'three';
-import { FAMILY, FAMILY_COLOR } from './config.js';
+import { FAMILY, FAMILY_COLOR, getPrimitiveColor } from './config.js';
 import { getGlowTexture, getLabelTexture } from './texture_cache.js';
 import { getCellWorldRadius } from './spatial_bounds.js';
+
+/** @typedef {'instrument'|'symbiosis'|'puremesh'|'lod'} PresentationMode */
 
 export const PORE_DIRS = [
   new THREE.Vector3( 1,  1,  1).normalize(),
@@ -114,6 +116,8 @@ export class CellView {
     this.cell = cell;
     this.scene = scene;
     this.org = org;
+    /** @type {PresentationMode} */
+    this.presentationMode = 'instrument';
     this.targetX = cell.x || 0;
     this.targetY = cell.y || 0;
     this.targetZ = cell.z || 0;
@@ -124,7 +128,7 @@ export class CellView {
     this.shockwaveRadius = 1.0;
 
     const fam = FAMILY(cell.type);
-    const col = FAMILY_COLOR[fam] || 0x38bdf8;
+    const col = getPrimitiveColor(cell.type) || FAMILY_COLOR[fam] || 0x38bdf8;
     const glow = getGlowTexture();
     const geos = getSharedGeos();
 
@@ -305,6 +309,49 @@ export class CellView {
     if (this.scene) {
       this.scene.add(this.group);
     }
+    this.applyPresentationMode(this.presentationMode);
+  }
+
+  /**
+   * 仪器模式：只保留原语语义几何（外壳 + 核 + 标签），关掉生物装饰。
+   * @param {PresentationMode} mode
+   */
+  applyPresentationMode(mode) {
+    this.presentationMode = mode || 'instrument';
+    const instrument = this.presentationMode === 'instrument';
+    if (this.innerMembraneMesh) this.innerMembraneMesh.visible = !instrument;
+    if (this.poresMesh) this.poresMesh.visible = !instrument;
+    if (this.metabolicPoints) this.metabolicPoints.visible = !instrument;
+    if (this.cytoMesh) this.cytoMesh.visible = !instrument;
+    if (this.delayRing) this.delayRing.visible = !instrument;
+    if (this.attrRibbon) this.attrRibbon.visible = !instrument;
+    if (this.shockwaveRing) this.shockwaveRing.visible = !instrument;
+    if (this.membrane) this.membrane.visible = !instrument;
+    if (this.organelles) {
+      for (const o of this.organelles) {
+        if (o.mesh) o.mesh.visible = !instrument;
+      }
+    }
+    if (this.outerMembraneMesh && this.outerMembraneMesh.material) {
+      this.outerMembraneMesh.material.opacity = instrument ? 0.55 : 0.38;
+      this.outerMembraneMesh.material.depthWrite = instrument;
+    }
+  }
+
+  /**
+   * 从 FrameBus 快照同步位置/输出（View 只读 Model 快照）。
+   * @param {{ x?: number, y?: number, z?: number, out?: number, glow?: number, type?: string }|null} snapCell
+   */
+  applySnapshot(snapCell) {
+    if (!snapCell) return;
+    this.targetX = snapCell.x || 0;
+    this.targetY = snapCell.y || 0;
+    this.targetZ = snapCell.z || 0;
+    if (this.cell) {
+      this.cell.out = snapCell.out || 0;
+      this.cell.glow = snapCell.glow || 0;
+      if (snapCell.type) this.cell.type = snapCell.type;
+    }
   }
 
   updateCell(cell, org = null) {
@@ -322,7 +369,7 @@ export class CellView {
     this.group.scale.set(sf, sf, sf);
 
     const fam = FAMILY(cell.type);
-    const col = FAMILY_COLOR[fam] || 0x38bdf8;
+    const col = getPrimitiveColor(cell.type) || FAMILY_COLOR[fam] || 0x38bdf8;
     if (this.outerMembraneMesh && this.outerMembraneMesh.material) {
       this.outerMembraneMesh.material.color.setHex(col);
       this.outerMembraneMesh.material.emissive.setHex(col);
@@ -367,8 +414,21 @@ export class CellView {
     this.group.position.set(this.curX, this.curY, this.curZ);
     this.label.position.set(0, -18, 0);
 
-    const breath = Math.sin(time * 2.2 + this.phase) * 0.08;
     const actIntensity = Math.min(2.0, Math.abs(c.out || 0) + (c.glow || 0));
+
+    // 仪器模式：低开销，|out| → 发光强度，原语色固定
+    if (this.presentationMode === 'instrument') {
+      const memScale = 1.0 + Math.min(0.22, actIntensity * 0.12);
+      this.outerMembraneMesh.scale.set(memScale, memScale, memScale);
+      this.outerMembraneMesh.material.emissiveIntensity = 0.12 + actIntensity * 0.55;
+      this.outerMembraneMesh.material.opacity = 0.50 + Math.min(0.35, actIntensity * 0.2);
+      const nScale = 1.0 + actIntensity * 0.18;
+      this.nucleus.scale.set(nScale, nScale, nScale);
+      this.nucleus.material.emissiveIntensity = 0.35 + actIntensity * 0.55;
+      return;
+    }
+
+    const breath = Math.sin(time * 2.2 + this.phase) * 0.08;
 
     // 因果脉冲去极化击穿闪光检测 (Depolarization Flash Trigger)
     if (this.lastOut === undefined) this.lastOut = c.out || 0;

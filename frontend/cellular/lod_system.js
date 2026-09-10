@@ -22,6 +22,25 @@ export const cellViewsMap = new Map();
 export const synViewsMap = new Map();
 export const views = { cells: [], syns: [] };
 
+/** View 呈现模式（与 organism_library.currentRenderMode 同步） */
+export let activePresentationMode = 'instrument';
+
+export function setActivePresentationMode(mode) {
+  activePresentationMode = mode || 'instrument';
+  for (const v of views.cells) {
+    if (v && typeof v.applyPresentationMode === 'function') v.applyPresentationMode(activePresentationMode);
+  }
+  for (const v of views.syns) {
+    if (v && typeof v.applyPresentationMode === 'function') v.applyPresentationMode(activePresentationMode);
+  }
+  for (const v of cellViewPool) {
+    if (v && typeof v.applyPresentationMode === 'function') v.applyPresentationMode(activePresentationMode);
+  }
+  for (const v of synViewPool) {
+    if (v && typeof v.applyPresentationMode === 'function') v.applyPresentationMode(activePresentationMode);
+  }
+}
+
 export let cellSpatialHash = new Map();
 export let cellSynAdj = new Map();
 export let synKeyMap = new Map();
@@ -384,6 +403,7 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
       const c = (orgObj.cellMap && orgObj.cellMap.get(cd.id)) || orgObj.cells.find(x => x.id === cd.id);
       if (!c) continue;
       v = cellViewPool.length ? cellViewPool.pop() : new CellView(c, scn, orgObj);
+      v.applyPresentationMode(activePresentationMode);
       v.updateCell(c, orgObj);
       cellViewsMap.set(cd.id, v);
     }
@@ -424,6 +444,7 @@ export function updateDetailLOD(arg1, arg2, arg3, arg4, arg5, arg6 = null) {
       const syn = synKeyMap.get(key);
       if (!syn) continue;
       let v = synViewPool.length ? synViewPool.pop() : new SynapseView(syn, orgObj, scn);
+      v.applyPresentationMode(activePresentationMode);
       v.updateSyn(syn, orgObj);
       synViewsMap.set(key, v);
     }
