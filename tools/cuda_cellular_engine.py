@@ -19,13 +19,18 @@ class CUDACellularPopulation:
     """
     与 C11 硬件运行时 sdsc_binary_runtime.h / sdsc_primitives.h 100% 绝对数值对齐的 GPU 批量元胞种群
     """
-    def __init__(self, pop_size=256, num_columns=16, cells_per_col=64, in_dim=32, out_dim=8, device="cuda", propagation_passes=1):
+    def __init__(self, pop_size=256, num_columns=16, cells_per_col=64, in_dim=32, out_dim=8, device="cuda", propagation_passes=1, per_column_input=False):
         self.pop_size = pop_size
         self.num_columns = num_columns
         self.cells_per_col = cells_per_col
         self.num_cells = num_columns * cells_per_col
         self.in_dim = in_dim
         self.out_dim = out_dim
+        # 逐列注入模式 (per_column_input=True): 每根微柱接收各自独立的 in_dim 观测
+        #   输入宽度 = num_columns * in_dim, 输入 [P, C*in_dim] → view(P, C, in_dim) 分列写入受体槽
+        #   (量化战役需求: 43 资产 × 4 特征异列注入; 2026-09-10 用户授权底座扩展)
+        #   False = 经典模式: 全局观测辐射广播至全部微柱 (ADAS 语义, 向后兼容)
+        self.per_column_input = per_column_input
         self.device = torch.device(device if torch.cuda.is_available() else "cpu")
         # 强制单精度 IEEE-754，禁用 TF32 截断，保证与 C 底座严格位级一致
         torch.backends.cuda.matmul.allow_tf32 = False
@@ -37,7 +42,10 @@ class CUDACellularPopulation:
         C = self.num_columns
 
         assert num_columns >= 4, "num_columns 至少为 4"
-        assert cells_per_col == 64, "当前槽位结构固定为 K=64"
+        if per_column_input:
+            assert cells_per_col >= 24, "逐列注入模式要求 K >= 24 (子类自定义算子布局)"
+        else:
+            assert cells_per_col == 64, "经典模式槽位结构固定为 K=64 (逐列注入模式支持 K>=24)"
         assert in_dim <= cells_per_col, "受体总数不得超过单微柱容量"
 
         # 1. 块稀疏突触连接定义 (Block-Sparse Neuropil + Inter-column Axons)
@@ -315,7 +323,11 @@ class CUDACellularPopulation:
         self.inputs_accum.add_(self.inter_drive)
         # 感觉辐射 (Thalamocortical Radiance): 外部观测广播至全部微柱的局部前 4 驱动槽,
         # 消除"观测仅入第 0 柱、跨柱标量广播独木桥"的信息瓶颈
-        if inputs.ndim == 2 and inputs.shape[1] >= 4:
+        if self.per_column_input:
+            # 逐列注入模式: 各列接收各自独立的观测切片 (无跨列广播)
+            if inputs.ndim == 2 and inputs.shape[1] >= C * self.in_dim:
+                self.inputs_accum.view(P, C, K)[:, :, :self.in_dim] += inputs.view(P, C, self.in_dim)
+        elif inputs.ndim == 2 and inputs.shape[1] >= 4:
             self.inputs_accum.view(P, C, K)[:, :, :4] += inputs[:, :4].view(P, 1, 4)
 
     def forward_step(self, inputs):
@@ -327,6 +339,8 @@ class CUDACellularPopulation:
         """
         P = self.pop_size
         N = self.num_cells
+        C = self.num_columns
+        K = self.cells_per_col
 
         if inputs.ndim == 1:
             inputs = inputs.unsqueeze(0).expand(P, -1)
@@ -334,7 +348,11 @@ class CUDACellularPopulation:
         R = self.propagation_passes
         if R <= 1:
             # 经典路径: 注入感知受体输入 (C11: g->inputs_accum[i] = inputs[i])
-            self.inputs_accum[:, :self.in_dim] = inputs[:, :self.in_dim]
+            if self.per_column_input:
+                # 逐列注入: inputs [P, C*in_dim] → 每列各自独立受体槽
+                self.inputs_accum.view(P, C, K)[:, :, :self.in_dim] = inputs.view(P, C, self.in_dim)
+            else:
+                self.inputs_accum[:, :self.in_dim] = inputs[:, :self.in_dim]
             self._state_commit = True
             self._eval_cells()
             self._propagate(inputs)
@@ -485,6 +503,62 @@ class CUDACellularPopulation:
         p1_noise = torch.randn_like(p1_target) * mutation_power
         p1_target.add_(p1_noise * p1_mask)
         p1_target.clamp_(0.0, 4.0)
+
+    def crossover_population(self, fitness_scores, elite_ratio=0.10, tournament_k=4,
+                             crossover_prob=0.5):
+        """
+        GPU 向量化有性重组 (列级整列掩码混合, 与 C++ CorticalMacroArray 列级杂交同语义):
+        精英保留; 后代 = 锦标赛双亲 A×B, 逐列 50/50 取整列基因 (柱内权重 + 逐柱参数),
+        长程轴突按成员级硬币混合。治"锦标赛克隆致种群坍缩"病 (2026-09-10 GPU 首战实证)。
+        返回 num_elites (供 mutate 只变异非精英)。
+        """
+        P = self.pop_size
+        C = self.num_columns
+        K = self.cells_per_col
+        N = self.num_cells
+        num_elites = max(1, int(P * elite_ratio))
+
+        sorted_indices = torch.argsort(fitness_scores, descending=True)
+        elite_indices = sorted_indices[:num_elites]
+
+        num_off = P - num_elites
+        # 双亲锦标赛 (全种群窗口, 与 selection 同式)
+        cand_a = torch.randint(0, P, (num_off, tournament_k), device=self.device)
+        cand_b = torch.randint(0, P, (num_off, tournament_k), device=self.device)
+        pa = cand_a.gather(1, torch.argmax(fitness_scores[cand_a], dim=1, keepdim=True)).squeeze(1)
+        pb = cand_b.gather(1, torch.argmax(fitness_scores[cand_b], dim=1, keepdim=True)).squeeze(1)
+
+        # 逐列整列掩码: [num_off, C, 1, 1] → 柱内权重整列取父; 列内参数同掩码展开
+        coin_col = (torch.rand(num_off, C, 1, 1, device=self.device) < crossover_prob)
+        coin_param = coin_col.view(num_off, C, 1).expand(num_off, C, K).reshape(num_off, N)  # [num_off, N]
+        child_intra = torch.where(coin_col, self.intra_weights[pa], self.intra_weights[pb])
+        child_p1 = torch.where(coin_param, self.param1[pa], self.param1[pb])
+        child_p2 = torch.where(coin_param, self.param2[pa], self.param2[pb])
+
+        # 长程轴突: 成员级硬币
+        coin_inter = (torch.rand(num_off, 1, device=self.device) < crossover_prob)
+        child_inter = torch.where(coin_inter, self.inter_weights[pa], self.inter_weights[pb])
+
+        # 写回非精英槽位 (精英原样保留)
+        non_elite = torch.arange(num_elites, P, device=self.device)
+        self.intra_weights[non_elite] = child_intra
+        self.inter_weights[non_elite] = child_inter
+        self.param1[non_elite] = child_p1
+        self.param2[non_elite] = child_p2
+        return num_elites
+
+    def repopulate_random(self, fitness_scores, elite_ratio=0.10, frac=0.5):
+        """灭绝-重繁: 以 frac 比例把非精英中最差成员重置为全新随机基因 (多样性哨兵触发时调用)"""
+        P = self.pop_size
+        num_elites = max(1, int(P * elite_ratio))
+        order = torch.argsort(fitness_scores)             # 升序: 最差在前
+        n_reset = int((P - num_elites) * frac)
+        victims = order[:n_reset]
+        self.intra_weights[victims] = torch.randn_like(self.intra_weights[victims]) * 0.04
+        self.inter_weights[victims] = torch.randn_like(self.inter_weights[victims]) * 0.40
+        self.param1[victims] = torch.rand_like(self.param1[victims]) * 0.4 + 0.1
+        self.param2[victims] = torch.zeros_like(self.param2[victims])
+        return n_reset
 
     def selection(self, fitness_scores, elite_ratio=0.10, tournament_k=4):
         """

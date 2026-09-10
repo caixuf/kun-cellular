@@ -45,7 +45,7 @@ public:
     template <typename Factory>
     void seed_population(size_t pop_size, Factory&& factory) {
         individuals_.clear();
-        fitness_.assign(pop_size, -1e18);
+        fitness_.assign(pop_size, -1e18);   // 全部待评估
         for (size_t i = 0; i < pop_size; ++i) {
             individuals_.push_back(factory(rng_));
         }
@@ -53,11 +53,13 @@ public:
 
     // 适应度评估 (评估委托由任务层实现; 逐个体调用)
     // OpenMP 并行: 评估委托必须线程安全 (任务拷贝共享不可变预计算, 状态全局部)
+    // fitness 约定: -1e18 = 待评估哨兵; 已有真实适应度的成员 (精英携带) 跳过重算
     template <typename Eval>
     void evaluate(Eval&& eval) {
-        fitness_.assign(individuals_.size(), -1e18);
+        if (fitness_.size() != individuals_.size()) fitness_.assign(individuals_.size(), -1e18);
         #pragma omp parallel for schedule(dynamic)
         for (int64_t i = 0; i < static_cast<int64_t>(individuals_.size()); ++i) {
+            if (fitness_[i] > -1e17) continue;             // 精英 fitness 携带: 零重复评估
             double f = eval(individuals_[i]);
             fitness_[i] = std::isfinite(f) ? f : -1e18;
         }
@@ -86,7 +88,13 @@ public:
             next.push_back(std::move(child));
         }
         individuals_ = std::move(next);
-        fitness_.assign(pop, -1e18);                    // 子代待评估 (未评估不入精英)
+        // 精英 fitness 携带: 精英个体未变, 保留其已知适应度 (跳过重算);
+        // 后代全部标记待评估
+        std::vector<double> carried(pop, -1e18);
+        for (size_t i = 0; i < elite_n; ++i) {
+            carried[i] = fitness_.empty() || fitness_.size() != pop ? -1e18 : fitness_[ranking_[i]];
+        }
+        fitness_ = std::move(carried);
         ranking_.clear();
     }
 
