@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <random>
 #include <vector>
 
@@ -35,6 +36,9 @@ struct ColumnLatticeSpec {
     float    w_receptor{0.15f};
     float    w_lateral{0.10f};
     float    w_readout{0.005f};        // 全 V_L→效应器 保命小权重
+    float    internal_param1{0.1f};    // 内部细胞初值 (EMA/积分等增益; 消融可抬到 1.0)
+    bool     add_interlayer_feedback{false}; // V_{l+1}→V_l 同列反馈 (compile 标 is_recurrent)
+    float    w_feedback{0.10f};        // 反馈边权重
     uint32_t seed{1};
 };
 
@@ -123,7 +127,7 @@ inline void build_columnar_structured_wiring(CellularOrganism& org,
                     Cell c;
                     c.id = next_id++;
                     c.type = palette[(cx + cy * 3 + l * 5 + kk * 7) % palette_sz];
-                    c.param1 = 0.1;
+                    c.param1 = static_cast<double>(spec.internal_param1);
                     c.x = static_cast<float>(cx * b);
                     c.y = static_cast<float>(cy * b);
                     c.z = static_cast<float>(l);  // z 标签: 层号 (1..L)
@@ -198,7 +202,23 @@ inline void build_columnar_structured_wiring(CellularOrganism& org,
         }
     }
 
-    org.compile();  // 活性集应 == 全体细胞 (机制定理)
+    // (4) 可选层间反馈: 同列 V_{l+1} → V_l (打破严格 DAG; compile 标 is_recurrent)
+    //     单变量消融用: 保持幅度默认, 只加记忆通道 —— 对照「R′ 意外递归」假说
+    if (spec.add_interlayer_feedback && L >= 2) {
+        for (uint32_t cy = 0; cy < G; ++cy) {
+            for (uint32_t cx = 0; cx < G; ++cx) {
+                for (uint32_t l = 1; l < L; ++l) {
+                    for (uint32_t kk = 0; kk < k; ++kk) {
+                        add_syn(int_ids[cell_index(cx, cy, l + 1, kk)],
+                                int_ids[cell_index(cx, cy, l, kk)],
+                                spec.w_feedback);
+                    }
+                }
+            }
+        }
+    }
+
+    org.compile();  // 活性集应 == 全体细胞 (机制定理; 反馈边不破坏反向可达)
 }
 
 // ── 消融对照: 打乱内部突触的目标端点 (同细胞数/同突触数, 仅拓扑随机化) ──────────
@@ -214,6 +234,124 @@ inline void randomize_internal_synapse_targets(CellularOrganism& org, uint32_t s
         s.to_cell_id = ids[pick(rng)];
     }
     org.is_compiled_ = false;
+    org.compile();
+}
+
+// 编译后递归突触计数 (消融诊断: R′ / recur 臂应 >0, 纯 DAG 为 0)
+inline size_t recurrent_synapse_count(const CellularOrganism& org) {
+    size_t n = 0;
+    for (const auto& cs : org.compiled_synapses_) {
+        if (cs.is_recurrent) ++n;
+    }
+    return n;
+}
+
+// ── 受体直路: 跳过恒等 SENSE_CHANNEL, 观测经 param1*w 直接打进下游端口 ──
+// 无塑性时动作输出应与 forward_nd 对齐; 膜电位/glow 不进适应度, 不更新。
+struct ReceptorBypass {
+    bool ok{false};
+    std::vector<char> is_receptor;
+    std::vector<size_t> internal_order;
+    std::vector<uint32_t> from_idx;
+    std::vector<uint32_t> to_idx;
+    std::vector<uint8_t> to_port;
+    std::vector<uint32_t> channel;
+    std::vector<uint32_t> syn_idx;
+    uint32_t n_receptors{0};
+};
+
+inline ReceptorBypass build_receptor_bypass(const CellularOrganism& org) {
+    ReceptorBypass b;
+    if (!org.is_compiled() || org.cells.empty()) return b;
+    b.is_receptor.assign(org.cells.size(), 0);
+    for (size_t i = 0; i < org.cells.size(); ++i) {
+        if (org.cells[i].type == CellType::SENSE_CHANNEL) {
+            b.is_receptor[i] = 1;
+            ++b.n_receptors;
+        }
+    }
+    if (b.n_receptors == 0) return b;
+    b.internal_order.reserve(org.execution_order_.size());
+    for (size_t idx : org.execution_order_) {
+        if (idx < b.is_receptor.size() && !b.is_receptor[idx])
+            b.internal_order.push_back(idx);
+    }
+    for (uint32_t si = 0; si < static_cast<uint32_t>(org.compiled_synapses_.size()); ++si) {
+        const auto& syn = org.compiled_synapses_[si];
+        if (syn.from_idx >= b.is_receptor.size() || !b.is_receptor[syn.from_idx]) continue;
+        if (syn.is_recurrent) continue;
+        const Cell& src = org.cells[syn.from_idx];
+        const uint32_t ch = (src.param2 >= 0.0) ? static_cast<uint32_t>(src.param2) : 0u;
+        b.from_idx.push_back(static_cast<uint32_t>(syn.from_idx));
+        b.to_idx.push_back(static_cast<uint32_t>(syn.to_idx));
+        b.to_port.push_back(syn.to_port);
+        b.channel.push_back(ch);
+        b.syn_idx.push_back(si);
+    }
+    b.ok = !b.internal_order.empty();
+    return b;
+}
+
+inline CellularOrganism::ActionOutputs forward_nd_skip_receptors(
+    CellularOrganism& org, const ReceptorBypass& bypass,
+    const double* inputs, size_t in_dim)
+{
+    if (!bypass.ok) return org.forward_nd(inputs, in_dim, false);
+    if (!org.is_compiled_) org.compile();
+    if (inputs == nullptr) in_dim = 0;
+
+    double* __restrict port_ptr = org.flat_port_inputs_.data();
+    std::memset(port_ptr, 0, org.flat_port_inputs_.size() * sizeof(double));
+    Cell* __restrict cells_ptr = org.cells.data();
+    auto* __restrict syn_ptr = org.compiled_synapses_.data();
+    const size_t num_synapses = org.compiled_synapses_.size();
+
+    for (size_t i = 0; i < num_synapses; ++i) {
+        const auto& syn = syn_ptr[i];
+        if (syn.is_recurrent) {
+            port_ptr[syn.to_idx * 2 + syn.to_port] +=
+                cells_ptr[syn.from_idx].prev_output_val * syn.weight;
+        }
+    }
+
+    const uint32_t n_inj = static_cast<uint32_t>(bypass.from_idx.size());
+    for (uint32_t i = 0; i < n_inj; ++i) {
+        const uint32_t ch = bypass.channel[i];
+        const double src = (ch < in_dim) ? inputs[ch] : 0.0;
+        const uint32_t fi = bypass.from_idx[i];
+        const auto& syn = syn_ptr[bypass.syn_idx[i]];
+        const double rec_out = src * cells_ptr[fi].param1;
+        cells_ptr[fi].output_val = rec_out;
+        port_ptr[bypass.to_idx[i] * 2 + bypass.to_port[i]] += rec_out * syn.weight;
+    }
+
+    for (size_t idx : bypass.internal_order) {
+        auto& c = cells_ptr[idx];
+        dispatch_cell_forward(c, port_ptr[idx * 2], port_ptr[idx * 2 + 1], in_dim, inputs);
+        if (std::abs(c.output_val) > 1e-6) {
+            c.activation_count++;
+        }
+        for (size_t k = org.out_start_[idx]; k < org.out_start_[idx + 1]; ++k) {
+            const auto& syn = syn_ptr[org.out_edges_[k]];
+            if (!syn.is_recurrent) {
+                port_ptr[syn.to_idx * 2 + syn.to_port] += c.output_val * syn.weight;
+            }
+        }
+    }
+
+    for (size_t i = 0; i < org.cells.size(); ++i) {
+        cells_ptr[i].prev_output_val = cells_ptr[i].output_val;
+    }
+
+    CellularOrganism::ActionOutputs actions{};
+    for (const auto& ac : org.compiled_actions_) {
+        const double val = cells_ptr[ac.cell_idx].output_val;
+        if (ac.type == CellType::ACT_PRIMARY_POSITIVE) actions.positive_action = val;
+        else if (ac.type == CellType::ACT_PRIMARY_NEGATIVE) actions.negative_action = val;
+        else if (ac.type == CellType::ACT_DEFENSIVE_RESET) actions.defensive_reset = val;
+        else if (ac.type == CellType::ACT_IMMUNE_BLOCK && val > 0.5) actions.immune_lock = true;
+    }
+    return actions;
 }
 
 }  // namespace population

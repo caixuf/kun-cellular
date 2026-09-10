@@ -89,6 +89,94 @@ public:
         return steps_ > 0 ? q_sum_ / static_cast<double>(steps_) : 0.0;
     }
 
+    // ── 空间换时间: 场与有机体解耦 (step 注释: 输出不影响场) ────────────────
+    // 把「预热 120 + 逐步推进」提前走完, 评测时只传送观测帧, 不再重算 CML。
+    struct Rollout {
+        int steps{0};
+        size_t obs_dim{0};
+        std::vector<double> frames;     // steps * obs_dim, 行主序
+        std::vector<double> target_a;   // 每步评分用的 A (与 step_continuous 拍前快照一致)
+        std::vector<double> target_b;
+    };
+
+    Rollout record_rollout(uint32_t seed, int steps) {
+        Rollout r;
+        r.steps = steps;
+        r.obs_dim = obs_dim();
+        r.frames.resize(static_cast<size_t>(steps) * r.obs_dim);
+        r.target_a.resize(static_cast<size_t>(steps));
+        r.target_b.resize(static_cast<size_t>(steps));
+        reset(seed);
+        for (int t = 0; t < steps; ++t) {
+            double* row = r.frames.data() + static_cast<size_t>(t) * r.obs_dim;
+            r.target_a[static_cast<size_t>(t)] = u_[target_a_];
+            r.target_b[static_cast<size_t>(t)] = u_[target_b_];
+            // 与 evaluate_organism 一致: 观测经 float 再进 forward
+            if (wide_) {
+                for (size_t i = 0; i < u_.size(); ++i)
+                    row[i] = static_cast<double>(static_cast<float>(u_[i]));
+            } else {
+                row[0] = static_cast<double>(static_cast<float>(u_[target_a_]));
+                row[1] = static_cast<double>(static_cast<float>(u_[target_b_]));
+            }
+            cml2d_step();
+        }
+        return r;
+    }
+
+    static std::vector<Rollout> record_rollouts(FieldCML2DTask& env,
+                                               const std::vector<uint32_t>& seeds,
+                                               int steps) {
+        std::vector<Rollout> out;
+        out.reserve(seeds.size());
+        for (uint32_t s : seeds) out.push_back(env.record_rollout(s, steps));
+        return out;
+    }
+
+    // 语义对齐 evaluate_organism: 每种子 reset_state(true) + 逐步 forward + exp(-err/scale)
+    template <typename ForwardFn>
+    double score_rollout(CellularOrganism& org, const Rollout& r,
+                         double score_scale, ForwardFn&& forward) const {
+        if (r.steps <= 0 || r.obs_dim == 0) return 0.0;
+        org.reset_state(true);
+        double q_sum = 0.0;
+        const double scale = (score_scale > 1e-12) ? score_scale : 0.15;
+        for (int t = 0; t < r.steps; ++t) {
+            const double* obs = r.frames.data() + static_cast<size_t>(t) * r.obs_dim;
+            auto acts = forward(org, obs, r.obs_dim);
+            double err = 0.5 * (std::fabs(acts.positive_action - r.target_a[static_cast<size_t>(t)]) +
+                                std::fabs(acts.negative_action - r.target_b[static_cast<size_t>(t)]));
+            if (!std::isfinite(err)) err = 1.0;
+            q_sum += std::exp(-err / scale);
+        }
+        return q_sum / static_cast<double>(r.steps);
+    }
+
+    double score_rollout(CellularOrganism& org, const Rollout& r,
+                         bool allow_plasticity, double score_scale) const {
+        return score_rollout(org, r, score_scale,
+            [allow_plasticity](CellularOrganism& o, const double* x, size_t d) {
+                return o.forward_nd(x, d, allow_plasticity);
+            });
+    }
+
+    template <typename ForwardFn>
+    double score_rollouts(CellularOrganism& org, const std::vector<Rollout>& rs,
+                          double score_scale, ForwardFn&& forward) const {
+        if (rs.empty()) return 0.0;
+        double s = 0.0;
+        for (const auto& r : rs) s += score_rollout(org, r, score_scale, forward);
+        return s / static_cast<double>(rs.size());
+    }
+
+    double score_rollouts(CellularOrganism& org, const std::vector<Rollout>& rs,
+                          bool allow_plasticity, double score_scale) const {
+        return score_rollouts(org, rs, score_scale,
+            [allow_plasticity](CellularOrganism& o, const double* x, size_t d) {
+                return o.forward_nd(x, d, allow_plasticity);
+            });
+    }
+
     // 持续性基线 (预测"下一步=当前"), 最终评分尺度 0.15 下实测
     double persistence_quality(uint32_t seed, int steps = 200) {
         reset(seed);

@@ -141,6 +141,52 @@ void test_forward_finite() {
     std::printf("  ✓ 前向有限 (n=16, %zu 输入)\n", in.size());
 }
 
+void test_ampfix_defaults_and_feedback_H1() {
+    // 幅度校准: param1 / w_readout 可配置且仍零坍缩
+    auto s = spec_of(8, 2);
+    s.internal_param1 = 1.0f;
+    s.w_readout = s.w_receptor;
+    auto org_amp = build(s);
+    assert(active_cell_count(org_amp) == org_amp.cells.size());
+    for (const auto& c : org_amp.cells) {
+        if (c.z >= 1.0f) assert(c.param1 == 1.0);
+    }
+    assert(kun::population::recurrent_synapse_count(org_amp) == 0);
+    std::printf("  ✓ ampfix: param1=1.0, 递归边=0, 活性比=1\n");
+
+    // 层间反馈: 引入 is_recurrent 且仍零坍缩
+    auto sf = spec_of(8, 2);
+    sf.add_interlayer_feedback = true;
+    auto org_f = build(sf);
+    assert(active_cell_count(org_f) == org_f.cells.size());
+    assert(kun::population::recurrent_synapse_count(org_f) > 0);
+    std::printf("  ✓ recur: 递归边=%zu, 活性比=1\n",
+                kun::population::recurrent_synapse_count(org_f));
+}
+
+void test_receptor_bypass_matches_forward() {
+    auto org = build(spec_of(8, 2));
+    auto bp = kun::population::build_receptor_bypass(org);
+    assert(bp.ok);
+    assert(bp.n_receptors > 0);
+    const size_t n = 16 * 16;
+    std::vector<double> in(n, 0.0);
+    for (size_t i = 0; i < n; ++i) in[i] = std::sin(static_cast<double>(i) * 0.11) * 0.4 + 0.5;
+    auto a = org;
+    auto b = org;
+    a.reset_state(true);
+    b.reset_state(true);
+    auto oa = a.forward_nd(in.data(), in.size(), false);
+    auto ob = kun::population::forward_nd_skip_receptors(b, bp, in.data(), in.size());
+    assert(std::fabs(oa.positive_action - ob.positive_action) < 1e-9);
+    assert(std::fabs(oa.negative_action - ob.negative_action) < 1e-9);
+    oa = a.forward_nd(in.data(), in.size(), false);
+    ob = kun::population::forward_nd_skip_receptors(b, bp, in.data(), in.size());
+    assert(std::fabs(oa.positive_action - ob.positive_action) < 1e-9);
+    std::printf("  ✓ 受体直路: 动作输出与 forward_nd 对齐 (受体 %u / 注入 %zu)\n",
+                bp.n_receptors, bp.from_idx.size());
+}
+
 }  // namespace
 
 int main() {
@@ -151,6 +197,8 @@ int main() {
     test_H2_dag_and_determinism();
     test_locality();
     test_forward_finite();
+    test_ampfix_defaults_and_feedback_H1();
+    test_receptor_bypass_matches_forward();
     test_H1_zero_collapse_scale();
     std::printf("[PASS] test_population_structured_wiring all assertions passed!\n");
     return 0;

@@ -8,11 +8,13 @@
 //   structured (S, 默认): 层单调 2D lattice 局部 + 目标锚点强读出
 //   noanchor   (S⁻ᵃ)     : 同上但锚点权重降为保命小权重 (剥离「喂答案」)
 //   random     (R′)       : 结构化后打乱内部突触目标端点 (同细胞/突触数, 仅拓扑随机)
+//   ampfix     (S^amp)    : 单变量① 幅度校准 — param1=1.0 + w_readout=w_receptor (拓扑同 S)
+//   recur      (S^rec)    : 单变量② 层间反馈 — 同列 V_{l+1}→V_l (幅度同 S 默认)
 //
 // 演化: L1 EcologyGrid (移植自系统层) + 权重-only 变异特化 (冻结拓扑, 隔离接线变量)。
 // 注意: 本 trainer 不调用 L0 结构变异/凋亡 —— 否则会毁掉结构化拓扑。
 //
-// 用法: ./train_flagship_wired [N=128] [GENS=60] [ARM=structured]
+// 用法: ./train_flagship_wired [N=128] [GENS=60] [ARM=structured] [G=64] [train_plast=1]
 // ============================================================================
 #include "kun/cellular/field_cml_2d.hpp"
 #include "kun/cellular/population/ecology_grid.hpp"
@@ -23,7 +25,6 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
-#include <memory>
 #include <random>
 #include <string>
 #include <vector>
@@ -33,6 +34,7 @@ using kun::population::ColumnLatticeSpec;
 using kun::population::EcologyGrid;
 using kun::population::EvolutionParams;
 using kun::population::ReadoutAnchor;
+using kun::population::recurrent_synapse_count;
 
 // ── 权重-only 变异特化 (Stage A 冻结拓扑; 演化机器仍在 L1, 领域语义在此) ──────
 namespace kun {
@@ -75,7 +77,7 @@ std::vector<uint32_t> seed_range(uint32_t lo, uint32_t count) {
 }
 
 struct StructStats {
-    size_t cells = 0, synapses = 0;
+    size_t cells = 0, synapses = 0, recurrent = 0;
     double active_ratio = 0.0;
 };
 
@@ -83,6 +85,7 @@ StructStats stats_of(const CellularOrganism& org) {
     StructStats s;
     s.cells = org.cells.size();
     s.synapses = org.synapses.size();
+    s.recurrent = recurrent_synapse_count(org);
     s.active_ratio = org.cells.empty() ? 0.0
                                        : (double)org.execution_order_.size() / (double)org.cells.size();
     return s;
@@ -121,6 +124,21 @@ int main(int argc, char** argv) {
     env.set_max_steps(MS);
     const double persist = env.persistence_quality(101, MS);
 
+    // 空间换时间: 场轨迹只走一遍, 种群评测直接传送观测帧
+    const auto train_rollouts = FieldCML2DTask::record_rollouts(env, train_seeds, MS);
+    const auto id_rollouts = FieldCML2DTask::record_rollouts(env, id_seeds, MS);
+    const auto ood_seed_rollouts = FieldCML2DTask::record_rollouts(env, ood_seeds, MS);
+    FieldCML2DTask ood_env(n, true, 0.22, 3.9);
+    ood_env.set_max_steps(MS);
+    ood_env.set_score_scale(0.15);
+    const auto ood_regime_rollouts = FieldCML2DTask::record_rollouts(ood_env, ood_regime_seeds, MS);
+    {
+        const size_t bytes = train_rollouts.empty() ? 0
+            : train_rollouts.size() * train_rollouts[0].frames.size() * sizeof(double);
+        std::printf("  轨迹缓存: 训练 %zu 种子 × %d 步 | ~%.1f MiB | 预热+推进已走完\n",
+                    train_rollouts.size(), MS, bytes / (1024.0 * 1024.0));
+    }
+
     // ── 结构化个体工厂 ──
     auto make_org = [&](std::mt19937& rng) {
         ColumnLatticeSpec spec;
@@ -131,6 +149,14 @@ int main(int argc, char** argv) {
         spec.cells_per_layer = 4;
         spec.lateral_radius = 1;
         spec.seed = static_cast<uint32_t>(rng());
+        // 单变量消融: ampfix 只改幅度; recur 只加反馈; 其余保持 Stage A 默认
+        if (arm == "ampfix") {
+            spec.internal_param1 = 1.0f;
+            spec.w_readout = spec.w_receptor;  // 0.15 — 解除读出衰减
+        } else if (arm == "recur") {
+            spec.add_interlayer_feedback = true;
+            spec.w_feedback = 0.10f;
+        }
         std::vector<ReadoutAnchor> anchors = {{0, 0, 0, 0.5}, {G / 2, G / 2, 1, 0.5}};
         if (arm == "noanchor") {
             for (auto& a : anchors) a.weight = spec.w_readout;
@@ -149,20 +175,26 @@ int main(int argc, char** argv) {
     // 结构统计 (个体 0)
     {
         auto st = stats_of(grid.demes()[0].individuals()[0]);
-        std::printf("  个体: %zu 细胞 | %zu 突触 | 活性比 %.4f (H1 需 ≥0.99) | 持续性基线 %.4f\n",
-                    st.cells, st.synapses, st.active_ratio, persist);
+        auto bp0 = kun::population::build_receptor_bypass(grid.demes()[0].individuals()[0]);
+        std::printf("  个体: %zu 细胞 | %zu 突触 | 递归边 %zu | 活性比 %.4f (H1 需 ≥0.99) | 持续性基线 %.4f\n",
+                    st.cells, st.synapses, st.recurrent, st.active_ratio, persist);
+        std::printf("  受体直路: %s | 受体 %u | 注入边 %zu | 内部序 %zu\n",
+                    bp0.ok ? "开" : "关", bp0.n_receptors, bp0.from_idx.size(),
+                    bp0.internal_order.size());
     }
 
-    // ── 每线程独立任务环境 (evaluate_organism 会 reset 任务) ──
+    // ── 传送评测: 只跑有机体前向, 场不再重算 ──
     std::atomic<double> cur_scale{0.60};
     auto eval = [&](CellularOrganism& org) -> double {
-        thread_local std::unique_ptr<FieldCML2DTask> tenv;
-        if (!tenv) {
-            tenv = std::make_unique<FieldCML2DTask>(n, true, coupling, r_log);
-            tenv->set_max_steps(MS);
+        const double scale = cur_scale.load(std::memory_order_relaxed);
+        if (train_plast) {
+            return env.score_rollouts(org, train_rollouts, true, scale);
         }
-        tenv->set_score_scale(cur_scale.load(std::memory_order_relaxed));
-        return tenv->evaluate_organism(org, train_seeds, MS, train_plast).mean_fitness;
+        const auto bypass = kun::population::build_receptor_bypass(org);
+        return env.score_rollouts(org, train_rollouts, scale,
+            [&](CellularOrganism& o, const double* x, size_t d) {
+                return kun::population::forward_nd_skip_receptors(o, bypass, x, d);
+            });
     };
 
     EvolutionParams params;
@@ -209,20 +241,16 @@ int main(int argc, char** argv) {
 
     auto st = stats_of(best_org);
     env.set_score_scale(0.15);
-    const double un_id = env.evaluate_organism(best_org, id_seeds, MS, true).mean_fitness;
-    const double un_id_nop = env.evaluate_organism(best_org, id_seeds, MS, false).mean_fitness;
-
-    FieldCML2DTask ood_env(n, true, 0.22, 3.9);  // 同尺寸异动力学
-    ood_env.set_max_steps(MS);
-    ood_env.set_score_scale(0.15);
-    const double un_ood = ood_env.evaluate_organism(best_org, ood_regime_seeds, MS, true).mean_fitness;
-    const double un_ood_seed = env.evaluate_organism(best_org, ood_seeds, MS, true).mean_fitness;
-    const double un_ood_nop = ood_env.evaluate_organism(best_org, ood_regime_seeds, MS, false).mean_fitness;
-    const double un_ood_seed_nop = env.evaluate_organism(best_org, ood_seeds, MS, false).mean_fitness;
+    const double un_id = env.score_rollouts(best_org, id_rollouts, true, 0.15);
+    const double un_id_nop = env.score_rollouts(best_org, id_rollouts, false, 0.15);
+    const double un_ood = ood_env.score_rollouts(best_org, ood_regime_rollouts, true, 0.15);
+    const double un_ood_seed = env.score_rollouts(best_org, ood_seed_rollouts, true, 0.15);
+    const double un_ood_nop = ood_env.score_rollouts(best_org, ood_regime_rollouts, false, 0.15);
+    const double un_ood_seed_nop = env.score_rollouts(best_org, ood_seed_rollouts, false, 0.15);
 
     std::printf("\n---------------------------------------------------------------------\n");
-    std::printf("  arm=%s | 训练塑性=%d | 冠军: %zu 细胞 | %zu 突触 | 活性比 %.4f\n",
-                arm.c_str(), train_plast ? 1 : 0, st.cells, st.synapses, st.active_ratio);
+    std::printf("  arm=%s | 训练塑性=%d | 冠军: %zu 细胞 | %zu 突触 | 递归边 %zu | 活性比 %.4f\n",
+                arm.c_str(), train_plast ? 1 : 0, st.cells, st.synapses, st.recurrent, st.active_ratio);
     std::printf("  持续性基线 P       : %.4f\n", persist);
     std::printf("  训练最佳           : %.4f\n", best);
     std::printf("  未见(id)越 PLASTIC : %.4f\n", un_id);
