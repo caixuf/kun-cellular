@@ -2,10 +2,10 @@
  "organism_id": "quant_ecology_gpu",
  "pool_size": 5,
  "protocol_note": "GPU 变体新世系 (稠密列内+环柱轴突+逐列注入; 算子池无 CORRELATION/INHIBIT); C11 位级对账未达成 (SDSC-BIN v5 受体映射立项中); val-selected frozen-consts, OOS single-shot",
- "pool_val_sharpe": 0.0,
- "pool_oos_sharpe": 0.19427061080932617,
- "pool_oos_return": 0.15415850281715393,
- "pool_oos_mdd": 0.34523171186447144,
+ "pool_val_sharpe": 0.530163586139679,
+ "pool_oos_sharpe": 0.12457285076379776,
+ "pool_oos_return": 0.025875624269247055,
+ "pool_oos_mdd": 0.15575659275054932,
  "members": [
   {
    "checkpoint_path": "checkpoints/quant_ecology_gpu_m39.bin",

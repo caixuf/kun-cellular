@@ -29,11 +29,12 @@ from tools.cuda_cellular_engine import CUDACellularPopulation
 
 DATA_DIR = "/home/caixuf/code/kunquant/data/history"
 
-# ── 预注册冻结常数 (GPU 战役 v2, 启动后不可改) ──
-# v2 修订 (首战实证: 引擎 GA 锦标赛克隆 → 256 成员 Gen20 前全部坍缩, corr 门拒 255/256):
-#   新增 GPU 列级杂交 (整列掩码混合, 与 CPU column_crossover 同语义);
-#   多样性哨兵: 每 10 代监控成员收益相关矩阵, corr>0.9 占比>50% → 50% 非精英重置为随机移民;
-#   其余不变: pop 256 / gen 200 / mut 0.06 / elite 0.10 / 池 K5 / corr 门 0.90。
+# ── 预注册冻结常数 (GPU 战役 v3, 启动后不可改) ──
+# v3 修订 (v2 实证: 融合池 val 零交易死池 — 原始信号等权均值被截面稀释/多空对冲互杀;
+#          成员 OOS 极端分化 +83%/-81% — val 过拟合主敌):
+#   融合改为截面 z-score: 每成员逐日信号跨资产标准化后等权平均 (保留截面信息, 消除尺度坍缩);
+#   新增诚实条款: 池 val 换手 ≥50 次, 否则判死池不产池;
+#   其余冻结: pop 256 / gen 200 / 杂交 0.5 / mut 0.06 / 哨兵 10代·0.5 / 池 K5 / corr 门 0.90。
 POP_SIZE = 256
 GENERATIONS = 200
 NUM_COLS = 43
@@ -47,6 +48,8 @@ ELITE_RATIO = 0.10
 CROSSOVER_PROB = 0.5
 WATCHDOG_EVERY = 10
 WATCHDOG_CORR_FRAC = 0.5
+MIN_POOL_TRADES = 50
+FUSION = "zscore"
 
 
 def load_series():
@@ -382,7 +385,14 @@ def main():
                 x = x.expand(pop.pop_size, -1)   # 单行输入广播至全种群 (融合语义只用入池成员行)
             pop.forward_step(x)
             eff = pop.outputs.view(pop.pop_size, NUM_COLS, CELLS_PER_COL)[:, :, -2:]
-            fused = (eff[:, :, 0] - eff[:, :, 1])[selected].mean(dim=0)
+            raw = (eff[:, :, 0] - eff[:, :, 1])[selected]           # [K, 43]
+            if FUSION == "zscore":
+                # v3: 截面 z-score (逐成员跨资产标准化后等权平均, 保留截面信息)
+                mu = raw.mean(dim=1, keepdim=True)
+                sd = raw.std(dim=1, keepdim=True).clamp(min=1e-6)
+                fused = ((raw - mu) / sd).mean(dim=0)
+            else:
+                fused = raw.mean(dim=0)
             self.outputs = torch.zeros(1, pop.num_cells, device=pop.device)
             self.outputs.view(1, NUM_COLS, CELLS_PER_COL)[:, :, -2] = fused.clamp(min=0)
             self.outputs.view(1, NUM_COLS, CELLS_PER_COL)[:, :, -1] = (-fused).clamp(min=0)
@@ -392,10 +402,14 @@ def main():
             return eff[:, :, 0] - eff[:, :, 1]
 
     sim_fv = BatchedPortfolioSim(1, *va, device=pop.device)
-    _, sh_fv, cum_fv, mdd_fv, _ = run_episode(_FusedPop(), sim_fv)
-    print(f"  ↳ [池·融合] val 夏普: {sh_fv[0].item():.2f} | 收益: {cum_fv[0].item()*100:.1f}% | 回撤: {mdd_fv[0].item()*100:.1f}%")
+    _, sh_fv, cum_fv, mdd_fv, tr_fv = run_episode(_FusedPop(), sim_fv)
+    print(f"  ↳ [池·融合·{FUSION}] val 夏普: {sh_fv[0].item():.2f} | 收益: {cum_fv[0].item()*100:.1f}% | "
+          f"回撤: {mdd_fv[0].item()*100:.1f}% | 换手: {int(tr_fv[0].item())} 次")
     if mdd_fv[0].item() > 0.15:
         print("  [FAIL] val 池回撤 >15% 诚实阈值, 战役失败")
+        return 1
+    if tr_fv[0].item() < MIN_POOL_TRADES:
+        print(f"  [FAIL] val 池换手 {int(tr_fv[0].item())} < {MIN_POOL_TRADES} (死池), 战役失败")
         return 1
 
     # ── OOS 一次性盲报 + 全量披露 + 导出 ──
