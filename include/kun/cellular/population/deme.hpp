@@ -91,27 +91,29 @@ public:
     }
 
     // 岛内代际推进: 精英保留 + 锦标赛亲本 + (杂交|克隆) + 变异, 种群规模守恒
-    // 双缓冲复用: offspring_/fitness_next_ 保留容量, 避免每代堆分配。
+    // 缓冲常驻复用: offspring_ 保持 pop 个活槽, 逐代按槽位原地写 (copy-assign 复用内部
+    // vector 容量) → 稳态零堆分配。无默认构造的个体用 individuals_[0] 拷贝构造补齐。
+    // rng 抽取序列与旧 push_back 版逐位一致 (抽取次数/顺序不变)。
     void evolve_generation(const EvolutionParams& params) {
         const size_t pop = individuals_.size();
         if (pop == 0 || fitness_.size() != pop) return;
         const size_t elite_n = std::min(params.elite_keep, pop);
         ensure_topk(elite_n);
 
-        offspring_.clear();
-        offspring_.reserve(pop);
+        ensure_offspring_slots(pop);
         for (size_t i = 0; i < elite_n; ++i) {
-            offspring_.push_back(individuals_[ranking_[i]]);  // 精英原样保留
+            offspring_[i] = individuals_[ranking_[i]];  // 精英原地拷贝 (复用容量)
         }
-        while (offspring_.size() < pop) {
+        for (size_t slot = elite_n; slot < pop; ++slot) {
             const Individual& pa = tournament(params.tournament_k);
             const Individual& pb = tournament(params.tournament_k);
             std::uniform_real_distribution<float> u(0.0f, 1.0f);
-            Individual child = (u(rng_) < params.crossover_prob)
-                ? CrossoverTrait<Individual>::cross(pa, pb, rng_)
-                : pa;                                   // 克隆父 A (单亲)
-            child.mutate(params.mut_rate, params.mut_sigma, rng_);
-            offspring_.push_back(std::move(child));
+            if (u(rng_) < params.crossover_prob) {
+                crossover_into(pa, pb, offspring_[slot], rng_);  // 原地杂交 (免分配)
+            } else {
+                offspring_[slot] = pa;                           // 克隆父 A (原地)
+            }
+            offspring_[slot].mutate(params.mut_rate, params.mut_sigma, rng_);
         }
         // 精英 fitness 携带 (跳过重算); 后代全部标记待评估
         fitness_next_.assign(pop, -1e18);
@@ -180,6 +182,20 @@ public:
     }
 
 private:
+    // 保证 offspring_ 恰有 pop 个活槽; 个体无需默认构造 (用 individuals_[0] 拷贝构造补齐)。
+    // 稳态: 槽数不变 → 逐代仅 copy-assign, 复用内部 buffer。前置条件: pop>0。
+    // pop 收缩时 resize 销毁多余槽 (正确, 但会丢缓冲; 演化中 pop 通常固定)。
+    void ensure_offspring_slots(size_t pop) {
+        if (offspring_.size() == pop) return;
+        if (offspring_.size() > pop) {
+            // 收缩用 pop_back (resize 需默认构造, 个体可能不可默认构造)
+            while (offspring_.size() > pop) offspring_.pop_back();
+            return;
+        }
+        const Individual& proto = individuals_[0];
+        while (offspring_.size() < pop) offspring_.push_back(proto);
+    }
+
     void ensure_topk(size_t keep_n) {
         const size_t pop = individuals_.size();
         const size_t k = std::min(keep_n, pop);

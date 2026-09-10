@@ -34,21 +34,25 @@ struct CrossoverTrait {
 //       长程轴突按子代列拓扑重新布线; 列内寄存器状态归零 (运行时状态不遗传)。
 template <>
 struct CrossoverTrait<CorticalMacroArray> {
-    static CorticalMacroArray cross(const CorticalMacroArray& a, const CorticalMacroArray& b,
-                                    std::mt19937& rng) {
+    // 原地杂交: 结果写入调用方预分配的 out (out 同形时逐元素拷贝赋值 → 复用内部 vector 容量,
+    // 稳态零堆分配)。前置条件: a/b 不得与 out 别名; out 可异形 (内部先 out = a 定形)。
+    // rng 抽取序列与旧值返回版 cross 逐位一致 (n_cols 次 coin + 1 次 rng() 布轴突种子)。
+    static void cross_into(const CorticalMacroArray& a, const CorticalMacroArray& b,
+                           CorticalMacroArray& out, std::mt19937& rng) {
         // 架构兼容性校验: 两亲本必须是同构阵列 (列数/每列细胞数一致)
         const auto& ac = a.columns();
         const auto& bc = b.columns();
         if (ac.size() != bc.size() || ac.empty()) {
-            return a;  // 不同构: 退化为克隆父 A (诚实降级, 不产生非法子代)
+            out = a;  // 不同构: 退化为克隆父 A (0 次 rng 抽取, 同旧)
+            return;
         }
         const size_t cells_per_col = ac[0].genome.num_cells;
         for (size_t c = 0; c < ac.size(); ++c) {
-            if (bc[c].genome.num_cells != cells_per_col) return a;
+            if (bc[c].genome.num_cells != cells_per_col) { out = a; return; }
         }
 
-        CorticalMacroArray child = a;  // 结构拷贝 (含全部列与轴突)
-        auto& cc = child.columns();
+        out = a;  // 拷贝赋值: out 同形且容量足够时复用内部 buffer
+        auto& cc = out.columns();
         std::uniform_real_distribution<float> coin(0.0f, 1.0f);
         for (size_t c = 0; c < cc.size(); ++c) {
             if (coin(rng) < 0.5f) {
@@ -58,15 +62,38 @@ struct CrossoverTrait<CorticalMacroArray> {
             }
         }
 
-        // 长程轴突按子代重连: 轴突密度从父 A 推断 (每柱轴突数 = 总数 / 列数)
+        // 长程轴突按子代重连: 密度取 out 轴突数 (刚由 out = a 拷贝而来, 即父 A 密度;
+        // 复用槽的上一代残留已被 out = a 覆盖) / 列数。
         const uint32_t n_cols = static_cast<uint32_t>(cc.size());
         uint32_t axons_per_col = n_cols > 0
-            ? static_cast<uint32_t>(child.macro_axons().size() / n_cols) : 0;
+            ? static_cast<uint32_t>(out.macro_axons().size() / n_cols) : 0;
         if (axons_per_col == 0) axons_per_col = 1;
-        child.wire_small_world_axons(axons_per_col, static_cast<uint32_t>(rng()));
+        out.wire_small_world_axons(axons_per_col, static_cast<uint32_t>(rng()));
+    }
+
+    // 值返回兼容壳 (tests/bench 依赖); 语义与 rng 序列同旧实现。
+    static CorticalMacroArray cross(const CorticalMacroArray& a, const CorticalMacroArray& b,
+                                    std::mt19937& rng) {
+        CorticalMacroArray child = a;
+        cross_into(a, b, child, rng);
         return child;
     }
 };
+
+// ── 定制点: 有 cross_into 的 trait 走零分配原地路径; 否则回退旧值返回 cross ──────
+// 未提供 cross_into 的类型 (默认 trait / 任务自定义值返回特化) 自动走 else 分支, 零改动兼容。
+template <typename Individual>
+inline void crossover_into(const Individual& a, const Individual& b,
+                           Individual& out, std::mt19937& rng) {
+    if constexpr (requires(Individual& o, const Individual& x,
+                           const Individual& y, std::mt19937& r) {
+                      CrossoverTrait<Individual>::cross_into(x, y, o, r);
+                  }) {
+        CrossoverTrait<Individual>::cross_into(a, b, out, rng);
+    } else {
+        out = CrossoverTrait<Individual>::cross(a, b, rng);
+    }
+}
 
 // ── 基因组等价判定 (字段级; 基因组含 vector 成员, 禁止 memcmp) ────────────────
 inline bool genome_equal(const CompactSoAGenome& x, const CompactSoAGenome& y) {

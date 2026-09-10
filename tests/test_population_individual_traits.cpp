@@ -105,6 +105,43 @@ void test_crossover_determinism() {
     std::cout << "  ✓ 杂交确定性: 同种子基因组位级一致 / 异种子列型分化" << std::endl;
 }
 
+void test_cross_into_equivalence() {
+    auto pa = make_parent(101);
+    auto pb = make_parent(202);
+
+    // 值返回参考
+    std::mt19937 r1(7);
+    auto ref = column_crossover(pa, pb, r1);
+
+    // 原地版: out 预分配同形 (复用路径) — 基因组逐字段一致 + rng 抽取序列一致
+    std::mt19937 r2(7);
+    CorticalMacroArray out = pa;
+    CrossoverTrait<CorticalMacroArray>::cross_into(pa, pb, out, r2);
+    assert(out.columns().size() == ref.columns().size());
+    for (size_t c = 0; c < out.columns().size(); ++c) {
+        assert(genome_equal(out.columns()[c].genome, ref.columns()[c].genome));
+    }
+    assert(out.macro_axons().size() == ref.macro_axons().size());
+    assert(r1 == r2);  // rng 状态逐位相同 ⇒ 抽取次数与顺序一致
+
+    // 复用槽二次调用 (out 已有上一代残留) 结果仍一致
+    std::mt19937 r3(7);
+    CrossoverTrait<CorticalMacroArray>::cross_into(pa, pb, out, r3);
+    for (size_t c = 0; c < out.columns().size(); ++c) {
+        assert(genome_equal(out.columns()[c].genome, ref.columns()[c].genome));
+    }
+    assert(out.macro_axons().size() == ref.macro_axons().size());
+
+    // 自由函数定制点 (经 if constexpr 分派到 cross_into)
+    std::mt19937 r4(7);
+    CorticalMacroArray out2 = pa;
+    kun::population::crossover_into(pa, pb, out2, r4);
+    for (size_t c = 0; c < out2.columns().size(); ++c) {
+        assert(genome_equal(out2.columns()[c].genome, ref.columns()[c].genome));
+    }
+    std::cout << "  ✓ 原地杂交等价: cross_into ≡ cross (基因逐字段 + rng 序列 + 轴突数)" << std::endl;
+}
+
 void test_default_trait_clones() {
     struct Dummy {
         int v = 3;
@@ -135,6 +172,7 @@ int main() {
     std::cout << "==================================================================" << std::endl;
     test_crossover_invariants();
     test_crossover_determinism();
+    test_cross_into_equivalence();
     test_default_trait_clones();
     test_incompatible_parents_degrade();
     std::cout << "[PASS] test_population_individual_traits all assertions passed!" << std::endl;

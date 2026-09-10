@@ -236,6 +236,14 @@ target_include_directories(train_quant_population_ecology PRIVATE "${CMAKE_CURRE
 add_executable(bench_population_evolution "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_population_evolution.cpp")
 target_link_libraries(bench_population_evolution PRIVATE kun_population Threads::Threads m)
 
+# 演化个体表示成本基准 (报告工具, 非 ctest 门禁)
+add_executable(bench_individual_representation "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_individual_representation.cpp")
+target_link_libraries(bench_individual_representation PRIVATE kun_population Threads::Threads m)
+
+# 演化算子真成本基准 (Deme::evolve_generation 稳态口径, 报告工具)
+add_executable(bench_evolution_operators "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_evolution_operators.cpp")
+target_link_libraries(bench_evolution_operators PRIVATE kun_population Threads::Threads m)
+
 add_executable(train_multi_asset_quant_l3 "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_multi_asset_quant_l3.cpp")
 target_link_libraries(train_multi_asset_quant_l3 PRIVATE kun_cellular Threads::Threads m)
 
