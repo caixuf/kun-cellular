@@ -1,0 +1,41 @@
+{
+ "organism_id": "quant_ecology_gpu",
+ "pool_size": 5,
+ "protocol_note": "GPU 变体新世系 (稠密列内+环柱轴突+逐列注入; 算子池无 CORRELATION/INHIBIT); C11 位级对账未达成 (SDSC-BIN v5 受体映射立项中); val-selected frozen-consts, OOS single-shot",
+ "pool_val_sharpe": 0.0,
+ "pool_oos_sharpe": 0.19427061080932617,
+ "pool_oos_return": 0.15415850281715393,
+ "pool_oos_mdd": 0.34523171186447144,
+ "members": [
+  {
+   "checkpoint_path": "checkpoints/quant_ecology_gpu_m39.bin",
+   "member_idx": 39,
+   "val_sharpe": 1.49934983253479,
+   "oos_sharpe": 0.5021571516990662
+  },
+  {
+   "checkpoint_path": "checkpoints/quant_ecology_gpu_m98.bin",
+   "member_idx": 98,
+   "val_sharpe": 1.2084681987762451,
+   "oos_sharpe": 0.3833644986152649
+  },
+  {
+   "checkpoint_path": "checkpoints/quant_ecology_gpu_m63.bin",
+   "member_idx": 63,
+   "val_sharpe": 1.0816797018051147,
+   "oos_sharpe": -0.1367720514535904
+  },
+  {
+   "checkpoint_path": "checkpoints/quant_ecology_gpu_m53.bin",
+   "member_idx": 53,
+   "val_sharpe": 1.0984946489334106,
+   "oos_sharpe": -0.9083962440490723
+  },
+  {
+   "checkpoint_path": "checkpoints/quant_ecology_gpu_m97.bin",
+   "member_idx": 97,
+   "val_sharpe": 0.9825664758682251,
+   "oos_sharpe": -0.11516711860895157
+  }
+ ]
+}

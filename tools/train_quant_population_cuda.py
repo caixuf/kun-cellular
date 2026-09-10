@@ -287,6 +287,39 @@ def run_episode(pop, sim):
     return sim.metrics()
 
 
+def _run_evolution(pop, sim_tr, generations, pop_size):
+    """演化主循环 (v2: 列级杂交 + 多样性哨兵); 结束后种群快照落盘"""
+    t0 = time.perf_counter()
+    best_fit = -float("inf")
+    repop_events = 0
+    for gen in range(1, generations + 1):
+        fitness, sharpe, cum, mdd, trades = run_episode(pop, sim_tr)
+        cur_best = fitness.max().item()
+        if cur_best > best_fit:
+            best_fit = cur_best
+        num_elites = pop.crossover_population(fitness, elite_ratio=ELITE_RATIO,
+                                              tournament_k=4, crossover_prob=CROSSOVER_PROB)
+        mut_scale = max(0.015, 0.08 * (1.0 - gen / generations))
+        pop.mutate(mutation_rate=MUT_RATE, mutation_power=mut_scale, num_elites=num_elites)
+        if gen % WATCHDOG_EVERY == 0:
+            Rg = sim_tr.returns
+            Z = (Rg - Rg.mean(dim=1, keepdim=True)) / Rg.std(dim=1, keepdim=True).clamp(min=1e-9)
+            Cmat = (Z @ Z.T) / max(1, Rg.shape[1])
+            off_mask = ~torch.eye(pop_size, dtype=torch.bool, device=pop.device)
+            frac_high = ((Cmat.abs() > CORR_GATE) & off_mask).float().sum() / off_mask.sum()
+            if frac_high.item() > WATCHDOG_CORR_FRAC:
+                pop.repopulate_random(fitness, elite_ratio=ELITE_RATIO, frac=0.5)
+                repop_events += 1
+        if gen % 20 == 0 or gen == 1:
+            print(f"  [Gen {gen:3d}/{generations}] 最佳fitness: {cur_best:7.3f} | "
+                  f"夏普均值: {sharpe.mean().item():5.2f} | 盈利成员: {(cum > 0).float().mean().item()*100:.1f}%"
+                  + (f" | 重繁: {repop_events}" if repop_events else ""))
+    print(f"  [✓] GPU 演化完毕: {time.perf_counter()-t0:.1f}s (种群 {pop_size} × {generations} 代 | 重繁 {repop_events} 次)")
+    torch.save({"intra": pop.intra_weights, "inter": pop.inter_weights,
+                "param1": pop.param1, "param2": pop.param2},
+               "/tmp/opencode/quant_gpu_pop_state.pt")
+
+
 def main():
     generations = int(sys.argv[sys.argv.index("--gen") + 1]) if "--gen" in sys.argv else GENERATIONS
     pop_size = int(sys.argv[sys.argv.index("--pop") + 1]) if "--pop" in sys.argv else POP_SIZE
@@ -305,40 +338,16 @@ def main():
     pop = QuantArrayPopulation(pop_size=pop_size, device="cuda")
     sim_tr = BatchedPortfolioSim(pop_size, *tr, device=pop.device)
 
-    t0 = time.perf_counter()
-    best_fit, best_idx = -float("inf"), 0
-    repop_events = 0
-    for gen in range(1, generations + 1):
-        fitness, sharpe, cum, mdd, trades = run_episode(pop, sim_tr)
-        cur_best = fitness.max().item()
-        if cur_best > best_fit:
-            best_fit = cur_best
-            best_idx = int(torch.argmax(fitness).item())
-        # GPU 列级有性重组 (v2) + 变异
-        num_elites = pop.crossover_population(fitness, elite_ratio=ELITE_RATIO,
-                                              tournament_k=4, crossover_prob=CROSSOVER_PROB)
-        mut_scale = max(0.015, 0.08 * (1.0 - gen / generations))
-        pop.mutate(mutation_rate=MUT_RATE, mutation_power=mut_scale, num_elites=num_elites)
-        # 多样性哨兵 (v2): 每 10 代监控相关矩阵, 坍缩即重繁
-        if gen % WATCHDOG_EVERY == 0:
-            Rg = sim_tr.returns
-            Z = (Rg - Rg.mean(dim=1, keepdim=True)) / Rg.std(dim=1, keepdim=True).clamp(min=1e-9)
-            Cmat = (Z @ Z.T) / max(1, Rg.shape[1])
-            off_mask = ~torch.eye(pop_size, dtype=torch.bool, device=pop.device)
-            frac_high = ((Cmat.abs() > CORR_GATE) & off_mask).float().sum() / off_mask.sum()
-            if frac_high.item() > WATCHDOG_CORR_FRAC:
-                n = pop.repopulate_random(fitness, elite_ratio=ELITE_RATIO, frac=0.5)
-                repop_events += 1
-        if gen % 20 == 0 or gen == 1:
-            print(f"  [Gen {gen:3d}/{generations}] 最佳fitness: {cur_best:7.3f} | "
-                  f"夏普均值: {sharpe.mean().item():5.2f} | 盈利成员: {(cum > 0).float().mean().item()*100:.1f}%"
-                  + (f" | 重繁: {repop_events}" if repop_events else ""))
-    print(f"  [✓] GPU 演化完毕: {time.perf_counter()-t0:.1f}s (种群 {pop_size} × {generations} 代 | 重繁 {repop_events} 次)")
-
-    # 种群快照落盘 (选型阶段崩溃可续跑, 免整场重演)
-    torch.save({"intra": pop.intra_weights, "inter": pop.inter_weights,
-                "param1": pop.param1, "param2": pop.param2},
-               "/tmp/opencode/quant_gpu_pop_state.pt")
+    snap_path = "/tmp/opencode/quant_gpu_pop_state.pt"
+    if "--resume" in sys.argv and os.path.exists(snap_path):
+        st = torch.load(snap_path)
+        pop.intra_weights.copy_(st["intra"])
+        pop.inter_weights.copy_(st["inter"])
+        pop.param1.copy_(st["param1"])
+        pop.param2.copy_(st["param2"])
+        print("  ↳ [续跑] 已从快照恢复种群, 跳过演化阶段")
+    else:
+        _run_evolution(pop, sim_tr, generations, pop_size)
 
     # ── val 选型 (预注册纪律同 v2) ──
     sim_va = BatchedPortfolioSim(pop_size, *va, device=pop.device)
@@ -378,6 +387,9 @@ def main():
             self.outputs.view(1, NUM_COLS, CELLS_PER_COL)[:, :, -2] = fused.clamp(min=0)
             self.outputs.view(1, NUM_COLS, CELLS_PER_COL)[:, :, -1] = (-fused).clamp(min=0)
             return self.outputs[:, pop.num_cells - pop.out_dim:]
+        def effector_signals(self):
+            eff = self.outputs.view(1, NUM_COLS, CELLS_PER_COL)[:, :, -2:]
+            return eff[:, :, 0] - eff[:, :, 1]
 
     sim_fv = BatchedPortfolioSim(1, *va, device=pop.device)
     _, sh_fv, cum_fv, mdd_fv, _ = run_episode(_FusedPop(), sim_fv)
