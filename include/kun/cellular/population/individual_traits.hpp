@@ -20,6 +20,16 @@ namespace population {
 // ── 变异算子概念: 个体必须提供 mutate(rate, sigma, rng) ──────────────────────
 // CorticalMacroArray 已满足 (cortical_column.hpp:239)。
 
+// ── 变异算子定制点: 默认透传个体自身的 mutate ────────────────────────────────
+// 任务层可特化本 trait 注入领域策略 (例: 冻结拓扑、仅扰动突触权重/参数),
+// 使演化机器仍留在 L1, 而领域变异语义留在任务层。
+template <typename Individual>
+struct MutationTrait {
+    static void mutate(Individual& ind, float rate, float sigma, std::mt19937& rng) {
+        ind.mutate(rate, sigma, rng);
+    }
+};
+
 // ── 杂交算子 traits: 默认无杂交 (克隆父 A); 由 L1 为具体底座类型提供特化 ──────
 template <typename Individual>
 struct CrossoverTrait {

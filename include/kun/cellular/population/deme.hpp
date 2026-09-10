@@ -113,7 +113,7 @@ public:
             } else {
                 offspring_[slot] = pa;                           // 克隆父 A (原地)
             }
-            offspring_[slot].mutate(params.mut_rate, params.mut_sigma, rng_);
+            MutationTrait<Individual>::mutate(offspring_[slot], params.mut_rate, params.mut_sigma, rng_);
         }
         // 精英 fitness 携带 (跳过重算); 后代全部标记待评估
         fitness_next_.assign(pop, -1e18);

@@ -250,6 +250,9 @@ target_link_libraries(train_multi_asset_quant_l3 PRIVATE kun_cellular Threads::T
 add_executable(train_flagship_voxel "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_flagship_voxel.cpp")
 target_link_libraries(train_flagship_voxel PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_flagship_wired "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_flagship_wired.cpp")
+target_link_libraries(train_flagship_wired PRIVATE kun_population Threads::Threads m)
+
 add_executable(train_field_3d_turbulence "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_field_3d_turbulence.cpp")
 target_link_libraries(train_field_3d_turbulence PRIVATE kun_cellular Threads::Threads m)
 
