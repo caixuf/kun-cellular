@@ -86,12 +86,14 @@ int main(int argc, char** argv) {
     uint32_t SEED = 0;
     float migration_rate = 0.0f;  // v2 冻结: 关迁移, 多样性来自隔离世系
     std::string out_dir = "checkpoints";
+    std::string eval_mode = "batch";  // batch | individual (A/B 用)
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() { return (i + 1 < argc) ? argv[++i] : ""; };
         if (a == "--seed") SEED = static_cast<uint32_t>(std::strtoul(next(), nullptr, 10));
         else if (a == "--migration") migration_rate = std::strtof(next(), nullptr);
         else if (a == "--out-dir") out_dir = next();
+        else if (a == "--eval-mode") eval_mode = next();
     }
 
     std::cout << "==================================================================\n";
@@ -127,17 +129,30 @@ int main(int argc, char** argv) {
     params.migration_rate = migration_rate;
     AdversarialCourse course;  // v1 保持 OFF (压力课程为 v2 议题, 如实不启用)
 
-    // 评估委托: 单个体在演化集 (train) 的回放适应度
-    auto train_eval = [&](const CorticalMacroArray& org) -> double {
+    // 评估委托 (任务层只提供 rollout/适应度; 调度归 L1 系统层):
+    //   individual: 逐个体委托 (L1 跨 pending 并行)
+    //   batch:      批量委托 (L1 交出全网格 pending 批, 任务在批内并行)
+    auto indiv_eval = [&](const CorticalMacroArray& org) -> double {
         CorticalMacroArray probe = org;             // 前向推进状态不污染 deme 个体
         CorticalQuantTask t = train_task;
         run_cortical_array_on_task(probe, t, NUM_COLS);
         return fitness_from_task(t);
     };
+    auto batch_eval = [&](kun::population::BatchView<CorticalMacroArray> batch) {
+        #pragma omp parallel for schedule(dynamic)
+        for (int64_t j = 0; j < static_cast<int64_t>(batch.individuals.size()); ++j) {
+            CorticalMacroArray probe = *batch.individuals[static_cast<size_t>(j)];
+            CorticalQuantTask t = train_task;
+            run_cortical_array_on_task(probe, t, NUM_COLS);
+            batch.fitness_out[static_cast<size_t>(j)] = fitness_from_task(t);
+        }
+    };
+    std::cout << "  ↳ 评估模式: " << eval_mode << "\n" << std::flush;
 
     auto start = std::chrono::high_resolution_clock::now();
     for (int gen = 1; gen <= GENERATIONS; ++gen) {
-        grid.step_generation(train_eval, params);
+        if (eval_mode == "individual") grid.step_generation(indiv_eval, params);
+        else grid.step_generation(batch_eval, params);
         if (gen % 25 == 0 || gen == 1) {
             std::cout << "  Gen " << std::setw(3) << gen << "/" << GENERATIONS;
             for (size_t di = 0; di < grid.demes().size(); ++di) {

@@ -41,6 +41,10 @@ if(OpenMP_CXX_FOUND)
     target_link_libraries(kun_cellular INTERFACE OpenMP::OpenMP_CXX)
 endif()
 
+# L1 系统层 INTERFACE 库 (header-only; 仅消费 L0 公开 API, 领域无关)
+add_library(kun_population INTERFACE)
+target_link_libraries(kun_population INTERFACE kun_cellular)
+
 enable_testing()
 
 # 自动探测 CUDA Driver 与 NVRTC 支持
@@ -91,7 +95,11 @@ foreach(TEST_SRC ${TEST_SOURCES})
         endif()
     else()
         add_executable(${TEST_NAME} ${TEST_SRC})
-        target_link_libraries(${TEST_NAME} PRIVATE kun_cellular)
+        if(TEST_NAME MATCHES "^test_population_")
+            target_link_libraries(${TEST_NAME} PRIVATE kun_population)
+        else()
+            target_link_libraries(${TEST_NAME} PRIVATE kun_cellular)
+        endif()
         target_compile_options(${TEST_NAME} PRIVATE -UNDEBUG)
         add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
         # 并行负载下时序/内存 flaky (单跑/串行满分): flow 家族重载实验, 统一串行隔离
@@ -221,8 +229,12 @@ target_link_libraries(train_multi_asset_cortical_array PRIVATE kun_cellular Thre
 target_include_directories(train_multi_asset_cortical_array PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tools")
 
 add_executable(train_quant_population_ecology "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_population_ecology.cpp")
-target_link_libraries(train_quant_population_ecology PRIVATE kun_cellular Threads::Threads m)
+target_link_libraries(train_quant_population_ecology PRIVATE kun_population Threads::Threads m)
 target_include_directories(train_quant_population_ecology PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tools")
+
+# L1 演化速度基准 (报告工具, 非 ctest 门禁)
+add_executable(bench_population_evolution "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_population_evolution.cpp")
+target_link_libraries(bench_population_evolution PRIVATE kun_population Threads::Threads m)
 
 add_executable(train_multi_asset_quant_l3 "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_multi_asset_quant_l3.cpp")
 target_link_libraries(train_multi_asset_quant_l3 PRIVATE kun_cellular Threads::Threads m)

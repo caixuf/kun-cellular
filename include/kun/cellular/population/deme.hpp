@@ -2,14 +2,24 @@
 // ============================================================================
 // population/deme.hpp — L1 系统层: 岛屿deme (岛内代际演化容器)
 // 概念吸收自底座 IslandEvolutionGrid::IslandDeme, 泛型化于任意个体类型。
+//
+// 系统层纪律 (docs/population_ecology_v1_design.md):
+//   - 仅消费 L0 底座公开 API, 零修改 L0
+//   - 领域无关: 无任何业务名词
+//   - 确定性: 全部随机源显式传入 (std::mt19937), 同种子位级可复现
+//
+// 并行归属: 本类的 evaluate 为串行 (单 deme 视角)。跨 deme 的并行调度由
+// EcologyGrid 统一持有 (系统层单一调度点), 避免嵌套并行区过订。
 // ============================================================================
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <numeric>
 #include <random>
 #include <vector>
 
 #include "kun/cellular/population/individual_traits.hpp"
+#include "kun/cellular/population/population_eval.hpp"
 
 namespace kun {
 namespace population {
@@ -41,6 +51,9 @@ public:
     const std::vector<double>& fitness() const { return fitness_; }
     std::mt19937& rng() { return rng_; }
 
+    // 适应度降序排名 (仅前 keep_n 有序; 全范围仍是索引的一个排列)
+    const std::vector<size_t>& ranking() const { return ranking_; }
+
     // 种群初始化 (工厂由任务层注入; L1 不关心个体如何诞生)
     template <typename Factory>
     void seed_population(size_t pop_size, Factory&& factory) {
@@ -49,35 +62,48 @@ public:
         for (size_t i = 0; i < pop_size; ++i) {
             individuals_.push_back(factory(rng_));
         }
+        ranking_valid_ = false;
     }
 
-    // 适应度评估 (评估委托由任务层实现; 逐个体调用)
-    // OpenMP 并行: 评估委托必须线程安全 (任务拷贝共享不可变预计算, 状态全局部)
-    // fitness 约定: -1e18 = 待评估哨兵; 已有真实适应度的成员 (精英携带) 跳过重算
+    // ── 待评估枚举 (系统层调度用: 网格收集全网格 pending, 统一并行) ─────────────
+    // 约定: fitness <= -1e17 为待评估哨兵; 已有真实适应度的成员 (精英携带) 跳过。
+    template <typename Fn>
+    void for_each_pending(Fn&& fn) {
+        if (fitness_.size() != individuals_.size()) fitness_.assign(individuals_.size(), -1e18);
+        for (size_t i = 0; i < individuals_.size(); ++i) {
+            if (fitness_[i] <= -1e17) fn(i, individuals_[i]);
+        }
+    }
+
+    // 回写评估结果 (系统层调度用); 非有限值统一钳为待评估哨兵
+    void set_fitness(size_t slot, double f) {
+        if (slot >= fitness_.size()) return;
+        fitness_[slot] = std::isfinite(f) ? f : -1e18;
+        ranking_valid_ = false;
+    }
+
+    // 单 deme 串行评估便利入口 (跨 deme 并行由 EcologyGrid 持有; 见文件头)
     template <typename Eval>
     void evaluate(Eval&& eval) {
-        if (fitness_.size() != individuals_.size()) fitness_.assign(individuals_.size(), -1e18);
-        #pragma omp parallel for schedule(dynamic)
-        for (int64_t i = 0; i < static_cast<int64_t>(individuals_.size()); ++i) {
-            if (fitness_[i] > -1e17) continue;             // 精英 fitness 携带: 零重复评估
-            double f = eval(individuals_[i]);
-            fitness_[i] = std::isfinite(f) ? f : -1e18;
-        }
-        rebuild_ranking();
+        for_each_pending([&](size_t slot, Individual& ind) {
+            set_fitness(slot, static_cast<double>(eval(ind)));
+        });
     }
 
     // 岛内代际推进: 精英保留 + 锦标赛亲本 + (杂交|克隆) + 变异, 种群规模守恒
+    // 双缓冲复用: offspring_/fitness_next_ 保留容量, 避免每代堆分配。
     void evolve_generation(const EvolutionParams& params) {
         const size_t pop = individuals_.size();
         if (pop == 0 || fitness_.size() != pop) return;
         const size_t elite_n = std::min(params.elite_keep, pop);
+        ensure_topk(elite_n);
 
-        std::vector<Individual> next;
-        next.reserve(pop);
+        offspring_.clear();
+        offspring_.reserve(pop);
         for (size_t i = 0; i < elite_n; ++i) {
-            next.push_back(individuals_[ranking_[i]]);  // 精英原样保留
+            offspring_.push_back(individuals_[ranking_[i]]);  // 精英原样保留
         }
-        while (next.size() < pop) {
+        while (offspring_.size() < pop) {
             const Individual& pa = tournament(params.tournament_k);
             const Individual& pb = tournament(params.tournament_k);
             std::uniform_real_distribution<float> u(0.0f, 1.0f);
@@ -85,27 +111,29 @@ public:
                 ? CrossoverTrait<Individual>::cross(pa, pb, rng_)
                 : pa;                                   // 克隆父 A (单亲)
             child.mutate(params.mut_rate, params.mut_sigma, rng_);
-            next.push_back(std::move(child));
+            offspring_.push_back(std::move(child));
         }
-        individuals_ = std::move(next);
-        // 精英 fitness 携带: 精英个体未变, 保留其已知适应度 (跳过重算);
-        // 后代全部标记待评估
-        std::vector<double> carried(pop, -1e18);
+        // 精英 fitness 携带 (跳过重算); 后代全部标记待评估
+        fitness_next_.assign(pop, -1e18);
         for (size_t i = 0; i < elite_n; ++i) {
-            carried[i] = fitness_.empty() || fitness_.size() != pop ? -1e18 : fitness_[ranking_[i]];
+            fitness_next_[i] = fitness_[ranking_[i]];
         }
-        fitness_ = std::move(carried);
+        std::swap(individuals_, offspring_);
+        std::swap(fitness_, fitness_next_);
+        ranking_valid_ = false;
         ranking_.clear();
     }
 
-    // 锦标赛选择: 从 fitness 排名前 k 中取最优
+    // 锦标赛选择: 均匀抽 k 个 (确定性: 固定 rng 抽取序列), 取适应度最优
+    // 与 ranking 顺序解耦 (partial_sort 尾部无序不影响选择语义)
     const Individual& tournament(size_t k) {
-        if (ranking_.empty()) return individuals_.front();
+        const size_t pop = individuals_.size();
+        if (pop == 0) return individuals_.front();
         k = std::max<size_t>(k, 1);
-        std::uniform_int_distribution<size_t> d(0, ranking_.size() - 1);
-        size_t best = ranking_[d(rng_)];
+        std::uniform_int_distribution<size_t> d(0, pop - 1);
+        size_t best = d(rng_);
         for (size_t t = 1; t < k; ++t) {
-            size_t cand = ranking_[d(rng_)];
+            size_t cand = d(rng_);
             if (fitness_[cand] > fitness_[best]) best = cand;
         }
         return individuals_[best];
@@ -124,28 +152,51 @@ public:
         if (slot >= individuals_.size()) return;
         individuals_[slot] = org;
         if (slot < fitness_.size()) fitness_[slot] = -1e18;  // 待重评估
+        ranking_valid_ = false;
     }
 
-    // 生态位画像槽 (池评估阶段由任务层填充; deme 层只做透传存储)
     double best_fitness() const {
         double best = -1e18;
         for (double f : fitness_) best = std::max(best, f);
         return best;
     }
 
+    // 重算前 keep_n 的有序排名 (partial_sort, O(n + k·log k));
+    // 全序比较器 (fitness 降序, index 升序) 保证并列时可移植确定性。
+    void rebuild_topk(size_t keep_n) {
+        const size_t pop = individuals_.size();
+        ranking_.resize(pop);
+        if (pop == 0) { ranking_valid_ = true; ranking_k_ = 0; return; }
+        std::iota(ranking_.begin(), ranking_.end(), size_t{0});
+        const size_t k = std::min(keep_n, pop);
+        auto cmp = [this](size_t x, size_t y) {
+            if (fitness_[x] != fitness_[y]) return fitness_[x] > fitness_[y];
+            return x < y;  // 确定性并列打破
+        };
+        std::partial_sort(ranking_.begin(), ranking_.begin() + static_cast<ptrdiff_t>(k),
+                          ranking_.end(), cmp);
+        ranking_valid_ = true;
+        ranking_k_ = k;
+    }
+
 private:
-    void rebuild_ranking() {
-        ranking_.resize(fitness_.size());
-        std::iota(ranking_.begin(), ranking_.end(), 0);
-        std::sort(ranking_.begin(), ranking_.end(),
-                  [this](size_t x, size_t y) { return fitness_[x] > fitness_[y]; });
+    void ensure_topk(size_t keep_n) {
+        const size_t pop = individuals_.size();
+        const size_t k = std::min(keep_n, pop);
+        if (ranking_valid_ && ranking_.size() == pop && ranking_k_ >= k) return;
+        rebuild_topk(keep_n);
     }
 
     uint32_t deme_id_;
     std::mt19937 rng_;
     std::vector<Individual> individuals_;
     std::vector<double> fitness_;
-    std::vector<size_t> ranking_;   // 适应度降序索引
+    std::vector<size_t> ranking_;   // 适应度降序索引 (前 ranking_k_ 有序)
+    bool ranking_valid_{false};
+    size_t ranking_k_{0};
+    // 双缓冲 (容量复用)
+    std::vector<Individual> offspring_;
+    std::vector<double> fitness_next_;
 };
 
 }  // namespace population
