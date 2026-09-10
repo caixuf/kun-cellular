@@ -103,8 +103,8 @@ def check_checkpoint_binary_discipline() -> list[str]:
                 magic, ver = struct.unpack("<II", hdr[:8])
                 if magic != SDSC_BINARY_MAGIC:
                     errors.append(f"检查点 {ckpt_path.name} 魔数无效: 0x{magic:08x} != 0x{SDSC_BINARY_MAGIC:08x}")
-                if ver not in (2, 3):
-                    errors.append(f"检查点 {ckpt_path.name} 版本无效: {ver} not in (2, 3)")
+                if ver not in (2, 3, 4, 5):
+                    errors.append(f"检查点 {ckpt_path.name} 版本无效: {ver} not in (2, 3, 4, 5)")
         except Exception as e:
             errors.append(f"检查点 {ckpt_path.name} 读取异常: {e}")
 
