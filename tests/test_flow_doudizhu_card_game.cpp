@@ -37,17 +37,10 @@ void test_doudizhu_step_and_fitness() {
 }
 
 void test_doudizhu_cand_scorer_checkpoint() {
-    // U0.2 权威冠军 (57.0% 基线): v4 JSON 格式检查点, 82 细胞 / 425 突触
-    std::ifstream f("checkpoints/doudizhu_cand_scorer.bin", std::ios::binary);
-    if (!f.is_open()) {
-        f.open("../checkpoints/doudizhu_cand_scorer.bin", std::ios::binary);
-    }
-    assert(f.is_open());
-    f.close();
-
-    CellularOrganism org = CellularOrganism::load_checkpoint_json("checkpoints/doudizhu_cand_scorer.bin");
+    // U0.2 权威冠军 (57.0% 基线): SDSC-BIN, 82 细胞 / 425 突触
+    CellularOrganism org = CellularOrganism::load_checkpoint_bin("checkpoints/doudizhu_cand_scorer.bin");
     if (org.cells.empty()) {
-        org = CellularOrganism::load_checkpoint_json("../checkpoints/doudizhu_cand_scorer.bin");
+        org = CellularOrganism::load_checkpoint_bin("../checkpoints/doudizhu_cand_scorer.bin");
     }
     assert(org.cells.size() == 82);
     int sense = 0, act = 0;

@@ -248,9 +248,9 @@ void test_legacy_v2_checkpoint_backward_compatibility() {
         assert(sum == 192 && "adas_cortex 线性运算细胞数必须为 192，绝不能被错译为受体！");
     }
 
-    // 2. doudizhu_cand_scorer.bin (U0.2 权威冠军, v4 JSON 格式) 形态学普查
+    // 2. doudizhu_cand_scorer.bin (U0.2 权威冠军, SDSC-BIN) 形态学普查
     {
-        CellularOrganism org = CellularOrganism::load_checkpoint_json(find_ckpt_path("checkpoints/doudizhu_cand_scorer.bin"));
+        CellularOrganism org = CellularOrganism::load_checkpoint_bin(find_ckpt_path("checkpoints/doudizhu_cand_scorer.bin"));
         assert(org.cells.size() == 82);
         int sense = 0, act = 0;
         for (const auto& c : org.cells) {
