@@ -4,8 +4,8 @@
 // 每域: 独立演化引擎 (解锁骨架, FULL_24) → Train/Holdout-ID/Holdout-OOD
 // 三隔离门禁 (OOD = 同任务类 ood=2.0 工厂扰动)。SR=0 强制 FAIL。
 //
-// 编译: g++ -O3 -march=native -std=c++20 -I include \
-//       tools/train_domain_zoo.cpp -o bin/train_domain_zoo
+// Maglev: 开环不稳定 + 质量 OOD 需课程化; 注入 PID 反射弧祖先并动态 ood 采样。
+// 既有 zoo_maglev.bin 仅在复测仍过 M1 时复用, 否则重训 (杜绝失效检查点短路)。
 // ============================================================================
 
 #include "tasks/control/domain_zoo.hpp"
@@ -14,6 +14,7 @@
 #include <fstream>
 #include <functional>
 #include <memory>
+#include <random>
 
 using namespace kun;
 
@@ -27,12 +28,42 @@ struct ZooResult {
     double sec = 0;
 };
 
+CellularOrganism make_maglev_pid_progenitor() {
+    CellularOrganism p = CellularOrganism::create_seed_organism(1);
+    p.lineage_name = "Maglev-Progenitor";
+    p.cells.clear();
+    p.synapses.clear();
+    p.cells.push_back({0, CellType::SENSE_RAW_INPUT_0, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -100.0f, -40.0f, 0.0f});
+    p.cells.push_back({1, CellType::SENSE_RAW_INPUT_1, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -100.0f,   0.0f, 0.0f});
+    p.cells.push_back({2, CellType::SENSE_RAW_INPUT_2, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, -100.0f,  40.0f, 0.0f});
+    p.cells.push_back({3, CellType::OP_INTEGRAL, 0.05, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 0.0f, -60.0f, 0.0f});
+    p.cells.push_back({4, CellType::OP_DIFF,     1.00, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 0.0f, -20.0f, 0.0f});
+    p.cells.push_back({5, CellType::OP_EMA,      0.30, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 0.0f,  20.0f, 0.0f});
+    p.cells.push_back({6, CellType::OP_SUM,      1.00, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 60.0f,  0.0f, 0.0f});
+    p.cells.push_back({7, CellType::ACT_PRIMARY_POSITIVE, 1.0, 0.0, 0.0, 0.0, false, 0.0, 0, 0, 120.0f, 0.0f, 0.0f});
+    p.synapses.push_back({0, 6, 0, 1.5, true, 60.0f, -1.0f});
+    p.synapses.push_back({0, 3, 0, 1.0, true, 60.0f, -1.0f});
+    p.synapses.push_back({3, 6, 1, 1.2, true, 60.0f, -1.0f});
+    p.synapses.push_back({1, 4, 0, 1.0, true, 60.0f, -1.0f});
+    p.synapses.push_back({4, 6, 2, 0.8, true, 60.0f, -1.0f});
+    p.synapses.push_back({6, 7, 0, 1.0, true, 60.0f, -1.0f});
+    for (auto& s : p.synapses) {
+        s.initial_weight = s.weight;
+        s.hebbian_rate = 0.0;
+    }
+    p.compile();
+    return p;
+}
+
 ZooResult train_one(const std::function<std::unique_ptr<ZooTask>(double ood)>& mk,
                     const char* ckpt_id, size_t pop, size_t gens, uint32_t seed) {
+    const bool is_maglev = (std::string(ckpt_id) == "zoo_maglev");
     auto train_env = mk(1.0);
     auto id_env = mk(1.0);
-    auto ood_env = mk(2.0);   // 跨物理参数扰动 (每类内部自定义语义)
-    const int MS = train_env->max_steps();
+    auto ood_env = mk(2.0);
+    int MS = train_env->max_steps();
+    if (is_maglev) MS = 600;  // 磁浮需更长稳态窗口
+    train_env->set_max_steps(MS);
     id_env->set_max_steps(MS);
     ood_env->set_max_steps(MS);
 
@@ -52,23 +83,57 @@ ZooResult train_one(const std::function<std::unique_ptr<ZooTask>(double ood)>& m
 
     const std::string existing_ckpt = std::string("checkpoints/") + ckpt_id + ".bin";
     bool use_existing = false;
-    if (std::string(ckpt_id) == "zoo_maglev" && std::ifstream(existing_ckpt).good()) {
+    if (is_maglev && std::ifstream(existing_ckpt).good()) {
         auto loaded = CellularOrganism::load_checkpoint_bin(existing_ckpt);
         if (!loaded.cells.empty() && loaded.compile()) {
-            champion = loaded;
-            use_existing = true;
+            OOSReport probe = TaskEvaluator::evaluate_task_split(
+                *train_env, *id_env, *ood_env, loaded, split, 0.70);
+            if (probe.train_metrics.success_rate > 0.0 && probe.passes_m1_gate) {
+                champion = loaded;
+                use_existing = true;
+                best = 1.0;
+            }
         }
     }
 
     if (!use_existing) {
+        if (is_maglev) {
+            auto progenitor = make_maglev_pid_progenitor();
+            engine.population()[0] = progenitor;
+            for (size_t i = 1; i < engine.population().size(); ++i) {
+                auto org = progenitor;
+                for (int m = 0; m < 2; ++m) engine.mutate(org);
+                engine.population()[i] = org;
+            }
+        }
+
+        std::mt19937 rng(seed);
         for (size_t gen = 1; gen <= gens; ++gen) {
             auto& popv = engine.population();
             double gb = -1e9;
             size_t bi = 0;
-            for (size_t i = 0; i < popv.size(); ++i) {
-                auto m = train_env->evaluate_organism(popv[i], split.train_seeds, MS, true);
-                popv[i].fitness_score = m.mean_fitness;
-                if (m.mean_fitness > gb) { gb = m.mean_fitness; bi = i; }
+
+            if (is_maglev) {
+                const double min_ood = 1.0 - std::min(0.3, gen * 0.003);
+                const double max_ood = 1.0 + std::min(0.8, gen * 0.008);
+                std::uniform_real_distribution<double> dist_ood(min_ood, max_ood);
+                ZooMaglev env1(dist_ood(rng));
+                ZooMaglev env2(dist_ood(rng));
+                env1.set_max_steps(MS);
+                env2.set_max_steps(MS);
+                for (size_t i = 0; i < popv.size(); ++i) {
+                    auto m1 = env1.evaluate_organism(popv[i], split.train_seeds, MS, false);
+                    auto m2 = env2.evaluate_organism(popv[i], split.train_seeds, MS, false);
+                    const double fit = 0.5 * (m1.mean_fitness + m2.mean_fitness);
+                    popv[i].fitness_score = fit;
+                    if (fit > gb) { gb = fit; bi = i; }
+                }
+            } else {
+                for (size_t i = 0; i < popv.size(); ++i) {
+                    auto m = train_env->evaluate_organism(popv[i], split.train_seeds, MS, false);
+                    popv[i].fitness_score = m.mean_fitness;
+                    if (m.mean_fitness > gb) { gb = m.mean_fitness; bi = i; }
+                }
             }
             if (gb > best) { best = gb; champion = popv[bi]; }
             if (gen < gens) engine.evolve_generation();
@@ -79,7 +144,7 @@ ZooResult train_one(const std::function<std::unique_ptr<ZooTask>(double ood)>& m
 
     OOSReport rep = TaskEvaluator::evaluate_task_split(*train_env, *id_env, *ood_env,
                                                        champion, split, 0.70);
-    if (rep.train_metrics.success_rate <= 0.0) {  // 生存型任务: SR=0 不得走距离回退虚报
+    if (rep.train_metrics.success_rate <= 0.0) {
         rep.passes_m1_gate = false;
         rep.verdict = "FAIL: train SR=0";
     }
@@ -96,8 +161,7 @@ ZooResult train_one(const std::function<std::unique_ptr<ZooTask>(double ood)>& m
     r.gate = rep.passes_m1_gate;
     r.sec = sec;
 
-    const std::string path = std::string("checkpoints/") + ckpt_id + ".bin";
-    champion.save_checkpoint_bin(path);
+    champion.save_checkpoint_bin(std::string("checkpoints/") + ckpt_id + ".bin");
     return r;
 }
 
@@ -140,14 +204,12 @@ int main() {
                     r.gate ? "PASS" : "FAIL");
     }
 
-    // 汇总
     size_t passed = 0;
     double total_sec = 0;
     for (auto& r : results) { passed += r.gate ? 1 : 0; total_sec += r.sec; }
     std::printf("---------------------------------------------------------------------\n");
     std::printf("  总计: %zu/%zu 域过 M1 门禁 | 总训练耗时 %.1fs\n", passed, results.size(), total_sec);
 
-    // 汇总报告 JSON (诚实记录, 失败也留档)
     std::ofstream rf("checkpoints/domain_zoo_report.json");
     rf << "{\n  \"gate\": " << (passed == results.size() ? "true" : "false") << ",\n";
     rf << "  \"passed\": " << passed << ", \"total\": " << results.size() << ",\n";
@@ -166,5 +228,5 @@ int main() {
     rf.close();
     std::printf("  [SUCCESS] 批量冠军 12 份 + domain_zoo_report.json 已存盘\n");
     std::printf("=====================================================================\n");
-    return 0;
+    return (passed == results.size()) ? 0 : 1;
 }

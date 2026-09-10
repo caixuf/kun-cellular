@@ -255,7 +255,8 @@ private:
     double L_{0.5}, q_{0.01}, dL_{0};
 };
 
-// 8. 直流电机调速 — 负载阶跃扰动
+// 8. 直流电机调速 — 一阶惯量 + 方波负载扰动
+//   J dw/dt = Kt*f - B*(w-w*) - Tl ; 去掉历史双重 DT 折算 (导致种子间脆断)
 class ZooDCMotor : public ZooTask {
 public:
     explicit ZooDCMotor(double ood = 1.0) : ZooTask(ood) {}
@@ -263,19 +264,21 @@ protected:
     const char* zoo_name() const override { return "zoo_dc_motor"; }
     void reset_physics() override {
         w_ = 50.0 + 8.0 * g_(rng_); tl_ = 0;
-        J_ = 0.02 * ood_;
+        J_ = 0.05 * ood_;
     }
     bool physics(double f) override {
-        if (static_cast<int>(steps_ / 60) % 2 == 0) tl_ = 3.0 * ood_; else tl_ = -3.0 * ood_;
-        const double dw = (f * 25.0 - 1.0 * (w_ - 50.0) / 50.0 * 10.0 - tl_) / J_ * 0.02;
-        w_ += DT * dw * 0.02 * 50.0;                            // 折算: 保持量纲稳定
-        o_[0] = (w_ - 50.0) / 25.0; o_[1] = tl_ / 3.0; o_[2] = f; o_[3] = 0;
+        // 每 60 步翻转负载 (方波), 幅度随 ood 放大
+        tl_ = ((static_cast<int>(steps_ / 60) % 2) == 0) ? (2.0 * ood_) : (-2.0 * ood_);
+        const double Kt = 18.0, B = 0.8, w_ref = 50.0;
+        const double dw = (Kt * f - B * (w_ - w_ref) - tl_) / J_;
+        w_ += DT * dw;
+        o_[0] = (w_ - w_ref) / 25.0; o_[1] = tl_ / 2.0; o_[2] = f; o_[3] = 0;
         t_ += DT;
-        return std::fabs(w_ - 50.0) > 25.0 || !std::isfinite(w_);
+        return std::fabs(w_ - w_ref) > 25.0 || !std::isfinite(w_);
     }
     double quality() const override { return 1.0 - std::min(1.0, std::fabs(w_ - 50.0) / 25.0); }
 private:
-    double w_{50}, tl_{0}, J_{0.02};
+    double w_{50}, tl_{0}, J_{0.05};
 };
 
 // 9. 振动隔离 — 共振对象 + 多频地面激励
@@ -300,7 +303,7 @@ private:
     double xr_{0}, vd_{0};
 };
 
-// 10. 伺服定位 — 双积分对象 + 载荷变化
+// 10. 伺服定位 — 带粘滞阻尼的质量块归零 (纯无阻尼双积分对离散力不可控)
 class ZooServo : public ZooTask {
 public:
     explicit ZooServo(double ood = 1.0) : ZooTask(ood) {}
@@ -311,9 +314,11 @@ protected:
         x_ = std::max(-1.9, std::min(1.9, x_)); v_ = 0;
     }
     bool physics(double f) override {
-        const double a = f * 4.0 / ood_;                        // 载荷使推力失效
-        v_ += DT * a; x_ += DT * v_;
-        o_[0] = x_ / 2.2; o_[1] = v_ / 5.0; o_[2] = 0; o_[3] = 0;
+        const double a = f * 4.0 / ood_;                        // 载荷↑ → 加速度权限↓
+        const double damp = 1.8;                                // 粘滞阻尼: 可镇定
+        v_ += DT * (a - damp * v_);
+        x_ += DT * v_;
+        o_[0] = x_ / 2.2; o_[1] = v_ / 5.0; o_[2] = f; o_[3] = 0;
         t_ += DT;
         return std::fabs(x_) > 2.2 || std::fabs(v_) > 5.0 || !std::isfinite(x_);
     }

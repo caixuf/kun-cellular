@@ -259,6 +259,9 @@ target_link_libraries(train_field_3d_turbulence PRIVATE kun_cellular Threads::Th
 add_executable(train_domain_zoo "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_domain_zoo.cpp")
 target_link_libraries(train_domain_zoo PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_maglev_champion "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_maglev_champion.cpp")
+target_link_libraries(train_maglev_champion PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(kun_certify "${CMAKE_CURRENT_SOURCE_DIR}/tools/kun_certify.cpp")
 target_link_libraries(kun_certify PRIVATE kun_cellular Threads::Threads m)
 
