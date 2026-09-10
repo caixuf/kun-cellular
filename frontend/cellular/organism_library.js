@@ -15,7 +15,7 @@ export let currentHighlightedBookId = null;
 let libraryInitialRenderDone = false;
 let activeSwitchAbortController = null;
 
-export let currentRenderMode = "instrument"; // "instrument" | "symbiosis" | "puremesh" | "lod"
+export let currentRenderMode = "symbiosis"; // "instrument" | "symbiosis" | "puremesh" | "lod"
 export let currentLOD = "1m";
 
 export const ORGAN_DESCRIPTIONS = {

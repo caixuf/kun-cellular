@@ -19,7 +19,7 @@ export class SynapseView {
     this.scene = scene;
     this.numSegments = 16;
     /** @type {'instrument'|'symbiosis'|'puremesh'|'lod'} */
-    this.presentationMode = 'instrument';
+    this.presentationMode = 'symbiosis';
 
     this.curvePoints = new Float32Array((this.numSegments + 1) * 3);
     this.geo = new THREE.BufferGeometry();
@@ -61,7 +61,7 @@ export class SynapseView {
   }
 
   applyPresentationMode(mode) {
-    this.presentationMode = mode || 'instrument';
+    this.presentationMode = mode || 'symbiosis';
     const instrument = this.presentationMode === 'instrument';
     if (this.photon1) this.photon1.visible = !instrument;
     if (this.photon2) this.photon2.visible = !instrument;

@@ -117,7 +117,7 @@ export class CellView {
     this.scene = scene;
     this.org = org;
     /** @type {PresentationMode} */
-    this.presentationMode = 'instrument';
+    this.presentationMode = 'symbiosis';
     this.targetX = cell.x || 0;
     this.targetY = cell.y || 0;
     this.targetZ = cell.z || 0;
@@ -317,7 +317,7 @@ export class CellView {
    * @param {PresentationMode} mode
    */
   applyPresentationMode(mode) {
-    this.presentationMode = mode || 'instrument';
+    this.presentationMode = mode || 'symbiosis';
     const instrument = this.presentationMode === 'instrument';
     if (this.innerMembraneMesh) this.innerMembraneMesh.visible = !instrument;
     if (this.poresMesh) this.poresMesh.visible = !instrument;

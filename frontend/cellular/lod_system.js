@@ -23,10 +23,10 @@ export const synViewsMap = new Map();
 export const views = { cells: [], syns: [] };
 
 /** View 呈现模式（与 organism_library.currentRenderMode 同步） */
-export let activePresentationMode = 'instrument';
+export let activePresentationMode = 'symbiosis';
 
 export function setActivePresentationMode(mode) {
-  activePresentationMode = mode || 'instrument';
+  activePresentationMode = mode || 'symbiosis';
   for (const v of views.cells) {
     if (v && typeof v.applyPresentationMode === 'function') v.applyPresentationMode(activePresentationMode);
   }

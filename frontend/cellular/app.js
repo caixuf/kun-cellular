@@ -32,13 +32,13 @@ import { updateManifoldSystem } from './manifold_system.js';
 initPostprocessing(renderer, scene, camera);
 initCameraController(renderer, camera, () => org, () => views, () => currentOrganismBounds, log);
 
-// 2. 初始构建全景流形与微观视图（默认仪器模式）
+// 2. 初始构建全景流形与微观视图（默认：实体+星云 + 舒适科研，仪器可选）
 compile(org);
 updateOrganismBounds(null, org);
-setActivePresentationMode('instrument');
+setActivePresentationMode('symbiosis');
 rebuildViews(scene, org, currentOrganismBounds);
 frameBus.publish(org);
-setVisualBloomMode('off', renderer, null);
+setVisualBloomMode('scientific', renderer, null);
 
 // 3. 启动 Worker Model 线程（失败则主线程降级）
 startSimEngine({ log });
@@ -255,7 +255,14 @@ function animate() {
 
 // 绑定所有全局 HTML 事件处理器
 window.setWarp = setWarp;
-window.setVisualBloomMode = (mode) => setVisualBloomMode(mode, renderer, log);
+window.setVisualBloomMode = (mode) => {
+  // 「舒适科研 / 柔和微光」期望旧渲染观感：若仍卡在仪器模式，一并切回实体+星云
+  if ((mode === 'scientific' || mode === 'cinematic') && currentRenderMode === 'instrument') {
+    setRenderMode('symbiosis');
+    if (airParticleCloud) airParticleCloud.visible = true;
+  }
+  setVisualBloomMode(mode, renderer, log);
+};
 window.setStress = setStress;
 window.playLifeEpicStory = () => playLifeEpicStory(views, currentOrganismBounds, log, (w, s) => sendBackendCommand('extinction', { wipeout_ratio: w, shock_scale: s }), () => sendBackendCommand('splice'));
 window.triggerGlobalLifeEvent = (type) => triggerGlobalLifeEvent(type, views, currentOrganismBounds, log, (w, s) => sendBackendCommand('extinction', { wipeout_ratio: w, shock_scale: s }), () => sendBackendCommand('splice'));
@@ -274,7 +281,13 @@ window.setCameraPreset = (mode) => setCameraPreset(mode, currentOrganismBounds);
 window.toggleAutoOrbit = toggleAutoOrbit;
 window.setRenderMode = (mode) => {
   setRenderMode(mode);
-  if (mode === 'instrument') setVisualBloomMode('off', renderer, null);
+  if (mode === 'instrument') {
+    setVisualBloomMode('off', renderer, null);
+    if (airParticleCloud) airParticleCloud.visible = false;
+  } else {
+    if (airParticleCloud) airParticleCloud.visible = true;
+    setVisualBloomMode('scientific', renderer, null);
+  }
 };
 window.switchLOD = switchLOD;
 window.loadPreset = loadPreset;
@@ -362,8 +375,8 @@ window.addEventListener('resize', () => {
 // 初始化新手 Smart Tooltips 引擎
 initTooltipEngine();
 
-log('仪器观测台已启动 — Worker Model / GUI View 分离 · 拖拽旋转 · 滚轮缩放', true);
-setRenderMode('instrument');
+log('细胞观测台已启动 — 默认实体+星云 · 仪器模式可选 · 拖拽旋转 · 滚轮缩放', true);
+setRenderMode('symbiosis');
 
 // 启动动画渲染循环（GUI 线程）
 animate();
