@@ -25,9 +25,24 @@ def db_path():
     shutil.rmtree(directory)
 
 
+def resolve_knowledge_demo():
+    candidates = []
+    env = os.environ.get("KUN_KNOWLEDGE_DEMO")
+    if env:
+        candidates.append(Path(env))
+    candidates.extend([
+        ROOT / "build" / "knowledge_transfer_demo",
+        ROOT / "build-r8" / "knowledge_transfer_demo",
+    ])
+    return next((p for p in candidates if p.is_file()), None)
+
+
 def run_native(path):
-    binary = Path(os.environ.get("KUN_KNOWLEDGE_DEMO", ROOT / "build-r8" / "knowledge_transfer_demo"))
-    assert binary.is_file(), "Build knowledge_transfer_demo before running R8 integration tests"
+    binary = resolve_knowledge_demo()
+    assert binary is not None, (
+        "Build knowledge_transfer_demo before running R8 integration tests "
+        f"(looked under build/ and build-r8/, or set KUN_KNOWLEDGE_DEMO)"
+    )
     result = subprocess.run([str(binary), "demo", str(path)], check=True, text=True, capture_output=True)
     return json.loads(result.stdout)
 
@@ -66,8 +81,9 @@ def test_native_abc_roundtrip_and_thread_safe_refresh(db_path):
         results = list(pool.map(lambda _: adapter.snapshot(), range(24)))
     assert all(result == snapshot for result in results)
     assert hashlib.sha256(db_path.read_bytes()).hexdigest() == before
-    binary = os.environ.get("KUN_KNOWLEDGE_DEMO", str(ROOT / "build-r8" / "knowledge_transfer_demo"))
-    reopened = json.loads(subprocess.check_output([binary, "inspect", str(db_path)], text=True))
+    binary = resolve_knowledge_demo()
+    assert binary is not None
+    reopened = json.loads(subprocess.check_output([str(binary), "inspect", str(db_path)], text=True))
     assert reopened["fresh_output"] == -6
     assert adapter.snapshot()["audit_log"][-1]["event"] == "borrow"
     with pytest.raises(LibraryError, match="C\\+\\+-owned"):

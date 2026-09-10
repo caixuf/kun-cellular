@@ -288,6 +288,25 @@
         "GATE_DEADZONE"
       ],
       "validation_report": "数值验证通过 (证书文件cartpole_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.015 < 1.0，50,000 步位级精确零漂移，极限扰动下 200ms 内回正。"
+    },
+    {
+      "id": "music_composer_cortex",
+      "name": "音高/节奏皮层演示体 (1024细胞·玩具演示, 非生成能力宣称)",
+      "domain": "声学玩具演示 (诚实披露: 非音乐生成能力)",
+      "cells_scale": 1024,
+      "synapses_scale": 196608,
+      "checkpoint": "checkpoints/music_composer_cortex.bin",
+      "c_header": "include/kun/cellular/sdsc_binary_runtime.h",
+      "test_suite": "tests/test_music_composer_cortex.py",
+      "input_signals": ["32 维音高/节拍特征"],
+      "action_outputs": ["16 维声学驱动通道"],
+      "macro_columns": {
+        "TonotopicHarmonicCortex": "音高拓扑柱",
+        "TensionResolutionCortex": "张力释放柱",
+        "RhythmGrooveCPGCortex": "节奏 CPG 柱",
+        "MelodicMotifMemoryCortex": "动机记忆柱"
+      },
+      "validation_report": "仅验证 SDSC-BIN 头与清单挂载; README 已声明不构成音乐生成能力宣称。"
     }
   ]
 }

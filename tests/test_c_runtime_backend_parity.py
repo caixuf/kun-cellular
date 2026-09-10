@@ -43,9 +43,9 @@ def test_primitive_eval_pure_c():
     state = (np.zeros(1, dtype=np.float32)).ctypes.data_as(pytest.importorskip("ctypes").POINTER(pytest.importorskip("ctypes").c_float))
     aux = (np.zeros(1, dtype=np.float32)).ctypes.data_as(pytest.importorskip("ctypes").POINTER(pytest.importorskip("ctypes").c_float))
 
-    # SUM: tanh(x * g)
+    # SUM (opcode 4): 纯直通 out=x（双端口折叠在调用方；增益无关）
     out_sum = _clib.sdsc_c_primitive_eval(4, 1.0, 0.5, state, aux)
-    assert np.isclose(out_sum, np.tanh(0.5), atol=1e-5)
+    assert np.isclose(out_sum, 0.5, atol=1e-5)
 
     # AMPLIFY: tanh(x * g * 2.5)
     out_amp = _clib.sdsc_c_primitive_eval(6, 1.0, 0.5, state, aux)
