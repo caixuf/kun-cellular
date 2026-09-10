@@ -231,6 +231,12 @@ void test_edge_class_randomize_counts() {
     kun::population::ensure_active_closure(org);
     assert(active_cell_count(org) == org.cells.size());
     std::printf("  ✓ 边类消融计数: recv=%zu eff=%zu int=%zu\n", n_recv, n_eff, n_int);
+
+    auto org_io = build(spec_of(8, 2));
+    auto [rw, rp] = kun::population::apply_io_mix_developmental(org_io, 99);
+    assert(rw == n_recv + n_eff);
+    assert(active_cell_count(org_io) == org_io.cells.size());
+    std::printf("  ✓ io_mix 配方: 改写 %zu | 修复 %zu | 活性比=1\n", rw, rp);
 }
 
 void test_receptor_bypass_matches_forward() {

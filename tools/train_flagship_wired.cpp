@@ -15,11 +15,12 @@
 //   rand_recv  (R′解剖)   : 仅打乱受体出边目标 (+闭包修复)
 //   rand_eff   (R′解剖)   : 仅打乱效应器入边目标 (+闭包修复)
 //   rand_io    (R′解剖)   : 打乱受体出边∪效应器入边 (+闭包修复)
+//   io_mix     (发育默认) : 同 rand_io, L1 apply_io_mix_developmental 一等公民入口
 //
 // 演化: L1 EcologyGrid (移植自系统层) + 权重-only 变异特化 (冻结拓扑, 隔离接线变量)。
 // 注意: 本 trainer 不调用 L0 结构变异/凋亡 —— 否则会毁掉结构化拓扑。
 //
-// 用法: ./train_flagship_wired [N=128] [GENS=60] [ARM=structured] [G=64] [train_plast=1]
+// 用法: ./train_flagship_wired [N=128] [GENS=60] [ARM=structured] [G=64] [train_plast=1] [evo_seed=20260910]
 // ============================================================================
 #include "kun/cellular/field_cml_2d.hpp"
 #include "kun/cellular/population/ecology_grid.hpp"
@@ -106,6 +107,8 @@ int main(int argc, char** argv) {
     const uint32_t G = argc > 4 ? std::strtoul(argv[4], nullptr, 10) : 64;  // 列格边长
     // 训练期塑性开关 (Arg5; 默认 1 = 预注册协议)。0 = post-hoc 后续实验 (塑性已证为混淆变量)
     const bool train_plast = argc > 5 ? (std::atoi(argv[5]) != 0) : true;
+    const uint32_t evo_seed = argc > 6 ? static_cast<uint32_t>(std::strtoul(argv[6], nullptr, 10))
+                                       : 20260910u;
     if (n % G != 0 || n == 0) {
         std::fprintf(stderr, "N 必须是 G(%u) 的倍数 (场边长 = G*b)\n", G);
         return 1;
@@ -120,8 +123,8 @@ int main(int argc, char** argv) {
     const std::vector<uint32_t> ood_regime_seeds = seed_range(301, 8);
 
     std::printf("=====================================================================\n");
-    std::printf("  结构化发育接线 × FieldCML2D | N=%zu (G=%u,b=%u) | arm=%s | POP=%zu | %zu 代\n",
-                n, G, b, arm.c_str(), POP, gens);
+    std::printf("  结构化发育接线 × FieldCML2D | N=%zu (G=%u,b=%u) | arm=%s | POP=%zu | %zu 代 | seed=%u\n",
+                n, G, b, arm.c_str(), POP, gens, evo_seed);
     std::printf("=====================================================================\n");
 
     auto t0 = std::chrono::high_resolution_clock::now();
@@ -182,24 +185,35 @@ int main(int argc, char** argv) {
                 last_repaired = rp;
                 rrac_diag_captured = true;
             }
-        } else if (arm == "rand_recv" || arm == "rand_eff" || arm == "rand_io") {
-            kun::population::EdgeClassRandomizeFlags fl;
-            fl.receptor_out = (arm == "rand_recv" || arm == "rand_io");
-            fl.effector_in = (arm == "rand_eff" || arm == "rand_io");
-            fl.internal = false;
-            const size_t rw = kun::population::randomize_targets_by_edge_class(
-                org, fl, static_cast<uint32_t>(rng()));
-            const size_t rp = kun::population::ensure_active_closure(org);
-            if (!rrac_diag_captured) {
-                last_rewritten = rw;
-                last_repaired = rp;
-                rrac_diag_captured = true;
+        } else if (arm == "rand_recv" || arm == "rand_eff" || arm == "rand_io" ||
+                   arm == "io_mix") {
+            if (arm == "io_mix") {
+                const auto [rw, rp] = kun::population::apply_io_mix_developmental(
+                    org, static_cast<uint32_t>(rng()));
+                if (!rrac_diag_captured) {
+                    last_rewritten = rw;
+                    last_repaired = rp;
+                    rrac_diag_captured = true;
+                }
+            } else {
+                kun::population::EdgeClassRandomizeFlags fl;
+                fl.receptor_out = (arm == "rand_recv" || arm == "rand_io");
+                fl.effector_in = (arm == "rand_eff" || arm == "rand_io");
+                fl.internal = false;
+                const size_t rw = kun::population::randomize_targets_by_edge_class(
+                    org, fl, static_cast<uint32_t>(rng()));
+                const size_t rp = kun::population::ensure_active_closure(org);
+                if (!rrac_diag_captured) {
+                    last_rewritten = rw;
+                    last_repaired = rp;
+                    rrac_diag_captured = true;
+                }
             }
         }
         return org;
     };
 
-    EcologyGrid<CellularOrganism> grid(1, POP, 20260910u);
+    EcologyGrid<CellularOrganism> grid(1, POP, evo_seed);
     for (auto& d : grid.demes()) d.seed_population(POP, make_org);
 
     // 结构统计 (个体 0)
@@ -212,7 +226,7 @@ int main(int argc, char** argv) {
                     bp0.ok ? "开" : "关", bp0.n_receptors, bp0.from_idx.size(),
                     bp0.internal_order.size());
         if (arm == "rrac" || arm == "rrac_dag" || arm == "rand_recv" ||
-            arm == "rand_eff" || arm == "rand_io") {
+            arm == "rand_eff" || arm == "rand_io" || arm == "io_mix") {
             std::printf("  边类诊断: 改写边 %zu | 活性修复边 %zu\n",
                         last_rewritten, last_repaired);
         }
@@ -284,8 +298,8 @@ int main(int argc, char** argv) {
     const double un_ood_seed_nop = env.score_rollouts(best_org, ood_seed_rollouts, false, 0.15);
 
     std::printf("\n---------------------------------------------------------------------\n");
-    std::printf("  arm=%s | 训练塑性=%d | 冠军: %zu 细胞 | %zu 突触 | 递归边 %zu | 活性比 %.4f\n",
-                arm.c_str(), train_plast ? 1 : 0, st.cells, st.synapses, st.recurrent, st.active_ratio);
+    std::printf("  arm=%s | seed=%u | 训练塑性=%d | 冠军: %zu 细胞 | %zu 突触 | 递归边 %zu | 活性比 %.4f\n",
+                arm.c_str(), evo_seed, train_plast ? 1 : 0, st.cells, st.synapses, st.recurrent, st.active_ratio);
     std::printf("  持续性基线 P       : %.4f\n", persist);
     std::printf("  训练最佳           : %.4f\n", best);
     std::printf("  未见(id)越 PLASTIC : %.4f\n", un_id);
@@ -295,6 +309,19 @@ int main(int argc, char** argv) {
     std::printf("  [参考] 塑开口径    : id %.4f | ood种子 %.4f | ood体制 %.4f\n",
                 un_id, un_ood_seed, un_ood);
     std::printf("  耗时 %.0fs\n", secs_since(t0));
+    std::printf("  JSON {\"arm\":\"%s\",\"seed\":%u,\"n\":%zu,\"G\":%u,\"gens\":%zu,\"plast\":%d,"
+                "\"train_best\":%.6f,\"un_id_nop\":%.6f,\"ood_regime_nop\":%.6f,"
+                "\"active\":%.6f,\"persist\":%.6f,\"cells\":%zu,\"syns\":%zu,\"recurrent\":%zu}\n",
+                arm.c_str(), evo_seed, n, G, gens, train_plast ? 1 : 0,
+                best, un_id_nop, un_ood_nop, st.active_ratio, persist,
+                st.cells, st.synapses, st.recurrent);
+    {
+        char path[256];
+        std::snprintf(path, sizeof(path), "checkpoints/flagship_%s_n%zu_s%u.bin",
+                      arm.c_str(), n, evo_seed);
+        best_org.save_checkpoint_bin(path);
+        std::printf("  冠军已存: %s\n", path);
+    }
     std::printf("---------------------------------------------------------------------\n");
     return 0;
 }

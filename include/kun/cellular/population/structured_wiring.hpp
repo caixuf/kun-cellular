@@ -22,6 +22,7 @@
 #include <limits>
 #include <random>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace kun {
@@ -350,7 +351,27 @@ inline size_t ensure_active_closure(CellularOrganism& org, float w_lifeline = 0.
     return added;
 }
 
-// 编译后递归突触计数 (消融诊断: R′ / recur / rrac 臂应 >0, 纯 DAG 为 0)
+// 发育默认配方 (路线 A 结论落地): 结构化内部 + IO 联合随机 + 活性闭包。
+// 返回 {改写边数, 修复边数}。
+inline std::pair<size_t, size_t> apply_io_mix_developmental(
+    CellularOrganism& org, uint32_t seed) {
+    EdgeClassRandomizeFlags fl;
+    fl.receptor_out = true;
+    fl.effector_in = true;
+    fl.internal = false;
+    const size_t rewritten = randomize_targets_by_edge_class(org, fl, seed);
+    const size_t repaired = ensure_active_closure(org);
+    return {rewritten, repaired};
+}
+
+inline void build_io_mix_columnar_wiring(CellularOrganism& org,
+                                         const ColumnLatticeSpec& spec,
+                                         const std::vector<ReadoutAnchor>& anchors) {
+    build_columnar_structured_wiring(org, spec, anchors);
+    apply_io_mix_developmental(org, spec.seed);
+}
+
+// 编译后递归突触计数 (消融诊断: R′ / recur / rrac / io_mix 臂应 >0, 纯 DAG 为 0)
 inline size_t recurrent_synapse_count(const CellularOrganism& org) {
     size_t n = 0;
     for (const auto& cs : org.compiled_synapses_) {
