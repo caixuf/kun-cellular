@@ -25,6 +25,12 @@
 
 namespace kun {
 
+// 微柱级 OpenMP 阈值 (通用, task-agnostic): 列数达阈值且不在并行区内才开线程队,
+// 避免「外层按个体并行 × 内层按列并行」的嵌套区过订。
+#ifndef KUN_CORTICAL_OMP_MIN_COLUMNS
+#define KUN_CORTICAL_OMP_MIN_COLUMNS 64
+#endif
+
 // 柱间长程神经束突触 (Macro-Axon)
 struct MacroAxon {
     uint32_t src_column_idx{0}; // 发射端微柱索引
@@ -143,8 +149,12 @@ public:
             }
         }
 
-        // 3. 所有微柱高并发独立前向推演 (OpenMP 零锁并行)
-        #pragma omp parallel for schedule(static)
+        // 3. 所有微柱高并发独立前向推演 (嵌套调用时退化为串行, 避免并行区过订)
+        bool par = false;
+#ifdef _OPENMP
+        par = !omp_in_parallel() && num_columns_ >= KUN_CORTICAL_OMP_MIN_COLUMNS;
+#endif
+        #pragma omp parallel for schedule(static) if(par)
         for (int c = 0; c < static_cast<int>(num_columns_); ++c) {
             columns_[c].step();
         }
@@ -200,16 +210,14 @@ public:
             }
         }
 
-        // 3. 微柱独立前向推演 (大规模微柱 >64 启用 OpenMP，中小规模纯紧凑循环避免线程抖动)
-        if (num_columns_ > 64) {
-            #pragma omp parallel for schedule(static)
-            for (int c = 0; c < static_cast<int>(num_columns_); ++c) {
-                columns_[c].step();
-            }
-        } else {
-            for (uint32_t c = 0; c < num_columns_; ++c) {
-                columns_[c].step();
-            }
+        // 3. 微柱独立前向推演 (嵌套调用/小规模退化为串行, 避免并行区过订)
+        bool par = false;
+#ifdef _OPENMP
+        par = !omp_in_parallel() && num_columns_ > KUN_CORTICAL_OMP_MIN_COLUMNS;
+#endif
+        #pragma omp parallel for schedule(static) if(par)
+        for (int c = 0; c < static_cast<int>(num_columns_); ++c) {
+            columns_[c].step();
         }
 
         // 4. 准备下一拍的轴突传导信号 (双缓冲延迟)
@@ -237,6 +245,29 @@ public:
     }
 
     void mutate(float rate, float sigma, std::mt19937& rng) {
+#if KUN_FAST_MUTATION
+        // 基础键: 单次串行抽取 (2 词); 逐列派生独立键 → 列间独立, 可并行且与线程数无关
+        const uint64_t base = (static_cast<uint64_t>(rng()) << 32) ^ static_cast<uint64_t>(rng());
+        const int ncol = static_cast<int>(num_columns_);
+        bool par = false;
+#ifdef _OPENMP
+        par = !omp_in_parallel() && num_columns_ >= KUN_CORTICAL_OMP_MIN_COLUMNS;
+#endif
+#pragma omp parallel for schedule(static) if(par)
+        for (int c = 0; c < ncol; ++c) {
+            const uint64_t k = base ^ (static_cast<uint64_t>(c) * 0x9E3779B97F4A7C15ull);
+            columns_[c].genome.mutate_parameters_keyed(rate, sigma, k);
+            columns_[c].genome.mutate_primitive_types_keyed(rate * 0.5f, k);
+        }
+        // 长程轴突权重 (串行; 复用 rng)
+        std::uniform_real_distribution<float> u(0.0f, 1.0f);
+        std::normal_distribution<float> n(0.0f, sigma);
+        for (auto& axon : macro_axons_) {
+            if (u(rng) < rate) {
+                axon.weight = std::clamp(axon.weight + n(rng), -2.0f, 2.0f);
+            }
+        }
+#else
         std::uniform_real_distribution<float> u(0.0f, 1.0f);
         std::normal_distribution<float> n(0.0f, sigma);
         for (auto& col : columns_) {
@@ -248,6 +279,7 @@ public:
                 axon.weight = std::clamp(axon.weight + n(rng), -2.0f, 2.0f);
             }
         }
+#endif
     }
 
     /**
