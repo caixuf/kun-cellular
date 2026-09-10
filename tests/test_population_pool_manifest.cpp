@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <iostream>
 
 using kun::population::PoolManifest;
@@ -17,6 +18,7 @@ int main() {
     std::cout << "  L1 系统层: 生态池持久化往返测试" << std::endl;
     std::cout << "==================================================================" << std::endl;
 
+    std::filesystem::create_directories("/tmp/opencode");
     const std::string path = "/tmp/opencode/test_pool_manifest.json";
 
     // ── 1. 写入 → 读取 → 字段一致 ──
