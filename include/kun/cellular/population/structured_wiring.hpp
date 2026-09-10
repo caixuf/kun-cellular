@@ -239,6 +239,47 @@ inline void randomize_internal_synapse_targets(CellularOrganism& org, uint32_t s
     org.compile();
 }
 
+// R′ 边类消融: 按源/汇角色选择性地把 to_cell_id 改写到全体细胞池 (与 R′ 同分布)。
+struct EdgeClassRandomizeFlags {
+    bool receptor_out{false};  // 源为受体 (z≈-1)
+    bool effector_in{false};   // 汇为效应器 (z≈-2) —— 按改写前的汇判定
+    bool internal{false};      // 源与汇皆为层细胞 (z≥1)
+};
+
+inline size_t randomize_targets_by_edge_class(CellularOrganism& org,
+                                             EdgeClassRandomizeFlags flags,
+                                             uint32_t seed) {
+    if (org.cells.empty()) return 0;
+    std::unordered_map<uint32_t, const Cell*> by_id;
+    by_id.reserve(org.cells.size() * 2);
+    for (const auto& c : org.cells) by_id[c.id] = &c;
+
+    std::vector<uint32_t> all_ids;
+    all_ids.reserve(org.cells.size());
+    for (const auto& c : org.cells) all_ids.push_back(c.id);
+
+    std::mt19937 rng(seed);
+    std::uniform_int_distribution<size_t> pick(0, all_ids.size() - 1);
+    size_t rewritten = 0;
+    for (auto& s : org.synapses) {
+        const Cell* src = by_id[s.from_cell_id];
+        const Cell* dst = by_id[s.to_cell_id];
+        if (!src || !dst) continue;
+        const bool is_recv = (src->z < 0.0f && src->z > -1.5f);  // z=-1 受体
+        const bool is_eff_in = (dst->z < -1.5f);                 // z=-2 效应器
+        const bool is_int = (src->z >= 1.0f && dst->z >= 1.0f);
+        bool hit = false;
+        if (flags.receptor_out && is_recv) hit = true;
+        if (flags.effector_in && is_eff_in) hit = true;
+        if (flags.internal && is_int) hit = true;
+        if (!hit) continue;
+        s.to_cell_id = all_ids[pick(rng)];
+        ++rewritten;
+    }
+    org.is_compiled_ = false;
+    return rewritten;
+}
+
 // 路线 A: 仅随机化「非 IO 骨架」边的目标 —— 保受体出边与效应器入边不动。
 // 返回被改写的边数。compile() 由调用方或 ensure_active_closure 负责。
 inline size_t randomize_internal_preserving_io(CellularOrganism& org, uint32_t seed) {

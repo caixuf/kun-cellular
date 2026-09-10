@@ -12,6 +12,9 @@
 //   recur      (S^rec)    : 单变量② 层间反馈 — 同列 V_{l+1}→V_l (幅度同 S 默认)
 //   rrac       (路线 A)   : 层间反馈 + 保 IO 内部随机化 + 活性闭包修复
 //   rrac_dag   (RRAC⁻ʳ)   : 同上但不加层间反馈 (递归必要性消融)
+//   rand_recv  (R′解剖)   : 仅打乱受体出边目标 (+闭包修复)
+//   rand_eff   (R′解剖)   : 仅打乱效应器入边目标 (+闭包修复)
+//   rand_io    (R′解剖)   : 打乱受体出边∪效应器入边 (+闭包修复)
 //
 // 演化: L1 EcologyGrid (移植自系统层) + 权重-only 变异特化 (冻结拓扑, 隔离接线变量)。
 // 注意: 本 trainer 不调用 L0 结构变异/凋亡 —— 否则会毁掉结构化拓扑。
@@ -179,6 +182,19 @@ int main(int argc, char** argv) {
                 last_repaired = rp;
                 rrac_diag_captured = true;
             }
+        } else if (arm == "rand_recv" || arm == "rand_eff" || arm == "rand_io") {
+            kun::population::EdgeClassRandomizeFlags fl;
+            fl.receptor_out = (arm == "rand_recv" || arm == "rand_io");
+            fl.effector_in = (arm == "rand_eff" || arm == "rand_io");
+            fl.internal = false;
+            const size_t rw = kun::population::randomize_targets_by_edge_class(
+                org, fl, static_cast<uint32_t>(rng()));
+            const size_t rp = kun::population::ensure_active_closure(org);
+            if (!rrac_diag_captured) {
+                last_rewritten = rw;
+                last_repaired = rp;
+                rrac_diag_captured = true;
+            }
         }
         return org;
     };
@@ -195,8 +211,9 @@ int main(int argc, char** argv) {
         std::printf("  受体直路: %s | 受体 %u | 注入边 %zu | 内部序 %zu\n",
                     bp0.ok ? "开" : "关", bp0.n_receptors, bp0.from_idx.size(),
                     bp0.internal_order.size());
-        if (arm == "rrac" || arm == "rrac_dag") {
-            std::printf("  RRAC 诊断: 内部改写边 %zu | 活性修复边 %zu\n",
+        if (arm == "rrac" || arm == "rrac_dag" || arm == "rand_recv" ||
+            arm == "rand_eff" || arm == "rand_io") {
+            std::printf("  边类诊断: 改写边 %zu | 活性修复边 %zu\n",
                         last_rewritten, last_repaired);
         }
     }

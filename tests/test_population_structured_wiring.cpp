@@ -208,6 +208,31 @@ void test_rrac_preserving_io_anticollapse() {
                 rewritten, repaired, kun::population::recurrent_synapse_count(org));
 }
 
+void test_edge_class_randomize_counts() {
+    auto org = build(spec_of(8, 2));
+    std::unordered_map<uint32_t, const Cell*> by_id;
+    for (const auto& c : org.cells) by_id[c.id] = &c;
+    size_t n_recv = 0, n_eff = 0, n_int = 0;
+    for (const auto& sy : org.synapses) {
+        const Cell* src = by_id[sy.from_cell_id];
+        const Cell* dst = by_id[sy.to_cell_id];
+        if (src->z < 0.0f && src->z > -1.5f) ++n_recv;
+        if (dst->z < -1.5f) ++n_eff;
+        if (src->z >= 1.0f && dst->z >= 1.0f) ++n_int;
+    }
+    kun::population::EdgeClassRandomizeFlags fr{true, false, false};
+    assert(kun::population::randomize_targets_by_edge_class(org, fr, 1) == n_recv);
+    org = build(spec_of(8, 2));
+    kun::population::EdgeClassRandomizeFlags fe{false, true, false};
+    assert(kun::population::randomize_targets_by_edge_class(org, fe, 2) == n_eff);
+    org = build(spec_of(8, 2));
+    kun::population::EdgeClassRandomizeFlags fi{false, false, true};
+    assert(kun::population::randomize_targets_by_edge_class(org, fi, 3) == n_int);
+    kun::population::ensure_active_closure(org);
+    assert(active_cell_count(org) == org.cells.size());
+    std::printf("  ✓ 边类消融计数: recv=%zu eff=%zu int=%zu\n", n_recv, n_eff, n_int);
+}
+
 void test_receptor_bypass_matches_forward() {
     auto org = build(spec_of(8, 2));
     auto bp = kun::population::build_receptor_bypass(org);
@@ -243,6 +268,7 @@ int main() {
     test_forward_finite();
     test_ampfix_defaults_and_feedback_H1();
     test_rrac_preserving_io_anticollapse();
+    test_edge_class_randomize_counts();
     test_receptor_bypass_matches_forward();
     test_H1_zero_collapse_scale();
     std::printf("[PASS] test_population_structured_wiring all assertions passed!\n");
