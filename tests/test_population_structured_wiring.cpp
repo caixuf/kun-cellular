@@ -164,6 +164,50 @@ void test_ampfix_defaults_and_feedback_H1() {
                 kun::population::recurrent_synapse_count(org_f));
 }
 
+void test_rrac_preserving_io_anticollapse() {
+    auto s = spec_of(8, 2);
+    s.add_interlayer_feedback = true;
+    auto org = build(s);
+    const size_t syn_before = org.synapses.size();
+    const size_t rec_before = kun::population::recurrent_synapse_count(org);
+    assert(rec_before > 0);
+
+    // 记录 IO 边指纹
+    std::vector<std::pair<uint32_t, uint32_t>> io_edges;
+    std::unordered_map<uint32_t, const Cell*> by_id;
+    for (const auto& c : org.cells) by_id[c.id] = &c;
+    for (const auto& sy : org.synapses) {
+        const Cell* src = by_id[sy.from_cell_id];
+        const Cell* dst = by_id[sy.to_cell_id];
+        if (src->z < 0.0f || dst->z < -1.5f)
+            io_edges.push_back({sy.from_cell_id, sy.to_cell_id});
+    }
+
+    const size_t rewritten = kun::population::randomize_internal_preserving_io(org, 42);
+    assert(rewritten > 0);
+    assert(org.synapses.size() == syn_before);  // 只改目标, 不增删
+
+    by_id.clear();
+    for (const auto& c : org.cells) by_id[c.id] = &c;
+    size_t io_i = 0;
+    for (const auto& sy : org.synapses) {
+        const Cell* src = by_id[sy.from_cell_id];
+        const Cell* dst = by_id[sy.to_cell_id];
+        if (src->z < 0.0f || dst->z < -1.5f) {
+            assert(io_edges[io_i].first == sy.from_cell_id);
+            assert(io_edges[io_i].second == sy.to_cell_id);
+            ++io_i;
+        }
+    }
+    assert(io_i == io_edges.size());
+
+    const size_t repaired = kun::population::ensure_active_closure(org);
+    assert(active_cell_count(org) == org.cells.size());
+    assert(kun::population::recurrent_synapse_count(org) > 0);
+    std::printf("  ✓ RRAC: 改写 %zu 边 | 修复 %zu | 递归边 %zu | 活性比=1 | IO 骨架保留\n",
+                rewritten, repaired, kun::population::recurrent_synapse_count(org));
+}
+
 void test_receptor_bypass_matches_forward() {
     auto org = build(spec_of(8, 2));
     auto bp = kun::population::build_receptor_bypass(org);
@@ -198,6 +242,7 @@ int main() {
     test_locality();
     test_forward_finite();
     test_ampfix_defaults_and_feedback_H1();
+    test_rrac_preserving_io_anticollapse();
     test_receptor_bypass_matches_forward();
     test_H1_zero_collapse_scale();
     std::printf("[PASS] test_population_structured_wiring all assertions passed!\n");

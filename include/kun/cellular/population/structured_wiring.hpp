@@ -19,7 +19,9 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <random>
+#include <unordered_map>
 #include <vector>
 
 namespace kun {
@@ -237,7 +239,77 @@ inline void randomize_internal_synapse_targets(CellularOrganism& org, uint32_t s
     org.compile();
 }
 
-// 编译后递归突触计数 (消融诊断: R′ / recur 臂应 >0, 纯 DAG 为 0)
+// 路线 A: 仅随机化「非 IO 骨架」边的目标 —— 保受体出边与效应器入边不动。
+// 返回被改写的边数。compile() 由调用方或 ensure_active_closure 负责。
+inline size_t randomize_internal_preserving_io(CellularOrganism& org, uint32_t seed) {
+    if (org.cells.empty()) return 0;
+    std::unordered_map<uint32_t, const Cell*> by_id;
+    by_id.reserve(org.cells.size() * 2);
+    for (const auto& c : org.cells) by_id[c.id] = &c;
+
+    std::vector<uint32_t> internal_ids;
+    internal_ids.reserve(org.cells.size());
+    for (const auto& c : org.cells) {
+        if (c.z >= 1.0f) internal_ids.push_back(c.id);  // 层细胞 (非受体/效应器)
+    }
+    if (internal_ids.empty()) return 0;
+
+    std::mt19937 rng(seed);
+    std::uniform_int_distribution<size_t> pick(0, internal_ids.size() - 1);
+    size_t rewritten = 0;
+    for (auto& s : org.synapses) {
+        const Cell* src = by_id[s.from_cell_id];
+        const Cell* dst = by_id[s.to_cell_id];
+        if (!src || !dst) continue;
+        if (src->z < 0.0f) continue;   // 受体出边: 保
+        if (dst->z < -1.5f) continue;  // 效应器入边 (z=-2): 保
+        // 内部→内部 (含反馈边): 目标改写到随机内部细胞
+        s.to_cell_id = internal_ids[pick(rng)];
+        ++rewritten;
+    }
+    org.is_compiled_ = false;
+    return rewritten;
+}
+
+// 活性闭包修复: 对 compile 后不在 execution_order_ 的细胞, 加一条到效应器 0 的保命边。
+// 返回新增边数。要求细胞 z 标签仍有效 (结构化构建产物)。
+inline size_t ensure_active_closure(CellularOrganism& org, float w_lifeline = 0.05f) {
+    if (org.cells.empty()) return 0;
+    org.compile();
+    if (org.execution_order_.size() == org.cells.size()) return 0;
+
+    std::vector<char> active(org.cells.size(), 0);
+    for (size_t idx : org.execution_order_) {
+        if (idx < active.size()) active[idx] = 1;
+    }
+
+    uint32_t eff0 = std::numeric_limits<uint32_t>::max();
+    for (const auto& c : org.cells) {
+        if (c.z < -1.5f) { eff0 = c.id; break; }
+    }
+    if (eff0 == std::numeric_limits<uint32_t>::max()) return 0;
+
+    size_t added = 0;
+    for (size_t i = 0; i < org.cells.size(); ++i) {
+        if (active[i]) continue;
+        Synapse s;
+        s.from_cell_id = org.cells[i].id;
+        s.to_cell_id = eff0;
+        s.to_port = 0;
+        s.weight = static_cast<double>(w_lifeline);
+        s.initial_weight = s.weight;
+        s.is_active = true;
+        org.synapses.push_back(s);
+        ++added;
+    }
+    if (added > 0) {
+        org.is_compiled_ = false;
+        org.compile();
+    }
+    return added;
+}
+
+// 编译后递归突触计数 (消融诊断: R′ / recur / rrac 臂应 >0, 纯 DAG 为 0)
 inline size_t recurrent_synapse_count(const CellularOrganism& org) {
     size_t n = 0;
     for (const auto& cs : org.compiled_synapses_) {

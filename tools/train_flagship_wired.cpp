@@ -7,9 +7,11 @@
 // 对照臂 (--arm):
 //   structured (S, 默认): 层单调 2D lattice 局部 + 目标锚点强读出
 //   noanchor   (S⁻ᵃ)     : 同上但锚点权重降为保命小权重 (剥离「喂答案」)
-//   random     (R′)       : 结构化后打乱内部突触目标端点 (同细胞/突触数, 仅拓扑随机)
+//   random     (R′)       : 结构化后打乱全部突触目标端点 (同细胞/突触数; 递归多为意外)
 //   ampfix     (S^amp)    : 单变量① 幅度校准 — param1=1.0 + w_readout=w_receptor (拓扑同 S)
 //   recur      (S^rec)    : 单变量② 层间反馈 — 同列 V_{l+1}→V_l (幅度同 S 默认)
+//   rrac       (路线 A)   : 层间反馈 + 保 IO 内部随机化 + 活性闭包修复
+//   rrac_dag   (RRAC⁻ʳ)   : 同上但不加层间反馈 (递归必要性消融)
 //
 // 演化: L1 EcologyGrid (移植自系统层) + 权重-only 变异特化 (冻结拓扑, 隔离接线变量)。
 // 注意: 本 trainer 不调用 L0 结构变异/凋亡 —— 否则会毁掉结构化拓扑。
@@ -140,6 +142,8 @@ int main(int argc, char** argv) {
     }
 
     // ── 结构化个体工厂 ──
+    size_t last_rewritten = 0, last_repaired = 0;
+    bool rrac_diag_captured = false;
     auto make_org = [&](std::mt19937& rng) {
         ColumnLatticeSpec spec;
         spec.lattice_w = G;
@@ -149,14 +153,15 @@ int main(int argc, char** argv) {
         spec.cells_per_layer = 4;
         spec.lateral_radius = 1;
         spec.seed = static_cast<uint32_t>(rng());
-        // 单变量消融: ampfix 只改幅度; recur 只加反馈; 其余保持 Stage A 默认
+        // 单变量消融: ampfix 只改幅度; recur/rrac 加反馈; 其余保持 Stage A 默认
         if (arm == "ampfix") {
             spec.internal_param1 = 1.0f;
             spec.w_readout = spec.w_receptor;  // 0.15 — 解除读出衰减
-        } else if (arm == "recur") {
+        } else if (arm == "recur" || arm == "rrac") {
             spec.add_interlayer_feedback = true;
             spec.w_feedback = 0.10f;
         }
+        // rrac_dag: 不加反馈 (A4 消融)
         std::vector<ReadoutAnchor> anchors = {{0, 0, 0, 0.5}, {G / 2, G / 2, 1, 0.5}};
         if (arm == "noanchor") {
             for (auto& a : anchors) a.weight = spec.w_readout;
@@ -165,6 +170,15 @@ int main(int argc, char** argv) {
         kun::population::build_columnar_structured_wiring(org, spec, anchors);
         if (arm == "random") {
             kun::population::randomize_internal_synapse_targets(org, static_cast<uint32_t>(rng()));
+        } else if (arm == "rrac" || arm == "rrac_dag") {
+            const size_t rw = kun::population::randomize_internal_preserving_io(
+                org, static_cast<uint32_t>(rng()));
+            const size_t rp = kun::population::ensure_active_closure(org);
+            if (!rrac_diag_captured) {
+                last_rewritten = rw;
+                last_repaired = rp;
+                rrac_diag_captured = true;
+            }
         }
         return org;
     };
@@ -176,11 +190,15 @@ int main(int argc, char** argv) {
     {
         auto st = stats_of(grid.demes()[0].individuals()[0]);
         auto bp0 = kun::population::build_receptor_bypass(grid.demes()[0].individuals()[0]);
-        std::printf("  个体: %zu 细胞 | %zu 突触 | 递归边 %zu | 活性比 %.4f (H1 需 ≥0.99) | 持续性基线 %.4f\n",
+        std::printf("  个体: %zu 细胞 | %zu 突触 | 递归边 %zu | 活性比 %.4f (A1/H1 需 ≥0.99) | 持续性基线 %.4f\n",
                     st.cells, st.synapses, st.recurrent, st.active_ratio, persist);
         std::printf("  受体直路: %s | 受体 %u | 注入边 %zu | 内部序 %zu\n",
                     bp0.ok ? "开" : "关", bp0.n_receptors, bp0.from_idx.size(),
                     bp0.internal_order.size());
+        if (arm == "rrac" || arm == "rrac_dag") {
+            std::printf("  RRAC 诊断: 内部改写边 %zu | 活性修复边 %zu\n",
+                        last_rewritten, last_repaired);
+        }
     }
 
     // ── 传送评测: 只跑有机体前向, 场不再重算 ──
