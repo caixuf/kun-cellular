@@ -11,7 +11,7 @@
 //       下一层(环形 lattice 无死点) ⇒ 归纳可达 V_L ⇒ V_L→效应器 ⇒ 活性集=全体细胞。
 //
 // 纪律: 仅消费 L0 公开 API (Cell/Synapse/CellularOrganism::cells/synapses/compile);
-//       领域无关(无体素/车辆/K线等业务名词); 显式 rng; 同 seed 逐字段可复现;
+//       领域无关(禁止具身业务专有名词); 显式 rng; 同 seed 逐字段可复现;
 //       不依赖 tasks/。L0 零修改。
 // ============================================================================
 #include "kun/cellular/cellular_genome.hpp"
