@@ -368,10 +368,11 @@ class CUDACellularPopulation:
             self._propagate(inputs)             # 同拍传播: 每通以最新输出重算驱动
         self.activation_count += 1
         return self.outputs[:, N - self.out_dim:]
-    def export_champion_to_sdsc_bin(self, champion_idx, filepath):
+    def export_champion_to_sdsc_bin(self, champion_idx, filepath, per_column=False):
         """
-        导出为严格标准的 SDSC-BIN v2 检查点
-        与 C11 sdsc_binary_runtime.h 绝对 1:1 无损对齐
+        导出 SDSC-BIN 检查点 (与 C11 sdsc_binary_runtime.h 1:1 无损对齐)
+        per_column=False: 经典 v2 (全局观测辐射广播, 感觉辐射出边固化进 CSR)
+        per_column=True:  v5 受体映射 (逐列异列注入; 辐射出边移除, 由 receptor map 承载)
         """
         champion_idx = int(champion_idx)
         intra_W = self.intra_weights[champion_idx].detach().cpu().numpy() # [C, K, K]
@@ -421,7 +422,8 @@ class CUDACellularPopulation:
 
             # 3. 感觉辐射出边 (拓扑固化): 受体细胞 0..3 直连每柱前 4 细胞 w=1.0
             #    使 C11 CSR 图复现 GPU 侧 thalamocortical radiance (位级对账必需)
-            if u < 4:
+            #    v5 逐列模式: 移除辐射出边 (逐列异列输入由 receptor map 承载)
+            if not per_column and u < 4:
                 for c in range(C):
                     edges.append((c * K + u, 1.0))
 
@@ -434,9 +436,10 @@ class CUDACellularPopulation:
 
         num_synapses = len(col_idx)
 
-        # 构造 72 字节 header
+        # 构造 72 字节 header (v5: coords 槽位复用为受体映射偏移, 最后 uint64 低 32 位 = 条目数)
         magic = 0x53445343
-        version = 2
+        in_dim_out = C * self.in_dim if per_column else self.in_dim
+        version = 5 if per_column else 2
         cells_off = 72
         cells_sz = N * 4
         rp_off = cells_off + cells_sz
@@ -445,12 +448,19 @@ class CUDACellularPopulation:
         ci_sz = num_synapses * 4
         w_off = ci_off + ci_sz
         w_sz = num_synapses * 4
-        coords_off = w_off + w_sz
+        tail_off = w_off + w_sz   # v5: receptor map 区; v2: coords 区
+
+        # v5 受体映射: 外部输入 k = 列 c*in_dim+j → 目标细胞 c*K+j
+        recv_map = []
+        if per_column:
+            for c in range(C):
+                for j in range(self.in_dim):
+                    recv_map.append(c * K + j)
 
         hdr = struct.pack(
             "<IIIIIIQQQQQQ",
-            magic, version, N, num_synapses, self.in_dim, self.out_dim,
-            cells_off, rp_off, ci_off, w_off, coords_off, 0
+            magic, version, N, num_synapses, in_dim_out, self.out_dim,
+            cells_off, rp_off, ci_off, w_off, tail_off, len(recv_map)
         )
 
         with open(filepath, "wb") as f:
@@ -467,9 +477,12 @@ class CUDACellularPopulation:
                 f.write(struct.pack(f"<{len(col_idx)}I", *col_idx))
                 f.write(struct.pack(f"<{len(weights)}f", *weights))
 
-
-            coords = [0.0] * (N * 3)
-            f.write(struct.pack(f"<{len(coords)}f", *coords))
+            if per_column:
+                # v5: 受体映射表 (uint32 × input_dim), 取代 coords 区
+                f.write(struct.pack(f"<{len(recv_map)}I", *recv_map))
+            else:
+                coords = [0.0] * (N * 3)
+                f.write(struct.pack(f"<{len(coords)}f", *coords))
 
         return num_synapses
 

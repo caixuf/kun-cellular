@@ -2632,7 +2632,7 @@ public:
         } hdr;
 
         ifs.read(reinterpret_cast<char*>(&hdr), sizeof(hdr));
-        if (!ifs || hdr.magic != 0x53445343 || (hdr.version < 2 || hdr.version > 4) || hdr.n_cells == 0) {
+        if (!ifs || hdr.magic != 0x53445343 || (hdr.version < 2 || hdr.version > 5) || hdr.n_cells == 0) {
             return org;
         }
 
@@ -2673,7 +2673,8 @@ public:
         }
 
         // 2. 读取坐标 (若存在)
-        if (hdr.coords_off > 0) {
+        // v5 注意: bytes 56-64 为受体映射偏移 (复用 coords 槽位), v5 不含坐标区
+        if (hdr.coords_off > 0 && hdr.version < 5) {
             ifs.seekg(hdr.coords_off);
             std::vector<float> coords(num_cells * 3, 0.0f);
             ifs.read(reinterpret_cast<char*>(coords.data()), coords.size() * sizeof(float));

@@ -42,20 +42,25 @@ extern "C" {
 #define SDSC_BINARY_MAGIC 0x53445343 /* "SDSC" */
 #define SDSC_BINARY_VERSION 2
 #define SDSC_BINARY_VERSION_V3 3
+#define SDSC_BINARY_VERSION_V5 5 /* v5: 受体映射表 (逐列异列注入, GPU 生态世系位级对账) */
 
 #pragma pack(push, 1)
 typedef struct {
     uint32_t magic;            /* 0x53445343 */
-    uint32_t version;          /* 2 */
+    uint32_t version;          /* 2/3/4/5 */
     uint32_t num_cells;        /* 细胞总数 (如 1,000,000) */
     uint32_t num_synapses;     /* 突触总数 (如 4,000,000) */
-    uint32_t input_dim;        /* 受体感知维度 (如 32) */
+    uint32_t input_dim;        /* 受体感知维度 (v5: 外部输入通道数, 如 43资产×4特征=172) */
     uint32_t output_dim;       /* 运动效应维度 (如 8) */
     uint64_t cells_offset;     /* 细胞元数据区字节偏移 */
     uint64_t row_ptr_offset;   /* CSR 行指针区字节偏移 */
     uint64_t col_idx_offset;   /* CSR 列索引区字节偏移 */
     uint64_t weights_offset;   /* 突触权重区字节偏移 */
-    uint8_t  reserved[16];
+    /* v5 受体映射 (v2/v3/v4 恒零 → 旧式前 input_dim 连续注入语义):
+       receptor_map[k] = 第 k 路外部输入的目标细胞全局索引 (逐列异列注入) */
+    uint64_t receptor_map_offset;  /* v5: 映射表字节偏移 (0 = 无) */
+    uint32_t receptor_map_count;   /* v5: 映射表条目数 (= input_dim) */
+    uint8_t  reserved[4];
 } SDSCBinaryHeader;
 
 typedef struct {
@@ -72,6 +77,7 @@ typedef struct {
     const uint32_t* row_ptr;         /* [num_cells + 1] CSR 突触起止 */
     const uint32_t* col_idx;         /* [num_synapses] CSR 目标索引 */
     const float*    weights;         /* [num_synapses] 突触浮点权重 */
+    const uint32_t* receptor_map;    /* [receptor_map_count] v5 受体映射 (NULL = 旧式连续注入) */
     
     /* 动态工作态状态寄存器 (连续内存，64字节对齐) */
     float* states;                   /* [num_cells] 主状态槽 (积分器/膜电位) */
@@ -115,7 +121,9 @@ static inline SDSCBinaryGraph* sdsc_binary_load(const char* filepath) {
 #endif
 
     const SDSCBinaryHeader* hdr = (const SDSCBinaryHeader*)raw_data;
-    if (hdr->magic != SDSC_BINARY_MAGIC || (hdr->version != SDSC_BINARY_VERSION && hdr->version != SDSC_BINARY_VERSION_V3)) {
+    if (hdr->magic != SDSC_BINARY_MAGIC ||
+        (hdr->version != SDSC_BINARY_VERSION && hdr->version != SDSC_BINARY_VERSION_V3 &&
+         hdr->version != SDSC_BINARY_VERSION_V5)) {
 #if defined(_WIN32) || defined(_WIN64)
         free(raw_data);
 #else
@@ -140,6 +148,9 @@ static inline SDSCBinaryGraph* sdsc_binary_load(const char* filepath) {
     g->row_ptr = (const uint32_t*)(base_ptr + hdr->row_ptr_offset);
     g->col_idx = (const uint32_t*)(base_ptr + hdr->col_idx_offset);
     g->weights = (const float*)(base_ptr + hdr->weights_offset);
+    /* v5 受体映射 (逐列异列注入); v2/v3/v4 恒 NULL → 旧式前 input_dim 连续注入 */
+    g->receptor_map = (hdr->version >= SDSC_BINARY_VERSION_V5 && hdr->receptor_map_offset > 0)
+        ? (const uint32_t*)(base_ptr + hdr->receptor_map_offset) : NULL;
 
     /* 分配运行时状态缓冲 (posix_memalign 64 字节对齐) */
     size_t nc = hdr->num_cells;
@@ -171,9 +182,17 @@ static inline void sdsc_binary_forward(
     const uint32_t input_dim = g->header.input_dim;
     const uint32_t output_dim = g->header.output_dim;
 
-    /* 1. 注入感知受体输入 */
-    for (uint32_t i = 0; i < input_dim && i < num_cells; ++i) {
-        g->inputs_accum[i] = inputs[i];
+    /* 1. 注入感知受体输入 (v5 受体映射: 逐列异列注入; 旧式: 前 input_dim 连续注入) */
+    if (g->receptor_map) {
+        const uint32_t* map = g->receptor_map;
+        for (uint32_t k = 0; k < input_dim && k < num_cells; ++k) {
+            uint32_t cell = map[k];
+            if (cell < num_cells) g->inputs_accum[cell] = inputs[k];
+        }
+    } else {
+        for (uint32_t i = 0; i < input_dim && i < num_cells; ++i) {
+            g->inputs_accum[i] = inputs[i];
+        }
     }
 
     /* 2. 拓扑细胞激发计算 (Cell Activation) */
