@@ -1,0 +1,13 @@
+# KunCellular Python 外围依赖
+#
+# 计算底座本身是自包含的 C/C++ (C11 + C++20)，构建与运行不依赖 Python。
+# 以下依赖仅用于工具链、Python 侧测试以及前端实时后端网关。
+
+numpy>=1.24
+PyYAML>=6.0
+pytest>=7.0
+
+# 可选：GPU 引擎 (cuda_cellular_engine.py) 与部分训练器需要 PyTorch。
+# CI 使用 CPU 版即可：
+#   pip install torch --extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0
