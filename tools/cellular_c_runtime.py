@@ -4,7 +4,7 @@ KunCellular C-ABI Substrate Runtime Binding (Python ctypes Wrapper)
 严格遵循《KunCellular 最高架构宪章》：
 - C/C++ 是唯一的绝对计算底座 (Single Source of Truth)
 - 零手写伪神经网络算子，Python 仅作为外围驱动与数据管线
-- 通过 C-ABI / ctypes 直接调度纳秒级纯 C11 运行时推演
+- 通过 C-ABI / ctypes 直接调度零堆分配的纯 C11 运行时推演
 """
 
 import os
@@ -128,7 +128,7 @@ SDSC_PRIMITIVE_NAME_TO_OP = {
 class NativeCellularDynamicsEngine:
     """
     纯 C11 硬件级细胞动力学与 STDP 塑性执行器
-    - 纳秒级推演 26 大原子动力学原语
+    - 零堆分配推演 28 大原子动力学原语 (ops.yaml v2.0.0)
     - 求解膜电位微分方程、自由能与在线 STDP+Oja 突触塑性重塑
     - 彻底剥离手写 PyTorch/GPU 胶水算子，回归绝对单一本源
     """
