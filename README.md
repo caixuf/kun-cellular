@@ -55,6 +55,8 @@
 | **流体阻尼控制** | 40 细胞 / 86 突触 | `checkpoints/fluid_damper_champion.bin` (5.0 KB) | Aero / Hydro / Vacuum 三态 3000 步极限扰动 100% 收敛（`test_multiphase_fluid_stress`） |
 | **ADAS 循迹皮层** | 210 细胞 / ~659 突触 | `checkpoints/adas_cortex_champion.bin` | L3 重调后 **9 胜 / 7 负**（见下表；2026-09-11） |
 | **12 任务控制动物园** | 9~35 细胞 / 9~89 突触 | `checkpoints/zoo_*.bin` | **12/12 门禁通过**（`8ea0c61`：servo/dc_motor 植物修复 + maglev 课程复用），训练耗时秒级/任务 |
+| **多足步态 (organism 真前向)** | 11 细胞 / 13 突触 | `checkpoints/locomotion_gait_champion.bin` | Train/ID/OOD **100%**（前进 ≥80px，固定表型冷评；`locomotion_gait_report.json`） |
+| **三体引力弹射导航** | 17 细胞 / 39 突触 | `checkpoints/slingshot_nav_champion.bin` | Train 100% / ID 80% / OOD 50%（门禁达标；OOD 为温和 G 扰动 1.5→1.6；`slingshot_nav_report.json`） |
 
 > **动物园勘误史**：2026-09-09 曾因报告与 bin 漂移回落为 **9/12**（maglev / dc_motor / servo）。2026-09-10 在 **Task 层**修复被控对象与课程后重跑对齐为 **12/12**（`checkpoints/domain_zoo_report.json` 的 `gate: true`）。不得引用过期的 9/12 作为当前状态。
 
@@ -110,7 +112,11 @@
 - **自动驾驶仿真 (`frontend/vehicle.html`)**：210 细胞 ADAS 皮层闭环仿真可视化（AdasCortexOrgan 真前向；对 Stanley 16 场景 9W/7L）。
 - **迷宫脱困 (`frontend/maze.html`)**：11 细胞 `maze_navigation_champion` 真前向避障演示（测地方位冷评 96/100）。
 - **硅基天籁钢琴 (`frontend/music.html`)**：WebAudio 物理建模钢琴音色 + SDSC-BIN v2 权重浏览器内推演（**玩具级声光演示**；权重 = 随机初始化 + 高斯变异，不构成"音乐智能"宣称）。
-- **生物圈生态、引力弹射、百足虫步态、免疫猎杀**：均为 Python 物理沙盒可视化演示，非 C 底座真前向。
+- **生物圈生态 (`frontend/ecosystem.html`)**：复用底座 C 生态圈 `EcoBiosphere`（代谢/捕食/气候/香农多样性）。真实信号为生态位种群与捕食事件；`prey/predator` 的位移为显示层合成（底座 `EcoAgent` 坐标为静态）。
+- **免疫猎杀 (`frontend/immune.html`)**：复用底座 C 模型 `PathogenCoEvolutionWorld`（宿主-病原体协同演化、抗原漂移、抗体记忆）。病原体/巨噬细胞粒子为感染/免疫遥测的显示层合成。
+- **百足虫步态 (`frontend/locomotion.html`)**：新建 `LocomotionGaitTask` + 演化冠军，肌肉目标长度由 `CellularOrganism` 真前向驱动（`checkpoints/locomotion_gait_champion.bin`，Train/ID/OOD 100%）。
+- **引力弹射 (`frontend/slingshot.html`)**：新建 `SlingshotNavTask`（混沌三体引力 + 探测器推力）+ 演化冠军（`checkpoints/slingshot_nav_champion.bin`，Train 100%/ID 80%/OOD 50%）。
+- 上述四页可通过各自导航栏互达；`index.html` 目前仅直链斗地主/智驾/迷宫/音乐。
 
 ---
 
