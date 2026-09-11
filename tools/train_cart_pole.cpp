@@ -105,7 +105,7 @@ int main() {
     // 骨架解锁: 演化必须能长出新的感受器/效应器 (LOCKED 时摆杆信号进不来)
     EvolutionConstraintConfig cfg;
     cfg.skeleton_lock = SkeletonLockMode::UNLOCKED;
-    cfg.type_whitelist = TypeWhitelistMode::FULL_24;
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;
     cfg.seed_mode = SeedInitMode::HANDCRAFTED_PROGENITOR;
 
     // 三隔离环境: 训练 / 同分布留出 / 跨物理参数 OOD

@@ -58,7 +58,7 @@ int main() {
     // 2. 初始化演化引擎
     EvolutionConstraintConfig cfg;
     cfg.skeleton_lock = SkeletonLockMode::UNLOCKED;
-    cfg.type_whitelist = TypeWhitelistMode::FULL_24;
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;
     cfg.seed_mode = SeedInitMode::HANDCRAFTED_PROGENITOR;
 
     MorphogeneticEvolutionEngine engine(POP, SEED, cfg);

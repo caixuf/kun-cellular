@@ -6,7 +6,7 @@
 ![Zero-GC](https://img.shields.io/badge/Memory-Zero--GC-emerald.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-> 基于冯·诺依曼自复制自动机理论、26 种算存一体原子动力学原语与 Kahn 拓扑排序编译器的**软件定义硅基细胞计算框架（Software-Defined Silicon Cellular Computer, SDSCC）**。
+> 基于冯·诺依曼自复制自动机理论、28 种算存一体原子动力学原语与 Kahn 拓扑排序编译器的**软件定义硅基细胞计算框架（Software-Defined Silicon Cellular Computer, SDSCC）**。
 >
 > 核心价值：~11,000 行纯 C/C++ 底座，零动态堆分配（Zero-GC），确定性实时推演，支持在小规模控制任务上通过演化算法得到可运行智能体。
 
@@ -32,7 +32,7 @@
 
 | 模块 | 文件 | 说明 |
 | :--- | :--- | :--- |
-| **26 原语动力学库** | `include/kun/cellular/cellular_genome.hpp` | 26 种算存一体细胞原语（OSCILLATOR、EMA、INTEGRATE、GATE_HYSTERESIS 等）、李雅普诺夫 BIBO 稳定性判定器 |
+| **28 原语动力学库** | `include/kun/cellular/cellular_genome.hpp` | 28 种算存一体细胞原语（OSCILLATOR、EMA、INTEGRATE、GATE_HYSTERESIS 等）、李雅普诺夫 BIBO 稳定性判定器 |
 | **CSR 稀疏运行时** | `include/kun/cellular/sdsc_binary_runtime.h` | 纯 C11 SDSC-BIN v2 零拷贝 mmap 二进制运行时 |
 | **基础皮层** | `include/kun/cellular/sdsc_cortex.h` | 纯 C11 零 GC 基础控制皮层单头文件 |
 | **演化引擎** | `include/kun/cellular/island_evolution_grid.hpp` | 8 岛屿拓扑网格迁移演化 |
@@ -157,7 +157,7 @@ python3 tools/cellular_live_backend.py --port 8833
 ## 七、项目定位
 
 **KunCellular 是什么：**
-- 约 11,000 行 C/C++ 演化计算底座，26 种动力学原语构成的通用算存一体框架
+- 约 11,000 行 C/C++ 演化计算底座，28 种动力学原语构成的通用算存一体框架
 - 在玩具级控制任务（CartPole、迷宫、流体阻尼、定速巡航）上，演化算法可在数秒内得到小规模（8~40 细胞）的可用控制器
 - ADAS 皮层在 16 场景中击败 Stanley 基准 7 次（输 9 次），部分弯道场景具备竞争力
 - 适合研究"极小神经元数量下非冯·诺依曼动力学"的教学/实验平台

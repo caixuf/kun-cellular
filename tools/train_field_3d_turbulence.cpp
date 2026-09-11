@@ -36,7 +36,7 @@ int main() {
     // 2. 演化配置 (全开放无枷锁)
     EvolutionConstraintConfig cfg;
     cfg.skeleton_lock = SkeletonLockMode::UNLOCKED;
-    cfg.type_whitelist = TypeWhitelistMode::FULL_24;
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;
     cfg.max_cells_limit = 0;
     cfg.max_synapses_limit = 0;
 

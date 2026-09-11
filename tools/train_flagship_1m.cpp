@@ -54,7 +54,7 @@ int main() {
     // ---- [A] 16K 规模演化 ----
     EvolutionConstraintConfig cfg;
     cfg.skeleton_lock = SkeletonLockMode::UNLOCKED;
-    cfg.type_whitelist = TypeWhitelistMode::FULL_24;
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;
     cfg.seed_mode = SeedInitMode::HANDCRAFTED_PROGENITOR;
     const size_t POP = 16, GENS = 300;
     const size_t SCALE_A = 2048;

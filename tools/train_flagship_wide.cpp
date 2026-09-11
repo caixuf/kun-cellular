@@ -44,7 +44,7 @@ VariantResult run_variant(const char* name, size_t n_channels, uint32_t seed) {
 
     EvolutionConstraintConfig cfg;
     cfg.skeleton_lock = SkeletonLockMode::UNLOCKED;
-    cfg.type_whitelist = TypeWhitelistMode::FULL_24;
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;
     cfg.seed_mode = SeedInitMode::HANDCRAFTED_PROGENITOR;
     cfg.max_cells_limit = 0;             // 无上限：细胞规模由动态代谢自然调节
     cfg.max_synapses_limit = 8000000;

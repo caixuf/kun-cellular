@@ -225,7 +225,7 @@ static void test_protocol_controls() {
 static EvolutionConstraintConfig make_evolution_config() {
     EvolutionConstraintConfig cfg;
     cfg.seed_mode = SeedInitMode::DISCONNECTED_EMBRYO;
-    cfg.type_whitelist = TypeWhitelistMode::FULL_24;
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;
     cfg.skeleton_lock = SkeletonLockMode::LOCKED;
     cfg.fitness_driver = FitnessDriverMode::TASK_FITNESS_ONLY;
     cfg.enable_baldwin_crystallization = false;

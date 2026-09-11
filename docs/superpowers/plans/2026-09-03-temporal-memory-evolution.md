@@ -25,7 +25,7 @@
 - `CellularOrganism::create_minimal_random_graph(id, seed)`
 - `org.forward(inputs, false)`, `org.reset_state(true)`, `org.export_genome_json()`, `org.compile()`
 
-Default whitelist is already `FULL_24`. Set `seed_mode = DISCONNECTED_EMBRYO`.
+Default whitelist is already `FULL_28`. Set `seed_mode = DISCONNECTED_EMBRYO`.
 
 ---
 
@@ -353,7 +353,7 @@ Use `get_population_mut()` or non-const `population()` to write `fitness_score`,
 static EvolutionConstraintConfig make_evolution_config() {
     EvolutionConstraintConfig cfg;
     cfg.seed_mode = SeedInitMode::DISCONNECTED_EMBRYO;
-    cfg.type_whitelist = TypeWhitelistMode::FULL_24;
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;
     cfg.skeleton_lock = SkeletonLockMode::LOCKED;
     cfg.fitness_driver = FitnessDriverMode::TASK_FITNESS_ONLY;
     cfg.enable_baldwin_crystallization = false;

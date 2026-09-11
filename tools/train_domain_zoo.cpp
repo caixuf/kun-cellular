@@ -1,7 +1,7 @@
 // ============================================================================
 // train_domain_zoo.cpp — 12 域批量训练器 (管线横向复刻批量实证)
 //
-// 每域: 独立演化引擎 (解锁骨架, FULL_24) → Train/Holdout-ID/Holdout-OOD
+// 每域: 独立演化引擎 (解锁骨架, FULL_28) → Train/Holdout-ID/Holdout-OOD
 // 三隔离门禁 (OOD = 同任务类 ood=2.0 工厂扰动)。SR=0 强制 FAIL。
 //
 // Maglev: 开环不稳定 + 质量 OOD 需课程化; 注入 PID 反射弧祖先并动态 ood 采样。
@@ -73,7 +73,7 @@ ZooResult train_one(const std::function<std::unique_ptr<ZooTask>(double ood)>& m
 
     EvolutionConstraintConfig cfg;
     cfg.skeleton_lock = SkeletonLockMode::UNLOCKED;
-    cfg.type_whitelist = TypeWhitelistMode::FULL_24;
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;
     cfg.seed_mode = SeedInitMode::HANDCRAFTED_PROGENITOR;
     MorphogeneticEvolutionEngine engine(pop, seed, cfg);
 

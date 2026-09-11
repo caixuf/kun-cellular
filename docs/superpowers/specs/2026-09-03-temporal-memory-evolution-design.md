@@ -72,7 +72,7 @@ fitness = max(0, 1 - 0.25*|transitions-4| - 0.5*in_band_rate - mismatch_rate)
 Evolution config:
 
 - `seed_mode = DISCONNECTED_EMBRYO`
-- `type_whitelist = FULL_24` so `OP_DELAY_N` and `GATE_HYSTERESIS` can appear
+- `type_whitelist = FULL_28` so `OP_DELAY_N` and `GATE_HYSTERESIS` can appear
 - `skeleton_lock = LOCKED`
 - `fitness_driver = TASK_FITNESS_ONLY`
 - `enable_baldwin_crystallization = false`

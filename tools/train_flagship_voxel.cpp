@@ -35,7 +35,7 @@ double secs_since(std::chrono::high_resolution_clock::time_point t0) {
 EvolutionConstraintConfig voxel_cfg() {
     EvolutionConstraintConfig cfg;
     cfg.skeleton_lock = SkeletonLockMode::UNLOCKED;
-    cfg.type_whitelist = TypeWhitelistMode::FULL_24;
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;
     cfg.seed_mode = SeedInitMode::HANDCRAFTED_PROGENITOR;
     cfg.max_cells_limit = 0;              // 无上限 (规模对照实验的生命线)
     cfg.max_synapses_limit = 16000000;

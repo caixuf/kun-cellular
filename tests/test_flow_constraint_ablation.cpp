@@ -249,7 +249,7 @@ int main() {
     // 1. 基准模式 (Baseline: 骨架锁定 + 全24原语 + 手工先祖 + 任务适应度)
     EvolutionConstraintConfig cfg_base{
         SkeletonLockMode::LOCKED,
-        TypeWhitelistMode::FULL_24,
+        TypeWhitelistMode::FULL_28,
         SeedInitMode::HANDCRAFTED_PROGENITOR,
         FitnessDriverMode::TASK_FITNESS_ONLY
     };

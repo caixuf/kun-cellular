@@ -5,7 +5,7 @@
 // 核心原语定义、算存一体局部状态、三维力敏自组织与 Kahn 拓扑零 GC 编译器
 //
 // 理论渊源: 约翰·冯·诺依曼自复制自动机理论 (1966) 与阿兰·图灵形态发生动力学 (1952)
-// 架构特性: 原生算存一体、24 种离散物理动力学原语、零 GC 扁平内存排布、因果可证伪
+// 架构特性: 原生算存一体、28 种离散物理动力学原语、零 GC 扁平内存排布、因果可证伪
 // ============================================================================
 
 #include <cstdint>
@@ -164,7 +164,7 @@ enum class SkeletonLockMode : uint8_t {
 
 enum class TypeWhitelistMode : uint8_t {
     CURATED_9 = 0, // 9 种基础代谢与门控算子白名单
-    FULL_24 = 1    // 24 种全原语分类学 (完整算子空间)
+    FULL_28 = 1    // 28 种全原语分类学 (ops.yaml v2.0.0 完整算子空间)
 };
 
 enum class FitnessDriverMode : uint8_t {
@@ -189,7 +189,7 @@ class CellularOrganism;
 
 struct EvolutionConstraintConfig {
     SkeletonLockMode skeleton_lock{SkeletonLockMode::UNLOCKED}; // 默认自由形态发生 (允许探索新感官与新附肢)
-    TypeWhitelistMode type_whitelist{TypeWhitelistMode::FULL_24};
+    TypeWhitelistMode type_whitelist{TypeWhitelistMode::FULL_28};
     SeedInitMode seed_mode{SeedInitMode::HANDCRAFTED_PROGENITOR};
     FitnessDriverMode fitness_driver{FitnessDriverMode::TASK_FITNESS_ONLY};
     double novelty_weight{0.3}; // 好奇心奖励权重 alpha

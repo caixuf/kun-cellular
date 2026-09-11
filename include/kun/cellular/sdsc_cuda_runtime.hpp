@@ -8,7 +8,7 @@
  * 
  * 体系结构定位：
  * 1. 业务绝对正交 (Domain-Agnostic)：纯张量动力学，严禁业务专用名词
- * 2. 26 种原子物理原语全部用 __device__ __forceinline__ 固化在 GPU 设备端
+ * 2. 28 种原子物理原语全部用 __device__ __forceinline__ 固化在 GPU 设备端
  * 3. 彻底打破反向传播在物理芯片上的内存墙，直接在 RTX 5060 显存中执行
  * 4. 采用 NVRTC + CUDA Driver API 运行时零依赖 JIT 编译，便携且零外部编译依赖
  */
