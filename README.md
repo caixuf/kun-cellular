@@ -54,9 +54,9 @@
 | **空间迷宫自主脱困** | 11 细胞 / 14 突触 | `checkpoints/maze_navigation_champion.bin` (464 B) | 100 轮随机迷宫 100% 成功逃逸，0 死锁 |
 | **流体阻尼控制** | 40 细胞 / 86 突触 | `checkpoints/fluid_damper_champion.bin` (5.0 KB) | Aero / Hydro / Vacuum 三态 3000 步极限扰动 100% 收敛 |
 | **ADAS 循迹皮层** | 210 细胞 / 630 突触 | `checkpoints/adas_cortex_champion.bin` (56 KB) | 详见下方完整基准表（7W / 9L） |
-| **12 任务控制动物园** | 9~35 细胞 / 9~89 突触 | `checkpoints/zoo_*.bin` | **9/12 门禁通过**（maglev / dc_motor / servo 未过，如实记录），训练耗时 2~6 秒/任务 |
+| **12 任务控制动物园** | 9~35 细胞 / 9~89 突触 | `checkpoints/zoo_*.bin` | **12/12 门禁通过**（`8ea0c61`：servo/dc_motor 植物修复 + maglev 课程复用），训练耗时秒级/任务 |
 
-> **动物园勘误（2026-09-09）**：`checkpoints/domain_zoo_report.json` 与随仓 `zoo_*.bin` 的拓扑此前互不一致——报告写于 2026-09-05，而 bin 在 `088cc2f` 被重新导出。以 `tools/train_domain_zoo.cpp`（确定性种子）重跑后，报告与 bin 重新对齐；门禁结果由旧宣称的 12/12 变为 **9/12**，三个未过域见上表。
+> **动物园勘误史**：2026-09-09 曾因报告与 bin 漂移回落为 **9/12**（maglev / dc_motor / servo）。2026-09-10 在 **Task 层**修复被控对象与课程后重跑对齐为 **12/12**（`checkpoints/domain_zoo_report.json` 的 `gate: true`）。不得引用过期的 9/12 作为当前状态。
 
 ### ADAS vs Stanley 完整基准（16 场景，10-seed 平均）
 
