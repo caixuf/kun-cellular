@@ -3666,170 +3666,324 @@ class LiveLocomotionSimulator:
 
 live_loco = LiveLocomotionSimulator()
 
+class CEcoFood(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float)]
+
+
+class CEcoPrey(ctypes.Structure):
+    _fields_ = [
+        ("x", ctypes.c_float),
+        ("y", ctypes.c_float),
+        ("theta", ctypes.c_float),
+        ("alive", ctypes.c_int32),
+    ]
+
+
+class CEcoPred(ctypes.Structure):
+    _fields_ = [
+        ("x", ctypes.c_float),
+        ("y", ctypes.c_float),
+        ("theta", ctypes.c_float),
+    ]
+
+
+class CEcoTelemetry(ctypes.Structure):
+    _fields_ = [
+        ("real", ctypes.c_int32),
+        ("generation", ctypes.c_int32),
+        ("step_count", ctypes.c_int32),
+        ("max_steps", ctypes.c_int32),
+        ("prey_alive", ctypes.c_int32),
+        ("total_prey", ctypes.c_int32),
+        ("total_hunts", ctypes.c_int32),
+        ("history_len", ctypes.c_int32),
+        ("history_prey", ctypes.c_int32 * 64),
+        ("history_pred", ctypes.c_int32 * 64),
+        ("n_food", ctypes.c_int32),
+        ("food", CEcoFood * 80),
+        ("n_prey", ctypes.c_int32),
+        ("prey", CEcoPrey * 80),
+        ("n_pred", ctypes.c_int32),
+        ("predators", CEcoPred * 40),
+    ]
+
+
 class LiveEcoSimulator:
+    """红皇后生态真前向运行时
+
+    - 复用底座 C 模型 EcoBiosphere (真实多生境代谢/捕食/气候/多样性)
+    - prey/predator 位移为显示层合成 (底座 EcoAgent 坐标静态)
+    - 真实信号: 生态位种群、捕食事件(PREDATION)、香农多样性
+    """
     def __init__(self):
-        self.generation = 1
+        self.lock = threading.RLock()
+        self.generation = 0
         self.step_count = 0
         self.max_steps = 360
         self.warp_speed = 5
-        self.lock = threading.RLock()
-        self.total_prey = 36
         self.total_hunts = 0
-        self.history_prey = [36]
-        self.history_pred = [4]
-        self.init_world()
+        self.lib = None
+        self.real = False
+        self._last = None
+        self._mount()
+
+    def _mount(self):
+        try:
+            lib_path = os.path.join(ROOT_DIR, "build", "libkun_eco_runtime.so")
+            if not os.path.exists(lib_path):
+                print(f"[EcoLive] 共享库不存在: {lib_path}, 尝试编译")
+                os.system(f"cmake --build {os.path.join(ROOT_DIR, 'build')} --target kun_eco_runtime -j4")
+            self.lib = ctypes.CDLL(lib_path)
+            self.lib.eco_c_init.argtypes = [ctypes.c_char_p]
+            self.lib.eco_c_init.restype = ctypes.c_int32
+            self.lib.eco_c_reset.argtypes = [ctypes.c_uint32]
+            self.lib.eco_c_reset.restype = None
+            self.lib.eco_c_step.argtypes = []
+            self.lib.eco_c_step.restype = ctypes.c_int32
+            self.lib.eco_c_get_telemetry.argtypes = [ctypes.POINTER(CEcoTelemetry)]
+            self.lib.eco_c_get_telemetry.restype = None
+            self.real = bool(self.lib.eco_c_init(b"__base__"))
+            self._pull()
+            if self.real:
+                print("[EcoLive] 真实多生境生态圈已挂载 (EcoBiosphere)")
+        except Exception as e:
+            self.real = False
+            self.lib = None
+            print(f"[EcoLive] 挂载失败 (保持离线): {e}")
+
+    def _pull(self):
+        if not self.real or self.lib is None:
+            return
+        t = CEcoTelemetry()
+        self.lib.eco_c_get_telemetry(ctypes.byref(t))
+        self._last = t
+        self.generation = int(t.generation)
+        self.step_count = int(t.step_count)
+        self.max_steps = int(t.max_steps)
+        self.total_hunts = int(t.total_hunts)
 
     def init_world(self):
-        self.prey = []
-        for i in range(self.total_prey):
-            self.prey.append({
-                "id": i,
-                "x": random.uniform(50, 750),
-                "y": random.uniform(50, 450),
-                "vx": random.uniform(-1, 1),
-                "vy": random.uniform(-1, 1),
-                "alive": True
-            })
-        self.predators = []
-        for i in range(4):
-            self.predators.append({
-                "id": i,
-                "x": random.uniform(50, 750),
-                "y": random.uniform(50, 450),
-                "vx": 0.0,
-                "vy": 0.0,
-                "energy": 100.0
-            })
+        if self.real and self.lib is not None:
+            self.lib.eco_c_reset(0)
+            self._pull()
 
     def step_physics(self):
-        with self.lock:
-            self.step_count += 1
-            for p in self.predators:
-                closest, best_d = None, float("inf")
-                for py in self.prey:
-                    if py["alive"]:
-                        d = (p["x"] - py["x"])**2 + (p["y"] - py["y"])**2
-                        if d < best_d:
-                            best_d, closest = d, py
-                if closest:
-                    dx, dy = closest["x"] - p["x"], closest["y"] - p["y"]
-                    dist = math.sqrt(dx*dx + dy*dy) + 1e-5
-                    p["x"] += (dx/dist) * 2.6
-                    p["y"] += (dy/dist) * 2.6
-                    if dist < 12.0:
-                        closest["alive"] = False
-                        self.total_hunts += 1
-                        p["energy"] = min(120.0, p["energy"] + 20.0)
-
-            for py in self.prey:
-                if py["alive"]:
-                    py["x"] = max(20, min(780, py["x"] + random.uniform(-1.8, 1.8)))
-                    py["y"] = max(20, min(480, py["y"] + random.uniform(-1.8, 1.8)))
-
-            if self.step_count >= self.max_steps:
-                self.generation += 1
-                alive_cnt = sum(1 for py in self.prey if py["alive"])
-                self.history_prey.append(alive_cnt)
-                self.history_pred.append(len(self.predators))
-                if len(self.history_prey) > 30:
-                    self.history_prey.pop(0)
-                    self.history_pred.pop(0)
-                self.step_count = 0
-                self.init_world()
+        if self.real and self.lib is not None:
+            self.lib.eco_c_step()
+            self._pull()
 
     def get_snapshot(self):
-        with self.lock:
-            alive_cnt = sum(1 for py in self.prey if py["alive"])
+        if not self.real or self._last is None:
             return {
                 "generation": self.generation,
                 "step_count": self.step_count,
                 "max_steps": self.max_steps,
-                "prey_alive": alive_cnt,
-                "total_prey": self.total_prey,
+                "prey_alive": 0,
+                "total_prey": 36,
                 "total_hunts": self.total_hunts,
-                "history_prey": list(self.history_prey),
-                "history_pred": list(self.history_pred),
-                "prey": list(self.prey),
-                "predators": list(self.predators)
+                "history_prey": [0],
+                "history_pred": [0],
+                "food": [],
+                "prey": [],
+                "predators": [],
+                "real": False,
             }
+        t = self._last
+        food = [{"x": float(t.food[i].x), "y": float(t.food[i].y)} for i in range(int(t.n_food))]
+        prey = [
+            {
+                "x": float(t.prey[i].x),
+                "y": float(t.prey[i].y),
+                "theta": float(t.prey[i].theta),
+                "alive": bool(t.prey[i].alive),
+            }
+            for i in range(int(t.n_prey))
+        ]
+        predators = [
+            {
+                "x": float(t.predators[i].x),
+                "y": float(t.predators[i].y),
+                "theta": float(t.predators[i].theta),
+            }
+            for i in range(int(t.n_pred))
+        ]
+        hp = [int(t.history_prey[i]) for i in range(int(t.history_len))]
+        hd = [int(t.history_pred[i]) for i in range(int(t.history_len))]
+        return {
+            "generation": int(t.generation),
+            "step_count": int(t.step_count),
+            "max_steps": int(t.max_steps),
+            "prey_alive": int(t.prey_alive),
+            "total_prey": int(t.total_prey),
+            "total_hunts": int(t.total_hunts),
+            "history_prey": hp or [0],
+            "history_pred": hd or [0],
+            "food": food,
+            "prey": prey,
+            "predators": predators,
+            "real": True,
+        }
+
 
 live_eco = LiveEcoSimulator()
 
+
+class CImmunePathogen(ctypes.Structure):
+    _fields_ = [
+        ("id", ctypes.c_int32),
+        ("x", ctypes.c_float),
+        ("y", ctypes.c_float),
+        ("alive", ctypes.c_int32),
+        ("type", ctypes.c_int32),
+    ]
+
+
+class CImmuneMacrophage(ctypes.Structure):
+    _fields_ = [
+        ("id", ctypes.c_int32),
+        ("x", ctypes.c_float),
+        ("y", ctypes.c_float),
+        ("radius", ctypes.c_float),
+        ("chem_r", ctypes.c_float),
+    ]
+
+
+class CImmuneTelemetry(ctypes.Structure):
+    _fields_ = [
+        ("real", ctypes.c_int32),
+        ("generation", ctypes.c_int32),
+        ("step_count", ctypes.c_int32),
+        ("max_steps", ctypes.c_int32),
+        ("clearance_rate", ctypes.c_float),
+        ("pathogens_alive", ctypes.c_int32),
+        ("total_pathogens", ctypes.c_int32),
+        ("history_len", ctypes.c_int32),
+        ("history_clearance", ctypes.c_float * 64),
+        ("n_pathogens", ctypes.c_int32),
+        ("pathogens", CImmunePathogen * 64),
+        ("n_macrophages", ctypes.c_int32),
+        ("macrophages", CImmuneMacrophage * 16),
+    ]
+
+
 class LiveImmuneSimulator:
+    """免疫猎杀真前向运行时
+
+    - 复用底座 C 模型 PathogenCoEvolutionWorld (真实宿主-病原体协同演化)
+    - 病原体/巨噬细胞粒子为宿主感染/免疫遥测的显示层合成 (底座宿主坐标为静态)
+    - 真实信号: 感染数(clearance)、抗体记忆、病原体毒株演化
+    """
     def __init__(self):
-        self.generation = 1
+        self.lock = threading.RLock()
+        self.generation = 0
         self.step_count = 0
         self.max_steps = 300
         self.warp_speed = 5
-        self.lock = threading.RLock()
-        self.total_pathogens = 24
-        self.history_clearance = [0]
-        self.init_microenvironment()
+        self.lib = None
+        self.real = False
+        self._last = None
+        self._mount()
+
+    def _mount(self):
+        try:
+            lib_path = os.path.join(ROOT_DIR, "build", "libkun_immune_runtime.so")
+            if not os.path.exists(lib_path):
+                print(f"[ImmuneLive] 共享库不存在: {lib_path}, 尝试编译")
+                os.system(f"cmake --build {os.path.join(ROOT_DIR, 'build')} --target kun_immune_runtime -j4")
+            self.lib = ctypes.CDLL(lib_path)
+            self.lib.immune_c_init.argtypes = [ctypes.c_char_p]
+            self.lib.immune_c_init.restype = ctypes.c_int32
+            self.lib.immune_c_reset.argtypes = [ctypes.c_uint32]
+            self.lib.immune_c_reset.restype = None
+            self.lib.immune_c_step.argtypes = []
+            self.lib.immune_c_step.restype = ctypes.c_int32
+            self.lib.immune_c_get_telemetry.argtypes = [ctypes.POINTER(CImmuneTelemetry)]
+            self.lib.immune_c_get_telemetry.restype = None
+            self.real = bool(self.lib.immune_c_init(b"__base__"))
+            self._pull()
+            if self.real:
+                print("[ImmuneLive] 真实病原-宿主协同演化世界已挂载 (PathogenCoEvolutionWorld)")
+        except Exception as e:
+            self.real = False
+            self.lib = None
+            print(f"[ImmuneLive] 挂载失败 (保持离线): {e}")
+
+    def _pull(self):
+        if not self.real or self.lib is None:
+            return
+        t = CImmuneTelemetry()
+        self.lib.immune_c_get_telemetry(ctypes.byref(t))
+        self._last = t
 
     def init_microenvironment(self):
-        self.pathogens = []
-        for i in range(self.total_pathogens):
-            self.pathogens.append({
-                "id": i,
-                "x": random.uniform(80, 720),
-                "y": random.uniform(80, 420),
-                "alive": True,
-                "antigen": i % 3
-            })
-        self.t_cells = []
-        for i in range(8):
-            self.t_cells.append({
-                "id": i,
-                "x": random.uniform(100, 700),
-                "y": random.uniform(100, 400),
-                "affinity": i % 3
-            })
+        # 兼容旧路由: 重启疫情周期
+        if self.real and self.lib is not None:
+            self.lib.immune_c_reset(0)
+            self._pull()
+            self.generation = int(self._last.generation) if self._last else 0
+            self.step_count = int(self._last.step_count) if self._last else 0
 
     def step_physics(self):
-        with self.lock:
-            self.step_count += 1
-            for tc in self.t_cells:
-                closest, best_d = None, float("inf")
-                for p in self.pathogens:
-                    if p["alive"]:
-                        d = (tc["x"] - p["x"])**2 + (tc["y"] - p["y"])**2
-                        if d < best_d:
-                            best_d, closest = d, p
-                if closest:
-                    dx, dy = closest["x"] - tc["x"], closest["y"] - tc["y"]
-                    dist = math.sqrt(dx*dx + dy*dy) + 1e-5
-                    tc["x"] += (dx/dist) * 2.8
-                    tc["y"] += (dy/dist) * 2.8
-                    if dist < 14.0:
-                        closest["alive"] = False
-
-            alive_cnt = sum(1 for p in self.pathogens if p["alive"])
-            if self.step_count >= self.max_steps or alive_cnt == 0:
-                self.generation += 1
-                rate = round(((self.total_pathogens - alive_cnt) / self.total_pathogens) * 100.0, 1)
-                self.history_clearance.append(rate)
-                if len(self.history_clearance) > 30:
-                    self.history_clearance.pop(0)
-                self.step_count = 0
-                self.init_microenvironment()
+        if self.real and self.lib is not None:
+            self.lib.immune_c_step()
+            self._pull()
+            if self._last is not None:
+                self.generation = int(self._last.generation)
+                self.step_count = int(self._last.step_count)
+                self.max_steps = int(self._last.max_steps)
 
     def get_snapshot(self):
-        with self.lock:
-            alive_cnt = sum(1 for p in self.pathogens if p["alive"])
-            rate = round(((self.total_pathogens - alive_cnt) / self.total_pathogens) * 100.0, 1)
+        if not self.real or self._last is None:
             return {
                 "generation": self.generation,
                 "step_count": self.step_count,
                 "max_steps": self.max_steps,
-                "clearance_rate": rate,
-                "pathogens_alive": alive_cnt,
-                "total_pathogens": self.total_pathogens,
-                "history_clearance": list(self.history_clearance),
-                "t_cells": list(self.t_cells),
-                "pathogens": list(self.pathogens)
+                "clearance_rate": 0.0,
+                "pathogens_alive": 0,
+                "total_pathogens": 0,
+                "history_clearance": [0.0],
+                "pathogens": [],
+                "macrophages": [],
+                "real": False,
             }
+        t = self._last
+        pathogens = [
+            {
+                "id": int(t.pathogens[i].id),
+                "x": float(t.pathogens[i].x),
+                "y": float(t.pathogens[i].y),
+                "alive": bool(t.pathogens[i].alive),
+                "type": int(t.pathogens[i].type),
+            }
+            for i in range(int(t.n_pathogens))
+        ]
+        macrophages = [
+            {
+                "id": int(t.macrophages[i].id),
+                "x": float(t.macrophages[i].x),
+                "y": float(t.macrophages[i].y),
+                "radius": float(t.macrophages[i].radius),
+                "chem_r": float(t.macrophages[i].chem_r),
+            }
+            for i in range(int(t.n_macrophages))
+        ]
+        hist = [float(t.history_clearance[i]) for i in range(int(t.history_len))]
+        return {
+            "generation": int(t.generation),
+            "step_count": int(t.step_count),
+            "max_steps": int(t.max_steps),
+            "clearance_rate": round(float(t.clearance_rate), 1),
+            "pathogens_alive": int(t.pathogens_alive),
+            "total_pathogens": int(t.total_pathogens),
+            "history_clearance": hist or [0.0],
+            "pathogens": pathogens,
+            "macrophages": macrophages,
+            "real": True,
+        }
+
 
 live_immune = LiveImmuneSimulator()
+
 
 class CMazeTelemetry(ctypes.Structure):
     _fields_ = [
@@ -4240,7 +4394,7 @@ def answer_cellular_dialogue(prompt: str) -> dict:
     elif any(k in prompt_clean for k in ["免疫", "病毒", "病原体", "T细胞", "抗原", "吞噬"]):
         ans = (
             f"【微环境免疫防线生命体回应】：当前代际 Gen-{live_immune.generation}，"
-            f"8 个特异性 T 细胞基于化学趋化性追踪并捕杀异形病原体，当前抗原清除率达 {live_immune.get_snapshot()['clearance_rate']}%。"
+            f"底座病原-宿主协同演化世界 (PathogenCoEvolutionWorld) 实时推演中，巨噬细胞为免疫遥测的显示层追猎者，当前抗原清除率达 {live_immune.get_snapshot()['clearance_rate']}%。"
         )
         mode = "mature"
     elif any(k in prompt_clean for k in ["引力", "三体", "弹弓", "轨道", "宇宙"]):
