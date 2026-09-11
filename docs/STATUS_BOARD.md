@@ -98,6 +98,7 @@
 > 完整顺序与复现：`docs/handoff/2026-09-11-fieldcml-core-closed-task-campaign.md`。
 
 1. **T1 DomainZoo 复跑锁档** → T2 室内覆盖多种子 → T3 ADAS 多种子 → T4 易证回归 → T5 量化复现 → T6 斗地主长线（后置）
+   - T1 ✅ 12/12；T2 ✅ household 修复；T3 ⚠️ 复现脚本过、相对历史表负（现仓 bin 5W11L）
 2. ~~在线 RL 战役~~：**已收官**（逼近教师成立；超越教师未成立）——勿再占用 T1–T5 带宽
 3. Population/Species 一等抽象统一（演化单元收进新 core 契约）——与任务战役并行、不抢主线
 4. 多谱系借阅与稳定多样性（第五阶段）——后置

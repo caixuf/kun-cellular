@@ -60,7 +60,9 @@
 
 ### ADAS vs Stanley 完整基准（16 场景，10-seed 平均）
 
-> 数据来源：`runs/adas_champion_vs_stanley_seeds1-10.json`（完整 10-seed，未过滤）。指标为平均横向误差 CTE（米），**越小越好**。
+> 数据来源：`runs/adas_champion_vs_stanley_seeds1-10.json`（历史 10-seed 表，**7 胜 / 9 负**）。指标为平均横向误差 CTE（米），**越小越好**。
+>
+> **2026-09-11 复跑锁档（T3）**：现仓 `checkpoints/adas_cortex_champion.bin` 用同协议复现为 **5 胜 / 11 负**（直道 CTE≈5.5 cm，`val_highway`≈53 cm），见 `runs/adas_champion_vs_stanley_seeds1-10_repro_20260911.json` 与 `docs/superpowers/plans/2026-09-11-adas-multiseed-lock.md`。下表保留为历史对照；**不得把现仓 bin 说成仍达成下表数字**。
 
 | 场景 | 数据集 | Champion 均值 | Stanley 均值 | 结果 |
 | :--- | :---: | :---: | :---: | :---: |
