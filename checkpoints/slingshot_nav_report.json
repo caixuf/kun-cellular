@@ -1,0 +1,30 @@
+{
+  "task_name": "SlingshotNav",
+  "organism_id": 44,
+  "lineage": "Apex-Gen66",
+  "topology_hash": "WL-fd064fc91089ec4d-C17S39",
+  "num_cells": 17,
+  "num_synapses": 39,
+  "m1_gate_passed": true,
+  "verdict": "M1 Strict 3-Isolation OOS Report: Train[SR=100.0%] -> ID-Holdout[SR=80.0%, Ratio=0.80] -> OOD-Holdout[SR=50.0%, Ratio=0.50]. Gate=PASSED (Strict All-Green)",
+  "train": {
+    "success_rate": 1,
+    "mean_fitness": 1.96658,
+    "mean_steps": 183.6,
+    "episodes": 10
+  },
+  "holdout_id": {
+    "success_rate": 0.8,
+    "generalization_ratio": 0.8,
+    "mean_fitness": 1.72407,
+    "mean_steps": 187.8,
+    "episodes": 10
+  },
+  "holdout_ood": {
+    "success_rate": 0.5,
+    "generalization_ratio": 0.5,
+    "mean_fitness": 1.38967,
+    "mean_steps": 193.9,
+    "episodes": 10
+  }
+}

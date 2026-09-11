@@ -4115,57 +4115,123 @@ class LiveMazeSimulator:
 
 live_maze = LiveMazeSimulator()
 
+class SlTarget(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float), ("r", ctypes.c_int32)]
+
+
+class SlStar(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float), ("color", ctypes.c_char * 16)]
+
+
+class SlProbe(ctypes.Structure):
+    _fields_ = [
+        ("id", ctypes.c_int32),
+        ("x", ctypes.c_float),
+        ("y", ctypes.c_float),
+        ("alive", ctypes.c_int32),
+        ("reached", ctypes.c_int32),
+        ("trail_len", ctypes.c_int32),
+        ("trail", (ctypes.c_float * 2) * 64),
+    ]
+
+
+class CSlingshotTelemetry(ctypes.Structure):
+    _fields_ = [
+        ("real", ctypes.c_int32),
+        ("generation", ctypes.c_int32),
+        ("step_count", ctypes.c_int32),
+        ("max_steps", ctypes.c_int32),
+        ("success_rate", ctypes.c_float),
+        ("history_len", ctypes.c_int32),
+        ("history_success", ctypes.c_float * 64),
+        ("target", SlTarget),
+        ("n_stars", ctypes.c_int32),
+        ("stars", SlStar * 8),
+        ("n_probes", ctypes.c_int32),
+        ("probes", SlProbe * 8),
+    ]
+
+
 class LiveSlingshotSimulator:
+    """混沌三体引力弹弓导航真前向运行时 (演化 organism 驱动推力)"""
     def __init__(self):
-        self.generation = 1
-        self.step_count = 0
-        self.warp_speed = 5
         self.lock = threading.RLock()
-        self.init_system()
+        self.generation = 0
+        self.step_count = 0
+        self.max_steps = 400
+        self.warp_speed = 5
+        self.lib = None
+        self.real = False
+        self._last = None
+        self._mount()
+
+    def _mount(self):
+        try:
+            lib_path = os.path.join(ROOT_DIR, "build", "libkun_slingshot_runtime.so")
+            if not os.path.exists(lib_path):
+                print(f"[SlingshotLive] 共享库不存在: {lib_path}, 尝试编译")
+                os.system(f"cmake --build {os.path.join(ROOT_DIR, 'build')} --target kun_slingshot_runtime -j4")
+            self.lib = ctypes.CDLL(lib_path)
+            self.lib.slingshot_c_init.argtypes = [ctypes.c_char_p]
+            self.lib.slingshot_c_init.restype = ctypes.c_int32
+            self.lib.slingshot_c_reset.argtypes = [ctypes.c_uint32]
+            self.lib.slingshot_c_reset.restype = None
+            self.lib.slingshot_c_step.argtypes = []
+            self.lib.slingshot_c_step.restype = ctypes.c_int32
+            self.lib.slingshot_c_get_telemetry.argtypes = [ctypes.POINTER(CSlingshotTelemetry)]
+            self.lib.slingshot_c_get_telemetry.restype = None
+            ckpt = os.path.join(ROOT_DIR, "checkpoints", "slingshot_nav_champion.bin").encode("utf-8")
+            self.real = bool(self.lib.slingshot_c_init(ckpt))
+            self._pull()
+            if self.real:
+                print("[SlingshotLive] 真实弹弓导航冠军已挂载: slingshot_nav_champion.bin")
+        except Exception as e:
+            self.real = False
+            self.lib = None
+            print(f"[SlingshotLive] 挂载失败 (保持离线): {e}")
+
+    def _pull(self):
+        if not self.real or self.lib is None:
+            return
+        t = CSlingshotTelemetry()
+        self.lib.slingshot_c_get_telemetry(ctypes.byref(t))
+        self._last = t
+        self.generation = int(t.generation)
+        self.step_count = int(t.step_count)
+        self.max_steps = int(t.max_steps)
 
     def init_system(self):
-        self.bodies = [
-            {"x": 250.0, "y": 250.0, "vx": 0.0, "vy": 1.2, "mass": 1000.0, "color": "#38bdf8", "r": 16},
-            {"x": 550.0, "y": 250.0, "vx": 0.0, "vy": -1.2, "mass": 1000.0, "color": "#f43f5e", "r": 16},
-            {"x": 400.0, "y": 380.0, "vx": 1.6, "vy": 0.0, "mass": 600.0, "color": "#fbbf24", "r": 12}
-        ]
-        self.trajectories = [[], [], []]
+        if self.real and self.lib is not None:
+            self.lib.slingshot_c_reset(0)
+            self._pull()
 
     def step_physics(self):
-        with self.lock:
-            self.step_count += 1
-            G = 250.0
-            dt = 0.04
-            n = len(self.bodies)
-            for i in range(n):
-                for j in range(i + 1, n):
-                    b1, b2 = self.bodies[i], self.bodies[j]
-                    dx = b2["x"] - b1["x"]
-                    dy = b2["y"] - b1["y"]
-                    d = math.sqrt(dx*dx + dy*dy) + 20.0
-                    f = (G * b1["mass"] * b2["mass"]) / (d * d)
-                    fx, fy = (dx/d)*f, (dy/d)*f
-                    b1["vx"] += (fx / b1["mass"]) * dt
-                    b1["vy"] += (fy / b1["mass"]) * dt
-                    b2["vx"] -= (fx / b2["mass"]) * dt
-                    b2["vy"] -= (fy / b2["mass"]) * dt
-
-            for i, b in enumerate(self.bodies):
-                b["x"] += b["vx"]
-                b["y"] += b["vy"]
-                if self.step_count % 2 == 0:
-                    self.trajectories[i].append({"x": round(b["x"], 1), "y": round(b["y"], 1)})
-                    if len(self.trajectories[i]) > 80:
-                        self.trajectories[i].pop(0)
+        if self.real and self.lib is not None:
+            self.lib.slingshot_c_step()
+            self._pull()
 
     def get_snapshot(self):
-        with self.lock:
-            return {
-                "generation": self.generation,
-                "step_count": self.step_count,
-                "bodies": list(self.bodies),
-                "trajectories": list(self.trajectories)
-            }
+        if not self.real or self._last is None:
+            stars = [{"x": 250, "y": 250, "color": "#38bdf8"}, {"x": 550, "y": 250, "color": "#f43f5e"},
+                     {"x": 400, "y": 380, "color": "#fbbf24"}]
+            probes = [{"id": 0, "x": 100, "y": 520, "alive": True, "reached": False, "trail": [[100, 520]]}]
+            return {"generation": self.generation, "step_count": self.step_count, "max_steps": self.max_steps,
+                    "success_rate": 0.0, "history_success": [0.0],
+                    "target": {"x": 600, "y": 220, "r": 50}, "stars": stars, "probes": probes, "real": False}
+        t = self._last
+        stars = [{"x": float(t.stars[i].x), "y": float(t.stars[i].y),
+                  "color": t.stars[i].color.decode("utf-8", "ignore")} for i in range(int(t.n_stars))]
+        probes = []
+        for i in range(int(t.n_probes)):
+            pr = t.probes[i]
+            trail = [[float(pr.trail[k][0]), float(pr.trail[k][1])] for k in range(int(pr.trail_len))]
+            probes.append({"id": int(pr.id), "x": float(pr.x), "y": float(pr.y),
+                           "alive": bool(pr.alive), "reached": bool(pr.reached), "trail": trail})
+        hist = [float(t.history_success[i]) for i in range(int(t.history_len))]
+        return {"generation": int(t.generation), "step_count": int(t.step_count), "max_steps": int(t.max_steps),
+                "success_rate": round(float(t.success_rate), 1), "history_success": hist or [0.0],
+                "target": {"x": float(t.target.x), "y": float(t.target.y), "r": int(t.target.r)},
+                "stars": stars, "probes": probes, "real": True}
 
 live_slingshot = LiveSlingshotSimulator()
 
