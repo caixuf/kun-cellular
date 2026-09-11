@@ -439,6 +439,9 @@ export class CellView {
       }
       return;
     }
+
+    // 仪器模式：低开销，|out| → 发光强度，原语色固定
+    if (this.presentationMode === 'instrument') {
       const memScale = 1.0 + Math.min(0.22, actIntensity * 0.12);
       this.outerMembraneMesh.scale.set(memScale, memScale, memScale);
       this.outerMembraneMesh.material.emissiveIntensity = 0.12 + actIntensity * 0.55;

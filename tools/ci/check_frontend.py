@@ -5,6 +5,9 @@ Frontend Syntax and Asset Integrity Checker
 Verifies:
 1. All local static assets referenced in frontend/*.html (src, href) exist on disk.
 2. All embedded <script> and <script type="module"> blocks parse cleanly with `node --check`.
+3. ES modules under frontend/cellular/ pass a deep structural parse (vm.Script after
+   ESM strip). Plain `node --check` can miss class-body brace corruption that still
+   breaks browsers (e.g. Unexpected identifier after a botched merge).
 """
 
 import os
@@ -16,6 +19,54 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 FRONTEND_DIR = REPO_ROOT / "frontend"
+
+# node --check is insufficient for some class-body syntax errors. Strip ESM
+# import/export, wrap in async IIFE (top-level await), then vm.Script-parse.
+_DEEP_PARSE_JS = r"""
+const fs = require("fs");
+const vm = require("vm");
+const file = process.argv[2];
+let src = fs.readFileSync(file, "utf8");
+src = src.replace(/^\s*import\s[\s\S]*?;\s*$/gm, "");
+src = src.replace(/^\s*export\s+\*\s+from\s+['"][^'"]+['"]\s*;?\s*$/gm, "");
+src = src.replace(/^\s*export\s+\{[^}]*\}\s*from\s+['"][^'"]+['"]\s*;?\s*$/gm, "");
+src = src.replace(/^\s*export\s+default\s+/gm, "");
+src = src.replace(/^\s*export\s+async\s+function\b/gm, "async function");
+src = src.replace(/^\s*export\s+function\b/gm, "function");
+src = src.replace(/^\s*export\s+(const|let|var|class)\b/gm, "$1");
+src = src.replace(/^\s*export\s*\{[^}]*\}\s*;?\s*$/gm, "");
+src = src.replace(/\bimport\.meta\b/g, "({})");
+src = "(async () => {\n" + src + "\n})();";
+try {
+  new vm.Script(src, { filename: file });
+  process.exit(0);
+} catch (e) {
+  console.error(e.message);
+  process.exit(1);
+}
+"""
+
+
+def deep_parse_js(js_file: Path) -> str | None:
+    """Return error message if deep structural parse fails, else None."""
+    with tempfile.NamedTemporaryFile(suffix=".js", mode="w", encoding="utf-8", delete=False) as tmp:
+        tmp_path = tmp.name
+        tmp.write(_DEEP_PARSE_JS)
+    try:
+        res = subprocess.run(
+            ["node", tmp_path, str(js_file)],
+            capture_output=True,
+            text=True,
+        )
+        if res.returncode != 0:
+            msg = (res.stderr or res.stdout or "deep parse failed").strip()
+            return msg.split("\n")[0]
+        return None
+    except Exception as e:
+        return f"Failed deep parse: {e}"
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
 
 
 def check_html_assets(html_path: Path) -> list[str]:
@@ -104,6 +155,10 @@ def check_es_modules(dir_path: Path) -> list[str]:
         res = subprocess.run(["node", "--check", str(js_file)], capture_output=True, text=True)
         if res.returncode != 0:
             errors.append(f"{js_file.name}: Syntax error:\n{res.stderr.strip()}")
+        else:
+            deep_err = deep_parse_js(js_file)
+            if deep_err:
+                errors.append(f"{js_file.name}: Deep syntax error: {deep_err}")
 
         content = js_file.read_text(encoding="utf-8")
         exps = set()
