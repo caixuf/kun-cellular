@@ -194,7 +194,7 @@ To eliminate pseudo-evolution, overfitting, and simulation-to-reality discrepanc
 graph TD
     G1["Gate 1: Baseline Environment Health & Physical Solvability<br>(Baseline Probe)"] --> G2["Gate 2: Generational Selection Pressure Convergence<br>(Selection Convergence)"]
     G2 --> G3["Gate 3: Compliant Physical Out-of-Distribution Blind Test<br>(OOD & Holdout Generalization)"]
-    G3 --> G4["Gate 4: Pure C Native Deterministic Zero-GC & Latency Certification<br>(Zero-GC & Sub-20ns Latency)"]
+    G3 --> G4["Gate 4: Pure C Native Deterministic Zero-GC Certification<br>(Zero-Allocation & Deterministic)"]
     G4 --> G5["Gate 5: Production Pipeline Offline Replay<br>(Offline Production Replay)"]
     G5 --> G6["Gate 6: Shadow Mode Differential Parity<br>(Shadow Parity |Δ| < 1e-5)"]
 ```
@@ -202,7 +202,7 @@ graph TD
 1. **Gate 1 (Baseline Probe)**: Verifies physical environment solvability and baseline health using blank-slate embryos before initiating evolution;
 2. **Gate 2 (Selection Convergence)**: Tracks generational fitness variance to guarantee non-random selection pressure;
 3. **Gate 3 (OOD & Holdout Generalization)**: Evaluates evolved brains on unseen holdout datasets and perturbed physical parameters; in-sample memorization is instantly rejected;
-4. **Gate 4 (Deterministic Zero-GC)**: Enforces exactly 0 bytes heap allocation during inference and asserts sub-25ns median latency on commodity CPUs;
+4. **Gate 4 (Deterministic Zero-GC)**: Enforces exactly 0 bytes heap allocation during inference and bit-reproducible (deterministic) outputs for identical inputs;
 5. **Gate 5 (Offline Replay)**: Integrates compiled binaries into offline production pipelines (FlowEngine) to verify zero warnings and zero exceptions;
 6. **Gate 6 (Shadow Parity)**: Asserts exact frame-by-frame numerical consistency between C11/CSR binary runtimes and simulator rollouts ($\max ert \Delta ert < 10^{-5}$).
 

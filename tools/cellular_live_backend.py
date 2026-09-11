@@ -1184,7 +1184,7 @@ class DouDiZhuCortexLive:
             self.lib.doudizhu_c_step()
 
     def decide(self, obs0: float, obs1: float, obs2: float, obs3: float):
-        """在线决策: 供对局 AI 与提示按钮纳秒级调用"""
+        """在线决策: 供对局 AI 与提示按钮实时调用"""
         if not self.real or self.lib is None:
             return 1, [0.0, 1.0, 0.0]
         with self.lock:
@@ -4440,7 +4440,7 @@ def answer_cellular_dialogue(prompt: str) -> dict:
         ans = "【特高拱坝三维水压微应变与安全调度生命体】：融合 300 米级特高拱坝内部上万支光纤应变测点，实时计算坝体李雅普诺夫弹性稳定包络线，实现百年一遇洪峰智能平抑。"
         mode = "mature"
     elif any(k in prompt_clean for k in ["量子", "比特", "qubit", "退相干", "超导量子"]):
-        ans = "【超导量子比特通量退相干动态补偿生命体】：以亚纳秒级神经元算存一体回路实时抑制低频 1/f 磁通噪声，使超导量子比特相干寿命 T_2^* 提升 3.4 倍。"
+        ans = "【超导量子比特通量退相干补偿演示生命体】：以算存一体回路演示低频 1/f 磁通噪声的在线补偿回路（演示叙事，非实验结论）。"
         mode = "mature"
     elif any(k in prompt_clean for k in ["深潜器", "万米", "深海", "马里亚纳", "潜水器"]):
         ans = "【万米深潜器深海浮力与6-DoF操舵生命体】：在马里亚纳海沟 10909 米挑战者深渊极限工况下，自适应抗衡复杂深海涡旋，实现厘米级海底微地形悬停采样。"
@@ -4490,7 +4490,7 @@ def answer_cellular_dialogue(prompt: str) -> dict:
             f"- 物理实证门禁：{c_report}\n"
             f"- 感知输入受体：{c_ins or '多通道高维张量'}\n"
             f"- 效应动作决策：{c_outs or '非线性自适应指令'}\n"
-            f"- 内部物理架构：{len(organism.cells)} 实体微柱细胞与 {len(organism.synapses)} 条自催化突触，正在进行硬实时因果前向积分。"
+            f"- 内部物理架构：{len(organism.cells)} 实体微柱细胞与 {len(organism.synapses)} 条自催化突触，正在进行确定性因果前向积分。"
         )
         mode = "mature"
     else:
