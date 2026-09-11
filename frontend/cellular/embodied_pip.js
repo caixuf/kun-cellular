@@ -468,9 +468,21 @@ export class EmbodiedPIPTwin {
       vCte.style.color = et.action && et.action.includes("POS") ? "#34d399" : (et.action && et.action.includes("NEG") ? "#f43f5e" : "#38bdf8");
     }
     const vAcc = document.getElementById("pip-v-acc");
-    if (vAcc) vAcc.textContent = `+${et.pnl_pct || 99.04}%`;
+    if (vAcc) {
+      if (et.pnl_pct !== undefined) {
+        vAcc.textContent = `${et.pnl_pct >= 0 ? '+' : ''}${et.pnl_pct.toFixed(2)}%`;
+      } else {
+        vAcc.textContent = `OOS过拟合`;
+      }
+    }
     const vLat = document.getElementById("pip-v-lat");
-    if (vLat) vLat.textContent = `夏普 ${et.sharpe || 403.9}`;
+    if (vLat) {
+      if (et.sharpe !== undefined) {
+        vLat.textContent = `夏普 ${et.sharpe.toFixed(2)}`;
+      } else {
+        vLat.textContent = `OOS -0.03`;
+      }
+    }
   }
 
   renderOFIMeter(ofi) {
