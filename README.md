@@ -51,7 +51,7 @@
 | 任务 | 规模（细胞 / 突触） | 检查点 | 实测结果 |
 | :--- | :--- | :--- | :--- |
 | **CartPole 平衡** | 13 细胞 / 49 突触 | `checkpoints/cartpole_balance_champion.bin`（另：`cartpole_tripartite_champion.bin`） | 冷评 ID/OOD **20/20**（MAX_STEPS=300；三权版 500 步亦满额） |
-| **空间迷宫自主脱困** | 11 细胞 / 14 突触 | `checkpoints/maze_navigation_champion.bin` | 100 未见种子冷评 **80%** 逃逸（T4 2026-09-11；旧称 100% 已否证） |
+| **空间迷宫自主脱困** | 11 细胞 / 15 突触 | `checkpoints/maze_navigation_champion.bin` | 测地势场方位观测下 100 未见种子 **96%** @250 步 / **100%** @400 步（L3；欧氏方位对照约 86%） |
 | **流体阻尼控制** | 40 细胞 / 86 突触 | `checkpoints/fluid_damper_champion.bin` (5.0 KB) | Aero / Hydro / Vacuum 三态 3000 步极限扰动 100% 收敛（`test_multiphase_fluid_stress`） |
 | **ADAS 循迹皮层** | 210 细胞 / ~659 突触 | `checkpoints/adas_cortex_champion.bin` | L3 重调后 **9 胜 / 7 负**（见下表；2026-09-11） |
 | **12 任务控制动物园** | 9~35 细胞 / 9~89 突触 | `checkpoints/zoo_*.bin` | **12/12 门禁通过**（`8ea0c61`：servo/dc_motor 植物修复 + maglev 课程复用），训练耗时秒级/任务 |

@@ -164,6 +164,9 @@ endforeach()
 add_executable(train_maze_navigator "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_maze_navigator.cpp")
 target_link_libraries(train_maze_navigator PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_maze_l3_distill "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_maze_l3_distill.cpp")
+target_link_libraries(train_maze_l3_distill PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_cart_pole "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_cart_pole.cpp")
 target_link_libraries(train_cart_pole PRIVATE kun_cellular Threads::Threads m)
 

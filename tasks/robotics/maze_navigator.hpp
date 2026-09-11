@@ -347,6 +347,10 @@ public:
     size_t obs_dim() const override { return 4; }
     size_t act_dim() const override { return 4; }
 
+    // 任务层脚手架：第 4 维观测由欧氏目标方位改为局部测地势场方位（BFS 邻格梯度）
+    void set_use_geodesic_bearing(bool on) { use_geodesic_bearing_ = on; }
+    bool use_geodesic_bearing() const { return use_geodesic_bearing_; }
+
     void reset(uint32_t episode_seed) override {
         maze_ = MazeEnvironment(width_, height_, episode_seed, braid_prob_);
         agent_ = MazeEnvironment::Agent{};
@@ -356,7 +360,9 @@ public:
         agent_.prev_y = agent_.y;
         agent_.theta = 0.0f;
         agent_.min_dist_to_goal = std::hypot(maze_.get_goal_x() - agent_.x, maze_.get_goal_y() - agent_.y);
+        rebuild_geodesic_field_();
         maze_.update_sensors(agent_);
+        apply_geodesic_bearing_();
         step_count_ = 0;
         init_dist_ = agent_.min_dist_to_goal;
         visited_tiles_.clear();
@@ -397,6 +403,7 @@ public:
         float dt = 0.12f;
         float prev_dist = std::hypot(maze_.get_goal_x() - agent_.x, maze_.get_goal_y() - agent_.y);
         maze_.step_agent(agent_, acts, dt);
+        apply_geodesic_bearing_();
         float new_dist = std::hypot(maze_.get_goal_x() - agent_.x, maze_.get_goal_y() - agent_.y);
 
         double step_reward = (prev_dist - new_dist) * 12.0; // 势能差奖励
@@ -445,12 +452,64 @@ public:
     const MazeEnvironment::Agent& get_agent() const { return agent_; }
 
 private:
+    void rebuild_geodesic_field_() {
+        geo_dist_.assign(static_cast<size_t>(width_ * height_), -1);
+        if (!use_geodesic_bearing_) return;
+        const int gx = width_ - 2, gy = height_ - 2;
+        if (maze_.is_wall(static_cast<float>(gx) + 0.5f, static_cast<float>(gy) + 0.5f)) return;
+        geo_dist_[static_cast<size_t>(gy * width_ + gx)] = 0;
+        std::vector<std::pair<int, int>> q{{gx, gy}};
+        size_t head = 0;
+        const int dx4[4] = {1, -1, 0, 0};
+        const int dy4[4] = {0, 0, 1, -1};
+        while (head < q.size()) {
+            auto [cx, cy] = q[head++];
+            for (int d = 0; d < 4; ++d) {
+                int nx = cx + dx4[d], ny = cy + dy4[d];
+                if (nx < 0 || ny < 0 || nx >= width_ || ny >= height_) continue;
+                if (geo_dist_[static_cast<size_t>(ny * width_ + nx)] != -1) continue;
+                if (maze_.is_wall(static_cast<float>(nx) + 0.5f, static_cast<float>(ny) + 0.5f)) continue;
+                geo_dist_[static_cast<size_t>(ny * width_ + nx)] =
+                    geo_dist_[static_cast<size_t>(cy * width_ + cx)] + 1;
+                q.push_back({nx, ny});
+            }
+        }
+    }
+
+    void apply_geodesic_bearing_() {
+        if (!use_geodesic_bearing_ || geo_dist_.empty()) return;
+        int cx = static_cast<int>(std::floor(agent_.x));
+        int cy = static_cast<int>(std::floor(agent_.y));
+        const int dx4[4] = {1, -1, 0, 0};
+        const int dy4[4] = {0, 0, 1, -1};
+        int best = 1 << 30, bx = cx, by = cy;
+        for (int d = 0; d < 4; ++d) {
+            int nx = cx + dx4[d], ny = cy + dy4[d];
+            if (nx < 0 || ny < 0 || nx >= width_ || ny >= height_) continue;
+            int dv = geo_dist_[static_cast<size_t>(ny * width_ + nx)];
+            if (dv < 0) continue;
+            if (dv < best) {
+                best = dv;
+                bx = nx;
+                by = ny;
+            }
+        }
+        float desired = std::atan2(static_cast<float>(by) + 0.5f - agent_.y,
+                                   static_cast<float>(bx) + 0.5f - agent_.x);
+        float diff = desired - agent_.theta;
+        while (diff > 3.14159265f) diff -= 6.2831853f;
+        while (diff < -3.14159265f) diff += 6.2831853f;
+        agent_.goal_bearing = std::clamp(diff / 3.14159265f, -1.0f, 1.0f);
+    }
+
     int width_{11};
     int height_{11};
     int max_steps_{160};
     int step_count_{0};
     float braid_prob_{0.15f};
     float init_dist_{10.0f};
+    bool use_geodesic_bearing_{false};
+    std::vector<int> geo_dist_;
     std::unordered_set<int> visited_tiles_;
     MazeEnvironment maze_;
     MazeEnvironment::Agent agent_;

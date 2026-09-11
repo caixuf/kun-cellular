@@ -28,7 +28,7 @@
 | 编号 | 结果 | 证据 |
 |------|------|------|
 | C1 | ✅ PASS | `cartpole_tripartite` ID/OOD **20/20**；重训后 `cartpole_balance` 亦 **20/20**（旧 bin `initial_weight` 全 0 已作废备份） |
-| M1 | ❌ FAIL（负结果） | `maze_navigation` 冷评 **80/100**（重训 50 代仍 80%；旧档 78%）。`maze_tripartite` 表型冷评 **0%**（评测已改 `reset_state(false)`，个体本身失效）。**不得再写 README 100%** |
+| M1 | ❌→✅ L3 | 欧氏方位 **80~86/100**（T4 负）；测地方位脚手架后 **96/100**（见 `2026-09-11-maze-l3-distill.md`） |
 | F1 | ✅ PASS | fluid bin 拓扑/前向冒烟 ✅；`test_multiphase_fluid_stress` 三相 ALL PASS |
 
 复现：

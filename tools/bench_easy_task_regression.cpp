@@ -70,6 +70,9 @@ static int bench_cartpole(const char* path, int max_steps) {
 static bool episode_maze(CellularOrganism& org, int map_size, uint32_t seed,
                          int max_steps, float braid, bool wipe_weights) {
     MazeTask task(map_size, map_size, seed, max_steps, braid);
+    // L3 任务层脚手架：局部测地势场方位（欧氏方位天花板约 80~86%）
+    task.set_use_geodesic_bearing(true);
+    task.reset(seed);
     org.reset_state(wipe_weights);
     for (int t = 0; t < max_steps; ++t) {
         auto obs = task.current_observation();
