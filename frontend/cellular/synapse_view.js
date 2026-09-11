@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { getGlowTexture } from './texture_cache.js';
 import { getCellWorldRadius } from './spatial_bounds.js';
+import { highlightedSubcircuitTargetSet } from './organism_library.js';
 
 const _tmpP0 = new THREE.Vector3();
 const _tmpP1 = new THREE.Vector3();
@@ -114,6 +115,27 @@ export class SynapseView {
     const synCount = (this.org && this.org.syns) ? this.org.syns.length : 10;
     const isDense = synCount > 80;
     const actA = Math.min(2.0, Math.abs(a.out || 0) + (a.glow || 0));
+
+    if (highlightedSubcircuitTargetSet) {
+      const isTarget = highlightedSubcircuitTargetSet.has(this.syn.from) || highlightedSubcircuitTargetSet.has(this.syn.to);
+      if (isTarget) {
+        this.lineMat.color.setHex(0xfbbf24);
+        this.lineMat.opacity = 1.0;
+        if (this.photon1 && this.photon1.material) {
+          this.photon1.material.color.setHex(0xffffff);
+          this.photon1.material.opacity = 1.0;
+        }
+        if (this.photon2 && this.photon2.material) {
+          this.photon2.material.color.setHex(0xfbbf24);
+          this.photon2.material.opacity = 1.0;
+        }
+      } else {
+        this.lineMat.opacity = 0.04;
+        if (this.photon1 && this.photon1.material) this.photon1.material.opacity = 0.05;
+        if (this.photon2 && this.photon2.material) this.photon2.material.opacity = 0.05;
+      }
+      return;
+    }
 
     if (this.presentationMode === 'instrument') {
       this.lineMat.color.setHex(w >= 0 ? 0x38bdf8 : 0xf43f5e);

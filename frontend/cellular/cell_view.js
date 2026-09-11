@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { FAMILY, FAMILY_COLOR, getPrimitiveColor } from './config.js';
 import { getGlowTexture, getLabelTexture } from './texture_cache.js';
 import { getCellWorldRadius } from './spatial_bounds.js';
+import { highlightedSubcircuitTargetSet } from './organism_library.js';
 
 /** @typedef {'instrument'|'symbiosis'|'puremesh'|'lod'} PresentationMode */
 
@@ -416,8 +417,28 @@ export class CellView {
 
     const actIntensity = Math.min(2.0, Math.abs(c.out || 0) + (c.glow || 0));
 
-    // 仪器模式：低开销，|out| → 发光强度，原语色固定
-    if (this.presentationMode === 'instrument') {
+    if (highlightedSubcircuitTargetSet) {
+      const isTarget = highlightedSubcircuitTargetSet.has(c && c.id);
+      if (isTarget) {
+        this.outerMembraneMesh.material.color.setHex(0xfbbf24);
+        this.outerMembraneMesh.material.emissive.setHex(0xf59e0b);
+        this.outerMembraneMesh.material.emissiveIntensity = 2.8;
+        this.outerMembraneMesh.material.opacity = 0.95;
+        this.nucleus.material.color.setHex(0xffffff);
+        this.nucleus.material.emissive.setHex(0xfbbf24);
+        this.nucleus.material.emissiveIntensity = 3.2;
+        if (this.membrane && this.membrane.material) {
+          this.membrane.visible = true;
+          this.membrane.material.color.setHex(0xfbbf24);
+          this.membrane.material.opacity = 1.0;
+        }
+      } else {
+        this.outerMembraneMesh.material.opacity = 0.08;
+        this.nucleus.material.opacity = 0.12;
+        if (this.membrane && this.membrane.material) this.membrane.material.opacity = 0.04;
+      }
+      return;
+    }
       const memScale = 1.0 + Math.min(0.22, actIntensity * 0.12);
       this.outerMembraneMesh.scale.set(memScale, memScale, memScale);
       this.outerMembraneMesh.material.emissiveIntensity = 0.12 + actIntensity * 0.55;

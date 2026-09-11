@@ -12,6 +12,7 @@ import { cellPointLight } from './scene_setup.js';
 
 export let currentSelectedOrgId = null;
 export let currentHighlightedBookId = null;
+export let highlightedSubcircuitTargetSet = null;
 let libraryInitialRenderDone = false;
 let activeSwitchAbortController = null;
 
@@ -193,6 +194,8 @@ export async function selectOrganism(organismId, organismName) {
   setPendingSwitchOrganism(organismId);
   currentSelectedOrgId = organismId;
   setCurrentSelectedOrgId(organismId);
+  highlightedSubcircuitTargetSet = null;
+  currentHighlightedBookId = null;
   org.lastOrganismId = organismId;
   if (currentOrganismBounds) {
     currentOrganismBounds.organismId = organismId;
@@ -320,6 +323,7 @@ export function highlightBookSubcircuit(bookId, title, organismName) {
   }
 
   const targetSet = new Set(targetCells);
+  highlightedSubcircuitTargetSet = targetSet;
 
   let sumX = 0, sumY = 0, sumZ = 0, cnt = 0;
   if (views && views.cells) {
@@ -338,19 +342,23 @@ export function highlightBookSubcircuit(bookId, title, organismName) {
 
   if (typeof cellPointLight !== 'undefined' && cellPointLight) {
     cellPointLight.color.setHex(0xfbbf24);
-    cellPointLight.intensity = 3.6;
+    cellPointLight.intensity = 4.5;
   }
 
   if (views && views.cells) {
     for (const v of views.cells) {
       if (targetSet.has(v.cell.id)) {
-        v.membrane.material.color.setHex(0xfbbf24);
-        v.membrane.material.opacity = 1.0;
+        if (v.membrane && v.membrane.material) {
+          v.membrane.material.color.setHex(0xfbbf24);
+          v.membrane.material.opacity = 1.0;
+          v.membrane.visible = true;
+        }
         v.cell.glow = 3.5;
-        if (v.membraneMesh && v.membraneMesh.material) {
-          v.membraneMesh.material.color.setHex(0xfbbf24);
-          v.membraneMesh.material.emissive.setHex(0xf59e0b);
-          v.membraneMesh.material.emissiveIntensity = 2.8;
+        if (v.outerMembraneMesh && v.outerMembraneMesh.material) {
+          v.outerMembraneMesh.material.color.setHex(0xfbbf24);
+          v.outerMembraneMesh.material.emissive.setHex(0xf59e0b);
+          v.outerMembraneMesh.material.emissiveIntensity = 2.8;
+          v.outerMembraneMesh.material.opacity = 1.0;
         }
         if (v.nucleus && v.nucleus.material) {
           v.nucleus.material.color.setHex(0xffffff);
@@ -359,8 +367,13 @@ export function highlightBookSubcircuit(bookId, title, organismName) {
         }
       } else {
         const fam = FAMILY(v.cell.type);
-        v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
-        v.membrane.material.opacity = 0.08;
+        if (v.membrane && v.membrane.material) {
+          v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
+          v.membrane.material.opacity = 0.08;
+        }
+        if (v.outerMembraneMesh && v.outerMembraneMesh.material) {
+          v.outerMembraneMesh.material.opacity = 0.12;
+        }
       }
     }
   }
@@ -398,6 +411,7 @@ export function highlightBookSubcircuit(bookId, title, organismName) {
   }
 
   setTimeout(() => {
+    highlightedSubcircuitTargetSet = null;
     if (typeof cellPointLight !== 'undefined' && cellPointLight) {
       cellPointLight.color.setHex(0x00f0ff);
       cellPointLight.intensity = 1.6;
@@ -416,13 +430,17 @@ export function highlightBookSubcircuit(bookId, title, organismName) {
     if (views && views.cells) {
       for (const v of views.cells) {
         const fam = FAMILY(v.cell.type);
-        v.membrane.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
-        v.membrane.material.opacity = 0.4;
+        const colHex = FAMILY_COLOR[fam] || 0x38bdf8;
+        if (v.membrane && v.membrane.material) {
+          v.membrane.material.color.setHex(colHex);
+          v.membrane.material.opacity = 0.4;
+        }
         v.cell.glow = 0.0;
-        if (v.membraneMesh && v.membraneMesh.material) {
-          v.membraneMesh.material.color.setHex(FAMILY_COLOR[fam] || 0x38bdf8);
-          v.membraneMesh.material.emissive.setHex(0x000000);
-          v.membraneMesh.material.emissiveIntensity = 0.25;
+        if (v.outerMembraneMesh && v.outerMembraneMesh.material) {
+          v.outerMembraneMesh.material.color.setHex(colHex);
+          v.outerMembraneMesh.material.emissive.setHex(colHex);
+          v.outerMembraneMesh.material.emissiveIntensity = 0.25;
+          v.outerMembraneMesh.material.opacity = 0.55;
         }
       }
     }
