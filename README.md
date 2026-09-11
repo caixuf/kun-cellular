@@ -105,12 +105,12 @@
 
 平台提供浏览器可访问的实时仿真沙盒（监听端口 `8833`）：
 
-- **斗地主对战 (`frontend/doudizhu.html`)**：标准三人斗地主规则界面，支持人机对战与 AI 全自动观战。AI 出牌逻辑为启发式规则，**非真实神经网络推演**。
+- **斗地主对战 (`frontend/doudizhu.html`)**：标准三人斗地主规则界面，支持人机对战与 AI 全自动观战。挂载 82 细胞候选打分生命体（C++ 真前向）；天梯 57.0% 为简化合成环境对教师配对结果（McNemar p=0.13 统计持平），不构成真实斗地主 AI 能力宣称。
 - **3D 细胞观测台 (`frontend/cellular.html`)**：WebGL 实时渲染细胞微柱网络，LOD 动态调度。
-- **自动驾驶仿真 (`frontend/vehicle.html`)**：210 细胞 ADAS 皮层闭环仿真可视化。
-- **迷宫脱困 (`frontend/maze.html`)**：13 细胞代理实时避障演示。
+- **自动驾驶仿真 (`frontend/vehicle.html`)**：210 细胞 ADAS 皮层闭环仿真可视化（AdasCortexOrgan 真前向；对 Stanley 16 场景 9W/7L）。
+- **迷宫脱困 (`frontend/maze.html`)**：11 细胞 `maze_navigation_champion` 真前向避障演示（测地方位冷评 96/100）。
 - **硅基天籁钢琴 (`frontend/music.html`)**：WebAudio 物理建模钢琴音色 + SDSC-BIN v2 权重浏览器内推演（**玩具级声光演示**；权重 = 随机初始化 + 高斯变异，不构成"音乐智能"宣称）。
-- **生物圈生态、引力弹射、百足虫步态、免疫猎杀**等演示沙盒。
+- **生物圈生态、引力弹射、百足虫步态、免疫猎杀**：均为 Python 物理沙盒可视化演示，非 C 底座真前向。
 
 ---
 
@@ -128,7 +128,7 @@ kun-cellular/
 ├── checkpoints/                   # 真实演化产物（SDSC-BIN v2 二进制检查点）
 │   └── domain_zoo_report.json     # 12 任务控制动物园报告
 ├── tools/                         # 演化工具链与后端网关
-├── tests/                         # 78 组回归测试（ctest 78/78 PASS）
+├── tests/                         # 87 组回归测试（ctest 87/87 PASS）
 └── runs/                          # 基准数据（含完整 ADAS 10-seed 结果）
     └── adas_champion_vs_stanley_seeds1-10.json  # 完整基准（7W / 9L）
 ```
@@ -142,7 +142,7 @@ kun-cellular/
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 ctest --test-dir build --output-on-failure
-# 78/78 Test suites passed
+# 87/87 Test suites passed
 
 # 流体压测
 ./build/test_multiphase_fluid_stress
