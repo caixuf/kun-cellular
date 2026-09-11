@@ -53,40 +53,38 @@
 | **CartPole 平衡** | 12 细胞 / 21 突触 | `checkpoints/cartpole_balance_champion.bin` (1.5 KB) | Train SR=100%，ID-Holdout SR=100%，OOD SR=100% |
 | **空间迷宫自主脱困** | 11 细胞 / 14 突触 | `checkpoints/maze_navigation_champion.bin` (464 B) | 100 轮随机迷宫 100% 成功逃逸，0 死锁 |
 | **流体阻尼控制** | 40 细胞 / 86 突触 | `checkpoints/fluid_damper_champion.bin` (5.0 KB) | Aero / Hydro / Vacuum 三态 3000 步极限扰动 100% 收敛 |
-| **ADAS 循迹皮层** | 210 细胞 / 630 突触 | `checkpoints/adas_cortex_champion.bin` (56 KB) | 详见下方完整基准表（7W / 9L） |
+| **ADAS 循迹皮层** | 210 细胞 / ~659 突触 | `checkpoints/adas_cortex_champion.bin` | L3 重调后 **9 胜 / 7 负**（见下表；2026-09-11） |
 | **12 任务控制动物园** | 9~35 细胞 / 9~89 突触 | `checkpoints/zoo_*.bin` | **12/12 门禁通过**（`8ea0c61`：servo/dc_motor 植物修复 + maglev 课程复用），训练耗时秒级/任务 |
 
 > **动物园勘误史**：2026-09-09 曾因报告与 bin 漂移回落为 **9/12**（maglev / dc_motor / servo）。2026-09-10 在 **Task 层**修复被控对象与课程后重跑对齐为 **12/12**（`checkpoints/domain_zoo_report.json` 的 `gate: true`）。不得引用过期的 9/12 作为当前状态。
 
 ### ADAS vs Stanley 完整基准（16 场景，10-seed 平均）
 
-> 数据来源：`runs/adas_champion_vs_stanley_seeds1-10.json`（历史 10-seed 表，**7 胜 / 9 负**）。指标为平均横向误差 CTE（米），**越小越好**。
+> **当前口径（2026-09-11）**：`checkpoints/adas_cortex_champion.bin` = L3 sep-CMA-ES 重调产物。数据：`runs/adas_champion_vs_stanley_seeds1-10_tuned_20260911.json`。指标 CTE（m），**越小越好**。战绩 **9 胜 / 7 负**。
 >
-> **2026-09-11 复跑锁档（T3）**：现仓 `checkpoints/adas_cortex_champion.bin` 用同协议复现为 **5 胜 / 11 负**（直道 CTE≈5.5 cm，`val_highway`≈53 cm），见 `runs/adas_champion_vs_stanley_seeds1-10_repro_20260911.json` 与 `docs/superpowers/plans/2026-09-11-adas-multiseed-lock.md`。下表保留为历史对照；**不得把现仓 bin 说成仍达成下表数字**。
+> 历史快照：`runs/adas_champion_vs_stanley_seeds1-10.json`（7W/9L）；未调参复现：`…_repro_20260911.json`（5W/11L）。预注册：`docs/superpowers/plans/2026-09-11-adas-l3-retune.md`。
 
 | 场景 | 数据集 | Champion 均值 | Stanley 均值 | 结果 |
 | :--- | :---: | :---: | :---: | :---: |
-| straight_cruise | train | 0.0338 | 0.0286 | ❌ 负 |
-| gentle_s | train | 0.0687 | 0.0640 | ❌ 负 |
-| s_curve | train | 0.1124 | 0.1394 | ✅ 胜 |
-| s_curve_mid | train | 0.2712 | 0.2173 | ❌ 负 |
-| s_curve_hard | train | 0.2664 | 0.2148 | ❌ 负 |
-| curve_easy | train | 0.1840 | 0.2209 | ✅ 胜 |
-| tight_curve | train | 0.1309 | 0.1661 | ✅ 胜 |
-| tight_curve_max | train | 0.1556 | 0.1559 | ✅ 胜（微弱） |
-| stop_go | train | 0.0725 | 0.0519 | ❌ 负 |
-| follow | train | 0.1119 | 0.1061 | ❌ 负 |
-| highway | train | 0.1323 | 0.1409 | ✅ 胜 |
-| ramp_merge | train | 0.1269 | 0.1672 | ✅ 胜 |
-| **val_s_curve** | **val** | **0.3430** | **0.2585** | ❌ **负** |
-| **val_curve** | **val** | **0.1707** | **0.2030** | ✅ **胜** |
-| **val_highway** | **val** | **0.2430** | **0.2076** | ❌ **负** |
-| **val_stop_go** | **val** | **0.0762** | **0.0568** | ❌ **负** |
-| **汇总** | | | | **7 胜 / 9 负（16 场景）** |
+| straight_cruise | train | 0.0312 | 0.0286 | ❌ 负 |
+| gentle_s | train | 0.0617 | 0.0640 | ✅ 胜 |
+| s_curve | train | 0.1417 | 0.1394 | ❌ 负 |
+| s_curve_mid | train | 0.2676 | 0.2173 | ❌ 负 |
+| s_curve_hard | train | 0.2436 | 0.2148 | ❌ 负 |
+| curve_easy | train | 0.1739 | 0.2209 | ✅ 胜 |
+| tight_curve | train | 0.1117 | 0.1661 | ✅ 胜 |
+| tight_curve_max | train | 0.1304 | 0.1559 | ✅ 胜 |
+| stop_go | train | 0.0705 | 0.0519 | ❌ 负 |
+| follow | train | 0.1019 | 0.1061 | ✅ 胜 |
+| highway | train | 0.1350 | 0.1409 | ✅ 胜 |
+| ramp_merge | train | 0.1023 | 0.1672 | ✅ 胜 |
+| **val_s_curve** | **val** | **0.3134** | **0.2585** | ❌ **负** |
+| **val_curve** | **val** | **0.1644** | **0.2030** | ✅ **胜** |
+| **val_highway** | **val** | **0.1715** | **0.2076** | ✅ **胜** |
+| **val_stop_go** | **val** | **0.0744** | **0.0568** | ❌ **负** |
+| **汇总** | | | | **9 胜 / 7 负（16 场景）** |
 
-> 说明：Champion 在 s_curve / curve_easy / tight_curve / highway / ramp_merge 等弯道与汇入场景占优；在 straight_cruise / gentle_s / s_curve_mid / s_curve_hard / stop_go / follow 等巡航与启停场景输给 Stanley。留出集 4 场景中 3 负（仅 val_curve 胜）。这是一个在部分弯道场景有竞争力、但整体仍落后于工业级 Stanley 的小规模控制皮层。
->
-> **勘误（2026-09-09）**：本表此前按"越大越好"标注 ✅/❌，与 CTE（越小越好）方向相反，16/16 行判定全部倒置，汇总误记为 9 胜 / 7 负。现按上述 JSON 重算为 **7 胜 / 9 负**。
+> 说明：L3 重调显著回收直道（3.1 cm）与 `val_highway`（17 cm，且胜 Stanley）；弯道组合与历史 7W9L 快照不完全同构（例如 `s_curve` 现为微负）。仍为部分场景领先 Stanley 的可交付控制皮层。
 
 ---
 
