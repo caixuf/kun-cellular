@@ -2,12 +2,13 @@
 // train_multi_asset_cortical_array.cpp — SDSCC L2 皮层微柱阵列量化训练器 (单冠军对照组)
 // 公共件 (数据/CorticalQuantTask/seed_column/回放/适应度) 已抽取至 quant_array_common.hpp
 // 与种群生态训练器 (train_quant_population_ecology) 共享, 消灭双份实现。
-// CLI: --gen --pop --seed --mut-rate --mut-scale --out
+// CLI: --gen --pop --seed --mut-rate --mut-scale --out --report
 //   --seed 0 = 原始基线精确复现
 // ============================================================================
 #include "quant_array_common.hpp"
 
 #include <cstdlib>
+#include <fstream>
 
 using namespace kun;
 using namespace kunquant;
@@ -19,6 +20,7 @@ int main(int argc, char** argv) {
     float mut_rate = 0.12f;
     float mut_scale = 0.25f;
     std::string out_path = "checkpoints/quant_cortical_array_champion.bin";
+    std::string report_path;
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         auto next = [&]() { return (i + 1 < argc) ? argv[++i] : ""; };
@@ -28,6 +30,7 @@ int main(int argc, char** argv) {
         else if (a == "--mut-rate") mut_rate = std::strtof(next(), nullptr);
         else if (a == "--mut-scale") mut_scale = std::strtof(next(), nullptr);
         else if (a == "--out") out_path = next();
+        else if (a == "--report") report_path = next();
     }
     std::cout << "==================================================================\n";
     std::cout << "  SDSCC L2 全息皮层微柱生态阵列量化系统 (1,032 细胞 / 43 微柱)     \n";
@@ -159,6 +162,39 @@ int main(int argc, char** argv) {
     std::cout << "  ↳ [OOS 盲测] L2 皮层阵列样本外换手调仓: " << test_task.total_trades() << " 次\n";
     std::cout << "  ↳ 初始资金: 1,000,000.00 元 -> 期末实现现金: " << std::setprecision(2)
               << test_task.final_capital() << " 元\n";
+
+    if (!report_path.empty()) {
+        std::ofstream rf(report_path);
+        rf << std::fixed;
+        rf << "{\n";
+        rf << "  \"tool\": \"train_multi_asset_cortical_array\",\n";
+        rf << "  \"seed\": " << SEED << ",\n";
+        rf << "  \"generations\": " << GENERATIONS << ",\n";
+        rf << "  \"population\": " << POPULATION_SIZE << ",\n";
+        rf << "  \"n_assets\": " << all_assets.size() << ",\n";
+        rf << "  \"train_days\": " << split.train_dates.size() << ",\n";
+        rf << "  \"val_days\": " << split.val_dates.size() << ",\n";
+        rf << "  \"test_days\": " << split.test_dates.size() << ",\n";
+        rf << "  \"test_start\": \"" << split.test_dates.front() << "\",\n";
+        rf << "  \"test_end\": \"" << split.test_dates.back() << "\",\n";
+        rf << "  \"val\": {\n";
+        rf << "    \"sharpe\": " << std::setprecision(6) << val_task.compute_annual_sharpe() << ",\n";
+        rf << "    \"cum_return\": " << val_task.get_cum_return() << ",\n";
+        rf << "    \"max_drawdown\": " << val_task.get_max_drawdown() << "\n";
+        rf << "  },\n";
+        rf << "  \"oos\": {\n";
+        rf << "    \"sharpe\": " << test_task.compute_annual_sharpe() << ",\n";
+        rf << "    \"cum_return\": " << test_task.get_cum_return() << ",\n";
+        rf << "    \"max_drawdown\": " << test_task.get_max_drawdown() << ",\n";
+        rf << "    \"calmar\": " << test_task.get_calmar() << ",\n";
+        rf << "    \"trades\": " << test_task.total_trades() << ",\n";
+        rf << "    \"final_capital\": " << test_task.final_capital() << "\n";
+        rf << "  },\n";
+        rf << "  \"paper_anchor\": {\"sharpe\": 0.22, \"cum_return\": 0.1355, \"max_drawdown\": 0.2011, \"calmar\": 0.67},\n";
+        rf << "  \"out_bin\": \"" << out_path << "\"\n";
+        rf << "}\n";
+        std::cout << "  [REPORT] " << report_path << "\n";
+    }
 
     if (global_champion.save_checkpoint_bin(out_path)) {
         std::cout << "\n  [SUCCESS] 1,032 细胞 L2 全息皮层微柱阵列已入库: " << out_path << "\n";

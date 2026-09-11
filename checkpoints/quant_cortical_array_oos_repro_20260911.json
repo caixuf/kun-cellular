@@ -1,0 +1,27 @@
+{
+  "tool": "train_multi_asset_cortical_array",
+  "seed": 0,
+  "generations": 25,
+  "population": 16,
+  "n_assets": 43,
+  "train_days": 1970,
+  "val_days": 740,
+  "test_days": 2593,
+  "test_start": "2016-01-04",
+  "test_end": "2026-09-01",
+  "val": {
+    "sharpe": 2.156062,
+    "cum_return": 0.853101,
+    "max_drawdown": 0.055891
+  },
+  "oos": {
+    "sharpe": -0.031879,
+    "cum_return": -0.153472,
+    "max_drawdown": 0.321857,
+    "calmar": -0.476834,
+    "trades": 2179,
+    "final_capital": 846527.843618
+  },
+  "paper_anchor": {"sharpe": 0.22, "cum_return": 0.1355, "max_drawdown": 0.2011, "calmar": 0.67},
+  "out_bin": "checkpoints/quant_cortical_array_champion_repro_20260911.bin"
+}
