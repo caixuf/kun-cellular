@@ -56,6 +56,7 @@ OMP_NUM_THREADS=6 ./build/train_flagship_wired 64 120 io_mix 16 0 20260910
 - [x] 核心收口文档（本文件 + STATUS_BOARD 增补 + README 动物园勘误）
 - [x] T1 DomainZoo 复跑锁档（2026-09-11，12/12）
 - [x] T2 household 修复重训（H1–H3 ✅；根因=塑性重置抹掉演化）
-- [x] T3 ADAS 多种子锁档（脚本 ✅；相对历史表 A2–A4 ❌ — 现仓 bin 漂移）
+- [x] T3 ADAS 多种子锁档（脚本 ✅；未调参相对历史表负）
+- [x] ADAS L3 重调复锁（L1–L4 ✅ → 现仓 9W/7L）
 - [ ] T4 易证回归烟测（CartPole/迷宫/流体）
 - [ ] T5–T6 按序

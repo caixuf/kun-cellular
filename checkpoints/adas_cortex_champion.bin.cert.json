@@ -1,28 +1,13 @@
 {
   "schema": "SDSC-Formal-Cert-v1.0",
   "organism_bin": "checkpoints/adas_cortex_champion.bin",
-  "wl_canonical_hash": "0x0000000000000000",
-  "topology": {
-    "num_cells": 210,
-    "num_synapses": 659,
-    "core_nodes": 0,
-    "core_edges": 0
+  "note": "Promoted from L3 sep-CMA-ES retune 2026-09-11 (80 iters). Metrics: seeds1-10 tuned bench.",
+  "task_gates": {
+    "wins": 9,
+    "losses": 7,
+    "straight_cruise": 0.0312,
+    "val_highway": 0.1715,
+    "l1_l4": "PASS"
   },
-  "lyapunov_certificate": {
-    "status": "CERTIFIED_BIBO_STABLE",
-    "max_loop_gain": 0.63973,
-    "stability_margin": 0.36027,
-    "has_unstable_cycles": false
-  },
-  "bit_exact_regression": {
-    "status": "BIT_EXACT_ZERO_DRIFT",
-    "steps": 50000,
-    "fnv1a_checksum": "0x61b94018df3e37a5",
-    "max_action_peak": 0
-  },
-  "operator_safety_proof": {
-    "bounds_check": "ALL_CELLS_BOUNDED",
-    "source_of_truth": "ops.yaml-v2.0.0"
-  },
-  "certified_at": "Thu Sep 10 01:40:09 2026"
+  "certified_at": "2026-09-11"
 }
