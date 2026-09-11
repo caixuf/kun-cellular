@@ -17,6 +17,8 @@ runs/
 *.bin
 !checkpoints/*.bin
 checkpoints/sdsc_mega_1million.bin
+# 运行时可变实验档 (vehicle 页面“继续进化”按钮每次覆盖写，不入库)
+checkpoints/*_live_exp.bin
 *.tmp
 bin/
 checkpoints/*_champion.json

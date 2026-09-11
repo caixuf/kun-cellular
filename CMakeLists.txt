@@ -320,6 +320,21 @@ set_target_properties(kun_doudizhu_runtime PROPERTIES
     POSITION_INDEPENDENT_CODE ON
 )
 
+add_library(kun_maze_runtime SHARED
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/maze_c_runtime.cpp"
+)
+target_include_directories(kun_maze_runtime PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(kun_maze_runtime PRIVATE kun_cellular Threads::Threads m)
+set_target_properties(kun_maze_runtime PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+)
+
 # 5. GPU vs C++ 硬件底座逐细胞全量数值保真对账测试与三方原语单一真相源门禁
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)

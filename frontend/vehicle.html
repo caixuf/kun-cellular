@@ -202,7 +202,7 @@
         <div class="brand">
             <span>[GRAND_CIRCUIT]</span>
             <span style="color:var(--text-dim);">//</span>
-            <span style="color:var(--text-main);">真实阿克曼车辆全景公路巡航</span>
+            <span style="color:var(--text-main);">体育场公路 · 米制阿克曼 · 真皮层闭环</span>
         </div>
 
         <div class="warp-bar">
@@ -226,7 +226,7 @@
     <main>
         <div class="viewport-card">
             <div class="panel-header">
-                <span>[OPEN_WORLD_CIRCUIT] // PHYSICAL_ACKERMANN_MOTION</span>
+                <span>[STADIUM_CIRCUIT] // METER_ACKERMANN + AdasCortexOrgan</span>
                 <span style="color:var(--emerald-glow);" id="hud-status">STATUS: AUTONOMOUS_CRUISING</span>
             </div>
             
@@ -234,12 +234,13 @@
                 <div style="display:flex;gap:8px;align-items:center;">
                     <button class="nav-btn" id="btn-toggle" onclick="toggleSim()">[PAUSE / RESUME]</button>
                     <button class="nav-btn" onclick="resetVeh()">[RESET_POSITION]</button>
-                    <button class="nav-btn" onclick="fastEvolve(50)" style="background:rgba(16,185,129,0.3); border-color:var(--emerald-glow); color:var(--emerald-glow); font-weight:bold;">[极速超演化 +50代]</button>
+                    <button class="nav-btn" onclick="fastEvolve(8)" style="background:rgba(16,185,129,0.3); border-color:var(--emerald-glow); color:var(--emerald-glow); font-weight:bold;">[继续进化 +8代 → live_exp]</button>
                 </div>
                 <div style="font-size:11px;color:var(--text-dim);">
-                    <span style="color:#00f0ff;">■ 自主巡航车辆 (真实在地图上行驶移动)</span> &nbsp;|&nbsp;
+                    <span style="color:#00f0ff;">■ 体育场公路巡航（米制）</span> &nbsp;|&nbsp;
                     <span style="color:rgba(16,185,129,0.5);">─ 绿色行驶轨迹</span> &nbsp;|&nbsp;
-                    <span style="color:#fbbf24;">┆ 双黄虚线车道中心线</span>
+                    <span style="color:#fbbf24;">┆ 中心线</span>
+                    <span style="color:var(--text-dim);"> · 进化另存实验档，不改 L3 锁档</span>
                 </div>
             </div>
 
@@ -249,29 +250,29 @@
         </div>
 
         <div class="sidebar">
-            <!-- 1. SDSCC 210-细胞 ADAS 皮层 (真实并行前向遥测) + 经典前瞻控制律 -->
+            <!-- 1. SDSCC 210-细胞 ADAS L3 锁档：AdasCortexOrgan 真前向闭环 -->
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span id="cortex-panel-title">[SDSCC_CORTEX]</span>
-                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">GEN: 45 // 皮层并行实测</span>
+                    <span id="cortex-panel-title">[SDSCC_ADAS_L3_210]</span>
+                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">L3 · 真闭环 · 9W/7L</span>
                 </div>
                 
                 <div class="stat-grid">
                     <div class="stat-box">
                         <div class="stat-label">GENERATION / AGENT</div>
-                        <div class="stat-val emerald" id="stat-gen">Gen 45 #1</div>
+                        <div class="stat-val emerald" id="stat-gen">Gen —</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">CHAMPION_FITNESS</div>
-                        <div class="stat-val amber" id="stat-fit">99.8</div>
+                        <div class="stat-label">VS_STANLEY_WIN%</div>
+                        <div class="stat-val amber" id="stat-fit">56.3</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">ACTIVE_CELLS</div>
-                        <div class="stat-val cyan" id="stat-cells">1,024 细胞</div>
+                        <div class="stat-val cyan" id="stat-cells">210 细胞</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">SYNAPSE_EDGES</div>
-                        <div class="stat-val emerald" id="stat-synapses">196,608 突触</div>
+                        <div class="stat-val emerald" id="stat-synapses">— 突触</div>
                     </div>
                 </div>
 
@@ -413,14 +414,21 @@
 
         window.fastEvolve = async function(gens) {
             const hud = document.getElementById("hud-status");
-            if (hud) hud.innerText = `STATUS: FAST_EVOLVING (+${gens} GENS)...`;
+            if (hud) hud.innerText = `STATUS: EVOLVING… (最多约数十秒)`;
             try {
                 const res = await fetch("/api/vehicle/train_fast?generations=" + gens);
                 const data = await res.json();
-                if (hud) hud.innerText = `STATUS: EVOLVED +${gens} GENS (FITNESS: ${data.result.champion_fitness})`;
+                const result = data.result || data;
+                if (result.status === "rejected" || result.status === "error") {
+                    if (hud) hud.innerText = `STATUS: FAIL (${result.message || "rejected"})`;
+                } else {
+                    const g = result.trained_generations || gens;
+                    const tip = result.capped ? ` (顶${g}代)` : "";
+                    if (hud) hud.innerText = `STATUS: LIVE_EXP +${g}${tip} cost=${result.cost ?? "?"} → live_exp.bin`;
+                }
                 fetchVehState();
             } catch(e) {
-                if (hud) hud.innerText = "STATUS: AUTONOMOUS_CRUISING";
+                if (hud) hud.innerText = "STATUS: EVOLVE_TIMEOUT_OR_ERROR";
             }
         };
 
@@ -463,23 +471,30 @@
                 const gen = vehState.generation || 1;
                 const agentIdx = (vehState.agent_index !== undefined ? vehState.agent_index + 1 : 1);
                 document.getElementById("stat-gen").innerText = `Gen ${gen} #${agentIdx}`;
-                document.getElementById("stat-gen-badge").innerText = `GEN: ${gen} // AGENT: ${agentIdx}/6`;
-                document.getElementById("stat-fit").innerText = `${vehState.champion_fitness || 0.0}`;
                 // 尺度真理: 细胞/突触数一律读后端真实值，无数据时显示占位符，严禁硬编码兜底
                 const nCells = vehState.n_cells || 0;
                 const nSyns = vehState.n_synapses || 0;
+                const claim = vehState.champion_claim || (nCells === 210 ? "L3 210 · 9W/7L" : "");
+                document.getElementById("stat-gen-badge").innerText = claim || `GEN: ${gen}`;
+                document.getElementById("stat-fit").innerText = `${vehState.champion_fitness || 0.0}`;
                 document.getElementById("stat-cells").innerText = nCells > 0 ? `${nCells.toLocaleString()} 细胞` : "… 细胞";
                 document.getElementById("stat-synapses").innerText = nSyns > 0 ? `${nSyns.toLocaleString()} 突触` : "… 突触";
 
                 // 动态渲染 原语链路徽章与微柱皮层标识
                 const titleEl = document.getElementById("cortex-panel-title");
                 if (titleEl) {
-                    titleEl.innerText = (nCells === 1024) ? "[SDSCC_1024_MULTI_COLUMN_CORTEX]" : `[SDSCC_${nCells}_CELL_PARALLEL_CORTEX]`;
+                    titleEl.innerText = (nCells === 210)
+                        ? "[SDSCC_ADAS_L3_210]"
+                        : ((nCells === 1024) ? "[SDSCC_1024_MULTI_COLUMN_CORTEX]" : `[SDSCC_${nCells}_CELL_PARALLEL_CORTEX]`);
                 }
 
                 const modeBadge = document.getElementById("cortex-mode-badge");
                 if (modeBadge) {
-                    if (nCells === 1024) {
+                    if (nCells === 210) {
+                        modeBadge.textContent = vehState.cortex_real
+                            ? `[210 L3 | 真闭环 ${vehState.control_loop === 'adas_cortex_organ_forward' ? 'AdasCortexOrgan' : 'fallback'}]`
+                            : "[210 L3 | 皮层离线]";
+                    } else if (nCells === 1024) {
                         modeBadge.textContent = vehState.cortex_real ? "[1,024 CELLS | 16-微柱 C11 直连]" : "[1,024 CELLS | 皮层离线]";
                     } else {
                         modeBadge.textContent = vehState.cortex_real ? `[${nCells} CELLS | C11 真实前向]` : `[${nCells} CELLS | 皮层离线]`;
@@ -502,12 +517,16 @@
                         html += `<span style="background:rgba(234,179,8,0.2); color:#facc15; padding:1px 5px; border-radius:3px; border:1px solid #eab308;">FAT+MULT</span>`;
                         html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
                         html += `<span style="background:#1e293b; color:#f43f5e; padding:1px 5px; border-radius:3px; border:1px solid #f43f5e;">8 MOT</span>`;
+                    } else if (nCells === 210) {
+                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">12 REC</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
+                        html += `<span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">192 ASSOC</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
+                        html += `<span style="background:#1e293b; color:#f43f5e; padding:1px 5px; border-radius:3px; border:1px solid #f43f5e;">6 MOT</span>`;
+                        html += `<span style="color:var(--text-dim); align-self:center;">·</span>`;
+                        html += `<span style="background:rgba(56,189,248,0.15); color:#38bdf8; padding:1px 5px; border-radius:3px; border:1px solid #0ea5e9;">真前向闭环</span>`;
                     } else {
-                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">6 REC</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">202 INTER (tanh×g)</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">2 MOT</span>`;
+                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">REC→INTER→MOT</span>`;
                     }
                     chainDiv.innerHTML = html;
                 }
@@ -661,9 +680,10 @@
 
             const track = (vehState && vehState.track) || [];
             if (track.length > 2) {
-                // 1. 绘制固定沥青大公路 (Asphalt Highway Surface)
+                // 1. 沥青公路表面（半宽随后端米制 road_half_px）
+                const halfW = (vehState && vehState.road_half_px) ? vehState.road_half_px : 12;
                 ctx.strokeStyle = "#172033";
-                ctx.lineWidth = 50 * scale;
+                ctx.lineWidth = halfW * 2 * scale;
                 ctx.lineCap = "round";
                 ctx.lineJoin = "round";
                 ctx.beginPath();
@@ -676,8 +696,8 @@
                 ctx.closePath();
                 ctx.stroke();
 
-                // 2. 绘制公路两侧白色实线路肩 (Roadside Shoulders)
-                [-25, 25].forEach(offset => {
+                // 2. 路肩白线
+                [-halfW, halfW].forEach(offset => {
                     ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
                     ctx.lineWidth = 2 * scale;
                     ctx.beginPath();
@@ -693,7 +713,7 @@
                     ctx.stroke();
                 });
 
-                // 3. 绘制双黄虚线中心线 (Double Yellow Centerline)
+                // 3. 中心黄虚线
                 ctx.strokeStyle = "#fbbf24";
                 ctx.lineWidth = 2 * scale;
                 ctx.setLineDash([8 * scale, 6 * scale]);

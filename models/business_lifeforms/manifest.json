@@ -178,11 +178,39 @@
       "validation_report": "【T5 战役客观对账】43 大宗商品期货微柱皮层阵列 (1,032 细胞 / 1,634 突触)：--seed 0 复训实测选择集出现严重过拟合（训练夏普 2.16），样本外 OOS 盲测夏普为 -0.03，历史论文 0.22 未稳定复现。根因为任务层选种过拟合与缺失阵列冷评反序列化接口（非底层细胞算子缺陷）。根据架构纪律，已坚决撤销所有实盘收益宣称，如实记录为负并冻结待改进。"
     },
     {
+      "id": "maze_navigation_champion",
+      "name": "具身迷宫导航冠军 (11细胞·测地方位 96/100)",
+      "domain": "连续物理空间导航与趋化性脱困",
+      "cells_scale": 11,
+      "synapses_scale": 15,
+      "checkpoint": "checkpoints/maze_navigation_champion.bin",
+      "c_header": "tasks/transfer/cross_domain_tasks.hpp",
+      "test_suite": "tests/test_flow_maze_spatial_memory.cpp",
+      "input_signals": [
+        "4向激光雷达射线测距 (Lidar Rays)",
+        "测地/BFS 地理势场方位 (Geodesic Bearing)",
+        "前进受阻死区感知 (Deadlock Stagnation)",
+        "机体偏航与角速度 (Yaw Rate)"
+      ],
+      "action_outputs": [
+        "航向角转向指令 (Steer)",
+        "前进推进动力 (Thrust)"
+      ],
+      "primitive_motif": [
+        "OP_EMA",
+        "OP_DIFF",
+        "GATE_HYSTERESIS",
+        "GATE_DEADZONE",
+        "OP_DAMPER"
+      ],
+      "validation_report": "【T4→L3 迷宫战役锁档】任务适配层引入测地方位脚手架（BFS 地理势场，不动底座）后，冷评 250 步 96/100 (96%)，400 步 100/100；initial_weight 与 weight 同步。纯欧氏直线方位对照组约 80–86/100（死胡同反向梯度见顶）。证书: maze_navigation_champion.bin.cert.json (BIBO / 50k 步零漂移)。"
+    },
+    {
       "id": "maze_tripartite_champion",
-      "name": "具身空间趋化迷宫导航生命体 (21细胞·数值验证)",
+      "name": "迷宫三方稳态微柱 (21细胞·Lyapunov 数值验证)",
       "domain": "连续物理空间导航与趋化性脱困",
       "cells_scale": 21,
-      "synapses_scale": 42,
+      "synapses_scale": 27,
       "checkpoint": "checkpoints/maze_tripartite_champion.bin",
       "c_header": "tasks/transfer/cross_domain_tasks.hpp",
       "test_suite": "tests/test_flow_maze_spatial_memory.cpp",
@@ -203,11 +231,11 @@
         "GATE_DEADZONE",
         "OP_DAMPER"
       ],
-      "validation_report": "【T4 迷宫任务实证】具身空间趋化迷宫导航生命体: 明确纯欧氏直线方位在死胡同中导致反向梯度见顶 (~80-86% 阶段负结果)。在任务适配层引入测地方位脚手架（BFS 地理势场，不动底座）后，冷评回归达 96/100 (96%)，400 步达 100/100 (100%)，且 initial_weight 完全同步。"
+      "validation_report": "【稳态微柱基线】21 细胞三方拓扑 Lyapunov/BIBO 数值验证通过 (maze_tripartite_champion.bin.cert.json)。逃脱率战役锁档请看书架「maze_navigation_champion」(测地方位 96/100)；本条目不宣称测地脚手架冷评成绩。"
     },
     {
       "id": "household_coverage_champion",
-      "name": "全屋覆盖清洁机器人具身大脑 (11细胞·数值验证)",
+      "name": "全屋覆盖清洁机器人具身大脑 (11细胞·ID 88.2%)",
       "domain": "有限空间遍历覆盖与动态障碍避让",
       "cells_scale": 11,
       "synapses_scale": 11,
@@ -263,8 +291,35 @@
       "validation_report": "数值验证通过 (证书文件fluid_damper_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.021 < 1.0，强湍流突变响应时间仅 4.2ms，振动能量衰减率提升 4.8x。"
     },
     {
+      "id": "cartpole_balance_champion",
+      "name": "倒立摆平衡冠军 (13细胞·ID/OOD 20/20)",
+      "domain": "欠驱动刚体动力学摆杆姿态平衡",
+      "cells_scale": 13,
+      "synapses_scale": 49,
+      "checkpoint": "checkpoints/cartpole_balance_champion.bin",
+      "c_header": "tasks/transfer/cross_domain_tasks.hpp",
+      "test_suite": "tests/test_flow_cartpole_balance.cpp",
+      "input_signals": [
+        "小车水平位置 x",
+        "小车水平速度 x_dot",
+        "摆杆偏角 theta",
+        "摆杆角速度 theta_dot"
+      ],
+      "action_outputs": [
+        "小车正向推力 (Force_Pos)",
+        "小车反向推力 (Force_Neg)"
+      ],
+      "primitive_motif": [
+        "OP_DIFF",
+        "OP_INTEGRATE",
+        "GATE_HYSTERESIS",
+        "GATE_DEADZONE"
+      ],
+      "validation_report": "【T4 易任务锁档】cartpole_balance 重训并同步 initial_weight 后，ID/OOD 冷评均为 20/20；证书 cartpole_balance_champion.bin.cert.json (BIBO / 50k 步零漂移)。旧 initial_weight 全 0 档已备份作废。"
+    },
+    {
       "id": "cartpole_tripartite_champion",
-      "name": "倒立摆超稳态平衡控制器 (8细胞·数值验证)",
+      "name": "倒立摆三方稳态微柱 (8细胞·Lyapunov 数值验证)",
       "domain": "欠驱动刚体动力学摆杆姿态平衡",
       "cells_scale": 8,
       "synapses_scale": 14,
@@ -287,7 +342,7 @@
         "GATE_HYSTERESIS",
         "GATE_DEADZONE"
       ],
-      "validation_report": "数值验证通过 (证书文件cartpole_tripartite_champion.bin.cert.json)：Lyapunov 最大增益 ρ=0.015 < 1.0，50,000 步位级精确零漂移，极限扰动下 200ms 内回正。"
+      "validation_report": "【稳态微柱基线】8 细胞三方拓扑 Lyapunov ρ≈0.015、50k 步零漂移 (cartpole_tripartite_champion.bin.cert.json)；T4 易任务 ID/OOD 20/20。任务层主展示冠军请看「cartpole_balance_champion」。"
     },
     {
       "id": "music_composer_cortex",

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KunCellular // 斗地主生命体对战沙盒 · 82细胞候选打分世系</title>
+    <title>KunCellular // 斗地主生命体对战沙盒 · 82细胞候选打分世系 57.0%</title>
     <style>
         :root {
             --bg-base: #06090e;
@@ -487,7 +487,7 @@
     <div class="brand">
         <span>KunCellular</span>
         <span style="color:var(--text-dim)">//</span>
-        <span>斗地主生命体对战沙盒 (82细胞候选打分世系)</span>
+        <span>斗地主生命体对战沙盒 (82细胞候选打分世系 · 天梯锁档 57.0%)</span>
         <span class="brand-badge">82-CELL CANDIDATE SCORER</span>
         <span class="brand-badge" style="background:rgba(16,185,129,0.15);border-color:#10b981;color:#34d399;">DEEPSEEK-GRPO</span>
     </div>
@@ -725,7 +725,7 @@
                 <span>博弈策略因果流 (CAUSAL INFERENCE STREAM)</span>
             </div>
             <div class="causal-log" id="causalLog">
-                <div class="log-entry play">系统启动完成: 已挂载 82 物理细胞 / 425 突触候选打分世系生命体。</div>
+                <div class="log-entry play">系统启动完成: 已挂载 doudizhu_cand_scorer.bin（82 细胞 / 425 突触 · 天梯 57.0% / McNemar 持平教师）。</div>
                 <div class="log-entry">标准斗地主全牌型引擎就绪: 支持顺子、连对、飞机、三带一/二、炸弹与王炸。</div>
             </div>
         </div>
@@ -1639,7 +1639,7 @@ async function pulseCortexMeters() {
             if (srcEl) { srcEl.textContent = "(后端离线)"; }
             return;
         }
-        if (srcEl) { srcEl.textContent = "(C++20 候选打分世系 · 82细胞/425突触)"; }
+        if (srcEl) { srcEl.textContent = "(C++20 候选打分世系 · 82细胞/425突触 · 57.0%)"; }
         for (let i = 0; i < 4; ++i) {
             const v = Math.max(0, Math.min(100, d.columns[i].act));
             document.getElementById("actVal" + i).textContent = v.toFixed(1) + "%";

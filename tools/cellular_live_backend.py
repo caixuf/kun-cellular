@@ -332,7 +332,7 @@ class LiveVehicleSimulator:
         self.warp_speed = 1
         self.lock = threading.RLock()
         self.history_cte = []
-        self.road_width = 46.0
+        self.road_width = 7.5  # 米：标准车道全宽（半宽 3.75m）
         self.prev_cte = 0.0
         self.init_track()
         # 种群：6 个 SDSCC 1024-细胞硅基生命体器官 (SdscSiliconLifeOrgan)
@@ -410,7 +410,7 @@ class LiveVehicleSimulator:
         v3_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion_v3.bin")
         cortex_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion.bin")
         track_path = os.path.join(base_dir, "checkpoints", "adas_track_champion.bin")
-        bin_path = v3_path if os.path.exists(v3_path) else (cortex_path if os.path.exists(cortex_path) else track_path)
+        bin_path = cortex_path if os.path.exists(cortex_path) else (v3_path if os.path.exists(v3_path) else track_path)
         loaded = False
 
         if os.path.exists(bin_path):
@@ -457,11 +457,26 @@ class LiveVehicleSimulator:
                             self.cell_types = ["REC"] * 12 + [f"Op_{t}" for t in htypes] + ["MOT"] * 6
                         self.cell_outs = [0.0] * 210
                         self.generation = bin_data.get("generation", 60) or 60
-                        self.champion_fitness = 99.8
+                        # 战役锁档叙事：多种子对撞 Stanley 9W/7L ≈ 56.3% 净胜率（非虚高 fitness）
+                        self.champion_fitness = 56.3
+                        self.champion_claim = "L3 210细胞 · vs Stanley 9W/7L · 直道 CTE≈3.1cm"
                         self.champion_genome = None
                         self._init_shadow_cortex(bin_data)
+                        # 与 bench/tune 同源：AdasCortexOrgan 真前向驱动转向/纵向
+                        self.adas_organ = None
+                        self._adas_T = None
+                        try:
+                            from export_sdsc_cortex import load_cortex_from_bin
+                            import train_adas_cortex as _adas_T
+                            ck = load_cortex_from_bin(bin_path)
+                            self.adas_organ = _adas_T.AdasCortexOrgan.deserialize(ck["organ"])
+                            self.adas_organ.reset_state()
+                            self._adas_T = _adas_T
+                            print(f"[LiveVehicleSimulator] AdasCortexOrgan 真闭环已挂载 (steer={self.adas_organ.steer_id}, accel={self.adas_organ.accel_id})")
+                        except Exception as e:
+                            print(f"[LiveVehicleSimulator] AdasCortexOrgan 挂载失败，将回退前瞻: {e}")
                         loaded = True
-                        print(f"[LiveVehicleSimulator] 已成功挂载 SDSCC 纯二进制 (SDSC-BIN v2) 210-细胞驾驶皮层冠军模型: {bin_path}")
+                        print(f"[LiveVehicleSimulator] 已挂载 L3 战役锁档 210-细胞 ADAS 冠军: {bin_path} (9W/7L, CTE≈3.1cm)")
                     else:
                         n_rec = 32
                         n_mot = 224 if num_cells == 1024 else max(2, bin_data.get("output_dim", 224))
@@ -514,141 +529,236 @@ class LiveVehicleSimulator:
         if not loaded:
             print(f"[LiveVehicleSimulator] 提示: 未找到自然演化冠军二进制检查点，初始化默认 210 细胞器官")
 
-    def fast_evolve_batch(self, target_generations=20, pop_size=12, sim_steps_per_agent=350):
+    def fast_evolve_batch(self, target_generations=12, pop_size=8, sim_steps_per_agent=350):
+        """真实继续进化：在 L3 锁档副本上做拓扑微突变+场景评测，另存实验档并热切换。
+
+        不覆盖 checkpoints/adas_cortex_champion.bin。
         """
-        128 细胞大脑皮层极速批量超演化加速引擎 (微秒级零开销推演)
-        """
-        pop = [SdscCorticalOrgan(n_hidden=96) for _ in range(pop_size)]
-        if self.champion_genome:
-            pop[0] = self.champion_genome
+        adas = getattr(self, "adas_organ", None)
+        T = getattr(self, "_adas_T", None)
+        if adas is None or T is None:
+            return {
+                "status": "rejected",
+                "message": "AdasCortexOrgan 未挂载，无法真实进化",
+                "champion_fitness": self.champion_fitness,
+                "n_cells": getattr(self, "total_active_cells", 210),
+            }
 
-        best_genome = self.champion_genome or pop[0]
-        best_fitness = self.champion_fitness if self.champion_fitness > 0 else 0.0
+        # 交互式：4 场景 × 短时长；完整战役请跑 tools/train_adas_cortex.py
+        want = [s for s in T.SCENARIOS if s[0] in (
+            "straight_cruise", "s_curve_hard", "tight_curve_max", "highway"
+        )]
+        if not want:
+            want = list(T.SCENARIOS[:4])
+        quick_scn = []
+        for name, path, spd, v0, dur, lead in want:
+            quick_scn.append((name, path, spd, v0, min(float(dur), 8.0), lead))
 
-        for gen in range(target_generations):
-            fits = []
-            for g in pop:
-                x, y, theta = self.get_track_point(0.0)
-                v = 2.5
-                delta = 0.0
-                s = 0.0
-                cum_cte = 0.0
-                steps = 0
-                dt = 0.04
-                L = 24.0
+        base_ser = adas.serialize()
+        pop_size = max(4, min(10, int(pop_size)))
+        pop = [T.AdasCortexOrgan.deserialize(base_ser)]
+        while len(pop) < pop_size:
+            pop.append(T.AdasCortexOrgan.deserialize(base_ser).mutate())
 
-                for step in range(sim_steps_per_agent):
-                    steps += 1
-                    s += v * dt * 25.0
-                    if step % 4 == 0:
-                        best_s, best_dist = s, float("inf")
-                        for ds in range(-2, 8):
-                            probe_s = s + ds * 12.0
-                            px, py, _ = self.get_track_point(probe_s)
-                            d = (x - px)*(x - px) + (y - py)*(y - py)
-                            if d < best_dist:
-                                best_dist, best_s = d, probe_s
-                        s = best_s
+        best = pop[0]
+        best_cost, _, best_detail = T.evaluate(best, quick_scn, noise_seed=20260911)
+        hist = []
+        t0 = time.time()
+        # 默认 UI 点 +50 会太慢：硬顶 12 代，保证数十秒内可完成
+        requested = int(target_generations)
+        gens = max(1, min(12, requested))
 
-                    cx, cy, road_theta = self.get_track_point(s)
-                    dx = x - cx
-                    dy = y - cy
-                    signed_cte = math.cos(road_theta) * dy - math.sin(road_theta) * dx
-                    cte = abs(signed_cte)
-                    cum_cte += cte
-                    heading_err = (road_theta - theta + math.pi) % math.tau - math.pi
-                    curv = self.get_max_curvature_ahead(s)
+        for gen in range(1, gens + 1):
+            nseed = 20260911 + gen * 7919
+            scored = []
+            for o in pop:
+                c, ok, d = T.evaluate(o, quick_scn, noise_seed=nseed)
+                scored.append((c, ok, d, o))
+            scored.sort(key=lambda r: r[0])
+            c, ok, d, o = scored[0]
+            if c < best_cost:
+                best, best_cost, best_detail = o, c, d
+            hist.append({"gen": gen, "cost": round(best_cost, 3), "ok": bool(ok)})
+            survivors = [r[3] for r in scored[: max(2, pop_size // 4)]]
+            pop = [best] + survivors
+            while len(pop) < pop_size:
+                pop.append(random.choice(survivors).mutate())
 
-                    cte_norm = signed_cte / (self.road_width * 0.5)
-                    heading_norm = heading_err / (math.pi * 0.5)
-                    curv_norm = min(1.0, curv * 50.0)
-                    speed_norm = v / 5.0
-                    steer_raw, speed_raw = g.forward(cte_norm, heading_norm, curv_norm, speed_norm)
-
-                    steer_target = max(-0.45, min(0.45, steer_raw * 0.45))
-                    delta += (steer_target - delta) * 0.30
-                    target_v = max(1.5, 4.2 - max(0.0, speed_raw) * 2.7)
-                    v += (target_v - v) * 0.12
-
-                    beta = math.atan(0.5 * math.tan(delta))
-                    x += v * math.cos(theta + beta) * dt
-                    y += v * math.sin(theta + beta) * dt
-                    theta += (v / L) * math.cos(beta) * math.tan(delta) * dt
-
-                    if cte > 28.0:
-                        break
-
-                fitness = steps / (1.0 + cum_cte / max(1, steps))
-                fits.append(fitness)
-                if fitness > best_fitness:
-                    best_fitness = fitness
-                    best_genome = g
-
-            # 锦标赛自然选择
-            sorted_idx = sorted(range(len(fits)), key=lambda i: fits[i], reverse=True)
-            survivors = [pop[i] for i in sorted_idx[:max(2, pop_size // 4)]]
-            new_pop = list(survivors)
-            while len(new_pop) < pop_size:
-                parent = random.choice(survivors)
-                new_pop.append(parent.mutate())
-            pop = new_pop
+        out_path = os.path.join(ROOT_DIR, "checkpoints", "adas_cortex_champion_live_exp.bin")
+        try:
+            self._write_adas_exp_bin(out_path, best, gens, best_detail)
+        except Exception as e:
+            return {"status": "error", "message": f"实验档落盘失败: {e}", "cost": best_cost}
 
         with self.lock:
-            self.generation += target_generations
-            self.champion_genome = best_genome
-            self.champion_fitness = round(best_fitness, 1)
-            self.population = [best_genome] + [best_genome.mutate() for _ in range(5)]
-            self.current_agent = 0
+            self.adas_organ = best
+            self.adas_organ.reset_state()
+            self.generation = int(getattr(self, "generation", 60) or 60) + gens
+            self.champion_claim = f"live_exp · {gens}代续进化 · cost={best_cost:.2f}（非L3锁档）"
+            # fitness 面板改展示「越低越好」的代价的可读变换
+            self.champion_fitness = round(max(0.0, 100.0 - best_cost), 1)
             self.init_vehicle()
 
         return {
-            "trained_generations": target_generations,
+            "status": "ok",
+            "mode": "real_continue_evolve",
+            "trained_generations": gens,
+            "requested_generations": requested,
+            "capped": requested > gens,
+            "cost": round(best_cost, 3),
             "champion_fitness": self.champion_fitness,
-            "n_cells": len(best_genome.cells),
-            "n_synapses": len(best_genome.synapses),
-            "hidden_types": list(best_genome.hidden_types)
+            "checkpoint": "checkpoints/adas_cortex_champion_live_exp.bin",
+            "lock_preserved": "checkpoints/adas_cortex_champion.bin",
+            "history": hist,
+            "elapsed_s": round(time.time() - t0, 2),
+            "n_cells": len(best.cells),
+            "message": (
+                f"已另存实验档并热切换；L3 锁档未改动"
+                + (f"（请求 {requested} 代，交互顶 {gens} 代）" if requested > gens else "")
+            ),
         }
 
+    def _write_adas_exp_bin(self, out_path, organ, generation, detail):
+        """与 tools/tune_adas_gains.write_bin 同构；metrics 去掉 trace 以免 meta 膨胀。"""
+        T = self._adas_T
+        ser = organ.serialize()
+        n_rec, n_mot = len(T.RECEPTOR_TYPES), len(T.MOTOR_TYPES)
+        n_cells = len(organ.cells)
+        safe_metrics = {}
+        if isinstance(detail, dict):
+            for k, v in detail.items():
+                if isinstance(v, dict):
+                    safe_metrics[k] = {kk: float(vv) if isinstance(vv, (int, float)) else vv
+                                       for kk, vv in v.items() if kk != "trace"}
+                else:
+                    safe_metrics[k] = v
+        meta = json.dumps({
+            "organism_id": "adas_cortex_champion_live_exp",
+            "generation": generation,
+            "organ": ser,
+            "metrics": safe_metrics,
+            "tuning": {"note": "live continue-evolve; L3 lock untouched"},
+        }, ensure_ascii=False).encode("utf-8")
+
+        adj = [[] for _ in range(n_cells)]
+        for f, t, w in organ.synapses:
+            adj[f].append((t, float(w)))
+        row_ptr, col_idx, weights = [0] * (n_cells + 1), [], []
+        for i in range(n_cells):
+            row_ptr[i] = len(col_idx)
+            for v, w in adj[i]:
+                col_idx.append(v)
+                weights.append(w)
+        row_ptr[n_cells] = len(col_idx)
+        n_syn = len(col_idx)
+
+        hdr = 72
+        cells_off = hdr
+        rp_off = cells_off + n_cells * 4
+        ci_off = rp_off + (n_cells + 1) * 4
+        w_off = ci_off + n_syn * 4
+        co_off = w_off + n_syn * 4
+        header = struct.pack(
+            "<IIIIIIQQQQQQ", 0x53445343, 2, n_cells, n_syn, 6, 2,
+            cells_off, rp_off, ci_off, w_off, co_off,
+            (generation & 0xFFFFFFFF) | ((len(meta) & 0xFFFFFFFF) << 32),
+        )
+        cell_bytes = bytearray(n_cells * 4)
+        for i, c in enumerate(organ.cells):
+            cell_bytes[i * 4] = 4
+            cell_bytes[i * 4 + 1] = min(255, max(0, int(c.gain * 64.0)))
+            flags = (0x01 if i < n_rec else 0) | (0x02 if i >= n_cells - n_mot else 0)
+            cell_bytes[i * 4 + 3] = flags
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "wb") as f:
+            f.write(header)
+            f.write(cell_bytes)
+            f.write(np.array(row_ptr, dtype=np.uint32).tobytes())
+            f.write(np.array(col_idx, dtype=np.uint32).tobytes())
+            f.write(np.array(weights, dtype=np.float32).tobytes())
+            f.write(np.zeros((n_cells, 3), dtype=np.float32).tobytes())
+            f.write(meta)
+
+    def world_to_canvas(self, xm, ym):
+        ox, oy = self.ORIGIN
+        return ox + xm * self.PX_PER_M, oy - ym * self.PX_PER_M
+
+    def get_track_point_m(self, s):
+        """标准体育场公路中心线（米）：直道 + 半圆弯，替代抽象李萨如。"""
+        L, R = self.STRAIGHT_M, self.RADIUS_M
+        straight, arc = L, math.pi * R
+        lap = 2.0 * straight + 2.0 * arc
+        s = s % lap
+        if s < straight:
+            x = -L * 0.5 + s
+            y = -R
+            th, kap = 0.0, 0.0
+        elif s < straight + arc:
+            a = (s - straight) / R
+            x = L * 0.5 + R * math.sin(a)
+            y = -R * math.cos(a)
+            th, kap = a, 1.0 / R
+        elif s < 2.0 * straight + arc:
+            u = s - (straight + arc)
+            x = L * 0.5 - u
+            y = R
+            th, kap = math.pi, 0.0
+        else:
+            a = (s - (2.0 * straight + arc)) / R
+            x = -L * 0.5 - R * math.sin(a)
+            y = R * math.cos(a)
+            th, kap = math.pi + a, 1.0 / R
+        return x, y, th, kap
+
     def get_track_point(self, s):
-        cx, cy = 400.0, 300.0
-        t = (s * 0.0025) % math.tau
-        x = cx + math.cos(t) * 280.0 + math.sin(t * 2.0) * 80.0
-        y = cy + math.sin(t) * 200.0 + math.cos(t * 2.0) * 35.0
-        dx = -math.sin(t) * 280.0 + math.cos(t * 2.0) * 160.0
-        dy =  math.cos(t) * 200.0 - math.sin(t * 2.0) * 70.0
-        return x, y, math.atan2(dy, dx)
+        """兼容旧调用：返回画布坐标与航向。"""
+        xm, ym, th, _ = self.get_track_point_m(s)
+        cx, cy = self.world_to_canvas(xm, ym)
+        return cx, cy, th
 
     def get_max_curvature_ahead(self, s, v=None):
-        speed = max(0.5, v if v is not None else self.v)
-        probes = [speed * 4, speed * 8, speed * 14]
-        max_curv, _, _, theta0 = 0.0, 0, 0, self.get_track_point(s)[2]
-        for ds in probes:
-            _, _, theta1 = self.get_track_point(s + ds)
-            curv = abs((theta1 - theta0 + math.pi) % math.tau - math.pi) / max(ds, 1.0)
-            max_curv = max(max_curv, curv)
-            theta0 = theta1
+        speed = max(0.5, v if v is not None else getattr(self, "v", 10.0))
+        max_curv = 0.0
+        _, _, th0, _ = self.get_track_point_m(s)
+        probe = s
+        for ds in (speed * 0.8, speed * 1.6, speed * 2.8):
+            _, _, th1, kap = self.get_track_point_m(s + ds)
+            curv = abs((th1 - th0 + math.pi) % math.tau - math.pi) / max(ds, 0.5)
+            max_curv = max(max_curv, curv, abs(kap))
+            th0 = th1
         return max_curv
 
     def init_track(self):
+        self.PX_PER_M = 3.2
+        self.ORIGIN = (400.0, 300.0)
+        self.STRAIGHT_M = 70.0
+        self.RADIUS_M = 32.0
+        self.WHEELBASE_M = 2.7
+        self.ROAD_HALF_W_M = 3.75
         self.track_points = []
+        lap = 2.0 * self.STRAIGHT_M + 2.0 * math.pi * self.RADIUS_M
         num_pts = 360
         for i in range(num_pts):
-            s_i = (i / num_pts) * (math.tau / 0.0025)
-            x, y, theta = self.get_track_point(s_i)
-            _, _, theta_next = self.get_track_point(s_i + 12.0)
-            curv = abs((theta_next - theta + math.pi) % math.tau - math.pi) / 12.0
+            s_i = (i / num_pts) * lap
+            xm, ym, theta, kap = self.get_track_point_m(s_i)
+            cx, cy = self.world_to_canvas(xm, ym)
             self.track_points.append({
                 "s": s_i,
-                "x": x,
-                "y": y,
+                "x": cx,
+                "y": cy,
+                "xm": xm,
+                "ym": ym,
                 "theta": theta,
-                "curv": curv
+                "curv": kap,
             })
+        self.lap_length = lap
 
     def init_vehicle(self):
-        x0, y0, theta0 = self.get_track_point(0.0)
-        self.x, self.y, self.theta = x0, y0, theta0
-        self.v = 4.8
+        xm, ym, theta0, _ = self.get_track_point_m(0.0)
+        self.xm, self.ym = xm, ym
+        self.x, self.y = self.world_to_canvas(xm, ym)
+        self.theta = theta0
+        self.v = 12.0  # m/s 巡航
         self.delta = 0.0
         self.s = 0.0
         self.cte = 0.0
@@ -657,6 +767,9 @@ class LiveVehicleSimulator:
         self.agent_lap_steps = 0
         self.agent_cum_cte = 0.0
         self.prev_signed_cte = 0.0
+        if getattr(self, "adas_organ", None) is not None:
+            self.adas_organ.reset_state()
+        self._adas_accel_act = 0.0
 
     def next_agent(self):
         with self.lock:
@@ -667,81 +780,118 @@ class LiveVehicleSimulator:
             self.step_count += 1
             self.agent_lap_steps += 1
             dt = 0.04
-            L = 18.0
-            road_half_w = 23.0
+            L = getattr(self, "WHEELBASE_M", 2.7)
+            road_half_w = getattr(self, "ROAD_HALF_W_M", 3.75)
 
-            # 1. 寻找最近赛道点与连续线段投影 (彻底消灭离散跳变与微分脉冲)
+            # 米制投影到体育场中心线（消灭像素李萨如与硬映射）
             best_idx = 0
             best_d = float("inf")
             n_pts = len(self.track_points)
             for idx, pt in enumerate(self.track_points):
-                d = (self.x - pt["x"])**2 + (self.y - pt["y"])**2
+                dxm = self.xm - pt["xm"]
+                dym = self.ym - pt["ym"]
+                d = dxm * dxm + dym * dym
                 if d < best_d:
                     best_d = d
                     best_idx = idx
 
             p_curr = self.track_points[best_idx]
             p_next = self.track_points[(best_idx + 1) % n_pts]
-            vx = p_next["x"] - p_curr["x"]
-            vy = p_next["y"] - p_curr["y"]
-            v_len2 = max(1e-6, vx * vx + vy * vy)
-            t_proj = max(0.0, min(1.0, ((self.x - p_curr["x"]) * vx + (self.y - p_curr["y"]) * vy) / v_len2))
+            vx = p_next["xm"] - p_curr["xm"]
+            vy = p_next["ym"] - p_curr["ym"]
+            v_len2 = max(1e-9, vx * vx + vy * vy)
+            t_proj = max(0.0, min(1.0, ((self.xm - p_curr["xm"]) * vx + (self.ym - p_curr["ym"]) * vy) / v_len2))
 
-            cx_b = p_curr["x"] + t_proj * vx
-            cy_b = p_curr["y"] + t_proj * vy
+            cx_m = p_curr["xm"] + t_proj * vx
+            cy_m = p_curr["ym"] + t_proj * vy
             th0, th1 = p_curr["theta"], p_next["theta"]
             dth = (th1 - th0 + math.pi) % math.tau - math.pi
             theta_b = th0 + t_proj * dth
-            curv_b = p_curr.get("curv", 0.02) * (1.0 - t_proj) + p_next.get("curv", 0.02) * t_proj
-            curr_s = p_curr["s"] + t_proj * math.hypot(vx, vy)
-            
-            # 物理恒定弧长前瞻插值 (消灭因离散步长导致的直弯预瞄失真)
-            lookahead_dist = max(18.0, 24.0 + self.v * 0.4 - curv_b * 100.0)
+            curv_b = p_curr.get("curv", 0.0) * (1.0 - t_proj) + p_next.get("curv", 0.0) * t_proj
+            seg_len = math.hypot(vx, vy)
+            curr_s = p_curr["s"] + t_proj * seg_len
+
+            lookahead_dist = max(8.0, 6.0 + self.v * 0.55)
             cum_d = 0.0
             look_idx = best_idx
             while cum_d < lookahead_dist:
                 next_idx = (look_idx + 1) % n_pts
-                cum_d += math.hypot(self.track_points[next_idx]["x"] - self.track_points[look_idx]["x"],
-                                   self.track_points[next_idx]["y"] - self.track_points[look_idx]["y"])
+                cum_d += math.hypot(
+                    self.track_points[next_idx]["xm"] - self.track_points[look_idx]["xm"],
+                    self.track_points[next_idx]["ym"] - self.track_points[look_idx]["ym"],
+                )
                 look_idx = next_idx
                 if look_idx == best_idx:
                     break
-            look_pt = self.track_points[look_idx]
-            theta_far = look_pt["theta"]
+            theta_far = self.track_points[look_idx]["theta"]
 
-            dx_b = self.x - cx_b
-            dy_b = self.y - cy_b
+            dx_b = self.xm - cx_m
+            dy_b = self.ym - cy_m
             signed_cte = math.cos(theta_b) * dy_b - math.sin(theta_b) * dx_b
             self.cte = abs(signed_cte)
             self.s = curr_s
-            self.total_dist += self.v * dt * 25.0
+            self.total_dist += self.v * dt
 
             heading_err = (theta_b - self.theta + math.pi) % math.tau - math.pi
             heading_far_err = (theta_far - self.theta + math.pi) % math.tau - math.pi
 
-            # 2. 神经闭环与 Stanley 联合控制律 (毫米级稳态，直道 CTE < 2.5cm，彻底根除蛇形画龙)
             nc = getattr(self, "total_active_cells", 210)
             organ = getattr(self, "champion_genome", None)
+            adas = getattr(self, "adas_organ", None)
+            Tadas = getattr(self, "_adas_T", None)
+            target_v = max(6.0, min(16.0, 14.0 - abs(curv_b) * 180.0))
 
-            if nc == 210 or organ is None:
-                # 210-细胞冠军模型控制律（经验标定，未经功能安全认证）：高精度连续前瞻与物理阿克曼前馈
-                k_cte = 0.28
-                k_heading = 1.35
+            if nc == 210 and adas is not None and Tadas is not None:
+                cte_m = float(signed_cte)
+                v_ms = max(0.5, float(self.v))
+                kap_m = float(curv_b)
+                v_target_ms = 14.0
+                if abs(kap_m) > 1e-4:
+                    v_target_ms = min(v_target_ms, Tadas.STG_CURVE_SAFETY * math.sqrt(Tadas.STG_A_LAT_MAX / abs(kap_m)))
+                    v_target_ms = min(v_target_ms, 0.75 * math.sqrt(Tadas.LAT_ENV_MANEUVER / abs(kap_m)))
+                v_target_ms = max(2.0, min(Tadas.MAX_SPEED, v_target_ms))
+                danger = min(1.0, max(0.0, abs(cte_m) / 2.0))
+                if abs(heading_err) > 0.6:
+                    danger = max(danger, 0.35)
+
+                cte_n = max(-1.0, min(1.0, cte_m / 2.0))
+                dpsi_n = max(-1.0, min(1.0, heading_err / 0.5))
+                kappa_n = max(-1.0, min(1.0, kap_m * 20.0))
+                v_n = max(0.0, min(1.0, v_ms / Tadas.MAX_SPEED))
+                verr_n = max(-1.0, min(1.0, (v_target_ms - v_ms) / 5.0))
+
+                steer_n, accel_n = adas.forward(cte_n, dpsi_n, kappa_n, v_n, verr_n, danger)
+
+                lim = Tadas.adaptive_steer_limit(v_ms, cte_m)
+                steer_req = max(-lim, min(lim, float(steer_n) * lim))
+                d_max = Tadas.STEER_RATE_MAX * dt
+                steer_req = self.delta + max(-d_max, min(d_max, steer_req - self.delta))
+                self.delta += (steer_req - self.delta) * min(1.0, dt / max(1e-3, Tadas.STEER_LAG_TAU))
+                self.delta = max(-lim, min(lim, self.delta))
+
+                accel_req = float(accel_n) * Tadas.ACCEL_MAX if accel_n > 0 else float(accel_n) * 6.0
+                if not hasattr(self, "_adas_accel_act"):
+                    self._adas_accel_act = 0.0
+                self._adas_accel_act += (accel_req - self._adas_accel_act) * min(1.0, dt / max(1e-3, Tadas.ACCEL_LAG_TAU))
+                v_ms = v_ms + self._adas_accel_act * dt
+                v_ms = max(0.0, min(Tadas.MAX_SPEED, v_ms))
+                self.v = v_ms
+                target_v = v_target_ms
+                self.control_loop = "adas_cortex_organ_forward"
+            elif nc == 210 or organ is None:
+                k_cte = 0.45
+                k_heading = 1.2
                 steer_target = heading_err * k_heading - math.atan2(k_cte * signed_cte, max(1.0, self.v))
                 steer_target = max(-0.55, min(0.55, steer_target))
                 self.delta += (steer_target - self.delta) * 0.38
-
-                # 弯道平滑预测减速：直道 5.5 m/s，急弯减速防离心漂移
-                target_v = max(3.2, min(5.5, 5.5 - curv_b * 75.0))
                 self.v += (target_v - self.v) * 0.15
+                self.control_loop = "classic_lookahead_fallback"
             else:
-                # 1024-细胞备用微柱推演
                 beta = math.atan(0.5 * math.tan(self.delta))
                 v_lateral = self.v * math.sin(self.theta + beta - theta_b)
                 L_lead = 8.0
                 pred_cte = signed_cte + L_lead * math.sin(self.theta - theta_b)
                 self.prev_signed_cte = signed_cte
-
                 if organ is not None and organ.W1 is not None and organ.W2 is not None:
                     steer_raw, speed_raw = organ.forward(
                         signed_cte=pred_cte,
@@ -749,100 +899,105 @@ class LiveVehicleSimulator:
                         psi_far=heading_far_err,
                         r_curv=curv_b,
                         v=self.v,
-                        cte_rate=v_lateral
+                        cte_rate=v_lateral,
                     )
                 else:
                     steer_raw = float(heading_err * 0.85 + heading_far_err * 0.45 - pred_cte * 0.04)
                     speed_raw = float(-curv_b * 30.0)
-
                 steer_target = max(-0.55, min(0.55, steer_raw * 0.48))
                 delta_diff = (steer_target - self.delta) * 0.28
                 self.delta += max(-0.06, min(0.06, delta_diff))
-                target_v = max(2.8, min(5.2, 4.8 + speed_raw * 1.0 - curv_b * 70.0))
+                target_v = max(6.0, min(16.0, 12.0 + speed_raw * 2.0 - abs(curv_b) * 120.0))
                 self.v += (target_v - self.v) * 0.18
+                self.control_loop = "organ_forward_demo"
 
-            # 阿克曼运动学
+            # 阿克曼（米制）：与训练域同量纲
             beta = math.atan(0.5 * math.tan(self.delta))
-            self.x += self.v * math.cos(self.theta + beta) * dt * 25.0
-            self.y += self.v * math.sin(self.theta + beta) * dt * 25.0
-            self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt * 25.0
+            self.xm += self.v * math.cos(self.theta + beta) * dt
+            self.ym += self.v * math.sin(self.theta + beta) * dt
+            self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt
+            self.x, self.y = self.world_to_canvas(self.xm, self.ym)
 
-            # 鲁棒防失控守护：若遇极端瞬态扰动导致离轨，平滑引导回最近赛道中心线，杜绝无限外圈打转
             if self.cte > road_half_w * 1.5:
-                self.x = cx_b
-                self.y = cy_b
+                self.xm, self.ym = cx_m, cy_m
+                self.x, self.y = self.world_to_canvas(cx_m, cy_m)
                 self.theta = theta_b
                 self.delta = 0.0
-                self.v = 4.8
+                self.v = 10.0
                 self.prev_cte = 0.0
+                if adas is not None:
+                    adas.reset_state()
+                self._adas_accel_act = 0.0
 
-            # 动态同步细胞膜电位状态 (0..11 受体，12..203 联络动力学，204..209 执行器)
             if not hasattr(self, "cell_outs") or len(self.cell_outs) != nc:
                 self.cell_outs = [0.0] * nc
 
             if nc == 1024 and getattr(self, "shadow_cortex", None) is not None:
-                # 真实 32 维任务信号注入 1024 细胞微柱皮层 (与 C11 底座直连)
                 if len(self.shadow_signals) < self.shadow_in_dim:
                     self.shadow_signals = [0.0] * self.shadow_in_dim
                 cte_norm = signed_cte / road_half_w
                 self.shadow_signals[0] = float(min(1.5, max(0.0, -cte_norm)))
-                self.shadow_signals[1] = float(min(1.5, max(0.0,  cte_norm)))
+                self.shadow_signals[1] = float(min(1.5, max(0.0, cte_norm)))
                 self.shadow_signals[2] = float(min(1.5, max(0.0, -signed_cte * 0.5 - 0.2)))
-                self.shadow_signals[3] = float(min(1.5, max(0.0,  signed_cte * 0.5 - 0.2)))
+                self.shadow_signals[3] = float(min(1.5, max(0.0, signed_cte * 0.5 - 0.2)))
                 self.shadow_signals[4] = float(min(1.0, max(-1.0, heading_err / 0.5)))
                 self.shadow_signals[5] = float(min(1.0, max(-1.0, heading_far_err / 0.8)))
-                self.shadow_signals[6] = float(min(1.5, max(0.0, curv_b * 25.0)))
-                self.shadow_signals[7] = float(min(1.5, max(0.0, curv_b * self.v * 0.35)))
-                self.shadow_signals[8] = float(min(1.5, max(0.0, self.v / 6.0)))
-                self.shadow_signals[9] = float(min(1.0, max(-1.0, (target_v - self.v) / 3.0)))
+                self.shadow_signals[6] = float(min(1.5, max(0.0, abs(curv_b) * 25.0)))
+                self.shadow_signals[7] = float(min(1.5, max(0.0, abs(curv_b) * self.v * 0.35)))
+                self.shadow_signals[8] = float(min(1.5, max(0.0, self.v / 20.0)))
+                self.shadow_signals[9] = float(min(1.0, max(-1.0, (target_v - self.v) / 5.0)))
                 self.shadow_signals[10] = float(min(1.0, max(0.0, abs(heading_err) * 1.5)))
-                self.shadow_signals[11] = float(min(1.0, max(0.0, self.cte / 0.5)))
-
+                self.shadow_signals[11] = float(min(1.0, max(0.0, self.cte / 2.0)))
                 if self.step_shadow_cortex():
                     outs = self.shadow_cortex.outputs
                     for i in range(nc):
                         self.cell_outs[i] = round(float(outs[i]), 3)
                     self.cortex_real = True
-
-                    # 计算 16 根功能微柱的实时激活平均波形与峰值
-                    col_w = []
-                    col_p = []
+                    col_w, col_p = [], []
                     for c in range(16):
-                        c_slice = self.cell_outs[c * 64 : (c + 1) * 64]
+                        c_slice = self.cell_outs[c * 64:(c + 1) * 64]
                         col_w.append(round(float(np.mean(np.abs(c_slice))), 3))
                         col_p.append(round(float(np.max(np.abs(c_slice))), 3))
                     self.column_waves = col_w
                     self.column_peaks = col_p
                 else:
-                    for i in range(nc): self.cell_outs[i] = 0.0
-                    self.cortex_real = False
-            elif nc == 210:
-                # 真实任务信号 (与控制律同源, 归一化)
-                self.shadow_signals[0] = float(min(1.0, max(-1.0, signed_cte / 20.0)))
-                self.shadow_signals[1] = float(min(1.0, max(-1.0, heading_err / 1.57)))
-                self.shadow_signals[2] = float(min(1.0, curv_b * 50.0))
-                self.shadow_signals[3] = float(min(1.0, self.v / 5.5))
-                self.shadow_signals[4] = float(min(1.0, max(-1.0, (target_v - self.v) / 3.0)))
-                self.shadow_signals[5] = float(min(1.0, max(0.0, 1.0 - best_d / 500.0)))
-
-                if self.step_shadow_cortex():
-                    # 皮层遥测 = C11 引擎真实前向输出 (冠军 bin 权重 + 真实任务信号)
-                    outs = self.shadow_cortex.outputs
-                    for i in range(nc):
-                        self.cell_outs[i] = round(float(outs[i]), 3)
-                    self.cortex_real = True
-                else:
-                    # 引擎不可用时显示离线, 严禁回退到合成波形
                     for i in range(nc):
                         self.cell_outs[i] = 0.0
                     self.cortex_real = False
+            elif nc == 210:
+                adas = getattr(self, "adas_organ", None)
+                if adas is not None and len(adas.cells) == nc:
+                    self.shadow_signals[0] = float(min(1.0, max(-1.0, signed_cte / 2.0)))
+                    self.shadow_signals[1] = float(min(1.0, max(-1.0, heading_err / 0.5)))
+                    self.shadow_signals[2] = float(min(1.0, max(-1.0, curv_b * 20.0)))
+                    self.shadow_signals[3] = float(min(1.0, max(0.0, self.v / 20.0)))
+                    self.shadow_signals[4] = float(min(1.0, max(-1.0, (target_v - self.v) / 5.0)))
+                    self.shadow_signals[5] = float(min(1.0, max(0.0, abs(signed_cte) / 2.0)))
+                    for i in range(nc):
+                        self.cell_outs[i] = round(float(adas.cells[i].output), 3)
+                    self.cortex_real = True
+                else:
+                    self.shadow_signals[0] = float(min(1.0, max(-1.0, signed_cte / 2.0)))
+                    self.shadow_signals[1] = float(min(1.0, max(-1.0, heading_err / 1.57)))
+                    self.shadow_signals[2] = float(min(1.0, abs(curv_b) * 20.0))
+                    self.shadow_signals[3] = float(min(1.0, self.v / 20.0))
+                    self.shadow_signals[4] = float(min(1.0, max(-1.0, (target_v - self.v) / 5.0)))
+                    self.shadow_signals[5] = float(min(1.0, max(0.0, 1.0 - math.sqrt(best_d) / 5.0)))
+                    if self.step_shadow_cortex():
+                        outs = self.shadow_cortex.outputs
+                        for i in range(nc):
+                            self.cell_outs[i] = round(float(outs[i]), 3)
+                        self.cortex_real = True
+                    else:
+                        for i in range(nc):
+                            self.cell_outs[i] = 0.0
+                        self.cortex_real = False
             elif organ is not None and hasattr(organ, "cells") and len(organ.cells) == nc:
                 for i in range(nc):
                     self.cell_outs[i] = float(organ.cells[i].output)
 
-            # 3. 记录行驶轨迹与遥测
             if self.step_count % 5 == 0:
-                self.history_cte.append(round(self.cte * 0.05, 3))
+                self.history_cte.append(round(self.cte, 3))
                 if len(self.history_cte) > 40:
                     self.history_cte.pop(0)
             if self.step_count % 2 == 0:
@@ -907,7 +1062,9 @@ class LiveVehicleSimulator:
                 ] if nc == 1024 else [],
                 "step_count": self.step_count,
                 "total_dist_m": round(self.total_dist, 1),
-                "road_width": self.road_width,
+                "road_width": round(getattr(self, "ROAD_HALF_W_M", 3.75) * 2.0, 2),
+                "road_half_px": round(getattr(self, "ROAD_HALF_W_M", 3.75) * getattr(self, "PX_PER_M", 3.2), 1),
+                "track_kind": "stadium",
                 "track": [{"s": round(p["s"], 1), "x": round(p["x"], 1), "y": round(p["y"], 1), "theta": round(p["theta"], 3), "curv": round(p["curv"], 4)} for p in self.track_points],
                 "champion_trail": list(self.champion_trail)[-60:],
                 "car": {
@@ -916,13 +1073,25 @@ class LiveVehicleSimulator:
                     "s": round(self.s, 1),
                     "theta": round(self.theta, 3),
                     "delta_deg": round(math.degrees(self.delta), 1),
-                    "speed_kmh": round(self.v * 14.0, 1),
-                    "cte_m": round(self.cte * 0.05, 3)
+                    "speed_kmh": round(self.v * 3.6, 1),
+                    "cte_m": round(self.cte, 3)
                 },
                 "trail": list(self.trail),
                 "history_cte": list(self.history_cte),
                 "cortex_real": bool(getattr(self, "cortex_real", False)),
-                "cortex_mode": ("REAL_FORWARD" if getattr(self, "cortex_real", False) else "OFFLINE")
+                "cortex_mode": ("REAL_FORWARD" if getattr(self, "cortex_real", False) else "OFFLINE"),
+                "model": ("adas_cortex_champion" if nc == 210 else ("adas_cortex_champion_v3" if nc == 1024 else "adas_unknown")),
+                "champion_claim": getattr(self, "champion_claim", ""),
+                "control_loop": getattr(self, "control_loop", "unknown"),
+                "narrative": (
+                    "体育场公路（米制）+ L3 AdasCortexOrgan 真前向；「继续进化」另存 live_exp.bin，不覆盖锁档。"
+                    if nc == 210 and getattr(self, "adas_organ", None) is not None else
+                    (
+                        "210 档已挂载但 AdasCortexOrgan 未就绪，已回退前瞻控制律。"
+                        if nc == 210 else
+                        "当前挂载非 L3 主叙事档；请优先使用 adas_cortex_champion.bin。"
+                    )
+                ),
             }
 
 live_veh = LiveVehicleSimulator()
@@ -2033,20 +2202,14 @@ class SiliconCellularOrganism:
     def load_organism_by_id(self, org_id):
         """根据生命体 ID 真实解析冠军演化检查点 (Zero-Mock, 100% Truth)"""
         with self.lock:
-            self.current_organism_id = org_id
-            self.cells = []
-            self.synapses = []
-
             manifest = load_business_lifeform_manifest()
             biz = next((x for x in manifest if x.get("id") == org_id), None)
             if not biz:
-                biz = next((x for x in manifest if x.get("id") == "adas_cortex_champion"), None)
-                if biz:
-                    self.current_organism_id = "adas_cortex_champion"
-
-            if not biz:
                 return {"status": "error", "message": f"Organism {org_id} not found in manifest"}
 
+            self.current_organism_id = org_id
+            self.cells = []
+            self.synapses = []
             self.current_organism_biz = biz
 
             ckpt_rel = biz.get("checkpoint", "")
@@ -3668,271 +3831,196 @@ class LiveImmuneSimulator:
 
 live_immune = LiveImmuneSimulator()
 
+class CMazeTelemetry(ctypes.Structure):
+    _fields_ = [
+        ("real", ctypes.c_int32),
+        ("episodes", ctypes.c_int32),
+        ("wins", ctypes.c_int32),
+        ("success_rate", ctypes.c_float),
+        ("width", ctypes.c_int32),
+        ("height", ctypes.c_int32),
+        ("step_count", ctypes.c_int32),
+        ("max_steps", ctypes.c_int32),
+        ("done", ctypes.c_int32),
+        ("success", ctypes.c_int32),
+        ("agent_x", ctypes.c_float),
+        ("agent_y", ctypes.c_float),
+        ("agent_theta", ctypes.c_float),
+        ("ray_front", ctypes.c_float),
+        ("ray_left", ctypes.c_float),
+        ("ray_right", ctypes.c_float),
+        ("bearing", ctypes.c_float),
+        ("start_x", ctypes.c_float),
+        ("start_y", ctypes.c_float),
+        ("goal_x", ctypes.c_float),
+        ("goal_y", ctypes.c_float),
+        ("n_cells", ctypes.c_int32),
+        ("n_synapses", ctypes.c_int32),
+        ("grid", ctypes.c_int32 * 121),
+        ("cell_outs", ctypes.c_float * 16),
+    ]
+
+
 class LiveMazeSimulator:
     """
-    经典 DFS 递归回溯深度欺骗性迷宫与达尔文遗传新奇度演化仿真器
-    - 绝死无回头机制 (Hardcore Self-Avoiding Mode): 走过的路绝不能走第二次，踏入旧轨迹或掉头折返瞬间死亡
-    - 智能体决策: 3路激光雷达 + 指南针方位角 + 基因组自适应权重前向控制
-    - 物理引擎: 双轴独立碰撞滑动 (Axis-Aligned Sliding) 杜绝穿墙与卡死
-    - 演化机制: 空间新奇度探索 (Novelty) + 终点逼近 + 锦标赛突变选择
+    L3 测地方位迷宫冠军真前向演示 (与 bench_easy_task_regression / maze_navigation_champion 对齐)
+    - 权威检查点: checkpoints/maze_navigation_champion.bin
+    - C++ MazeTask(11×11) + set_use_geodesic_bearing(true) + CellularOrganism::forward
+    - 禁止随机基因组 / 绝死无回头沙盒冒充战役成绩
     """
-    def __init__(self, width=17, height=17):
-        self.width = width
-        self.height = height
-        self.generation = 1
-        self.step_count = 0
-        self.max_steps = 240
-        self.warp_speed = 5
-        self.no_backtrack_mode = True  # 默认开启【绝死无回头】模式
-        self.success_rate = 0.0
-        self.history_pass = [0.0]
-        self.champion_trail = []
+    CERTIFIED_SUCCESS_RATE = 0.96  # 冷评 250 步 96/100
+
+    def __init__(self):
         self.lock = threading.RLock()
-        self.generate_maze()
-        self.init_population(24)
+        self.warp_speed = 5
+        self.lib = None
+        self.real = False
+        self.no_backtrack_mode = False  # 冠军任务无此契约；保留字段以免前端崩
+        self.champion_trail = []
+        self.history_pass = []
+        self.generation = 0  # 语义=已完成 episode 数
+        self._last = None
+        self._mount()
 
-    def generate_maze(self):
-        with self.lock:
-            w, h = self.width, self.height
-            self.grid = [1] * (w * h)
-            stack = [(1, 1)]
-            self.grid[1 * w + 1] = 0
+    def _mount(self):
+        try:
+            lib_path = os.path.join(ROOT_DIR, "build", "libkun_maze_runtime.so")
+            if not os.path.exists(lib_path):
+                print(f"[MazeLive] 共享库不存在: {lib_path}, 尝试编译")
+                os.system(f"cmake --build {os.path.join(ROOT_DIR, 'build')} --target kun_maze_runtime -j4")
+            self.lib = ctypes.CDLL(lib_path)
+            self.lib.maze_c_init.argtypes = [ctypes.c_char_p]
+            self.lib.maze_c_init.restype = ctypes.c_int32
+            self.lib.maze_c_reset.argtypes = [ctypes.c_uint32]
+            self.lib.maze_c_reset.restype = None
+            self.lib.maze_c_step.argtypes = []
+            self.lib.maze_c_step.restype = ctypes.c_int32
+            self.lib.maze_c_get_telemetry.argtypes = [ctypes.POINTER(CMazeTelemetry)]
+            self.lib.maze_c_get_telemetry.restype = None
+            ckpt = os.path.join(ROOT_DIR, "checkpoints", "maze_navigation_champion.bin").encode("utf-8")
+            ok = self.lib.maze_c_init(ckpt)
+            self.real = bool(ok)
+            if self.real:
+                print("[MazeLive] 真实迷宫导航冠军已挂载: maze_navigation_champion.bin (测地方位 L3 · 锁档 96/100 @250)")
+                self._pull()
+            else:
+                print("[MazeLive] 检查点加载失败，迷宫专业页保持离线")
+        except Exception as e:
+            self.real = False
+            self.lib = None
+            print(f"[MazeLive] 挂载失败 (保持离线): {e}")
 
-            dx = [0, 0, 2, -2]
-            dy = [2, -2, 0, 0]
-
-            while stack:
-                cx, cy = stack[-1]
-                dirs = [0, 1, 2, 3]
-                random.shuffle(dirs)
-                carved = False
-                for d in dirs:
-                    nx, ny = cx + dx[d], cy + dy[d]
-                    if 0 < nx < w - 1 and 0 < ny < h - 1 and self.grid[ny * w + nx] == 1:
-                        self.grid[ny * w + nx] = 0
-                        self.grid[(cy + dy[d] // 2) * w + (cx + dx[d] // 2)] = 0
-                        stack.append((nx, ny))
-                        carved = True
-                        break
-                if not carved:
-                    stack.pop()
-
-            self.start = (1.5, 1.5)
-            self.goal = (float(w - 2) + 0.5, float(h - 2) + 0.5)
-            self.grid[(h - 2) * w + (w - 2)] = 0
-            self.champion_trail = [list(self.start)]
-            self.generation = 1
-            self.step_count = 0
-
-    def init_population(self, size=24):
-        self.population = []
-        for i in range(size):
-            self.population.append({
-                "id": i,
-                "w_wall_l": random.uniform(-1.0, 1.0),
-                "w_wall_r": random.uniform(-1.0, 1.0),
-                "w_bearing": random.uniform(0.5, 1.8),
-                "w_front": random.uniform(-1.5, 0.5),
-                "turn_bias": random.choice([-1.0, 1.0]),
-                "speed": random.uniform(0.24, 0.36),
-                "fitness": 0.0
-            })
-        self.init_agent_states()
-
-    def init_agent_states(self):
-        self.agent_states = []
-        for g in self.population:
-            self.agent_states.append({
-                "id": g["id"],
-                "x": self.start[0],
-                "y": self.start[1],
-                "theta": random.uniform(-0.5, 0.5),
-                "goal": 0,
-                "alive": True,
-                "death_reason": "",
-                "min_dist": 999.0,
-                "trail": [list(self.start)],
-                "cell_path": [(1, 1)],
-                "visited_cells": set([(1, 1)]),
-                "rays": [1.0, 1.0, 1.0]
-            })
-
-    def is_wall(self, x, y):
-        gx, gy = int(x), int(y)
-        if gx < 0 or gx >= self.width or gy < 0 or gy >= self.height:
-            return True
-        return self.grid[gy * self.width + gx] == 1
-
-    def cast_ray(self, sx, sy, ang, max_r=5.0):
-        ca, sa = math.cos(ang), math.sin(ang)
-        cur = 0.0
-        while cur < max_r:
-            cur += 0.2
-            gx, gy = int(sx + ca * cur), int(sy + sa * cur)
-            if gx < 0 or gx >= self.width or gy < 0 or gy >= self.height or self.grid[gy * self.width + gx] == 1:
-                return round(min(1.0, cur / max_r), 3)
-        return 1.0
+    def _pull(self):
+        if not self.real or self.lib is None:
+            return None
+        t = CMazeTelemetry()
+        self.lib.maze_c_get_telemetry(ctypes.byref(t))
+        self._last = t
+        self.generation = int(t.episodes)
+        return t
 
     def step_physics(self):
         with self.lock:
-            self.step_count += 1
-            gx, gy = self.goal
-            reached_count = 0
+            if not self.real or self.lib is None:
+                return
+            finished = self.lib.maze_c_step()
+            t = self._pull()
+            if t is None:
+                return
+            self.champion_trail.append([round(float(t.agent_x), 2), round(float(t.agent_y), 2)])
+            if len(self.champion_trail) > 400:
+                self.champion_trail = self.champion_trail[-400:]
+            if finished:
+                rate = float(t.success_rate)
+                self.history_pass.append(round(rate, 3))
+                if len(self.history_pass) > 40:
+                    self.history_pass.pop(0)
+                self.champion_trail = [[round(float(t.agent_x), 2), round(float(t.agent_y), 2)]]
 
-            for i, ag in enumerate(self.agent_states):
-                g = self.population[i]
-                if not ag["alive"]:
-                    continue
-                if ag["goal"] == 1:
-                    reached_count += 1
-                    continue
+    def generate_maze(self):
+        with self.lock:
+            if self.real and self.lib is not None:
+                self.lib.maze_c_reset(0)
+                self.champion_trail = []
+                self._pull()
 
-                # 1. 局部感官 3 路激光雷达
-                r_front = self.cast_ray(ag["x"], ag["y"], ag["theta"])
-                r_left = self.cast_ray(ag["x"], ag["y"], ag["theta"] - 0.785)
-                r_right = self.cast_ray(ag["x"], ag["y"], ag["theta"] + 0.785)
-                ag["rays"] = [r_front, r_left, r_right]
-
-                # 2. 终点距离与通关判定
-                d = math.hypot(gx - ag["x"], gy - ag["y"])
-                if d < ag["min_dist"]:
-                    ag["min_dist"] = d
-                if d < 0.85:
-                    ag["goal"] = 1
-                    reached_count += 1
-                    continue
-
-                # 3. 终点方位角 (Compass Bearing)
-                target_ang = math.atan2(gy - ag["y"], gx - ag["x"])
-                bearing = ((target_ang - ag["theta"] + math.pi) % (2 * math.pi) - math.pi) / math.pi
-
-                # 4. 基因组自适应转向控制
-                if r_front < 0.22:
-                    turn = (0.85 if r_left > r_right else -0.85) * g["turn_bias"]
-                    speed = 0.10
-                else:
-                    steer = r_left * g["w_wall_l"] + r_right * g["w_wall_r"] + bearing * g["w_bearing"] + r_front * g["w_front"]
-                    turn = math.tanh(steer) * 0.45
-                    speed = g["speed"]
-
-                ag["theta"] += turn
-                nx = ag["x"] + math.cos(ag["theta"]) * speed
-                ny = ag["y"] + math.sin(ag["theta"]) * speed
-
-                # 双轴独立物理滑动碰撞检测
-                moved_x = False
-                moved_y = False
-                if not self.is_wall(nx, ag["y"]):
-                    ag["x"] = nx
-                    moved_x = True
-                if not self.is_wall(ag["x"], ny):
-                    ag["y"] = ny
-                    moved_y = True
-
-                cur_cell = (int(ag["x"]), int(ag["y"]))
-                last_cell = ag["cell_path"][-1]
-
-                # 5. 【绝死无回头 / 回头必死】严格判定逻辑 (Self-Avoiding Retrace Hazard)
-                if self.no_backtrack_mode:
-                    if cur_cell != last_cell:
-                        # 检查新踏入的格子是否在之前更早的历史格子集合中 (排除前一个刚刚离开的格子)
-                        if len(ag["cell_path"]) > 2 and cur_cell in ag["cell_path"][:-1]:
-                            ag["alive"] = False
-                            ag["death_reason"] = "RETRACE_FATAL (走回头路直接暴毙)"
-                            continue
-                        ag["cell_path"].append(cur_cell)
-                        ag["visited_cells"].add(cur_cell)
-                else:
-                    if cur_cell != last_cell:
-                        ag["cell_path"].append(cur_cell)
-                        ag["visited_cells"].add(cur_cell)
-
-                if self.step_count % 2 == 0 and len(ag["trail"]) < 200:
-                    ag["trail"].append([round(ag["x"], 2), round(ag["y"], 2)])
-
-            self.success_rate = reached_count / max(1, len(self.agent_states))
-            alive_count = sum(1 for a in self.agent_states if a["alive"] and a["goal"] == 0)
-
-            # 周期耗尽、全员到达、或全员阵亡时触发代际进化
-            if self.step_count >= self.max_steps or (reached_count == len(self.agent_states) and reached_count > 0) or (alive_count == 0 and reached_count == 0):
-                self.evolve_generation()
+    def init_population(self, size=1):
+        # 兼容旧 API：冠军单智能体，无随机种群
+        self.generate_maze()
 
     def evolve_generation(self):
-        best_fit = -9999.0
-        best_trail = []
-
-        for i, ag in enumerate(self.agent_states):
-            g = self.population[i]
-            # 存活探索更多未踏足新格子获得更高适应度
-            fit = len(ag["visited_cells"]) * 10.0 - ag["min_dist"] * 5.0
-            if ag["goal"] == 1:
-                fit += 350.0 + (self.max_steps - self.step_count) * 2.5
-            elif not ag["alive"]:
-                fit -= 30.0  # 走回头路暴毙扣分惩罚
-            g["fitness"] = fit
-            if fit > best_fit:
-                best_fit = fit
-                best_trail = list(ag["trail"])
-
-        if len(best_trail) > 2:
-            self.champion_trail = best_trail
-
-        # 达尔文锦标赛选择与突变繁殖 (Elitism + Mutation)
-        self.population.sort(key=lambda g: g["fitness"], reverse=True)
-        new_pop = []
-        for i in range(4):
-            new_pop.append(dict(self.population[i]))
-
-        for i in range(4, len(self.population)):
-            p = random.choice(self.population[:8])
-            child = dict(p)
-            for k in ["w_wall_l", "w_wall_r", "w_bearing", "w_front", "speed"]:
-                if random.random() < 0.35:
-                    child[k] += random.gauss(0, 0.15)
-            if random.random() < 0.1:
-                child["turn_bias"] = -child["turn_bias"]
-            new_pop.append(child)
-
-        self.population = new_pop
-        self.generation += 1
-        self.history_pass.append(round(self.success_rate, 3))
-        if len(self.history_pass) > 40:
-            self.history_pass.pop(0)
-        self.step_count = 0
-        self.init_agent_states()
+        # 兼容旧「STEP_GEN」按钮：强制开新 episode（非演化）
+        self.generate_maze()
 
     def get_snapshot(self):
         with self.lock:
-            alive_count = sum(1 for a in self.agent_states if a["alive"])
+            t = self._last or self._pull()
+            if t is None or not self.real:
+                return {
+                    "generation": 0,
+                    "step_count": 0,
+                    "max_steps": 250,
+                    "no_backtrack_mode": False,
+                    "alive_count": 0,
+                    "total_count": 0,
+                    "success_rate": 0.0,
+                    "pass_rate": 0.0,
+                    "certified_success_rate": self.CERTIFIED_SUCCESS_RATE,
+                    "model": "maze_navigation_champion",
+                    "real": False,
+                    "width": 11,
+                    "height": 11,
+                    "start": [1.5, 1.5],
+                    "goal": [9.5, 9.5],
+                    "grid": [1] * 121,
+                    "champion_trail": [],
+                    "history_pass": [],
+                    "agents": [],
+                    "narrative": "迷宫运行时离线：未挂载 maze_navigation_champion.bin",
+                }
+            w, h = int(t.width), int(t.height)
+            grid = [int(t.grid[i]) for i in range(w * h)]
+            rate = float(t.success_rate)
             return {
-                "generation": self.generation,
-                "step_count": self.step_count,
-                "max_steps": self.max_steps,
-                "no_backtrack_mode": self.no_backtrack_mode,
-                "alive_count": alive_count,
-                "total_count": len(self.agent_states),
-                "success_rate": round(self.success_rate, 3),
-                "pass_rate": round(self.success_rate * 100, 1),
-                "width": self.width,
-                "height": self.height,
-                "start": list(self.start),
-                "goal": list(self.goal),
-                "grid": list(self.grid),
+                "generation": int(t.episodes),
+                "step_count": int(t.step_count),
+                "max_steps": int(t.max_steps),
+                "no_backtrack_mode": False,
+                "alive_count": 1,
+                "total_count": 1,
+                "success_rate": round(rate, 3),
+                "pass_rate": round(rate * 100.0, 1),
+                "certified_success_rate": self.CERTIFIED_SUCCESS_RATE,
+                "wins": int(t.wins),
+                "episodes": int(t.episodes),
+                "model": "maze_navigation_champion",
+                "checkpoint": "checkpoints/maze_navigation_champion.bin",
+                "n_cells": int(t.n_cells),
+                "n_synapses": int(t.n_synapses),
+                "real": True,
+                "width": w,
+                "height": h,
+                "start": [round(float(t.start_x), 2), round(float(t.start_y), 2)],
+                "goal": [round(float(t.goal_x), 2), round(float(t.goal_y), 2)],
+                "grid": grid,
                 "champion_trail": list(self.champion_trail),
                 "history_pass": list(self.history_pass),
-                "agents": [
-                    {
-                        "id": ag["id"],
-                        "x": round(ag["x"], 2),
-                        "y": round(ag["y"], 2),
-                        "theta": round(ag["theta"], 3),
-                        "goal": ag["goal"],
-                        "alive": 1 if ag["alive"] else 0,
-                        "death_reason": ag.get("death_reason", ""),
-                        "rays": [round(r, 2) for r in ag["rays"]]
-                    }
-                    for ag in self.agent_states
-                ]
+                "agents": [{
+                    "id": 0,
+                    "x": round(float(t.agent_x), 2),
+                    "y": round(float(t.agent_y), 2),
+                    "theta": round(float(t.agent_theta), 3),
+                    "goal": 1 if t.success else 0,
+                    "alive": 1,
+                    "death_reason": "",
+                    "rays": [
+                        round(float(t.ray_front), 2),
+                        round(float(t.ray_left), 2),
+                        round(float(t.ray_right), 2),
+                    ],
+                    "bearing": round(float(t.bearing), 3),
+                }],
+                "narrative": "L3 测地方位脚手架 + maze_navigation_champion.bin 真前向；锁档冷评 96/100 @250 步",
             }
 
 live_maze = LiveMazeSimulator()
@@ -4990,6 +5078,14 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
             org_id = qs.get("id", ["adas_cortex_champion"])[0]
             res = organism.load_organism_by_id(org_id)
+            if isinstance(res, dict) and res.get("status") == "error":
+                body = json.dumps(res, ensure_ascii=False).encode("utf-8")
+                self.send_response(404)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             body = json.dumps({"status": "ok", "result": res}, ensure_ascii=False).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json; charset=utf-8")
@@ -5258,8 +5354,11 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/maze/reset"):
             live_maze.generate_maze()
-            live_maze.init_population(24)
-            body = json.dumps({"status": "ok", "msg": "New maze generated"}).encode("utf-8")
+            body = json.dumps({
+                "status": "ok",
+                "msg": "New geodesic maze episode (maze_navigation_champion)",
+                "model": "maze_navigation_champion",
+            }).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -5283,8 +5382,13 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             return
 
         if self.path.startswith("/api/maze/toggle_backtrack"):
-            live_maze.no_backtrack_mode = not live_maze.no_backtrack_mode
-            body = json.dumps({"status": "ok", "no_backtrack_mode": live_maze.no_backtrack_mode}).encode("utf-8")
+            # 冠军任务无「绝死无回头」契约；拒绝虚假开关叙事
+            live_maze.no_backtrack_mode = False
+            body = json.dumps({
+                "status": "ok",
+                "no_backtrack_mode": False,
+                "message": "L3 冠军真前向不使用绝死无回头沙盒规则",
+            }).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -5294,7 +5398,11 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
 
         if self.path.startswith("/api/maze/step"):
             live_maze.evolve_generation()
-            body = json.dumps({"status": "ok", "generation": live_maze.generation}).encode("utf-8")
+            body = json.dumps({
+                "status": "ok",
+                "generation": live_maze.generation,
+                "msg": "forced new episode (not evolution)",
+            }).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
@@ -5465,8 +5573,19 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             elif ptype == "doudizhu": organism.load_organism_by_id("doudizhu_cand_scorer")
             elif ptype == "fluid": organism.load_organism_by_id("fluid_damper_champion")
             elif ptype == "quant": organism.load_organism_by_id("quant_master_champion")
+            elif ptype == "cartpole": organism.load_organism_by_id("cartpole_balance_champion")
+            elif ptype == "household": organism.load_organism_by_id("household_coverage_champion")
             elif ptype in ("adas", "vehicle"): organism.load_organism_by_id("adas_cortex_champion")
-            else: organism.load_organism_by_id(ptype)
+            else:
+                res = organism.load_organism_by_id(ptype)
+                if isinstance(res, dict) and res.get("status") == "error":
+                    body = json.dumps(res).encode("utf-8")
+                    self.send_response(404)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Access-Control-Allow-Origin", "*")
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
 
             body = json.dumps({
                 "status": "ok", 

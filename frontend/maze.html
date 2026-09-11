@@ -448,7 +448,7 @@
                     <button class="maze-top-btn primary" id="btn-toggle-top" onclick="document.getElementById('btn-toggle').click()">[PAUSE / RESUME]</button>
                     <button class="maze-top-btn" onclick="document.getElementById('btn-new-maze').click()">[GEN_NEW_MAZE]</button>
                     <button class="maze-top-btn" onclick="document.getElementById('btn-step').click()">[STEP_NEXT_GEN]</button>
-                    <button class="maze-top-btn" id="btn-no-backtrack" onclick="toggleNoBacktrack()" style="color:#ff0055;border-color:#ff0055;background:rgba(255,0,85,0.15);font-weight:bold;">[绝死无回头: ON]</button>
+                    <button class="maze-top-btn" id="btn-no-backtrack" onclick="toggleNoBacktrack()" style="color:var(--text-dim);border-color:#334155;background:rgba(15,23,42,0.5);font-weight:bold;">[L3 真前向 · 无沙盒规则]</button>
                 </div>
                 <div style="display:flex;gap:6px;align-items:center;">
                     <span style="font-size:12px;font-weight:bold;color:var(--cyan-glow);margin-right:4px;">[WARP_SPEED]:</span>
@@ -463,7 +463,7 @@
             </div>
             <div class="controls-overlay" style="border-color:rgba(0,240,255,0.3);background:rgba(10,16,28,0.92);">
                 <span style="color:var(--cyan-glow);font-size:10px;font-weight:bold;">[LIVE]</span>
-                <span style="font-size:10px;color:var(--text-dim);" id="hud-live-desc">24 智能体激光避障中</span>
+                <span style="font-size:10px;color:var(--text-dim);" id="hud-live-desc">maze_navigation_champion 真前向 (11 细胞 · 测地 96/100)</span>
                 <span style="border-left:1px solid #283548;margin:0 4px;"></span>
                 <span style="font-size:10px;color:var(--amber-glow);" id="hud-warp-label">曲率: 5x</span>
             </div>
@@ -496,25 +496,25 @@
             </div>
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span>[EVOLUTIONARY_TELEMETRY]</span>
-                    <span class="badge">DAG_MORPHOGENESIS</span>
+                    <span>[CHAMPION_TELEMETRY]</span>
+                    <span class="badge">L3_GEODESIC · 96/100</span>
                 </div>
                 <div class="stat-grid">
                     <div class="stat-box">
-                        <div class="stat-label">GENERATION</div>
-                        <div class="stat-val green" id="stat-gen">GEN-1</div>
+                        <div class="stat-label">EPISODES</div>
+                        <div class="stat-val green" id="stat-gen">EP-0</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">SUCCESS_RATE</div>
+                        <div class="stat-label">LIVE_SUCCESS</div>
                         <div class="stat-val" id="stat-rate">0.0%</div>
                     </div>
                     <div class="stat-box">
-                        <div class="stat-label">ALIVE_EXPLORERS</div>
-                        <div class="stat-val purple" id="stat-agents">24 / 24 存活</div>
+                        <div class="stat-label">CHAMPION_AGENT</div>
+                        <div class="stat-val purple" id="stat-agents">1 / 1 在役</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">CYCLE_STEPS</div>
-                        <div class="stat-val amber" id="stat-steps">0 / 240</div>
+                        <div class="stat-val amber" id="stat-steps">0 / 250</div>
                     </div>
                 </div>
             </div>
@@ -537,14 +537,14 @@
             <div class="viewport-card">
                 <div class="panel-header">
                     <span>[SUCCESS_RATE_PROGRESSION]</span>
-                    <span class="badge">ONLINE_LEARNING</span>
+                    <span class="badge">CERTIFIED_96%</span>
                 </div>
                 <div class="chart-box">
                     <canvas id="chart-canvas" class="chart-canvas"></canvas>
                 </div>
                 <div class="info-box">
-                    <strong>[公理审查] 空间学习能力验证：</strong><br>
-                    形态发生神经细胞通过 3 路激光测距 (SENSE) 与死胡同迟滞门控 (GATE)，自发演化出突触拓扑，实现无监督避障、脱困与终点导航。
+                    <strong>[战役锁档] maze_navigation_champion.bin：</strong><br>
+                    任务层测地方位脚手架（BFS 地理势场，不动底座）+ 11 细胞真前向。冷评 250 步 <b>96/100</b>，400 步 100/100。本页滚动成功率是在线复现，不是随机基因组演化。
                 </div>
             </div>
         </div>
@@ -591,34 +591,35 @@
         function updateUI() {
             if (!mazeState) return;
 
-            document.getElementById('stat-gen').innerText = `GEN-${mazeState.generation}`;
+            document.getElementById('stat-gen').innerText = `EP-${mazeState.generation}`;
             const ratePct = (mazeState.success_rate * 100).toFixed(1);
             const rateEl = document.getElementById('stat-rate');
-            rateEl.innerText = `${ratePct}%`;
+            const cert = mazeState.certified_success_rate != null ? (mazeState.certified_success_rate * 100).toFixed(0) : '96';
+            rateEl.innerText = `${ratePct}% (锁档 ${cert}%)`;
             rateEl.className = 'stat-val ' + (mazeState.success_rate > 0.5 ? 'green' : (mazeState.success_rate > 0.1 ? 'amber' : ''));
 
-            const alive = mazeState.alive_count !== undefined ? mazeState.alive_count : (mazeState.agents ? mazeState.agents.filter(a => a.alive !== 0).length : 24);
-            const total = mazeState.total_count || (mazeState.agents ? mazeState.agents.length : 24);
-            document.getElementById('stat-agents').innerText = `${alive} / ${total} 存活`;
+            const alive = mazeState.alive_count !== undefined ? mazeState.alive_count : (mazeState.agents ? mazeState.agents.filter(a => a.alive !== 0).length : 1);
+            const total = mazeState.total_count || (mazeState.agents ? mazeState.agents.length : 1);
+            const nCells = mazeState.n_cells || 11;
+            document.getElementById('stat-agents').innerText = `${alive} / ${total} · ${nCells}细胞`;
 
             const btnNb = document.getElementById('btn-no-backtrack');
             if (btnNb) {
-                if (mazeState.no_backtrack_mode) {
-                    btnNb.innerText = "[绝死无回头: ON]";
-                    btnNb.style.color = "#ff0055";
-                    btnNb.style.borderColor = "#ff0055";
-                    btnNb.style.background = "rgba(255, 0, 85, 0.22)";
-                    btnNb.style.boxShadow = "0 0 12px rgba(255,0,85,0.4)";
-                } else {
-                    btnNb.innerText = "[NORMAL: 自由回溯]";
-                    btnNb.style.color = "var(--text-dim)";
-                    btnNb.style.borderColor = "#283548";
-                    btnNb.style.background = "#111827";
-                    btnNb.style.boxShadow = "none";
-                }
+                btnNb.innerText = "[L3 真前向 · 无沙盒规则]";
+                btnNb.style.color = "var(--emerald-glow, #34d399)";
+                btnNb.style.borderColor = "#065f46";
+                btnNb.style.background = "rgba(16,185,129,0.12)";
+                btnNb.style.boxShadow = "none";
             }
 
-            const maxSteps = mazeState.max_steps || 240;
+            const liveDesc = document.getElementById('hud-live-desc');
+            if (liveDesc) {
+                liveDesc.innerText = mazeState.real
+                    ? `${mazeState.model || 'maze_navigation_champion'} 真前向 · ${(mazeState.narrative || '').slice(0, 48)}`
+                    : '迷宫运行时离线';
+            }
+
+            const maxSteps = mazeState.max_steps || 250;
             document.getElementById('stat-steps').innerText = `${mazeState.step_count} / ${maxSteps}`;
 
             if (historyRates.length === 0 || historyRates[historyRates.length - 1].gen !== mazeState.generation) {

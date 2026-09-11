@@ -105,12 +105,16 @@ export const LIFEFORM_SCALES = {
   doudizhu_cand_scorer: 82,
   adas_tripartite_champion: 18,
   adas_cortex_champion: 210,
+  adas_cortex_champion_v3: 1024,
   quant_tripartite_champion: 9,
   quant_master_champion: 1032,
+  maze_navigation_champion: 11,
   maze_tripartite_champion: 21,
   household_coverage_champion: 11,
   fluid_damper_champion: 40,
-  cartpole_tripartite_champion: 8
+  cartpole_balance_champion: 13,
+  cartpole_tripartite_champion: 8,
+  music_composer_cortex: 1024
 };
 
 export const TOOLTIP_DICT = {
