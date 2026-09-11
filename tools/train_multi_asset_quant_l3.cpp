@@ -538,7 +538,7 @@ int main() {
     cfg.max_cells_limit = 0;              // 0 = 彻底解除细胞数量上限！
     cfg.max_synapses_limit = 0;           // 0 = 彻底解除突触数量上限！
     cfg.skeleton_lock = SkeletonLockMode::UNLOCKED; // 解除骨架锁，允许自由有丝分裂与形态增殖
-    cfg.type_whitelist = TypeWhitelistMode::FULL_28;// 允许 24 类全原语自由涌现
+    cfg.type_whitelist = TypeWhitelistMode::FULL_28;// 允许 28 类全原语自由涌现
     cfg.enable_dynamic_metabolism = true; // 动态代谢自平衡：盈利个体扩张，亏损个体调节
     cfg.enable_mechanotransduction = true;// 力敏转导：高应力/惊奇度区域自发分裂折叠
     cfg.slow_mutation_rate = 0.55;        // 有丝分裂增殖发生率

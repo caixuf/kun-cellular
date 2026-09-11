@@ -36,10 +36,13 @@ MOTOR_TYPES = [
     "EFFECTOR_STEER", "EFFECTOR_ACCEL",
 ]
 
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 DEFAULT_TARGETS = [
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                 "include", "kun", "cellular", "sdsc_cortex.h"),
-    "/home/caixuf/code/FlowEngine/include/sdsc_cortex.h",
+    os.path.join(_REPO_ROOT, "include", "kun", "cellular", "sdsc_cortex.h"),
+    # 兄弟仓 FlowEngine 的镜像 (二者契约对齐, 训练器常量需一致)。
+    # 相对仓库父目录推导, 缺失时 main() 会自动跳过, 避免硬编码本机绝对路径。
+    os.path.join(_REPO_ROOT, os.pardir, "FlowEngine", "include", "sdsc_cortex.h"),
 ]
 
 

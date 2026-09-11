@@ -44,7 +44,7 @@ WHEELBASE     = 2.7      # 轴距 m
 CRUISE_SPEED  = 12.0     # 巡航车速 m/s
 STEER_LIMIT   = 0.60     # 最大转向角 rad
 
-# 24 类计算原语
+# 28 类计算原语
 CELL_TYPES = [
     "Sense_LatErr", "Sense_HeadingErr", "Sense_Curvature", "Sense_ObstacleDist",
     "Op_EMA", "Op_Diff", "Op_Integral", "Op_Sum", "Op_Sub", "Op_Multiply",

@@ -12,7 +12,7 @@
 ## Structured Abstract
 
 * **Background**: Safety-critical cyber-physical controllers (lane keeping, low-dimensional plant regulation, portfolio risk gating) need three properties simultaneously: (i) non-differentiable safety operators such as hysteresis, deadband and hard lockouts; (ii) a structure small and discrete enough to be *formally inspected* and exported to certifiable C; (iii) sub-microsecond, allocation-free execution. Gradient-based dense networks fail (i) by construction and (ii)/(iii) in practice.
-* **Method**: We present a **Cartesian-Genetic-Programming (CGP) variant whose function set is a fixed library of 26 control-theoretic primitives** (EMA/integrator, differentiator, Schmitt hysteresis, deadband, saturation, correlation, Van-der-Pol-type oscillator, fatigue, effectors). Topology and parameters are evolved with morphogenetic operators (mitosis, axonal rewiring, apoptosis). Two search-space gates constrain evolution: a **loop-gain screening** pass (Tarjan SCC + gain product, with an explicit dissipative-gate exemption) and a **strain-selected developmental encoding** in which a Lennard-Jones layout field chooses *where* mitosis occurs. The champion graph is Kahn-sorted into a contiguous CSR array and emitted as **SDSC-BIN (v2)** + zero-allocation C11.
+* **Method**: We present a **Cartesian-Genetic-Programming (CGP) variant whose function set is a fixed library of 28 control-theoretic primitives** (authoritative list: `include/kun/cellular/ops.yaml` v2.0.0) (EMA/integrator, differentiator, Schmitt hysteresis, deadband, saturation, correlation, Van-der-Pol-type oscillator, fatigue, effectors). Topology and parameters are evolved with morphogenetic operators (mitosis, axonal rewiring, apoptosis). Two search-space gates constrain evolution: a **loop-gain screening** pass (Tarjan SCC + gain product, with an explicit dissipative-gate exemption) and a **strain-selected developmental encoding** in which a Lennard-Jones layout field chooses *where* mitosis occurs. The champion graph is Kahn-sorted into a contiguous CSR array and emitted as **SDSC-BIN (v2)** + zero-allocation C11.
 * **Evaluated Evidence**:
   1. **Deterministic micro-benchmark [E1]**: a 1M-cell / 3M-synapse organism (`checkpoints/sdsc_mega_1million.bin`) completes a full CSR forward step in **134.588 ms (7.43 MCells/s)** with mmap zero-copy mount in 5.328 ms (`tests/test_binary_runtime_scale.c`); 0 bytes runtime heap. *The previously reported 19.06 ns P50 / 52.47 M-Inferences/s / 0.385 µs-per-frame figures are withdrawn — their source (`test_c11_apex_maneuver`, `sdsc_apex_cortex.h`) was removed in commit `b555cb7` and is not reproducible from the current tree.*
   2. **Lane-keeping cortex, shipped champion `checkpoints/adas_cortex_champion.bin` (210 cells, 630 synapses) [E1]**: 12/12 training and 4/4 holdout scenarios pass the ≤ 0.60 m *max*-CTE envelope with 100% completion; standard S-curve mean CTE 6.36 cm, gentle-S 6.03 cm, tight-curve max 3.96 cm, stop-and-go 5.15 cm, holdout validation stop-and-go 7.76 cm; generalization gap is 0.29x; straight cruise steady-state bias after L3 tuning is compressed to 3.38 cm ($0.0338 \pm 0.0015\,\text{m}$ vs baseline Stanley $0.0286 \pm 0.0017\,\text{m}$, difference only 5.2 mm); on the scenarios it wins (s_curve, curve_easy, tight_curve, highway, ramp_merge) it outperforms Stanley by 1.0–1.3x, but the overall 16-scenario tally is 7 wins / 9 losses (Table 2b); C11/Python bit-exact parity verified with max |Δ| < 1e-5 (PASS). Comparison data across seeds available in `runs/adas_champion_vs_stanley_seed7.json` and `runs/adas_champion_vs_stanley_seeds1-10.json`.
@@ -25,7 +25,7 @@
 
 ## Contributions Panel
 
-> 1. **Control-primitive function set for CGP [E2]**: 26 typed, stateful primitives with explicit transfer equations (Table 1), chosen so that the search space already contains PID/relay/lead-lag building blocks. Evolution therefore rediscovers controllers instead of re-inventing them from weighted sums.
+> 1. **Control-primitive function set for CGP [E2]**: 28 typed, stateful primitives with explicit transfer equations (Table 1), chosen so that the search space already contains PID/relay/lead-lag building blocks. Evolution therefore rediscovers controllers instead of re-inventing them from weighted sums.
 > 2. **A theoretical argument for when evolution should beat gradient descent [E2]** (§1.2): the co-occurrence of non-differentiable safety operators, a formal-verification requirement, and an L1-resident size budget makes derivative-free structural search the *appropriate* optimiser, not a fallback.
 > 3. **Stability-gated search [E1]**: loop-gain screening with dissipative-gate exemption (§5.9) removes topologies with unbounded positive feedback before evaluation. We state precisely what this does and does not guarantee.
 > 4. **Strain-selected developmental encoding [E1]**: mechanical strain in a Lennard-Jones layout field selects the mitosis site, coupling spatial embedding to structural growth (a developmental-encoding relative of HyperNEAT/CPPN, §1.3).
@@ -47,7 +47,7 @@ Dense networks trained by back-propagation are the default function class for le
 Ashby's Law of Requisite Variety [1] states that a regulator needs structural variety matched to the disturbances it faces; it does not state that this variety must be purely *parametric*. To avoid combinatorial explosion in scaling structural search to complex dynamical environments, three principles must be distinguished:
 - (i) **Phylogeny searches topology, ontogeny tunes parameters**: The Baldwin hypothesis, formalized computationally by Hinton & Nowlan [27], establishes that continuous lifetime adaptation smooths needle-in-a-haystack fitness landscapes into tractable funnels, allowing structural evolution to search without combinatorial stagnation;
 - (ii) **Module duplication over monolithic scaling**: Ohno's gene duplication theory [28] and connection-cost constraints (Clune et al. [16]) show that biological complexity scales via the replication and divergence of canonical micro-circuits (analogous to the neocortex's $10^8$ minicolumns and $10^6$ macrocolumns [21]), rather than expanding uniform monolithic networks;
-- (iii) **Fixed primitive priors**: Much as terrestrial carbon-based biochemistry operates on a fixed alphabet of 22 standard proteinogenic amino acids (including selenocysteine and pyrrolysine), CPS controllers can be built upon a fixed, canonical set of 26 control-theoretic dynamical primitives.
+- (iii) **Fixed primitive priors**: Much as terrestrial carbon-based biochemistry operates on a fixed alphabet of 22 standard proteinogenic amino acids (including selenocysteine and pyrrolysine), CPS controllers can be built upon a fixed, canonical set of 28 control-theoretic dynamical primitives.
 We take the structural route: evolve small, typed graphs from a library of control primitives.
 
 ### 1.2 Why derivative-free structural search is the right optimiser here
@@ -80,7 +80,7 @@ graph LR
       M1[Fixed dense W] --> M2[Back-prop] --> M3[Smoothed safety ops / implicit loops / ms jitter]
     end
     subgraph This work: control-primitive CGP
-      C1[26 typed stateful primitives] --> C2[Loop-gain screen + strain-selected mitosis] --> C3[Kahn/CSR -> SDSC-BIN v2 -> zero-GC C11, 19 ns kernel]
+      C1[28 typed stateful primitives] --> C2[Loop-gain screen + strain-selected mitosis] --> C3[Kahn/CSR -> SDSC-BIN v2 -> zero-GC C11, zero-allocation kernel]
     end
 ```
 
@@ -90,7 +90,7 @@ graph LR
 
 | Dimension | Deep Neural Networks (DNN / Transformer) | Custom Neuromorphic ASICs | This work (control-primitive CGP) |
 | :--- | :--- | :--- | :--- |
-| **Computational Primitives** | Homogeneous matrix multiplications ($\mathbf{W}\mathbf{x} + \mathbf{b}$) with uniform static activations | Homogeneous leaky integrate-and-fire (LIF / Izhikevich) silicon units | **26 heterogeneous atomic dynamical primitives** (integrators, Schmitt triggers, correlation kernels, dampers, deadbands) |
+| **Computational Primitives** | Homogeneous matrix multiplications ($\mathbf{W}\mathbf{x} + \mathbf{b}$) with uniform static activations | Homogeneous leaky integrate-and-fire (LIF / Izhikevich) silicon units | **28 heterogeneous atomic dynamical primitives** (integrators, Schmitt triggers, correlation kernels, dampers, deadbands) |
 | **Hardware Dependency** | High-bandwidth GPU/TPU matrix accelerator clusters | Custom non-standard neuromorphic fabrication processes | **Standard commodity silicon** (x86-64/ARM CPUs and GPU stream processors) |
 | **State & Memory** | External hidden state tensors with high memory bus overhead | Analog charge or on-chip SRAM crossbars | Per-node state registers $s_i, a_i$ in one contiguous array; the whole graph is L1-resident (this is a cache-locality property, not a non-von-Neumann architecture) |
 | **Network Topology** | Static layer-wise dense matrices or full-attention maps | Constrained local hardware crossbar routing | **3D self-organizing dynamic DAG/recurrent graphs** naturally clustering into cortical column macro-arrays |
@@ -100,7 +100,7 @@ graph LR
 
 ---
 
-## 3. System Model and 26-Primitive Taxonomy
+## 3. System Model and 28-Primitive Taxonomy
 
 ### 3.1 Computational Cell Formalization
 Each computational cell $c_i \in \mathcal{C}$ is formalized as a 7-tuple [E2]:
@@ -108,14 +108,14 @@ Each computational cell $c_i \in \mathcal{C}$ is formalized as a 7-tuple [E2]:
 $$c_i = \langle \tau_i, g_i, s_i, a_i, \mathbf{x}_i, \mathbf{v}_i, \gamma_i \rangle$$
 
 where:
-* $\tau_i \in \{0, 1, \dots, 25\}$: Atomic primitive functional type identifier;
+* $\tau_i \in \{0, 1, \dots, 27\}$: Atomic primitive functional type identifier;
 * $g_i \in \mathbb{R}$: Internal evolvable operator gain parameter;
 * $s_i \in \mathbb{R}$: Private primary accumulated state potential (in-cell memory for integration, filtering, or hysteresis);
 * $a_i \in \mathbb{R}$: Private auxiliary state slot (for differentiation history or spatiotemporal correlation memory);
 * $\mathbf{x}_i, \mathbf{v}_i \in \mathbb{R}^3$: 3D spatial coordinate and velocity vectors;
 * $\gamma_i \in \mathbb{R}^+$: Basal metabolic tax rate.
 
-### Table 1: Complete 26 Computational Cell Primitives and Dynamical Transfer Equations [E2]
+### Table 1: Complete 28 Computational Cell Primitives and Dynamical Transfer Equations [E2]
 
 | Family | Primitive Identifier (`SdscOpType`) | Discrete Transfer Function / State Update Equation | Dynamical & Control Semantics |
 | :--- | :--- | :--- | :--- |
@@ -143,9 +143,10 @@ where:
 | **Cognitive Adaptation**<br>(Cognitive & Adaptation) | `SDSC_OP_CORRELATION` (24) | $s_i^{(t)} = 0.90 s_i^{(t-1)} + 0.10(x_i^{(t)} \cdot a_i^{(t-1)}), \quad a_i^{(t)} = x_i^{(t)}, \quad u_i^{(t)} = \tanh(s_i^{(t)} g_i)$ | **Spatiotemporal Autocorrelation Kernel** (Local temporal attention and causal convolution) |
 | | `SDSC_OP_FATIGUE` (25) | $s_i^{(t)} = \min(2.0, s_i^{(t-1)} + 0.15 \vert x_i^{(t)} \vert) \times 0.96, \quad u_i^{(t)} = \frac{\tanh(x_i^{(t)} g_i)}{1.0 + s_i^{(t)}}$ | Metabolic adaptation fatigue gate (Sustained stimulus desensitization) |
 | **Passthrough** | `SDSC_OP_PASSTHRU` (26) | $u_i^{(t)} = x_i^{(t)}$ | Distortion-free feedthrough bus |
+| **Metabolic (Accumulator)** | `SDSC_OP_ACCUMULATOR` (27) | $s_i^{(t)} = \text{clamp}(s_i^{(t-1)} + x_i^{(t)} \cdot g_i, -16.0, 16.0), \quad u_i^{(t)} = s_i^{(t)}$ | Bounded persistent accumulator (saturating integral, temporal working-memory core) |
 
 #### Empirical Primitive Selection & Initialization Prior Boundaries
-While the SDSCC substrate formally implements 26 complete atomic primitives, empirical evolution reveals sharp task-dimensional divergence:
+While the SDSCC substrate formally implements 28 complete atomic primitives, empirical evolution reveals sharp task-dimensional divergence:
 1. **Spontaneous Sparse Convergence in Low-Dimensional Tasks**: In the 14-cell commodity futures quant champion (`quant_futures_champion.bin`), evolutionary selection pruned all superfluous operators, converging strictly to **6 core primitives**: leaky accumulator (`EMA/INTEGRATE` × 3), weighted summing (`SUM` × 2), divergence difference (`SUB` × 1), Schmitt trigger (`HYSTERESIS` × 1), time derivative (`DIFF` × 1), and deadzone (`DEADZONE` × 1). Crucially, the synergistic pairing `HYSTERESIS + EMA(INTEGRATE)` emerged autonomously without human prior injection, forming an adaptive physical low-pass filter and bistable anti-chatter loop.
 2. **Prior Sampling Reality in High-Dimensional Control Cortices**: In the 192-hidden-cell ADAS driving cortex (`adas_cortex_champion.bin`), all 18 primitives appear with near-uniform frequency (6~19 cells each). Traceability analysis (`train_adas_cortex.py:190`) demonstrates that this distribution stems directly from uniform pseudorandom sampling (`random.choice`) during population seeding. Within the current shallow evolutionary envelope (`pop=16, gen=20`), selection pressure has not yet reshaped primitive type proportions. Hence, this 18-type diversity is an initialization sampling artifact rather than evolved synergy; the empirical necessity of the remaining 18+ primitives awaits deep, long-horizon generation studies.
 
@@ -169,7 +170,7 @@ typedef struct {
 } SDSCBinaryHeader; /* 72-byte hardware-aligned header */
 
 typedef struct {
-    uint8_t  op_type;          /* 26-primitive opcode (0~25) */
+    uint8_t  op_type;          /* 28-primitive opcode (0~27) */
     uint8_t  param1_u8;        /* 8-bit quantized gain (0.0~4.0) */
     uint8_t  param2_u8;        /* 8-bit quantized bias/aux */
     uint8_t  flags;            /* Bitflags (0x01: Receptor, 0x02: Effector) */
@@ -389,7 +390,7 @@ To evaluate SDSCC's large-scale cortical reasoning and self-organizing decision-
 2. **Straight-cruise and high-speed precision bounds**: earlier 20-generation champions exhibited a 1.04 m straight-cruise bias; while the current 210-cell champion has reduced mean CTE to $0.074 \pm 0.002\,\text{m}$ (steady-state offset < 4.5 cm), it remains under-tuned on pure straight lines and unseen high-speed overtake (`val_highway` 72.8 cm vs 20.8 cm) compared to industrial Stanley geometric feedforward.
 3. **`tests/test_flow_sota_benchmark.cpp` is not a SOTA comparison**: its "Dense MLP" has constant untrained weights, its "NEAT" is a hand-built static graph, and its data is a synthetic random walk. Those results are excluded from this paper. The Stanley head-to-head (§5.2) is currently the only classical baseline.
 4. **Single training seed for driving**; the 10 seeds of Table 2b are *evaluation-noise* seeds for one champion, not independent training runs.
-5. **Primitive-set necessity**: the quant champion uses 6 of 26 primitives; the ADAS 18-type histogram is the initialisation prior of `train_adas_cortex.py`. Necessity of the remaining primitives is unshown.
+5. **Primitive-set necessity**: the quant champion uses 6 of 28 primitives; the ADAS 18-type histogram is the initialisation prior of `train_adas_cortex.py`. Necessity of the remaining primitives is unshown.
 6. **Operator ablation missing** for the four morphogenetic operators (§5.9); the earlier "Table 5b" is withdrawn.
 7. **Stability claim is a screen, not a proof** (§5.9 item 3); the dissipative-gate exemption is known to be too permissive.
 8. **No sample-complexity / hypothesis-class-size analysis** for typed graphs versus dense networks (§1.2).
@@ -406,7 +407,7 @@ To evaluate SDSCC's large-scale cortical reasoning and self-organizing decision-
 
 ### 7.1 Why the substrate should not grow with the task
 
-The 26-primitive set is analogous to a fixed instruction set: an ISA is not extended with a `LaneKeep` opcode when a new program is needed. All results in §5 were obtained by changing *fitness functions, sensor encodings and training loops* in the task layer only; commit `c19f645` moved every task header out of `include/kun/cellular/` for exactly this reason. Two honest caveats bound this analogy:
+The 28-primitive set is analogous to a fixed instruction set: an ISA is not extended with a `LaneKeep` opcode when a new program is needed. All results in §5 were obtained by changing *fitness functions, sensor encodings and training loops* in the task layer only; commit `c19f645` moved every task header out of `include/kun/cellular/` for exactly this reason. Two honest caveats bound this analogy:
 
 - We make **no completeness claim**. `SDSC_OP_MULTIPLY` is a single-input gain modulation (`tanh(1.5·g·x)`), not a two-signal product node, so bilinear systems are not representable and no Volterra/Wiener-style universality follows. The defensible statement is *empirical sufficiency* for PID-, hysteresis- and oscillator-class controllers (§5).
 - Composability removes the apparent need for new memory primitives: `GATE_HYSTERESIS` with a feedback edge is an SR latch; a chain of `EMA` nodes is a tapped delay line. New primitives would enlarge the hypothesis class (§1.2) and would each require the necessity evidence that §6 item 5 already flags as missing.
@@ -456,7 +457,7 @@ Before examining philosophical isomorphisms, we delineate the categorical bounda
 - Operates as "parametric tuning on fixed forms" — the form persists, the numbers shift.
 
 **SDSCC Morphogenetic Evolution**:
-- Optimization Target: **Topological DAGs of 26 heterogeneous dynamical primitives**;
+- Optimization Target: **Topological DAGs of 28 heterogeneous dynamical primitives**;
 - Completely eliminates homogeneous weight matrices; computation is discrete topological potential propagation;
 - Genomes encode **form** (structures and causal pathways); evolution is topological phase change and natural selection;
 - Operates as "emergent structural genesis" — forms emerge from single-cell zygotes into complex nervous systems.
@@ -476,7 +477,7 @@ This cosmogony shares an exact structural isomorphism with SDSCC:
 | **The One** (Taiji, Undifferentiated) | Single Undifferentiated Zygote Cell | Minimal primitive unit — Unspecialized, possessing basic potential excitation |
 | **The Two** (Yin and Yang) | Excitation and Inhibition | Synaptic polarity and antagonistic cancellation, the dual basis of computation |
 | **The Three** (Heaven, Earth, Man) | Receptor-Integrator-Effector Triad | Sensory Receptors + Metabolic Operators + Effector Actions — The irreducible minimal closed-loop reflex arc |
-| **The Ten Thousand Things** | Evolved Topologies of 26 Primitives | Spontaneous emergence from lane-centering reflexes to multi-asset cortical arrays |
+| **The Ten Thousand Things** | Evolved Topologies of 28 Primitives | Spontaneous emergence from lane-centering reflexes to multi-asset cortical arrays |
 
 **Modern Cybernetic Interpretation of "Blending Vital Breaths"**: In closed-loop control, negative feedback (Yin: correction and braking) and positive drive (Yang: objective and acceleration) reach dynamic equilibrium through stabilizing operators (the breath: steady-state integration and hysteresis filtering).
 

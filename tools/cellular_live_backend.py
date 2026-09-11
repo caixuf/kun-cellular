@@ -4347,8 +4347,8 @@ def answer_cellular_dialogue(prompt: str) -> dict:
     # 3. 领域知识精准路由与物理状态注入 (Cellular Neural RAG)
     if any(k in prompt_clean for k in ["迷宫", "雷达导航"]):
         ans = (
-            f"【迷宫新奇性导航生命体回应】：当前代际 Gen-{live_maze.generation}，"
-            f"24 个具身智能体基于三向激光测距与局部神经反射弧自主探索，通关率已涌现至 {live_maze.get_snapshot()['pass_rate']}%。"
+            f"【迷宫导航生命体回应】：当前代际 EP-{live_maze.generation}，"
+            f"maze_navigation_champion (11 细胞 · 测地方位 L3 真前向) 抵达率 {live_maze.get_snapshot()['pass_rate']}%（锁档冷评 96/100）。"
         )
         mode = "mature"
     elif any(k in prompt_clean for k in ["智驾", "自动驾驶", "百万细胞", "阿克曼", "赛道", "转向", "居中", "急弯"]):
