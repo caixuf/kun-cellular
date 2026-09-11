@@ -90,7 +90,7 @@
 
 ---
 
-## 三、理论体系：26 原语动力学演化框架
+## 三、理论体系：28 原语动力学演化框架
 
 系统通过 **Kahn 拓扑排序编译器**将有向图展平为无循环计算序列，并使用以下四个演化机制驱动拓扑搜索：
 
@@ -125,7 +125,7 @@
 ```
 kun-cellular/
 ├── include/kun/cellular/          # C/C++ 核心底座（~11,000 行）
-│   ├── cellular_genome.hpp        # 26 原语 + BIBO 稳定性判定器
+│   ├── cellular_genome.hpp        # 28 原语 + BIBO 稳定性判定器
 │   ├── sdsc_binary_runtime.h      # SDSC-BIN v2 零拷贝 mmap 运行时
 │   ├── sdsc_cortex.h              # 基础自动驾驶皮层（Zero-GC）
 │   ├── island_evolution_grid.hpp  # 8 岛屿拓扑演化

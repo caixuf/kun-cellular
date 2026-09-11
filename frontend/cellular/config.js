@@ -114,6 +114,8 @@ export const LIFEFORM_SCALES = {
   fluid_damper_champion: 40,
   cartpole_balance_champion: 13,
   cartpole_tripartite_champion: 8,
+  locomotion_gait_champion: 11,
+  slingshot_nav_champion: 17,
   music_composer_cortex: 1024
 };
 

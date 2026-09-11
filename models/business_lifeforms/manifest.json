@@ -362,6 +362,58 @@
         "MelodicMotifMemoryCortex": "动机记忆柱"
       },
       "validation_report": "仅验证 SDSC-BIN 头与清单挂载; README 已声明不构成音乐生成能力宣称。"
+    },
+    {
+      "id": "locomotion_gait_champion",
+      "name": "多足步态生命体 (11细胞·organism 真前向)",
+      "domain": "欠驱动多足步态与肌肉时序控制",
+      "cells_scale": 11,
+      "synapses_scale": 13,
+      "checkpoint": "checkpoints/locomotion_gait_champion.bin",
+      "c_header": "tasks/robotics/locomotion_gait.hpp",
+      "test_suite": "tests/test_demo_runtime_parity.py",
+      "input_signals": [
+        "躯干高度/竖向速度",
+        "躯干倾角/角速度",
+        "双足离地高度",
+        "4 肌肉长度比"
+      ],
+      "action_outputs": [
+        "4 肌肉目标长度 (positive/negative/defensive_reset/predicted_sense_0)"
+      ],
+      "primitive_motif": [
+        "OP_DIFF",
+        "OP_INTEGRATE",
+        "GATE_HYSTERESIS",
+        "OP_OSCILLATOR"
+      ],
+      "validation_report": "【organism 真前向】LocomotionGaitTask：肌肉目标长度由 CellularOrganism 连续输出驱动；固定表型冷评 Train/ID/OOD 100%（前进 ≥80px）。见 locomotion_gait_report.json。"
+    },
+    {
+      "id": "slingshot_nav_champion",
+      "name": "三体引力弹弓导航生命体 (17细胞·organism 真前向)",
+      "domain": "混沌三体牛顿引力场中的推力导航",
+      "cells_scale": 17,
+      "synapses_scale": 39,
+      "checkpoint": "checkpoints/slingshot_nav_champion.bin",
+      "c_header": "tasks/robotics/slingshot_nav.hpp",
+      "test_suite": "tests/test_demo_runtime_parity.py",
+      "input_signals": [
+        "3 天体相对位置/速度 (12)",
+        "目标相对位置 (2)",
+        "探测器速度 (2)"
+      ],
+      "action_outputs": [
+        "推力 ax / ay",
+        "推力增益 boost"
+      ],
+      "primitive_motif": [
+        "OP_INTEGRATE",
+        "OP_DIFF",
+        "OP_SUM",
+        "GATE_DEADZONE"
+      ],
+      "validation_report": "【organism 真前向】SlingshotNavTask：探测器推力由演化 CellularOrganism 驱动；Train 100% / ID 80% / OOD 50%（OOD 为温和 G 扰动 1.5→1.6，门禁达标）。见 slingshot_nav_report.json。"
     }
   ]
 }
