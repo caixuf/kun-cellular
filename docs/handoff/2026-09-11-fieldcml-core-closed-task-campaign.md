@@ -61,4 +61,5 @@ OMP_NUM_THREADS=6 ./build/train_flagship_wired 64 120 io_mix 16 0 20260910
 - [x] T4 易证回归烟测（CartPole/迷宫/流体）— C1✅ F1✅；M1 欧氏负（~80%）
 - [x] 迷宫 L3（测地方位脚手架）— L3-M1/M2/M3 ✅（96%/100%）
 - [x] T5 量化皮层阵列复现锁 — **负**：seed0 复训 OOS 夏普 -0.03（论文 0.22 未复现；选择集过拟合）
-- [ ] T6 按序（后置）
+- [x] T6 斗地主评测锁档 — ✅ 57.0%@2000，vs 教师 p=0.13 持平（未再训）
+- [x] 战役总结：`docs/handoff/2026-09-11-task-campaign-wrap.md`
