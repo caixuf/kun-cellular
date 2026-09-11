@@ -28,8 +28,10 @@
 
 ### 复现命令（开跑时填写）
 
-```
-（待填）
+```bash
+cmake --build build --target train_household_coverage_tripartite -j
+./build/train_household_coverage_tripartite --eval-only
+# 多种子重训（若冷评不过）：./build/train_household_coverage_tripartite
 ```
 
 ---
@@ -38,20 +40,26 @@
 
 | 编号 | 判据 |
 |------|------|
-| H1 | 三种子（或三组 holdout）**平均覆盖率 ≥ 既有单次宣称的 90% 相对水平**——开跑前从一次 dry-run 打印「当前冠军冷评覆盖率 C0」，冻结为 `mean ≥ C0 − 0.05` |
-| H2 | 回充/回桩成功率：三组均值 ≥ max(C0_dock − 0.05, 0.50)（C0_dock 由 dry-run 冻结） |
-| H3 | 动态障碍碰撞率：三组均值 ≤ C0_crash + 0.05（越低越好） |
-| H4 | 冠军仍可导出 SDSC-BIN + cert；Lyapunov 声明不劣于现有 CERTIFIED |
+| H1 | 冷评或重训后三组 holdout **平均覆盖率 ≥ max(C0, 0.70) − 0.05**；若 C0<0.20，则战役升级为「修复至 ≥0.70 覆盖」而非「多种子巩固」 |
+| H2 | 安全回充率 ≥ 0.50（C0_dock=0 时用绝对门槛） |
+| H3 | OOD 动态避障自愈率 ≥ 0.50（C0 失效时用绝对门槛） |
+| H4 | 可导出 SDSC-BIN + cert；Lyapunov CERTIFIED |
 
-**阈值冻结声明**：C0* 必须在 dry-run 后、正式多种子前写入本节；之后禁止改。
+**阈值冻结声明**：下表 C0 来自 2026-09-11 `--eval-only` dry-run；之后禁止改写 C0。
 
-### 冻结的 C0（dry-run 后填）
+### 冻结的 C0（dry-run 2026-09-11）
 
 | 量 | 值 |
 |----|-----|
-| C0 覆盖率 | （待填） |
-| C0_dock | （待填） |
-| C0_crash | （待填） |
+| C0 覆盖率（ID 24×16，50 种子） | **0.070** |
+| C0 合规通过率 ≥70% | **0/50** |
+| C0_dock 安全回充率 | **0/50** |
+| C0_crash 碰撞总次数 | 58950（评测器打印「安全零事故」——口径待核对，可能为接触计数非失败） |
+| C0 OOD 覆盖率 | **0.062** |
+| C0 OOD 动态避障自愈率 | **0/50** |
+| BFS 教师覆盖率（同协议） | **1.000** |
+
+**战役定性修正**：现有 `household_coverage_champion.bin` **冷评失效**（远低于论文/前端叙事）。T2 主目标改为 **修复或重训至 H1–H3 绝对门槛**，不得把失效冠军多种子「平均一下」当通过。
 
 ---
 
