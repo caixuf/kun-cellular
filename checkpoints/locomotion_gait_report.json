@@ -1,0 +1,30 @@
+{
+  "task_name": "LocomotionGait",
+  "organism_id": 13,
+  "lineage": "Apex-Gen2",
+  "topology_hash": "WL-ad124d6aefa451cf-C11S13",
+  "num_cells": 11,
+  "num_synapses": 13,
+  "m1_gate_passed": true,
+  "verdict": "M1 Strict 3-Isolation OOS Report: Train[SR=100.0%] -> ID-Holdout[SR=100.0%, Ratio=1.00] -> OOD-Holdout[SR=100.0%, Ratio=1.00]. Gate=PASSED (Strict All-Green)",
+  "train": {
+    "success_rate": 1,
+    "mean_fitness": 1,
+    "mean_steps": 199,
+    "episodes": 10
+  },
+  "holdout_id": {
+    "success_rate": 1,
+    "generalization_ratio": 1,
+    "mean_fitness": 1,
+    "mean_steps": 199,
+    "episodes": 10
+  },
+  "holdout_ood": {
+    "success_rate": 1,
+    "generalization_ratio": 1,
+    "mean_fitness": 1,
+    "mean_steps": 199,
+    "episodes": 10
+  }
+}

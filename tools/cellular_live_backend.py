@@ -3494,175 +3494,111 @@ class SiliconLifeformLibrary:
 
 silicon_library = SiliconLifeformLibrary()
 
+class CLocoNode(ctypes.Structure):
+    _fields_ = [("x", ctypes.c_float), ("y", ctypes.c_float)]
+
+
+class CLocoMuscle(ctypes.Structure):
+    _fields_ = [
+        ("n1", ctypes.c_int32),
+        ("n2", ctypes.c_int32),
+        ("rest", ctypes.c_float),
+    ]
+
+
+class CLocomotionTelemetry(ctypes.Structure):
+    _fields_ = [
+        ("real", ctypes.c_int32),
+        ("generation", ctypes.c_int32),
+        ("step_count", ctypes.c_int32),
+        ("max_steps", ctypes.c_int32),
+        ("best_distance", ctypes.c_float),
+        ("history_len", ctypes.c_int32),
+        ("history_dist", ctypes.c_float * 64),
+        ("n_nodes", ctypes.c_int32),
+        ("nodes", CLocoNode * 8),
+        ("n_muscles", ctypes.c_int32),
+        ("muscles", CLocoMuscle * 8),
+    ]
+
+
 class LiveLocomotionSimulator:
+    """多足步态真前向运行时 (演化 organism 驱动肌肉目标长度)"""
     def __init__(self):
         self.lock = threading.RLock()
-        self.generation = 1
+        self.generation = 0
         self.step_count = 0
-        self.max_steps = 260
+        self.max_steps = 200
         self.warp_speed = 5
-        self.x_base = 80.0
-        self.ground_y = 380.0
-        self.best_distance = 0
-        self.history_dist = [0]
-        self.pop_size = 8
-        self.population = []
-        self.init_population(self.pop_size)
+        self.best_distance = 0.0
+        self.lib = None
+        self.real = False
+        self._last = None
+        self._mount()
 
-    def init_population(self, n=8):
-        with self.lock:
-            self.pop_size = n
-            self.population = []
-            base_muscles = [
-                {"n1": 0, "n2": 1, "rest": 40.0},
-                {"n1": 0, "n2": 2, "rest": 50.0},
-                {"n1": 1, "n2": 3, "rest": 50.0},
-                {"n1": 2, "n2": 3, "rest": 40.0},
-                {"n1": 0, "n2": 3, "rest": 64.0}
-            ]
-            for _ in range(self.pop_size):
-                ind = {"muscles": [], "fitness": 0.0}
-                for bm in base_muscles:
-                    m = dict(bm)
-                    m["phase"] = random.uniform(0.0, 2.0 * math.pi)
-                    m["freq"] = random.uniform(2.5, 4.5)
-                    m["amp"] = random.uniform(0.15, 0.35)
-                    ind["muscles"].append(m)
-                self.population.append(ind)
-            self.generation = 1
-            self.step_count = 0
-            self.best_distance = 0
-            self.history_dist = [0]
-            self.reset_organism_state()
+    def _mount(self):
+        try:
+            lib_path = os.path.join(ROOT_DIR, "build", "libkun_locomotion_runtime.so")
+            if not os.path.exists(lib_path):
+                print(f"[LocoLive] 共享库不存在: {lib_path}, 尝试编译")
+                os.system(f"cmake --build {os.path.join(ROOT_DIR, 'build')} --target kun_locomotion_runtime -j4")
+            self.lib = ctypes.CDLL(lib_path)
+            self.lib.locomotion_c_init.argtypes = [ctypes.c_char_p]
+            self.lib.locomotion_c_init.restype = ctypes.c_int32
+            self.lib.locomotion_c_reset.argtypes = [ctypes.c_uint32]
+            self.lib.locomotion_c_reset.restype = None
+            self.lib.locomotion_c_step.argtypes = []
+            self.lib.locomotion_c_step.restype = ctypes.c_int32
+            self.lib.locomotion_c_get_telemetry.argtypes = [ctypes.POINTER(CLocomotionTelemetry)]
+            self.lib.locomotion_c_get_telemetry.restype = None
+            ckpt = os.path.join(ROOT_DIR, "checkpoints", "locomotion_gait_champion.bin").encode("utf-8")
+            self.real = bool(self.lib.locomotion_c_init(ckpt))
+            self._pull()
+            if self.real:
+                print("[LocoLive] 真实步态冠军已挂载: locomotion_gait_champion.bin")
+        except Exception as e:
+            self.real = False
+            self.lib = None
+            print(f"[LocoLive] 挂载失败 (保持离线): {e}")
 
-    def reset_organism_state(self):
-        self.nodes = [
-            {"x": self.x_base, "y": 320.0, "vx": 0.0, "vy": 0.0},
-            {"x": self.x_base + 40.0, "y": 320.0, "vx": 0.0, "vy": 0.0},
-            {"x": self.x_base, "y": 370.0, "vx": 0.0, "vy": 0.0},
-            {"x": self.x_base + 40.0, "y": 370.0, "vx": 0.0, "vy": 0.0}
-        ]
-        if self.population:
-            self.muscles = [dict(m) for m in self.population[0]["muscles"]]
-        else:
-            self.muscles = []
+    def _pull(self):
+        if not self.real or self.lib is None:
+            return
+        t = CLocomotionTelemetry()
+        self.lib.locomotion_c_get_telemetry(ctypes.byref(t))
+        self._last = t
+        self.generation = int(t.generation)
+        self.step_count = int(t.step_count)
+        self.max_steps = int(t.max_steps)
+        self.best_distance = float(t.best_distance)
 
-    def eval_candidate_pure_physics(self, muscles, steps=260):
-        nodes = [
-            {"x": self.x_base, "y": 320.0, "vx": 0.0, "vy": 0.0},
-            {"x": self.x_base + 40.0, "y": 320.0, "vx": 0.0, "vy": 0.0},
-            {"x": self.x_base, "y": 370.0, "vx": 0.0, "vy": 0.0},
-            {"x": self.x_base + 40.0, "y": 370.0, "vx": 0.0, "vy": 0.0}
-        ]
-        for s in range(steps):
-            t = s * 0.05
-            for m in muscles:
-                act = math.sin(t * m.get("freq", 4.0) + m["phase"])
-                target_len = m["rest"] * (1.0 + act * m.get("amp", 0.25))
-                n1, n2 = nodes[m["n1"]], nodes[m["n2"]]
-                dx, dy = n2["x"] - n1["x"], n2["y"] - n1["y"]
-                d = math.sqrt(dx*dx + dy*dy) + 1e-5
-                f = (d - target_len) * 0.18
-                fx, fy = (dx/d)*f, (dy/d)*f
-                n1["vx"] += fx; n1["vy"] += fy
-                n2["vx"] -= fx; n2["vy"] -= fy
-
-            for n in nodes:
-                n["vy"] += 0.40
-                n["x"] += n["vx"]
-                n["y"] += n["vy"]
-                n["vx"] *= 0.95
-                n["vy"] *= 0.95
-                if n["y"] >= self.ground_y - 6:
-                    n["y"] = self.ground_y - 6
-                    n["vy"] = 0.0
-                    n["vx"] *= 0.20
-        return max(0.0, nodes[0]["x"] - self.x_base)
-
-    def advance_generation(self, current_dist):
-        if self.population:
-            self.population[0]["fitness"] = float(current_dist)
-        for i in range(1, len(self.population)):
-            self.population[i]["fitness"] = self.eval_candidate_pure_physics(self.population[i]["muscles"])
-        self.population.sort(key=lambda x: x["fitness"], reverse=True)
-        top_dist = self.population[0]["fitness"]
-        if top_dist > self.best_distance:
-            self.best_distance = int(top_dist)
-        self.generation += 1
-        self.history_dist.append(self.best_distance)
-        if len(self.history_dist) > 35:
-            self.history_dist.pop(0)
-
-        elites = [self.population[0], self.population[1] if len(self.population) > 1 else self.population[0]]
-        new_pop = [
-            {"muscles": [dict(m) for m in elites[0]["muscles"]], "fitness": 0.0},
-            {"muscles": [dict(m) for m in elites[1]["muscles"]], "fitness": 0.0}
-        ]
-        while len(new_pop) < self.pop_size:
-            parent = random.choice(elites)
-            child_muscles = []
-            for m in parent["muscles"]:
-                cm = dict(m)
-                if random.random() < 0.65:
-                    cm["phase"] = (cm["phase"] + random.gauss(0, 0.35)) % (2 * math.pi)
-                if random.random() < 0.40:
-                    cm["freq"] = max(1.8, min(6.0, cm["freq"] + random.gauss(0, 0.3)))
-                if random.random() < 0.40:
-                    cm["amp"] = max(0.10, min(0.40, cm["amp"] + random.gauss(0, 0.05)))
-                child_muscles.append(cm)
-            new_pop.append({"muscles": child_muscles, "fitness": 0.0})
-
-        self.population = new_pop
-        self.reset_organism_state()
+    def init_population(self, size=20):
+        if self.real and self.lib is not None:
+            self.lib.locomotion_c_reset(0)
+            self._pull()
 
     def step_physics(self):
-        with self.lock:
-            self.step_count += 1
-            t = self.step_count * 0.05
-            for m in self.muscles:
-                act = math.sin(t * m.get("freq", 4.0) + m["phase"])
-                target_len = m["rest"] * (1.0 + act * m.get("amp", 0.25))
-                n1, n2 = self.nodes[m["n1"]], self.nodes[m["n2"]]
-                dx, dy = n2["x"] - n1["x"], n2["y"] - n1["y"]
-                d = math.sqrt(dx*dx + dy*dy) + 1e-5
-                f = (d - target_len) * 0.18
-                fx, fy = (dx/d)*f, (dy/d)*f
-                n1["vx"] += fx; n1["vy"] += fy
-                n2["vx"] -= fx; n2["vy"] -= fy
-
-            for n in self.nodes:
-                n["vy"] += 0.40
-                n["x"] += n["vx"]
-                n["y"] += n["vy"]
-                n["vx"] *= 0.95
-                n["vy"] *= 0.95
-                if n["y"] >= self.ground_y - 6:
-                    n["y"] = self.ground_y - 6
-                    n["vy"] = 0.0
-                    # 纯净牛顿物理与地面库仑摩擦（完全剔除任何人工向前加速外挂）
-                    n["vx"] *= 0.20
-
-            dist = int(max(0, self.nodes[0]["x"] - self.x_base))
-            if dist > self.best_distance:
-                self.best_distance = dist
-
-            if self.step_count >= self.max_steps or self.nodes[0]["x"] > 1200:
-                self.step_count = 0
-                self.advance_generation(dist)
+        if self.real and self.lib is not None:
+            self.lib.locomotion_c_step()
+            self._pull()
 
     def get_snapshot(self):
-        with self.lock:
-            return {
-                "generation": self.generation,
-                "step_count": self.step_count,
-                "max_steps": self.max_steps,
-                "best_distance": self.best_distance,
-                "history_dist": list(self.history_dist),
-                "champion": {
-                    "nodes": list(self.nodes),
-                    "muscles": list(self.muscles)
-                }
-            }
+        if not self.real or self._last is None:
+            nodes = [{"x": 120, "y": 320, "vx": 0.0, "vy": 0.0}, {"x": 80, "y": 320, "vx": 0.0, "vy": 0.0},
+                     {"x": 80, "y": 370, "vx": 0.0, "vy": 0.0}, {"x": 120, "y": 370, "vx": 0.0, "vy": 0.0}]
+            muscles = [{"n1": 0, "n2": 1}, {"n1": 1, "n2": 2}, {"n1": 0, "n2": 3}, {"n1": 1, "n2": 3}]
+            return {"generation": self.generation, "step_count": self.step_count, "max_steps": self.max_steps,
+                    "best_distance": self.best_distance, "history_dist": [0.0],
+                    "champion": {"nodes": nodes, "muscles": muscles}, "real": False}
+        t = self._last
+        nodes = [{"x": float(t.nodes[i].x), "y": float(t.nodes[i].y), "vx": 0.0, "vy": 0.0}
+                 for i in range(int(t.n_nodes))]
+        muscles = [{"n1": int(t.muscles[i].n1), "n2": int(t.muscles[i].n2), "rest": float(t.muscles[i].rest)}
+                   for i in range(int(t.n_muscles))]
+        hist = [float(t.history_dist[i]) for i in range(int(t.history_len))]
+        return {"generation": int(t.generation), "step_count": int(t.step_count), "max_steps": int(t.max_steps),
+                "best_distance": float(t.best_distance), "history_dist": hist or [0.0],
+                "champion": {"nodes": nodes, "muscles": muscles}, "real": True}
 
 live_loco = LiveLocomotionSimulator()
 

@@ -170,6 +170,9 @@ target_link_libraries(train_maze_l3_distill PRIVATE kun_cellular Threads::Thread
 add_executable(train_cart_pole "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_cart_pole.cpp")
 target_link_libraries(train_cart_pole PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_locomotion_gait "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_locomotion_gait.cpp")
+target_link_libraries(train_locomotion_gait PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_maze_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_maze_tripartite.cpp")
 target_link_libraries(train_maze_tripartite PRIVATE kun_cellular Threads::Threads m)
 
@@ -360,6 +363,21 @@ target_include_directories(kun_eco_runtime PUBLIC
 )
 target_link_libraries(kun_eco_runtime PRIVATE kun_cellular Threads::Threads m)
 set_target_properties(kun_eco_runtime PROPERTIES
+    CXX_STANDARD 20
+    CXX_STANDARD_REQUIRED ON
+    POSITION_INDEPENDENT_CODE ON
+)
+
+add_library(kun_locomotion_runtime SHARED
+    "${CMAKE_CURRENT_SOURCE_DIR}/tools/locomotion_c_runtime.cpp"
+)
+target_include_directories(kun_locomotion_runtime PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include>
+)
+target_link_libraries(kun_locomotion_runtime PRIVATE kun_cellular Threads::Threads m)
+set_target_properties(kun_locomotion_runtime PROPERTIES
     CXX_STANDARD 20
     CXX_STANDARD_REQUIRED ON
     POSITION_INDEPENDENT_CODE ON
