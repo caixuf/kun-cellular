@@ -164,6 +164,9 @@ endforeach()
 add_executable(train_maze_navigator "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_maze_navigator.cpp")
 target_link_libraries(train_maze_navigator PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(train_cart_pole "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_cart_pole.cpp")
+target_link_libraries(train_cart_pole PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_maze_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_maze_tripartite.cpp")
 target_link_libraries(train_maze_tripartite PRIVATE kun_cellular Threads::Threads m)
 
@@ -267,6 +270,9 @@ target_link_libraries(kun_certify PRIVATE kun_cellular Threads::Threads m)
 
 add_executable(train_cart_pole_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_cart_pole_tripartite.cpp")
 target_link_libraries(train_cart_pole_tripartite PRIVATE kun_cellular Threads::Threads m)
+
+add_executable(bench_easy_task_regression "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_easy_task_regression.cpp")
+target_link_libraries(bench_easy_task_regression PRIVATE kun_cellular Threads::Threads m)
 
 add_executable(train_quant_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_tripartite.cpp")
 target_link_libraries(train_quant_tripartite PRIVATE kun_cellular Threads::Threads m)

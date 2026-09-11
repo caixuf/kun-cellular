@@ -13,7 +13,7 @@ int main() {
     std::cout << "=========================================================\n";
 
     const int POPULATION_SIZE = 36;
-    const int GENERATIONS = 35;
+    const int GENERATIONS = 50;
     const uint32_t SEED = 20260903;
     const int MAP_SIZE = 11;
     const int MAX_STEPS = 250;
@@ -121,6 +121,11 @@ int main() {
 
     std::cout << "🛡️ 门禁 3 (100 独立随机种子 OOD 盲测): 成功率 = " 
               << (ood_sr * 100.0) << "% (" << ood_passed << "/" << OOD_TOTAL << ")\n";
+
+    // 落盘前同步基因初始权重，避免 reset_state(true) 抹掉演化表型
+    for (auto& s : global_champion.synapses) {
+        s.initial_weight = s.weight;
+    }
 
     std::string out_path = "checkpoints/maze_navigation_champion.bin";
     bool saved = global_champion.save_checkpoint_bin(out_path);

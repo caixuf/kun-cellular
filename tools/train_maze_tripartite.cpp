@@ -134,7 +134,7 @@ int main(int argc, char** argv) {
         std::cout << "[载入待评个体] " << champion.cells.size() << " 细胞 / " << champion.synapses.size() << " 突触\n";
         auto run_episode = [&](CellularOrganism& org, int w, uint32_t seed, float braid, int steps) -> std::pair<bool, double> {
             MazeTask task(w, w, seed, steps, braid);
-            org.reset_state(true);
+            org.reset_state(false);
             for (int t = 0; t < steps; ++t) {
                 auto obs = task.current_observation();
                 double inps[4] = {obs[0], obs[1], obs[2], obs[3]};
@@ -382,6 +382,7 @@ int main(int argc, char** argv) {
         teacher_bench("OOD  25×25", 25, 0.22f, 480, 66000, 50);
     }
 
+    for (auto& s : champion.synapses) s.initial_weight = s.weight;
     champion.save_checkpoint_bin("checkpoints/maze_tripartite_champion.bin");
     std::cout << "\n[产物] 冠军已存盘: checkpoints/maze_tripartite_champion.bin\n";
 

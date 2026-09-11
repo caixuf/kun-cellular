@@ -101,11 +101,14 @@ int main() {
                 champion.cells.size(), champion.synapses.size(),
                 TaskEvaluator::compute_topology_hash(champion).c_str());
 
+    // 落盘前同步基因初始权重，避免 reset_state(true) 抹掉演化表型
+    for (auto& s : champion.synapses) s.initial_weight = s.weight;
+
     champion.save_checkpoint_bin("checkpoints/cartpole_balance_champion.bin");
     std::ofstream rf("checkpoints/cartpole_balance_report.json");
     rf << report.to_json();
     rf.close();
     std::printf("  [SUCCESS] 冠军与门禁报告已存盘\n");
     std::printf("==========================================================\n");
-    return 0;
+    return report.passes_m1_gate ? 0 : 1;
 }

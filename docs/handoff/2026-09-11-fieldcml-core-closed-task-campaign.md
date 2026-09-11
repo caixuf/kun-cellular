@@ -58,5 +58,5 @@ OMP_NUM_THREADS=6 ./build/train_flagship_wired 64 120 io_mix 16 0 20260910
 - [x] T2 household 修复重训（H1–H3 ✅；根因=塑性重置抹掉演化）
 - [x] T3 ADAS 多种子锁档（脚本 ✅；未调参相对历史表负）
 - [x] ADAS L3 重调复锁（L1–L4 ✅ → 现仓 9W/7L）
-- [ ] T4 易证回归烟测（CartPole/迷宫/流体）
+- [x] T4 易证回归烟测（CartPole/迷宫/流体）— C1✅ F1✅；**M1 负**（迷宫 80/100，非 100%）
 - [ ] T5–T6 按序
