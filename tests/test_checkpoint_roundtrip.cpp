@@ -266,15 +266,16 @@ void test_legacy_v2_checkpoint_backward_compatibility() {
     // 3. cartpole_balance_champion.bin 历史形态学普查
     {
         CellularOrganism org = CellularOrganism::load_checkpoint_bin(find_ckpt_path("checkpoints/cartpole_balance_champion.bin"));
-        assert(org.cells.size() == 12);
+        assert(org.cells.size() == 13);
         int sense = 0, act = 0;
         for (const auto& c : org.cells) {
             if (is_receptor_cell(c.type)) sense++;
             else if (is_effector_cell(c.type)) act++;
         }
-        std::cout << "  ✓ cartpole_balance_champion.bin: cells=12, sense=" << sense << ", act=" << act << std::endl;
+        std::cout << "  ✓ cartpole_balance_champion.bin: cells=13, sense=" << sense << ", act=" << act << std::endl;
         assert(sense == 2 && "cartpole 受体数必须为 2！");
         assert(act == 3 && "cartpole 效应器数必须为 3！");
+        assert(org.synapses.size() == 49 && "cartpole 突触数必须为 49！");
     }
 
     std::cout << "[PASS] test_legacy_v2_checkpoint_backward_compatibility 完美通过！" << std::endl;

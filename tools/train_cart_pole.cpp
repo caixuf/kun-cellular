@@ -9,11 +9,87 @@
 // ============================================================================
 
 #include "tasks/control/cart_pole_task.hpp"
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstdio>
 #include <fstream>
+#include <functional>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 using namespace kun;
+
+// ============================================================================
+// 严格李雅普诺夫环增益修复 (任务层，不动底座)
+//
+// 底座 CellularOrganism::check_lyapunov_stability() 对"环内含耗散门 (EMA/迟滞/死区)"
+// 的反馈环宽容 (is_stable=true)，但形式化认证管线 kun_certify 的契约要求
+// max_loop_gain < 1.0 才颁发 BIBO 证书。为保证演化产物可通过认证，这里对高增益
+// 环做任务层权重缩放，把 max_loop_gain 压到 target 以下（幂律按环长分配，尽量小扰动）。
+// ============================================================================
+static void enforce_strict_loop_gain(CellularOrganism& org, double target = 0.95) {
+    struct Cycle { std::vector<std::pair<uint32_t, uint32_t>> edges; double gain{0.0}; };
+    for (int iter = 0; iter < 32; ++iter) {
+        auto rep = org.check_lyapunov_stability();
+        if (rep.max_loop_gain < target) break;
+
+        std::unordered_map<uint32_t, size_t> id2i;
+        for (size_t i = 0; i < org.cells.size(); ++i) id2i[org.cells[i].id] = i;
+        std::unordered_map<uint32_t, std::vector<std::pair<uint32_t, double>>> adj;
+        for (const auto& s : org.synapses) {
+            if (!s.is_active) continue;
+            if (id2i.count(s.from_cell_id) && id2i.count(s.to_cell_id))
+                adj[s.from_cell_id].push_back({s.to_cell_id, s.weight});
+        }
+
+        std::unordered_map<uint32_t, int> vis;
+        std::vector<uint32_t> path;
+        std::vector<double> wp;
+        Cycle best;
+        std::function<void(uint32_t)> dfs = [&](uint32_t u) {
+            vis[u] = 1; path.push_back(u);
+            for (const auto& e : adj[u]) {
+                wp.push_back(e.second);
+                uint32_t v = e.first;
+                if (vis[v] == 1) {
+                    auto it = std::find(path.begin(), path.end(), v);
+                    size_t st = static_cast<size_t>(std::distance(path.begin(), it));
+                    double g = 1.0;
+                    for (size_t k = st; k < path.size(); ++k)
+                        g *= CellularOrganism::get_cell_operator_gain(org.cells[id2i.at(path[k])].type, 0.0);
+                    for (size_t k = st; k < wp.size(); ++k) g *= std::fabs(wp[k]);
+                    if (g > best.gain) {
+                        best.gain = g; best.edges.clear();
+                        for (size_t k = st; k + 1 < path.size(); ++k)
+                            best.edges.push_back({path[k], path[k + 1]});
+                        best.edges.push_back({path.back(), v});
+                    }
+                } else if (vis[v] == 0) {
+                    dfs(v);
+                }
+                wp.pop_back();
+            }
+            path.pop_back(); vis[u] = 2;
+        };
+        for (const auto& c : org.cells) if (vis[c.id] == 0) dfs(c.id);
+        if (best.edges.empty()) break;
+
+        double f = std::pow(target / best.gain, 1.0 / static_cast<double>(best.edges.size()));
+        std::unordered_set<uint64_t> es;
+        for (const auto& e : best.edges) es.insert((static_cast<uint64_t>(e.first) << 32) | e.second);
+        for (auto& s : org.synapses) {
+            if (!s.is_active) continue;
+            if (es.count((static_cast<uint64_t>(s.from_cell_id) << 32) | s.to_cell_id)) {
+                s.weight *= f; s.initial_weight = s.weight;
+            }
+        }
+        org.compile();
+    }
+    auto rep = org.check_lyapunov_stability();
+    std::printf("  [Lyapunov] 严格环增益修复后 rho=%.5f (target<%.2f)\n", rep.max_loop_gain, target);
+}
 
 int main() {
     std::setvbuf(stdout, nullptr, _IONBF, 0);
@@ -82,6 +158,9 @@ int main() {
     }
     const double train_sec = std::chrono::duration<double>(
         std::chrono::high_resolution_clock::now() - t0).count();
+
+    // ---- 严格环增益修复 (保证可过 kun_certify 的 rho<1.0 契约) ----
+    enforce_strict_loop_gain(champion, 0.95);
 
     // ---- 三隔离门禁终审 (TaskEvaluator 规范路径) ----
     OOSReport report = TaskEvaluator::evaluate_task_split(

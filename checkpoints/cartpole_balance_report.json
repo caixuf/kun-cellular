@@ -2,28 +2,28 @@
   "task_name": "CartPoleBalance",
   "organism_id": 37,
   "lineage": "Apex-Gen87",
-  "topology_hash": "WL-39e853709133e9ff-C13S49",
+  "topology_hash": "WL-a23496b171ea63a7-C13S49",
   "num_cells": 13,
   "num_synapses": 49,
   "m1_gate_passed": true,
   "verdict": "M1 Strict 3-Isolation OOS Report: Train[SR=100.0%] -> ID-Holdout[SR=100.0%, Ratio=1.00] -> OOD-Holdout[SR=100.0%, Ratio=1.00]. Gate=PASSED (Strict All-Green)",
   "train": {
     "success_rate": 1,
-    "mean_fitness": 0.99906,
+    "mean_fitness": 0.999058,
     "mean_steps": 300,
     "episodes": 10
   },
   "holdout_id": {
     "success_rate": 1,
     "generalization_ratio": 1,
-    "mean_fitness": 0.998496,
+    "mean_fitness": 0.998489,
     "mean_steps": 300,
     "episodes": 10
   },
   "holdout_ood": {
     "success_rate": 1,
     "generalization_ratio": 1,
-    "mean_fitness": 1.79775,
+    "mean_fitness": 1.79778,
     "mean_steps": 600,
     "episodes": 10
   }
