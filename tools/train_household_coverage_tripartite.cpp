@@ -100,7 +100,9 @@ struct EpisodeResult {
 
 static EpisodeResult run_household_episode(CellularOrganism& org, int width, int height, uint32_t seed, int max_steps, bool inject_obstacle = false) {
     HouseholdCoverageTask task(width, height, seed, max_steps);
-    org.reset_state(true);
+    // 无在线塑性: 只清状态, 保留当代基因组权重 (切勿 reset_plasticity=true —
+    // 否则会打回未同步的 initial_weight, 演化变异被每回合抹掉)。
+    org.reset_state(false);
 
     bool injected = false;
 
@@ -206,9 +208,9 @@ int main(int argc, char** argv) {
     // -----------------------------------------------------------------------
     // 演化训练模式
     // -----------------------------------------------------------------------
-    std::mt19937 rng(20260906);
-    const size_t POP_SIZE = 24;
-    const size_t GENS = 35;
+    std::mt19937 rng(20260911);
+    const size_t POP_SIZE = 32;
+    const size_t GENS = 60;
 
     std::vector<CellularOrganism> population;
     for (size_t i = 0; i < POP_SIZE; ++i) {
@@ -218,7 +220,8 @@ int main(int argc, char** argv) {
     CellularOrganism best_champion = population[0];
     double best_fitness = -1e9;
 
-    std::cout << "[演化开始] 种群=" << POP_SIZE << " 代数=" << GENS << " | 三权分立学习与多生境选择压力\n";
+    std::cout << "[演化开始] 种群=" << POP_SIZE << " 代数=" << GENS
+              << " | 权重变异同步 initial_weight | reset_state(false)\n";
     auto t_start = std::chrono::steady_clock::now();
 
     for (size_t gen = 0; gen < GENS; ++gen) {
@@ -230,6 +233,8 @@ int main(int argc, char** argv) {
             auto r2 = run_household_episode(population[i], 24, 16, gen_seed + 2, 1200, false);
             auto r3 = run_household_episode(population[i], 26, 18, gen_seed + 3, 1200, true);
             fits[i] = (r1.fitness + r2.fitness + r3.fitness) / 3.0;
+            // 覆盖率硬加成, 避免「直行撞墙刷步数」虚高
+            fits[i] += 40.0 * (r1.coverage + r2.coverage + r3.coverage) / 3.0;
         }
 
         size_t best_idx = 0;
@@ -254,15 +259,25 @@ int main(int argc, char** argv) {
         std::vector<CellularOrganism> next_gen;
         next_gen.push_back(best_champion); // 精英保留
         std::uniform_int_distribution<size_t> p_dist(0, POP_SIZE - 1);
-        std::uniform_real_distribution<double> mut_dist(-0.06, 0.06);
+        std::uniform_real_distribution<double> mut_dist(-0.08, 0.08);
 
         while (next_gen.size() < POP_SIZE) {
             size_t a = p_dist(rng), b = p_dist(rng);
             size_t winner = (fits[a] > fits[b]) ? a : b;
             CellularOrganism child = population[winner];
             for (auto& s : child.synapses) {
-                if (std::uniform_real_distribution<double>(0, 1)(rng) < 0.20) {
-                    s.weight = std::clamp(s.weight + mut_dist(rng), -8.0, 8.0);
+                if (std::uniform_real_distribution<double>(0, 1)(rng) < 0.25) {
+                    const double w = std::clamp(s.weight + mut_dist(rng), -8.0, 8.0);
+                    s.weight = w;
+                    s.initial_weight = w;  // 基因组同步, 防止塑性重置抹掉演化
+                }
+            }
+            for (auto& c : child.cells) {
+                if (c.type == CellType::GATE_THRESHOLD || c.type == CellType::GATE_HYSTERESIS ||
+                    c.type == CellType::OP_EMA) {
+                    if (std::uniform_real_distribution<double>(0, 1)(rng) < 0.10) {
+                        c.param1 = std::clamp(c.param1 + mut_dist(rng) * 0.5, -2.0, 2.0);
+                    }
                 }
             }
             child.enforce_lyapunov_stability(0.85);
@@ -276,9 +291,52 @@ int main(int argc, char** argv) {
     double total_sec = std::chrono::duration<double>(t_end - t_start).count();
     std::cout << "[演化完成] 总耗时: " << std::fixed << std::setprecision(1) << total_sec << "s\n";
 
-    // 存盘
+    // 落盘前同步 initial_weight, 保证冷载入 + reset_plasticity 仍可复现
+    for (auto& s : best_champion.synapses) s.initial_weight = s.weight;
+    best_champion.compile();
     best_champion.save_checkpoint_bin(CHAMPION_PATH);
-    std::cout << "[模型落盘] " << CHAMPION_PATH << "\n";
+    std::cout << "[模型落盘] " << CHAMPION_PATH
+              << " | " << best_champion.cells.size() << " 细胞 / "
+              << best_champion.synapses.size() << " 突触\n";
+
+    // 训练后立即跑与 --eval-only 同协议的门禁, 决定是否宣称通过
+    {
+        CellularOrganism champ = CellularOrganism::load_checkpoint_bin(CHAMPION_PATH);
+        int id_passed = 0, id_docked = 0, ood_passed = 0, ood_healed = 0;
+        double sum_id = 0.0, sum_ood = 0.0;
+        for (int i = 0; i < 50; ++i) {
+            auto r = run_household_episode(champ, TEST_W, TEST_H, 1000 + i, TEST_STEPS, false);
+            sum_id += r.coverage;
+            if (r.coverage >= 0.70) id_passed++;
+            if (r.returned_to_dock) id_docked++;
+        }
+        for (int i = 0; i < 50; ++i) {
+            auto r = run_household_episode(champ, 28, 18, 5000 + i, TEST_STEPS, true);
+            sum_ood += r.coverage;
+            if (r.coverage >= 0.65) ood_passed++;
+            if (r.obstacle_healed) ood_healed++;
+        }
+        const double avg_id = sum_id / 50.0;
+        const double avg_ood = sum_ood / 50.0;
+        const bool h1 = avg_id >= 0.70;
+        const bool h2 = (id_docked / 50.0) >= 0.50;
+        const bool h3 = (ood_healed / 50.0) >= 0.50;
+        std::cout << "\n=== 训练后锁档评测 (同 --eval-only) ===\n";
+        std::cout << "  ID 覆盖均值=" << (avg_id * 100.0) << "%  合规=" << id_passed
+                  << "/50  回充=" << id_docked << "/50  => H1 " << (h1 ? "PASS" : "FAIL") << "\n";
+        std::cout << "  回充率=" << (id_docked * 2) << "% => H2 " << (h2 ? "PASS" : "FAIL") << "\n";
+        std::cout << "  OOD 覆盖=" << (avg_ood * 100.0) << "%  自愈=" << ood_healed
+                  << "/50 => H3 " << (h3 ? "PASS" : "FAIL") << "\n";
+        std::cout << "  JSON {\"avg_id_cov\":" << avg_id << ",\"id_pass\":" << id_passed
+                  << ",\"id_dock\":" << id_docked << ",\"avg_ood_cov\":" << avg_ood
+                  << ",\"ood_heal\":" << ood_healed << ",\"h1\":" << (h1 ? "true" : "false")
+                  << ",\"h2\":" << (h2 ? "true" : "false") << ",\"h3\":" << (h3 ? "true" : "false")
+                  << "}\n";
+        if (!(h1 && h2 && h3)) {
+            std::cout << "  [NEGATIVE] 未过 T2 绝对门槛; 产物已落盘供诊断, 不得升格论文宣称。\n";
+            return 2;
+        }
+    }
 
     return 0;
 }

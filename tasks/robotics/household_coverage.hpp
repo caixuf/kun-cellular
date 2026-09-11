@@ -845,12 +845,12 @@ public:
             // Forward thrust (positive_action) vs differential steering (negative_action: >0 right, <0 left)
             if (acts.positive_action > std::abs(acts.negative_action) && acts.positive_action > 0.05) {
                 action = Env::Action::FORWARD;
-            } else if (acts.negative_action > 0.0) {
+            } else if (acts.negative_action > 0.05) {
                 action = Env::Action::TURN_RIGHT;
-            } else if (acts.negative_action < 0.0) {
+            } else if (acts.negative_action < -0.05) {
                 action = Env::Action::TURN_LEFT;
             } else {
-                action = Env::Action::FORWARD;
+                action = Env::Action::WAIT;
             }
         }
 

@@ -55,5 +55,6 @@ OMP_NUM_THREADS=6 ./build/train_flagship_wired 64 120 io_mix 16 0 20260910
 
 - [x] 核心收口文档（本文件 + STATUS_BOARD 增补 + README 动物园勘误）
 - [x] T1 DomainZoo 复跑锁档（2026-09-11，12/12）
-- [ ] T2 household 预注册并开跑
-- [ ] T3–T6 按序
+- [x] T2 household 修复重训（H1–H3 ✅；根因=塑性重置抹掉演化）
+- [ ] T3 ADAS 多种子统计加固
+- [ ] T4–T6 按序
