@@ -371,6 +371,62 @@ inline void build_io_mix_columnar_wiring(CellularOrganism& org,
     apply_io_mix_developmental(org, spec.seed);
 }
 
+// 形态发生：按当前端点角色识别 IO 轴突（受体出边 ∪ 效应器入边），以 rate 概率改写目标。
+// 对齐论文「轴突重塑」——代际结构搜索，非梯度投影。返回本轮改写边数。
+inline size_t rewire_io_axon_targets(CellularOrganism& org, float rate, std::mt19937& rng) {
+    if (org.cells.empty() || org.synapses.empty() || rate <= 0.0f) return 0;
+    std::unordered_map<uint32_t, const Cell*> by_id;
+    by_id.reserve(org.cells.size() * 2);
+    for (const auto& c : org.cells) by_id[c.id] = &c;
+
+    std::vector<uint32_t> all_ids;
+    all_ids.reserve(org.cells.size());
+    for (const auto& c : org.cells) all_ids.push_back(c.id);
+
+    std::uniform_real_distribution<float> u(0.0f, 1.0f);
+    std::uniform_int_distribution<size_t> pick(0, all_ids.size() - 1);
+    size_t rewritten = 0;
+    for (auto& s : org.synapses) {
+        if (!s.is_active) continue;
+        const Cell* src = by_id[s.from_cell_id];
+        const Cell* dst = by_id[s.to_cell_id];
+        if (!src || !dst) continue;
+        const bool is_recv = (src->z < 0.0f && src->z > -1.5f);
+        const bool is_eff_in = (dst->z < -1.5f);
+        if (!is_recv && !is_eff_in) continue;
+        if (u(rng) >= rate) continue;
+        s.to_cell_id = all_ids[pick(rng)];
+        ++rewritten;
+    }
+    if (rewritten > 0) org.is_compiled_ = false;
+    return rewritten;
+}
+
+// 诊断：相对参照骨架，按参照端点识别的 IO 边上 to_cell_id 不一致比例。
+// 仅比较前 min(n) 条（闭包修复追加边忽略）；要求同工厂同序构建。
+inline double io_target_disagreement_ratio(const CellularOrganism& org,
+                                           const CellularOrganism& ref) {
+    if (ref.synapses.empty() || ref.cells.empty()) return 0.0;
+    std::unordered_map<uint32_t, const Cell*> by_id;
+    by_id.reserve(ref.cells.size() * 2);
+    for (const auto& c : ref.cells) by_id[c.id] = &c;
+
+    const size_t n = std::min(org.synapses.size(), ref.synapses.size());
+    size_t io_n = 0, diff = 0;
+    for (size_t i = 0; i < n; ++i) {
+        const auto& r = ref.synapses[i];
+        const Cell* src = by_id[r.from_cell_id];
+        const Cell* dst = by_id[r.to_cell_id];
+        if (!src || !dst) continue;
+        const bool is_recv = (src->z < 0.0f && src->z > -1.5f);
+        const bool is_eff_in = (dst->z < -1.5f);
+        if (!is_recv && !is_eff_in) continue;
+        ++io_n;
+        if (org.synapses[i].to_cell_id != r.to_cell_id) ++diff;
+    }
+    return io_n == 0 ? 0.0 : static_cast<double>(diff) / static_cast<double>(io_n);
+}
+
 // 编译后递归突触计数 (消融诊断: R′ / recur / rrac / io_mix 臂应 >0, 纯 DAG 为 0)
 inline size_t recurrent_synapse_count(const CellularOrganism& org) {
     size_t n = 0;
