@@ -1,0 +1,17 @@
+{
+  "name": "KunCellular",
+  "install": "bash .cursor/install.sh",
+  "terminals": [
+    {
+      "name": "live-backend",
+      "command": "python3 tools/cellular_live_backend.py",
+      "description": "SDSCC 实时计算与流式遥测后端 (细胞皮层前向推演 + 前端沙盒静态托管), 监听 http://localhost:8833/"
+    }
+  ],
+  "ports": [
+    {
+      "name": "live-backend",
+      "port": 8833
+    }
+  ]
+}
