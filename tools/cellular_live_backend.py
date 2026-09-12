@@ -827,7 +827,10 @@ class LiveVehicleSimulator:
 
             dx_b = self.xm - cx_m
             dy_b = self.ym - cy_m
-            signed_cte = math.cos(theta_b) * dy_b - math.sin(theta_b) * dx_b
+            # 严格对齐 train_adas_cortex.py 核心契约：
+            # cte = math.cos(ph) * (py - y) - math.sin(ph) * (px - x)
+            # 正值代表参考线在车身左侧，控制器输出正转向角向左纠偏
+            signed_cte = math.cos(theta_b) * (cy_m - self.ym) - math.sin(theta_b) * (cx_m - self.xm)
             self.cte = abs(signed_cte)
             self.s = curr_s
             self.total_dist += self.v * dt
@@ -881,7 +884,7 @@ class LiveVehicleSimulator:
             elif nc == 210 or organ is None:
                 k_cte = 0.45
                 k_heading = 1.2
-                steer_target = heading_err * k_heading - math.atan2(k_cte * signed_cte, max(1.0, self.v))
+                steer_target = heading_err * k_heading + math.atan2(k_cte * signed_cte, max(1.0, self.v))
                 steer_target = max(-0.55, min(0.55, steer_target))
                 self.delta += (steer_target - self.delta) * 0.38
                 self.v += (target_v - self.v) * 0.15
@@ -928,6 +931,7 @@ class LiveVehicleSimulator:
                 if adas is not None:
                     adas.reset_state()
                 self._adas_accel_act = 0.0
+                self.trail.clear()
 
             if not hasattr(self, "cell_outs") or len(self.cell_outs) != nc:
                 self.cell_outs = [0.0] * nc
@@ -1001,8 +1005,14 @@ class LiveVehicleSimulator:
                 if len(self.history_cte) > 40:
                     self.history_cte.pop(0)
             if self.step_count % 2 == 0:
-                self.trail.append({"x": round(self.x, 1), "y": round(self.y, 1)})
-                if len(self.trail) > 120:
+                pt = {"x": round(self.x, 1), "y": round(self.y, 1)}
+                if self.trail:
+                    last_pt = self.trail[-1]
+                    dist_sq = (pt["x"] - last_pt["x"]) ** 2 + (pt["y"] - last_pt["y"]) ** 2
+                    if dist_sq > 2500:  # 超过 50px 跳变（跨圈/瞬间位移）切断尾迹，避免穿屏折线
+                        self.trail.clear()
+                self.trail.append(pt)
+                if len(self.trail) > 180:
                     self.trail.pop(0)
                 self.champion_trail = list(self.trail)
 

@@ -680,122 +680,360 @@
 
             const track = (vehState && vehState.track) || [];
             if (track.length > 2) {
-                // 1. 沥青公路表面（半宽随后端米制 road_half_px）
+                const N = track.length;
                 const halfW = (vehState && vehState.road_half_px) ? vehState.road_half_px : 12;
-                ctx.strokeStyle = "#172033";
-                ctx.lineWidth = halfW * 2 * scale;
+
+                // 预先计算屏幕空间严格正交法向量（消灭 Canvas Y 轴导致的赛车路肩扭曲变形与交叉折角）
+                const leftBoundary = [];
+                const rightBoundary = [];
+                for (let i = 0; i < N; i++) {
+                    const pPrev = track[(i - 1 + N) % N];
+                    const pNext = track[(i + 1) % N];
+                    const pt = track[i];
+                    const scrX = offsetX + pt.x * scale;
+                    const scrY = offsetY + pt.y * scale;
+
+                    const dx = (pNext.x - pPrev.x) * scale;
+                    const dy = (pNext.y - pPrev.y) * scale;
+                    const len = Math.hypot(dx, dy) || 1.0;
+                    // 严格屏幕空间法向量 (nx, ny) 正交于切线 (dx, dy)
+                    const nx = -dy / len;
+                    const ny = dx / len;
+
+                    leftBoundary.push({ x: scrX + nx * halfW * scale, y: scrY + ny * halfW * scale });
+                    rightBoundary.push({ x: scrX - nx * halfW * scale, y: scrY - ny * halfW * scale });
+                }
+
+                ctx.save();
+
+                // 1. 公路深色路基底色 (Asphalt Sub-base)
+                ctx.strokeStyle = "#090d16";
+                ctx.lineWidth = (halfW * 2 + 6) * scale;
                 ctx.lineCap = "round";
                 ctx.lineJoin = "round";
                 ctx.beginPath();
                 track.forEach((pt, i) => {
-                    const scrX = offsetX + pt.x * scale;
-                    const scrY = offsetY + pt.y * scale;
-                    if (i === 0) ctx.moveTo(scrX, scrY);
-                    else ctx.lineTo(scrX, scrY);
+                    const sx = offsetX + pt.x * scale;
+                    const sy = offsetY + pt.y * scale;
+                    if (i === 0) ctx.moveTo(sx, sy);
+                    else ctx.lineTo(sx, sy);
                 });
                 ctx.closePath();
                 ctx.stroke();
 
-                // 2. 路肩白线
-                [-halfW, halfW].forEach(offset => {
-                    ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
-                    ctx.lineWidth = 2 * scale;
-                    ctx.beginPath();
-                    track.forEach((pt, i) => {
-                        const nx = Math.cos(pt.theta + Math.PI/2) * offset;
-                        const ny = Math.sin(pt.theta + Math.PI/2) * offset;
-                        const scrX = offsetX + (pt.x + nx) * scale;
-                        const scrY = offsetY + (pt.y + ny) * scale;
-                        if (i === 0) ctx.moveTo(scrX, scrY);
-                        else ctx.lineTo(scrX, scrY);
-                    });
-                    ctx.closePath();
-                    ctx.stroke();
+                // 2. 赛道沥青主表面 (High-Grip Dark Asphalt)
+                ctx.strokeStyle = "#172033";
+                ctx.lineWidth = halfW * 2 * scale;
+                ctx.beginPath();
+                track.forEach((pt, i) => {
+                    const sx = offsetX + pt.x * scale;
+                    const sy = offsetY + pt.y * scale;
+                    if (i === 0) ctx.moveTo(sx, sy);
+                    else ctx.lineTo(sx, sy);
                 });
+                ctx.closePath();
+                ctx.stroke();
 
-                // 3. 中心黄虚线
+                // 3. 弯道红白相间路肩齿 (Racing Kerbs / Rumble Strips)
+                for (let i = 0; i < N; i++) {
+                    const pt = track[i];
+                    if (Math.abs(pt.curv) > 0.012) {
+                        const isRed = (Math.floor(pt.s * 1.5) % 2 === 0);
+                        const kerbColor = isRed ? "#ef4444" : "#f8fafc";
+                        const lb = leftBoundary[i];
+                        const rb = rightBoundary[i];
+                        const pNextIdx = (i + 1) % N;
+                        const lbNext = leftBoundary[pNextIdx];
+                        const rbNext = rightBoundary[pNextIdx];
+
+                        // 绘制外侧与内侧路肩红白斑马条纹
+                        ctx.fillStyle = kerbColor;
+                        ctx.beginPath();
+                        ctx.moveTo(lb.x, lb.y);
+                        ctx.lineTo(lbNext.x, lbNext.y);
+                        ctx.lineTo(lbNext.x - (lbNext.x - rbNext.x) * 0.08, lbNext.y - (lbNext.y - rbNext.y) * 0.08);
+                        ctx.lineTo(lb.x - (lb.x - rb.x) * 0.08, lb.y - (lb.y - rb.y) * 0.08);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.moveTo(rb.x, rb.y);
+                        ctx.lineTo(rbNext.x, rbNext.y);
+                        ctx.lineTo(rbNext.x + (lbNext.x - rbNext.x) * 0.08, rbNext.y + (lbNext.y - rbNext.y) * 0.08);
+                        ctx.lineTo(rb.x + (lb.x - rb.x) * 0.08, rb.y + (lb.y - rb.y) * 0.08);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+
+                // 4. 双侧清晰路面边缘白实线 (Solid White Edge Lines)
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+                ctx.lineWidth = 1.8 * scale;
+                ctx.beginPath();
+                leftBoundary.forEach((p, i) => {
+                    if (i === 0) ctx.moveTo(p.x, p.y);
+                    else ctx.lineTo(p.x, p.y);
+                });
+                ctx.closePath();
+                ctx.stroke();
+
+                ctx.beginPath();
+                rightBoundary.forEach((p, i) => {
+                    if (i === 0) ctx.moveTo(p.x, p.y);
+                    else ctx.lineTo(p.x, p.y);
+                });
+                ctx.closePath();
+                ctx.stroke();
+
+                // 5. 赛道中心发光黄虚线 (Luminous Amber Centerline)
                 ctx.strokeStyle = "#fbbf24";
-                ctx.lineWidth = 2 * scale;
+                ctx.lineWidth = 1.8 * scale;
                 ctx.setLineDash([8 * scale, 6 * scale]);
                 ctx.beginPath();
                 track.forEach((pt, i) => {
-                    const scrX = offsetX + pt.x * scale;
-                    const scrY = offsetY + pt.y * scale;
-                    if (i === 0) ctx.moveTo(scrX, scrY);
-                    else ctx.lineTo(scrX, scrY);
+                    const sx = offsetX + pt.x * scale;
+                    const sy = offsetY + pt.y * scale;
+                    if (i === 0) ctx.moveTo(sx, sy);
+                    else ctx.lineTo(sx, sy);
                 });
                 ctx.closePath();
                 ctx.stroke();
                 ctx.setLineDash([]);
+
+                // 6. 起终点方格旗线 (Start / Finish Checkered Line)
+                const startLb = leftBoundary[0];
+                const startRb = rightBoundary[0];
+                const nBlocks = 8;
+                for (let b = 0; b < nBlocks; b++) {
+                    const t0 = b / nBlocks;
+                    const t1 = (b + 1) / nBlocks;
+                    const bx0 = startLb.x + (startRb.x - startLb.x) * t0;
+                    const by0 = startLb.y + (startRb.y - startLb.y) * t0;
+                    const bx1 = startLb.x + (startRb.x - startLb.x) * t1;
+                    const by1 = startLb.y + (startRb.y - startLb.y) * t1;
+                    ctx.strokeStyle = (b % 2 === 0) ? "#f8fafc" : "#020617";
+                    ctx.lineWidth = 3.5 * scale;
+                    ctx.beginPath();
+                    ctx.moveTo(bx0, by0);
+                    ctx.lineTo(bx1, by1);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
             }
 
-            // 4. 绘制发光行驶轨迹尾迹 (Glowing Cyan Trail)
-            const trail = (vehState && vehState.trail) || [];
-            if (trail.length > 1) {
-                ctx.strokeStyle = "rgba(0, 240, 255, 0.45)";
-                ctx.lineWidth = 2 * scale;
-                ctx.beginPath();
-                trail.forEach((pt, i) => {
-                    const scrX = offsetX + pt.x * scale;
-                    const scrY = offsetY + pt.y * scale;
-                    if (i === 0) ctx.moveTo(scrX, scrY);
-                    else ctx.lineTo(scrX, scrY);
-                });
-                ctx.stroke();
-            }
+            // 4. 绘制超平滑阿克曼气动发光轨迹流光带 (Aerodynamic Smooth Bézier Spline Ribbon)
+            // 结合本地 60FPS 稠密推演点与后端遥测，消灭折线与棱角
+            updateLocalTrail();
+            drawUltraSmoothTrail(scale, offsetX, offsetY);
 
-            // 5. 绘制正在地图上真实移动的自车 (Car Physically Moving Across Canvas!)
+            // 5. 绘制正在地图上真实移动的自车 (High-Fidelity Autonomous Vehicle Cockpit)
             const carScrX = offsetX + car.x * scale;
             const carScrY = offsetY + car.y * scale;
+
+            // 绘制横向偏差 (CTE) 实时引导法向标尺 (微米级对账探针)
+            if (vehState && vehState.track && vehState.track.length > 2) {
+                drawCteGuide(scale, offsetX, offsetY, carScrX, carScrY);
+            }
 
             ctx.save();
             ctx.translate(carScrX, carScrY);
             ctx.rotate(car.theta);
 
-            // 前照大灯光束 (Headlight Beam)
-            const grad = ctx.createRadialGradient(0, 0, 4, 35 * scale, 0, 50 * scale);
-            grad.addColorStop(0, "rgba(0, 240, 255, 0.5)");
+            // 前照激光大灯与多层光锥 (Laser Headlight Beam)
+            const grad = ctx.createRadialGradient(0, 0, 4, 38 * scale, 0, 56 * scale);
+            grad.addColorStop(0, "rgba(0, 240, 255, 0.45)");
+            grad.addColorStop(0.5, "rgba(16, 185, 129, 0.20)");
             grad.addColorStop(1, "rgba(0, 240, 255, 0.0)");
             ctx.fillStyle = grad;
             ctx.beginPath();
-            ctx.moveTo(10 * scale, -6 * scale);
-            ctx.lineTo(55 * scale, -22 * scale);
-            ctx.lineTo(55 * scale, 22 * scale);
-            ctx.lineTo(10 * scale, 6 * scale);
+            ctx.moveTo(10 * scale, -5 * scale);
+            ctx.lineTo(56 * scale, -24 * scale);
+            ctx.lineTo(56 * scale, 24 * scale);
+            ctx.lineTo(10 * scale, 5 * scale);
             ctx.closePath();
             ctx.fill();
 
-            // 车身底盘 (Cyan Metallic Sports Car)
-            ctx.fillStyle = "#0284c7";
-            ctx.fillRect(-14 * scale, -7 * scale, 28 * scale, 14 * scale);
+            // 前向感知雷达探测扇面 (Autonomous Radar Sector)
+            ctx.strokeStyle = "rgba(56, 189, 248, 0.35)";
+            ctx.lineWidth = 1 * scale;
+            ctx.beginPath();
+            ctx.arc(10 * scale, 0, 42 * scale, -0.38, 0.38);
+            ctx.stroke();
 
-            // 黑色挡风玻璃
-            ctx.fillStyle = "#081226";
-            ctx.fillRect(-6 * scale, -5 * scale, 12 * scale, 10 * scale);
+            // 车身底盘投影阴影
+            ctx.fillStyle = "rgba(2, 6, 23, 0.75)";
+            ctx.fillRect(-16 * scale, -9 * scale, 32 * scale, 18 * scale);
 
-            // 前轮物理阿克曼转向轮 (Front Turning Wheels)
+            // 车身金属质感外壳 (Aerodynamic Cybernetic Chassis)
+            const bodyGrad = ctx.createLinearGradient(-14 * scale, -7 * scale, 14 * scale, 7 * scale);
+            bodyGrad.addColorStop(0, "#0284c7");
+            bodyGrad.addColorStop(0.5, "#0369a1");
+            bodyGrad.addColorStop(1, "#0f172a");
+            ctx.fillStyle = bodyGrad;
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(-14 * scale, -7 * scale, 28 * scale, 14 * scale, 3 * scale) : ctx.rect(-14 * scale, -7 * scale, 28 * scale, 14 * scale);
+            ctx.fill();
+            ctx.strokeStyle = "#38bdf8";
+            ctx.lineWidth = 1 * scale;
+            ctx.stroke();
+
+            // 深邃挡风玻璃与座舱
+            ctx.fillStyle = "#030712";
+            ctx.beginPath();
+            ctx.roundRect ? ctx.roundRect(-6 * scale, -5 * scale, 12 * scale, 10 * scale, 2 * scale) : ctx.rect(-6 * scale, -5 * scale, 12 * scale, 10 * scale);
+            ctx.fill();
+
+            // 前轮物理阿克曼转向轮 (Front Steered Wheels with Active Angle)
             const steerRad = (car.delta_deg * Math.PI) / 180.0;
-            [-6, 6].forEach(wy => {
+            [-6.5, 6.5].forEach(wy => {
                 ctx.save();
                 ctx.translate(9 * scale, wy * scale);
                 ctx.rotate(steerRad);
-                ctx.fillStyle = "#ffffff";
-                ctx.fillRect(-3 * scale, -1.5 * scale, 6 * scale, 3 * scale);
+                ctx.fillStyle = "#f8fafc";
+                ctx.fillRect(-3.5 * scale, -1.5 * scale, 7 * scale, 3 * scale);
+                ctx.strokeStyle = "#0284c7";
+                ctx.lineWidth = 0.8 * scale;
+                ctx.strokeRect(-3.5 * scale, -1.5 * scale, 7 * scale, 3 * scale);
                 ctx.restore();
             });
 
-            // 后轮固定轮
-            [-6, 6].forEach(wy => {
-                ctx.fillStyle = "#64748b";
-                ctx.fillRect(-10 * scale, (wy - 1.5) * scale, 6 * scale, 3 * scale);
+            // 后轮动力驱动轮 (Rear Wheels)
+            [-6.5, 6.5].forEach(wy => {
+                ctx.fillStyle = "#475569";
+                ctx.fillRect(-10.5 * scale, (wy - 1.5) * scale, 7 * scale, 3 * scale);
+                ctx.strokeStyle = "#1e293b";
+                ctx.lineWidth = 0.8 * scale;
+                ctx.strokeRect(-10.5 * scale, (wy - 1.5) * scale, 7 * scale, 3 * scale);
             });
 
-            // 尾部红色刹车灯
+            // 尾部高亮刹车灯 (Dynamic Red Brake Lights)
             ctx.fillStyle = "#f43f5e";
-            ctx.fillRect(-15 * scale, -5 * scale, 2 * scale, 3 * scale);
-            ctx.fillRect(-15 * scale, 2 * scale, 2 * scale, 3 * scale);
+            ctx.shadowColor = "#f43f5e";
+            ctx.shadowBlur = 6 * scale;
+            ctx.fillRect(-14.5 * scale, -6 * scale, 2 * scale, 3 * scale);
+            ctx.fillRect(-14.5 * scale, 3 * scale, 2 * scale, 3 * scale);
+            ctx.shadowBlur = 0;
 
             ctx.restore();
+        }
+
+        // 本地 60FPS 连续平滑轨迹池
+        const localTrail = [];
+        let lastCarX = car.x;
+        let lastCarY = car.y;
+
+        function updateLocalTrail() {
+            if (!isRunning) return;
+            const dx = car.x - lastCarX;
+            const dy = car.y - lastCarY;
+            const d2 = dx * dx + dy * dy;
+            if (d2 >= 0.8) {
+                // 瞬间大位移（重置/跨圈）清空本地轨迹，防飞线
+                if (d2 > 2500) {
+                    localTrail.length = 0;
+                }
+                localTrail.push({ x: car.x, y: car.y });
+                if (localTrail.length > 180) localTrail.shift();
+                lastCarX = car.x;
+                lastCarY = car.y;
+            }
+        }
+
+        function drawUltraSmoothTrail(scale, offsetX, offsetY) {
+            // 优先使用本地 60FPS 高频平滑点序列，后备使用后端遥测
+            let pts = [];
+            if (localTrail.length >= 2) {
+                pts = localTrail.map(p => ({ x: offsetX + p.x * scale, y: offsetY + p.y * scale }));
+                // 紧密连接到自车当前绘制中心（后轴位置）
+                pts.push({ x: offsetX + car.x * scale, y: offsetY + car.y * scale });
+            } else if (vehState && vehState.trail && vehState.trail.length >= 2) {
+                pts = vehState.trail.map(p => ({ x: offsetX + p.x * scale, y: offsetY + p.y * scale }));
+            }
+            if (pts.length < 2) return;
+
+            // 智能分段：滤除任何跨度超过 40px 的跳变线
+            const segments = [];
+            let curSeg = [pts[0]];
+            for (let i = 1; i < pts.length; i++) {
+                const prev = pts[i - 1];
+                const d2 = (pts[i].x - prev.x) ** 2 + (pts[i].y - prev.y) ** 2;
+                if (d2 > 45 * 45 * scale * scale) {
+                    if (curSeg.length >= 2) segments.push(curSeg);
+                    curSeg = [pts[i]];
+                } else {
+                    curSeg.push(pts[i]);
+                }
+            }
+            if (curSeg.length >= 2) segments.push(curSeg);
+
+            segments.forEach(seg => {
+                ctx.save();
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+
+                // 1. 外层青色霓虹发光晕 (Neon Halo)
+                ctx.shadowColor = "#00f0ff";
+                ctx.shadowBlur = 8 * scale;
+                ctx.strokeStyle = "rgba(0, 240, 255, 0.28)";
+                ctx.lineWidth = 4.5 * scale;
+                renderSpline(seg);
+                ctx.stroke();
+
+                // 2. 内层翡翠绿高能激光流光带 (Emerald Laser Ribbon)
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = "rgba(52, 211, 153, 0.85)";
+                ctx.lineWidth = 2.0 * scale;
+                renderSpline(seg);
+                ctx.stroke();
+
+                ctx.restore();
+            });
+        }
+
+        // 二阶中点光滑样条插值（消灭折线棱角，达成毫米级纯滑曲线）
+        function renderSpline(pts) {
+            if (pts.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            if (pts.length === 2) {
+                ctx.lineTo(pts[1].x, pts[1].y);
+                return;
+            }
+            for (let i = 1; i < pts.length - 1; i++) {
+                const mx = (pts[i].x + pts[i + 1].x) * 0.5;
+                const my = (pts[i].y + pts[i + 1].y) * 0.5;
+                ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+            }
+            ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        }
+
+        // 绘制自车至中心线的实时几何偏差标尺 (CTE Visualizer)
+        function drawCteGuide(scale, offsetX, offsetY, carScrX, carScrY) {
+            const track = vehState.track;
+            let bestD = Infinity;
+            let bestPt = null;
+            for (let i = 0; i < track.length; i++) {
+                const tx = offsetX + track[i].x * scale;
+                const ty = offsetY + track[i].y * scale;
+                const d = (carScrX - tx) ** 2 + (carScrY - ty) ** 2;
+                if (d < bestD) {
+                    bestD = d;
+                    bestPt = { x: tx, y: ty };
+                }
+            }
+            if (bestPt && bestD > 4 && bestD < 120 * 120 * scale * scale) {
+                ctx.save();
+                ctx.strokeStyle = car.cte_m < 0.15 ? "rgba(52, 211, 153, 0.6)" : "rgba(251, 191, 36, 0.65)";
+                ctx.lineWidth = 1.2 * scale;
+                ctx.setLineDash([2 * scale, 3 * scale]);
+                ctx.beginPath();
+                ctx.moveTo(carScrX, carScrY);
+                ctx.lineTo(bestPt.x, bestPt.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+            }
         }
 
         setInterval(fetchVehState, 30);
