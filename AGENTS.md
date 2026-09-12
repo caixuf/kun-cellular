@@ -2,7 +2,7 @@
 
 本仓库是**软件定义硅基细胞计算机（Software-Defined Silicon Cellular Computer, SDSCC）**的核心实现。所有协作者与 AI 代理必须时刻恪守以下最高准则：
 
-详细架构宪章参见：[docs/ARCHITECTURE_DISCIPLINE.md](file:///home/caixuf/code/kun-cellular/docs/ARCHITECTURE_DISCIPLINE.md)
+详细架构宪章参见：[docs/ARCHITECTURE_DISCIPLINE.md](docs/ARCHITECTURE_DISCIPLINE.md)
 
 ---
 

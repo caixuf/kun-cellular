@@ -152,6 +152,7 @@ foreach(C_TEST_SRC ${C_TEST_SOURCES})
         add_executable(${TEST_NAME} ${C_TEST_SRC})
         target_link_libraries(${TEST_NAME} PRIVATE kun_cellular m)
         target_compile_options(${TEST_NAME} PRIVATE -UNDEBUG)
+        target_compile_definitions(${TEST_NAME} PRIVATE TEST_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
         if(TEST_NAME STREQUAL "test_cellular_core_kernel_c" OR
            TEST_NAME STREQUAL "test_cellular_core_strict_kernel_c")
             target_compile_options(${TEST_NAME} PRIVATE -pedantic-errors)

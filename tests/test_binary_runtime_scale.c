@@ -20,7 +20,22 @@ int main(void) {
     printf("  SDSCC 硬件级紧凑二进制大生命体运行时极限吞吐实测 (C11 mmap)\n");
     printf("==================================================================\n");
 
+    /* 优先使用编译期注入的仓库绝对路径，避免依赖 ctest 的工作目录 */
+#ifdef TEST_SOURCE_DIR
+    static char abs_mega[512];
+    static char abs_track[512];
+    static char abs_trained[512];
+    snprintf(abs_mega, sizeof(abs_mega), "%s/checkpoints/sdsc_mega_1million.bin", TEST_SOURCE_DIR);
+    snprintf(abs_track, sizeof(abs_track), "%s/checkpoints/adas_track_champion.bin", TEST_SOURCE_DIR);
+    snprintf(abs_trained, sizeof(abs_trained), "%s/checkpoints/real_trained_champion.bin", TEST_SOURCE_DIR);
+#endif
+
     const char* candidate_paths[] = {
+#ifdef TEST_SOURCE_DIR
+        abs_mega,
+        abs_track,
+        abs_trained,
+#endif
         "checkpoints/sdsc_mega_1million.bin",
         "../checkpoints/sdsc_mega_1million.bin",
         "checkpoints/adas_track_champion.bin",
