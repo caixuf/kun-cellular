@@ -67,6 +67,7 @@ Under this conjunction the effective hypothesis class is a finite set of small t
 * **Evolutionary origins of modularity** (Clune, Mouret & Lipson [16]) show that connection-cost pressure yields modular graphs. Our metabolic tax and lateral-inhibition macro-axons are variants of that pressure.
 * **Contraction analysis** (Lohmiller & Slotine [17]) and switched-system stability (Liberzon [18]) are the correct tools for what §5.9 currently approximates with a loop-gain product; we position our gate as a *screen*, not a proof.
 * **Stanley path-tracking controller** (Hoffmann et al. [19]) is the classical baseline for lane keeping and is implemented in `tests/test_adas_cortex_contract.py`; a same-scenario, same-seed comparison table is listed as required future work (§6).
+* **Connectomics and Structural Priors**: Recent Drosophila full-brain connectome breakthroughs (FlyWire consortium: Shiu et al. [29]; Dorkenwald et al. [30]) provide decisive empirical evidence for "topology-as-capacity": in the absence of any gradient-based training, the anatomical wiring topology alone (synaptic count weights + excitation/inhibition signs) coupled with simple, untrained leaky integrate-and-fire (LIF) dynamics spontaneously reproduces intricate sensorimotor closed loops (optic flow navigation, antennal grooming); furthermore, connectome-constrained graph models consistently exhibit superior sample efficiency and causal interpretability over degree-matched random networks or MLPs. This supplies profound empirical backing for our central thesis: control capacity is fundamentally rooted in discrete topology and dynamical causal flow rather than continuous parameter matrices, reinforcing our focus on developmental structural search over parametric gradient descent.
 
 ### 1.4 Research questions and substrate discipline
 * **RQ1**: Can a CGP with a control-primitive function set, stability screening and developmental growth evolve controllers that pass holdout envelopes in lane keeping, low-dimensional plants and a multi-asset risk-gating task?
@@ -88,7 +89,7 @@ graph LR
 
 ## 2. Paradigm Comparison
 
-| Dimension | Deep Neural Networks (DNN / Transformer) | Custom Neuromorphic ASICs | This work (control-primitive CGP) |
+| Dimension | Deep Neural Networks (DNN / Transformer) | Neuromorphic / Wetware Reverse-Eng. | This work (control-primitive CGP) |
 | :--- | :--- | :--- | :--- |
 | **Computational Primitives** | Homogeneous matrix multiplications ($\mathbf{W}\mathbf{x} + \mathbf{b}$) with uniform static activations | Homogeneous leaky integrate-and-fire (LIF / Izhikevich) silicon units | **28 heterogeneous atomic dynamical primitives** (integrators, Schmitt triggers, correlation kernels, dampers, deadbands) |
 | **Hardware Dependency** | High-bandwidth GPU/TPU matrix accelerator clusters | Custom non-standard neuromorphic fabrication processes | **Standard commodity silicon** (x86-64/ARM CPUs and GPU stream processors) |
@@ -97,6 +98,8 @@ graph LR
 | **Optimization Paradigm** | Global backpropagation through time (BPTT / AdamW) with blocking sync | Heuristic local spike-timing-dependent plasticity (STDP) | **Controlled morphogenesis** (mitosis/apoptosis/axonal rewiring) + local Oja plasticity + Baldwinian crystallization |
 | **Latency & Determinism** | Runtime interpreter overhead, garbage collection (GC) pauses, ms jitter | Event-driven microsecond response, lacking unified graph compile contracts | **Kahn topological sorting + CSR flat-array compilation, deterministic execution, 0 bytes runtime heap allocation** |
 | **Causal Interpretability** | Distributed continuous black-box representations | Discrete spikes, but lacking formal graph-level causal fingerprints | **Explicit causal pathways, 3-round WL graph hashing, Graph Edit Distance (GED), and knockout deficit assertions** |
+
+*Note: Full-brain connectome simulation (e.g., FlyWire / Shiu et al. [29]) represents wetware reverse-engineering constrained by organism-specific anatomy and uniform spiking dynamics. In contrast, our work constitutes forward developmental synthesis for deterministic CPS control: leveraging the "topology-as-function" inductive bias while evolving minimal, verifiable circuits (tens to hundreds of cells) across 28 cybernetic primitives that directly satisfy zero-GC and formal certification requirements.*
 
 ---
 
@@ -398,6 +401,7 @@ To evaluate SDSCC's large-scale cortical reasoning and self-organizing decision-
 10. **Terminology retracted**: "non-von-Neumann", "compute-in-memory", "physical limits", "axioms" and "ASIL-D" from earlier drafts. The runtime is an AOT-scheduled sparse dataflow graph on a conventional CPU; its speed is a cache-locality result.
 11. **DouDiZhu 82.5% OOD win rate retracted**: the figure was produced in a simplified synthetic simulation (no bidding, no legal-play validation, random-number opponents) and says nothing about real three-player DouDiZhu. The reported replacement is 57.0% (1139/2000, Wilson lower bound 54.8%) against heuristic opponents under a full rules engine. The 411.8 µs single-step latency claim is withdrawn with it.
 12. **Quant macro-array and DomainZoo numbers corrected**: the 43-column array's earlier +20.30% / Sharpe +0.36 / Calmar 1.58 do not reproduce — a deterministic re-run of `tools/train_multi_asset_cortical_array.cpp` gives Sharpe 0.22 / +13.55% / Calmar 0.67 (§5.3.2). The DomainZoo "12/12" does not reproduce either — a deterministic re-run of `tools/train_domain_zoo.cpp` passes 9/12 (§5.5). Both are now reported at their reproducible values.
+13. **Topological Causal Significance & Ablation Baselines**: Inspired by connectome ablation protocols [29], while our current pipeline enforces knockout deficit assertions, future verification gates require systematic benchmarking against **degree-preserving random rewiring** and **excitation/inhibition (E/I) sign flipping** baselines to rigorously rule out performance artifacts stemming from spurious numerical resonance.
 
 ---
 
@@ -555,4 +559,6 @@ It merges seamlessly with Western formal methods (Turing, von Neumann, Lyapunov)
 [25] J. Lehman and K. O. Stanley, "Abandoning Objectives: Evolution Through the Search for Novelty Alone," *Evolutionary Computation*, vol. 19, no. 2, pp. 189-223, 2011.  
 [26] A. J. Ijspeert, "Central Pattern Generators for Locomotion Control in Animals and Robots: A Review," *Neural Networks*, vol. 21, no. 4, pp. 642-653, 2008.  
 [27] G. E. Hinton and S. J. Nowlan, "How Learning Can Guide Evolution," *Complex Systems*, vol. 1, no. 3, pp. 495-502, 1987.  
-[28] S. Ohno, *Evolution by Gene Duplication*. Springer-Verlag, 1970.
+[28] S. Ohno, *Evolution by Gene Duplication*. Springer-Verlag, 1970.  
+[29] P. K. Shiu et al., "A Drosophila computational brain model reveals sensorimotor processing," *Nature*, vol. 634, pp. 210-219, 2024.  
+[30] S. Dorkenwald et al., "Neuronal wiring diagram of an adult brain," *Nature*, vol. 634, pp. 124-138, 2024.

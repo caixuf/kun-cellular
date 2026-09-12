@@ -67,6 +67,7 @@ Ashby 必备多样性定律 [1] 指出调节器需具备与受扰动态匹配的
 * **模块化的演化起源**（Clune, Mouret & Lipson [16]）表明连接代价压力产生模块化图。我们的代谢税与侧向抑制宏轴突是该压力的变体。
 * **收缩分析**（Lohmiller & Slotine [17]）与切换系统稳定性（Liberzon [18]）是 §5.9 当前用环路增益乘积近似之物的正确工具；我们将本文的门控定位为*筛查*而非证明。
 * **Stanley 路径跟踪控制器**（Hoffmann 等 [19]）是车道保持的经典基线，已实现于 `tests/test_adas_cortex_contract.py`；同场景同种子对照见 §5.2。
+* **全脑连接组与结构先验**（Connectomics & Structural Priors）：近期果蝇全脑连接组（FlyWire 合作组：Shiu 等 [29]；Dorkenwald 等 [30]）为“拓扑即能力”提供了关键生物实证——在未经反向传播训练的前提下，仅凭真实连接图拓扑（突触计数权重 + 兴奋/抑制符号）配以极简无学习 LIF 动力学，即自发涌现了视流避障、向触与梳理等复杂的感知–运动闭环；其连接图先验在样本效率与因果解释性上亦显著优于同度数均质网络。这为本文底层假说（控制能力本质由离散拓扑与动力学因果流决定，演化重心应在拓扑发育而非高维参数矩阵连续拟合）提供了有力的跨学科物理依据。
 
 ### 1.4 科学问题与底座纪律
 * **RQ1**：带控制原语函数集、稳定性筛查与发育生长的 CGP，能否演化出在车道保持、低维被控对象与多资产风险门控任务上通过留出包络的控制器？
@@ -88,7 +89,7 @@ graph LR
 
 ## 2. 计算范式对照体系 (Paradigm Comparison)
 
-| 对比维度 | 传统人工神经网络 (ANN / Transformer) | 硬件专用神经形态芯片 (Neuromorphic ASICs) | 本工作（控制原语 CGP） |
+| 对比维度 | 传统人工神经网络 (ANN / Transformer) | 硬件专用神经形态 / 湿件逆向重构 (Neuromorphic / Brain Reverse-Eng.) | 本工作（控制原语 CGP） |
 | :--- | :--- | :--- | :--- |
 | **计算基元** | 均质张量矩阵乘加（$\mathbf{W}\mathbf{x} + \mathbf{b}$）+ 统一静态激活函数 | 均质硬件漏电积分发放单元（LIF / Izhikevich） | **28 种异构原子动力学原语**（积分、施密特迟滞、时空相关、微分、死区门） |
 | **物理硬件依赖** | 依赖高带宽 GPU/TPU 稠密张量算力单元 | 依赖专用晶圆工艺与非标脉冲硬件芯片 | **标准通用硅基处理器**（标准 x86-64/ARM CPU 及通用 GPU 流处理器） |
@@ -97,6 +98,8 @@ graph LR
 | **优化机制** | 全局梯度反向传播（BPTT / AdamW），依赖全局同步阻断 | 局部脉冲时序依赖可塑性（STDP）启发式调整 | **受控形态发生**（有丝分裂/凋亡/轴突重塑）+ 局部 Oja 塑性 + 鲍德温代际固化 |
 | **时延与确定性** | 动态解释器调度、GC 垃圾回收暂停、毫秒级抖动 | 微秒级事件触发，但缺乏软件层统一图编译契约 | **Kahn 拓扑排序 + CSR 紧凑编译，确定性执行，单步 0 字节堆分配** |
 | **因果可解释性** | 连续稠密黑箱表征，单神经元无法独立逻辑证伪 | 脉冲离散发放，但缺乏全系统因果拓扑指纹 | **显式因果链路、3 轮 WL 规范图哈希、图编辑距离 (GED) 与敲除劣化硬断言** |
+
+*注：全脑连接组仿真（如 FlyWire / Shiu 等 [29]）属于生物湿件解剖学的逆向重构（Reverse Engineering），受限于特化解剖拓扑与均质发放模型；而本工作属于面向 CPS 确定性硬实时控制的硅基正向发育综合（Forward Synthesis）——吸收其“拓扑因果即功能先验”的核心洞见，依托 28 类控制论原语演化出满足零 GC 与形式化验证约束的极简解（几十至数百细胞），无需复刻数十万神经元的解剖图谱。*
 
 ---
 
@@ -399,6 +402,7 @@ $$\text{GED}(G_A, G_B) = \sum_{\tau \in \mathcal{T}} \vert N_A(\tau) - N_B(\tau)
 10. **术语撤回**：早期稿件中的"非冯"、"算存一体"、"突破物理极限"、"公理"、"ASIL-D"全部撤回。运行时是常规 CPU 上的 AOT 调度稀疏数据流图；其速度是缓存局部性的结果。
 11. **斗地主 82.5% OOD 胜率撤回**：该数字产自简化合成仿真（无叫分、无合法牌型判定、对手为随机数发生器），对真实三人斗地主无参考价值。替换数字为 57.0%（1139/2000，Wilson 下界 54.8%），对手为启发式策略、完整规则引擎。411.8 µs 单步时延一并撤回。
 12. **量化宏阵列与 DomainZoo 数字更正**：43 柱阵列此前的 +20.30% / 夏普 +0.36 / 卡玛 1.58 不可复现——确定性重跑 `tools/train_multi_asset_cortical_array.cpp` 得到夏普 0.22 / +13.55% / 卡玛 0.67（§5.3.2）。DomainZoo 的"12/12"同样不可复现——确定性重跑 `tools/train_domain_zoo.cpp` 通过 9/12（§5.5）。两处现均按可复现值报告。
+13. **拓扑因果显著性与消融对照门禁**：受全脑连接组对照实验 [29] 启发，目前工作虽已包含敲除劣化断言，但仍需在后续门禁中系统引入**同度数拓扑随机重连（Degree-Preserving Random Rewiring）**与**兴奋/抑制符号翻转（E/I Flipping）**消融基线，以彻底排除特定场景下优异表现来自偶然数值共振的可能。
 
 ---
 
@@ -556,4 +560,6 @@ $$\text{GED}(G_A, G_B) = \sum_{\tau \in \mathcal{T}} \vert N_A(\tau) - N_B(\tau)
 [25] J. Lehman and K. O. Stanley, "Abandoning Objectives: Evolution Through the Search for Novelty Alone," *Evolutionary Computation*, vol. 19, no. 2, pp. 189-223, 2011.  
 [26] A. J. Ijspeert, "Central Pattern Generators for Locomotion Control in Animals and Robots: A Review," *Neural Networks*, vol. 21, no. 4, pp. 642-653, 2008.  
 [27] G. E. Hinton and S. J. Nowlan, "How Learning Can Guide Evolution," *Complex Systems*, vol. 1, no. 3, pp. 495-502, 1987.  
-[28] S. Ohno, *Evolution by Gene Duplication*. Springer-Verlag, 1970.
+[28] S. Ohno, *Evolution by Gene Duplication*. Springer-Verlag, 1970.  
+[29] P. K. Shiu et al., "A Drosophila computational brain model reveals sensorimotor processing," *Nature*, vol. 634, pp. 210-219, 2024.  
+[30] S. Dorkenwald et al., "Neuronal wiring diagram of an adult brain," *Nature*, vol. 634, pp. 124-138, 2024.
