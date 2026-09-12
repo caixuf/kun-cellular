@@ -980,6 +980,8 @@ class LiveVehicleSimulator:
             self.xm += (self.v * math.cos(self.theta) - half_wb * math.sin(self.theta) * yaw_rate) * dt
             self.ym += (self.v * math.sin(self.theta) + half_wb * math.cos(self.theta) * yaw_rate) * dt
             self.theta += yaw_rate * dt
+            # 航向归一化到 (-π, π]，避免多圈累积到数千度导致前端插值“原地拧螺丝”
+            self.theta = (self.theta + math.pi) % math.tau - math.pi
             self.x, self.y = self.world_to_canvas(self.xm, self.ym)
 
             if self.cte > road_half_w * 1.5:
@@ -1065,15 +1067,18 @@ class LiveVehicleSimulator:
                 self.history_cte.append(round(self.cte, 3))
                 if len(self.history_cte) > 40:
                     self.history_cte.pop(0)
-            if self.step_count % 2 == 0:
-                pt = {"x": round(self.x, 3), "y": round(self.y, 3)}
-                if self.trail:
-                    last_pt = self.trail[-1]
-                    dist_sq = (pt["x"] - last_pt["x"]) ** 2 + (pt["y"] - last_pt["y"]) ** 2
-                    if dist_sq > 4000:  # 跨圈/瞬间位移切断尾迹
-                        self.trail.clear()
+            # 每步记点，弯道在高 warp 下仍保持密采样（前端直接回放，不再本地航位推算）
+            pt = {"x": round(self.x, 2), "y": round(self.y, 2)}
+            if self.trail:
+                last_pt = self.trail[-1]
+                dist_sq = (pt["x"] - last_pt["x"]) ** 2 + (pt["y"] - last_pt["y"]) ** 2
+                if dist_sq > 4000:
+                    self.trail.clear()
+                elif dist_sq < 0.25:
+                    pt = None
+            if pt is not None:
                 self.trail.append(pt)
-                if len(self.trail) > 360:
+                if len(self.trail) > 480:
                     self.trail.pop(0)
                 self.champion_trail = list(self.trail)
 
@@ -1156,7 +1161,7 @@ class LiveVehicleSimulator:
                     "xm": round(self.xm, 2),
                     "ym": round(self.ym, 2),
                     "s": round(self.s, 1),
-                    "theta": round(self.theta, 3),
+                    "theta": round((self.theta + math.pi) % math.tau - math.pi, 4),
                     "delta_deg": round(math.degrees(self.delta), 1),
                     "teacher_delta_deg": round(math.degrees(getattr(self, "teacher_steer", 0.0)), 1),
                     "cortex_delta_deg": round(math.degrees(getattr(self, "cortex_steer", 0.0)), 1),

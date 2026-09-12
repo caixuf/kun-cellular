@@ -459,7 +459,8 @@
         window.resetVeh = async function() {
             try {
                 await fetch("/api/vehicle/reset");
-                localTrail.length = 0;
+                clearTrails();
+                fetchVehState();
             } catch(e) {}
         };
 
@@ -498,7 +499,11 @@
                     if (data.car) {
                         car.target_x = data.car.x;
                         car.target_y = data.car.y;
-                        car.target_theta = data.car.theta;
+                        // 遥测航向必须折到 (-π, π]，禁止带着多圈绝对值过来
+                        let th = data.car.theta;
+                        while (th > Math.PI) th -= Math.PI * 2;
+                        while (th < -Math.PI) th += Math.PI * 2;
+                        car.target_theta = th;
                         car.target_delta_deg = data.car.delta_deg;
                         car.speed_kmh = data.car.speed_kmh;
                         car.cte_m = data.car.cte_m;
@@ -735,27 +740,20 @@
             lastFrameTime = now;
 
             if (isRunning) {
-                // 60FPS 连续运动学航位推测 (Kinematic Dead Reckoning)
-                // 彻底消灭网络轮询和时间加速导致的离散跳跃与多边形折线
-                const speed_ms = (car.speed_kmh || 0.0) / 3.6;
-                const px_per_m = (vehState && vehState.px_per_m) || 3.2;
-                const v_px_s = speed_ms * px_per_m * currentWarp;
-                
-                // 沿自车实时航向平滑推进
-                const advance = v_px_s * dt;
-                car.x += Math.cos(car.theta) * advance;
-                car.y -= Math.sin(car.theta) * advance; // canvas Y向下
+                // 只做遥测指数收敛，禁止 warp×航位推算（那会在弯道拉出冲出赛道的折线）
+                const warp = currentWarp || 1;
+                const lerpPos = Math.min(1.0, (warp >= 20 ? 28.0 : warp >= 5 ? 16.0 : 10.0) * dt);
+                const lerpYaw = Math.min(1.0, (warp >= 20 ? 32.0 : 14.0) * dt);
+                car.x += (car.target_x - car.x) * lerpPos;
+                car.y += (car.target_y - car.y) * lerpPos;
 
-                // 柔和向后端最新真实遥测收敛 (指数平滑，彻底消除突跳)
-                const lerpFactor = Math.min(1.0, 8.0 * dt);
-                car.x += (car.target_x - car.x) * lerpFactor;
-                car.y += (car.target_y - car.y) * lerpFactor;
+                let diff = car.target_theta - car.theta;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                car.theta += diff * lerpYaw;
+                while (car.theta > Math.PI) car.theta -= Math.PI * 2;
+                while (car.theta < -Math.PI) car.theta += Math.PI * 2;
 
-                // 航向角柔和插值
-                let diff = (car.target_theta - car.theta + Math.PI) % (Math.PI * 2) - Math.PI;
-                car.theta += diff * Math.min(1.0, 12.0 * dt);
-
-                // 转向角平滑插值
                 const dSteer = (car.target_delta_deg - car.delta_deg);
                 car.delta_deg += dSteer * Math.min(1.0, 18.0 * dt);
             }
@@ -772,8 +770,8 @@
             // 1. 绘制数学严格解析的高精体育场赛道 (Sleek Grand Circuit)
             drawStadiumTrack(scale, offsetX, offsetY);
 
-            // 2. 绘制超平滑气动发光轨迹流光带 (Aerodynamic Spline Ribbon)
-            updateLocalTrail();
+            // 2. 绘制超平滑气动发光轨迹流光带（后端真物理点）
+            updateLocalTrailFromBackend();
             drawUltraSmoothTrail(scale, offsetX, offsetY);
 
             // 3. 绘制阿克曼动力学座舱与自车 (High-Fidelity Autonomous Cyber Vehicle)
@@ -1010,25 +1008,47 @@
             return { x: offsetX + projX * scale, y: offsetY + projY * scale };
         }
 
-        // 本地 60FPS 稠密推演轨迹池
+        // 轨迹只采信后端物理点 / 遥测锚点，禁止用本地航位推算污染飘带
         const localTrail = [];
-        let lastCarX = car.x;
-        let lastCarY = car.y;
+        let lastAnchorX = null;
+        let lastAnchorY = null;
 
-        function updateLocalTrail() {
-            if (!isRunning) return;
-            const dx = car.x - lastCarX;
-            const dy = car.y - lastCarY;
-            const d2 = dx * dx + dy * dy;
-            if (d2 >= 0.6) {
-                // 瞬间大位移（重置或跨圈）切断轨迹
-                if (d2 > 2500) {
-                    localTrail.length = 0;
+        function clearTrails() {
+            localTrail.length = 0;
+            lastAnchorX = null;
+            lastAnchorY = null;
+        }
+
+        function pushTrailAnchor(x, y) {
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+            if (lastAnchorX !== null) {
+                const d2 = (x - lastAnchorX) ** 2 + (y - lastAnchorY) ** 2;
+                if (d2 < 0.35) return;          // 去重
+                if (d2 > 2500) localTrail.length = 0;  // 重置/瞬移切断
+            }
+            localTrail.push({ x, y });
+            if (localTrail.length > 420) localTrail.shift();
+            lastAnchorX = x;
+            lastAnchorY = y;
+        }
+
+        function updateLocalTrailFromBackend() {
+            if (!isRunning || !vehState) return;
+            const serverTrail = vehState.trail || [];
+            if (serverTrail.length >= 2) {
+                // 直接同步后端米制投影轨迹（真物理），避免 DR 折线
+                localTrail.length = 0;
+                const start = Math.max(0, serverTrail.length - 360);
+                for (let i = start; i < serverTrail.length; i++) {
+                    localTrail.push({ x: serverTrail[i].x, y: serverTrail[i].y });
                 }
-                localTrail.push({ x: car.x, y: car.y });
-                if (localTrail.length > 300) localTrail.shift();
-                lastCarX = car.x;
-                lastCarY = car.y;
+                const last = serverTrail[serverTrail.length - 1];
+                lastAnchorX = last.x;
+                lastAnchorY = last.y;
+                return;
+            }
+            if (car.target_x !== undefined) {
+                pushTrailAnchor(car.target_x, car.target_y);
             }
         }
 
@@ -1036,9 +1056,14 @@
             let pts = [];
             if (localTrail.length >= 2) {
                 pts = localTrail.map(p => ({ x: offsetX + p.x * scale, y: offsetY + p.y * scale }));
-                pts.push({ x: offsetX + car.x * scale, y: offsetY + car.y * scale });
-            } else if (vehState && vehState.trail && vehState.trail.length >= 2) {
-                pts = vehState.trail.map(p => ({ x: offsetX + p.x * scale, y: offsetY + p.y * scale }));
+                // 接到当前插值车位，仅短尾，不引入 DR 长直线
+                const tipX = offsetX + car.x * scale;
+                const tipY = offsetY + car.y * scale;
+                const last = pts[pts.length - 1];
+                const tipD2 = (tipX - last.x) ** 2 + (tipY - last.y) ** 2;
+                if (tipD2 > 0.25 && tipD2 < 35 * 35 * scale * scale) {
+                    pts.push({ x: tipX, y: tipY });
+                }
             }
             if (pts.length < 2) return;
 
@@ -1063,7 +1088,6 @@
                 ctx.lineCap = "round";
                 ctx.lineJoin = "round";
 
-                // 1. 青色霓虹光晕外层 (Neon Cyan Glow)
                 ctx.shadowColor = "#00f0ff";
                 ctx.shadowBlur = 8 * scale;
                 ctx.strokeStyle = "rgba(0, 240, 255, 0.35)";
@@ -1071,7 +1095,6 @@
                 renderSpline(seg);
                 ctx.stroke();
 
-                // 2. 翡翠绿核心流光带 (Emerald Core Laser Ribbon)
                 ctx.shadowBlur = 0;
                 ctx.strokeStyle = "rgba(16, 185, 129, 0.95)";
                 ctx.lineWidth = 1.8 * scale;
@@ -1121,7 +1144,8 @@
 
             ctx.save();
             ctx.translate(carScrX, carScrY);
-            ctx.rotate(car.theta);
+            // 世界系：x 右、y 上、θ 逆时针；画布 y 向下 → 取 -θ 才是车头朝向
+            ctx.rotate(-car.theta);
 
             // 前照激光大灯与多层光锥 (Laser Headlight Beam)
             const grad = ctx.createRadialGradient(0, 0, 4, 38 * scale, 0, 56 * scale);
