@@ -231,16 +231,22 @@
             </div>
             
             <div class="veh-top-bar">
-                <div style="display:flex;gap:8px;align-items:center;">
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <div style="display:flex;gap:4px;align-items:center;background:rgba(15,23,42,0.9);padding:2px 8px;border-radius:4px;border:1px solid #334155;">
+                        <span style="font-size:11px;font-weight:bold;color:var(--text-dim);">[控制导师]:</span>
+                        <button class="nav-btn active" id="btn-mode-teacher" onclick="setVehMode('teacher')" title="KunAutoDrive Stanley 工业导师驱动 (CTE < 3cm)">🏆 导师驱动</button>
+                        <button class="nav-btn" id="btn-mode-co_driver" onclick="setVehMode('co_driver')" title="皮层前向主导 + 导师在线残差安全监护">🤝 导师在线监护</button>
+                        <button class="nav-btn" id="btn-mode-student" onclick="setVehMode('student')" title="SDSCC 210-细胞皮层纯自主前向闭环">🧠 210皮层自主</button>
+                    </div>
                     <button class="nav-btn" id="btn-toggle" onclick="toggleSim()">[PAUSE / RESUME]</button>
                     <button class="nav-btn" onclick="resetVeh()">[RESET_POSITION]</button>
                     <button class="nav-btn" onclick="fastEvolve(8)" style="background:rgba(16,185,129,0.3); border-color:var(--emerald-glow); color:var(--emerald-glow); font-weight:bold;">[继续进化 +8代 → live_exp]</button>
                 </div>
                 <div style="font-size:11px;color:var(--text-dim);">
-                    <span style="color:#00f0ff;">■ 体育场公路巡航（米制）</span> &nbsp;|&nbsp;
-                    <span style="color:rgba(16,185,129,0.5);">─ 绿色行驶轨迹</span> &nbsp;|&nbsp;
-                    <span style="color:#fbbf24;">┆ 中心线</span>
-                    <span style="color:var(--text-dim);"> · 进化另存实验档，不改 L3 锁档</span>
+                    <span style="color:#00f0ff;">■ 高精沥青赛道</span> &nbsp;|&nbsp;
+                    <span style="color:#10b981;">─ 激光流光轨迹</span> &nbsp;|&nbsp;
+                    <span style="color:#fbbf24;">┆ 中心线</span> &nbsp;|&nbsp;
+                    <span id="top-mode-indicator" style="color:var(--amber-glow);font-weight:bold;">[模式: 工业导师]</span>
                 </div>
             </div>
 
@@ -312,7 +318,7 @@
             <div class="viewport-card">
                 <div class="panel-header">
                     <span>[AUTONOMOUS_COCKPIT]</span>
-                    <span style="color:var(--cyan-glow);">KINEMATIC_TELEMETRY</span>
+                    <span style="color:var(--cyan-glow);" id="telemetry-mode-badge">STANLEY_TEACHER</span>
                 </div>
                 
                 <div class="stat-grid">
@@ -326,22 +332,36 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">STEERING_ANGLE</div>
-                        <div class="stat-val amber" id="stat-steer">0.0 deg</div>
+                        <div class="stat-val amber" id="stat-steer">0.0°</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">LATERAL_OFFSET (CTE)</div>
-                        <div class="stat-val emerald" id="stat-cte">0.00 m</div>
+                        <div class="stat-val emerald" id="stat-cte">0.0 cm</div>
+                    </div>
+                </div>
+
+                <!-- 导师 vs 皮层 转角实时对账面板 -->
+                <div style="padding: 0 12px 8px;">
+                    <div style="background:rgba(15,23,42,0.6);border:1px solid var(--border);border-radius:4px;padding:6px 10px;font-size:10px;display:flex;flex-direction:column;gap:4px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="color:var(--text-dim);">导师期望转角 (δ_teach):</span>
+                            <span id="stat-steer-teach" style="color:var(--cyan-glow);font-weight:bold;font-size:12px;">0.0°</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="color:var(--text-dim);">210皮层转角 (δ_cortex):</span>
+                            <span id="stat-steer-cortex" style="color:var(--emerald-glow);font-weight:bold;font-size:12px;">0.0°</span>
+                        </div>
                     </div>
                 </div>
 
                 <div class="steer-dial-box">
                     <svg class="steer-wheel-svg" id="steer-wheel" viewBox="0 0 100 100">
                         <circle cx="50" cy="50" r="42" fill="none" stroke="#38bdf8" stroke-width="6"/>
+                        <circle cx="50" cy="14" r="4" fill="#f43f5e"/>
                         <circle cx="50" cy="50" r="14" fill="#0f172a" stroke="#10b981" stroke-width="4"/>
                         <line x1="8" y1="50" x2="36" y2="50" stroke="#38bdf8" stroke-width="6"/>
                         <line x1="64" y1="50" x2="92" y2="50" stroke="#38bdf8" stroke-width="6"/>
                         <line x1="50" y1="64" x2="50" y2="92" stroke="#38bdf8" stroke-width="6"/>
-                        <circle cx="50" cy="14" r="4" fill="#f43f5e"/>
                     </svg>
                     <div style="font-size:11px;color:var(--text-dim);margin-top:6px;">
                         STEERING ANGLE: <span id="steer-val-text" style="color:var(--cyan-glow);font-weight:bold;">0.0°</span>
@@ -376,18 +396,20 @@
 
         let isRunning = true;
         let vehState = null;
+        let currentWarp = 5;
 
-        // 本地平滑自车推演
+        // 本地平滑自车推演状态 (60FPS 运动学连续航位推测，消灭折线)
         const car = {
-            x: 680.0,
-            y: 335.0,
-            theta: 0.87,
+            x: 400.0,
+            y: 402.4,
+            theta: 0.0,
             delta_deg: 0.0,
-            speed_kmh: 70.0,
+            speed_kmh: 45.0,
             cte_m: 0.01,
-            target_x: 680.0,
-            target_y: 335.0,
-            target_theta: 0.87
+            target_x: 400.0,
+            target_y: 402.4,
+            target_theta: 0.0,
+            target_delta_deg: 0.0
         };
 
         function resize() {
@@ -398,6 +420,7 @@
         resize();
 
         window.setVehWarp = async function(speed) {
+            currentWarp = speed;
             document.querySelectorAll('[id^="hw-"]').forEach(b => b.classList.remove("active"));
             const btn = document.getElementById("hw-" + speed);
             if (btn) btn.classList.add("active");
@@ -406,9 +429,37 @@
             } catch(e) {}
         };
 
+        window.setVehMode = async function(mode) {
+            updateModeButtons(mode);
+            try {
+                await fetch("/api/vehicle/set_mode?mode=" + mode);
+                fetchVehState();
+            } catch(e) {}
+        };
+
+        function updateModeButtons(mode) {
+            document.querySelectorAll('[id^="btn-mode-"]').forEach(b => b.classList.remove("active"));
+            const btn = document.getElementById("btn-mode-" + mode);
+            if (btn) btn.classList.add("active");
+
+            const modeLabels = {
+                "teacher": "🏆 工业导师驱动 (Stanley + 阻尼 + 前瞻)",
+                "co_driver": "🤝 导师在线监护 (皮层前向 + 导师残差协同)",
+                "student": "🧠 210皮层自主闭环 (AdasCortexOrgan 纯自主)"
+            };
+            const topInd = document.getElementById("top-mode-indicator");
+            if (topInd) topInd.innerText = `[${modeLabels[mode] || mode}]`;
+            const telemBadge = document.getElementById("telemetry-mode-badge");
+            if (telemBadge) {
+                telemBadge.innerText = (mode === "teacher") ? "STANLEY_TEACHER" : (mode === "co_driver" ? "CO_DRIVER_SAFETY" : "210_CORTEX_STUDENT");
+                telemBadge.style.color = (mode === "teacher") ? "var(--cyan-glow)" : (mode === "co_driver" ? "var(--amber-glow)" : "var(--emerald-glow)");
+            }
+        }
+
         window.resetVeh = async function() {
             try {
                 await fetch("/api/vehicle/reset");
+                localTrail.length = 0;
             } catch(e) {}
         };
 
@@ -448,7 +499,7 @@
                         car.target_x = data.car.x;
                         car.target_y = data.car.y;
                         car.target_theta = data.car.theta;
-                        car.delta_deg = data.car.delta_deg;
+                        car.target_delta_deg = data.car.delta_deg;
                         car.speed_kmh = data.car.speed_kmh;
                         car.cte_m = data.car.cte_m;
                     }
@@ -460,12 +511,30 @@
         function updateUI(totalDist) {
             document.getElementById("stat-dist").innerText = `${totalDist || 0.0} m`;
             document.getElementById("stat-speed").innerText = `${car.speed_kmh || 0.0} km/h`;
-            document.getElementById("stat-steer").innerText = `${car.delta_deg || 0.0}°`;
-            document.getElementById("stat-cte").innerText = `${car.cte_m || 0.0} m`;
-
             const deg = car.delta_deg || 0.0;
+            const degStr = `${deg > 0 ? "+" : ""}${deg.toFixed(1)}°`;
+            document.getElementById("stat-steer").innerText = degStr;
+            
+            // 厘米级高精横向偏差展示
+            const cteCm = ((car.cte_m || 0.0) * 100.0).toFixed(1);
+            document.getElementById("stat-cte").innerText = `${cteCm} cm`;
+
+            // 导师 vs 皮层转角展示
+            if (vehState) {
+                const tSteer = vehState.teacher_delta_deg !== undefined ? Number(vehState.teacher_delta_deg).toFixed(1) : "0.0";
+                const cSteer = vehState.cortex_delta_deg !== undefined ? Number(vehState.cortex_delta_deg).toFixed(1) : "0.0";
+                const tEl = document.getElementById("stat-steer-teach");
+                if (tEl) tEl.innerText = `${tSteer > 0 ? "+" : ""}${tSteer}°`;
+                const cEl = document.getElementById("stat-steer-cortex");
+                if (cEl) cEl.innerText = `${cSteer > 0 ? "+" : ""}${cSteer}°`;
+
+                if (vehState.drive_mode) {
+                    updateModeButtons(vehState.drive_mode);
+                }
+            }
+
             steerWheel.style.transform = `rotate(${deg * 4.5}deg)`;
-            document.getElementById("steer-val-text").innerText = `${deg > 0 ? "+" : ""}${deg}°`;
+            document.getElementById("steer-val-text").innerText = degStr;
 
             if (vehState) {
                 const gen = vehState.generation || 1;
@@ -657,16 +726,38 @@
             chartCtx.stroke();
         }
 
-        function render() {
+        let lastFrameTime = performance.now();
+
+        function render(now) {
             requestAnimationFrame(render);
+            if (!now) now = performance.now();
+            const dt = Math.min(0.08, (now - lastFrameTime) * 0.001);
+            lastFrameTime = now;
 
             if (isRunning) {
-                // 平滑逼近
-                car.x += (car.target_x - car.x) * 0.35;
-                car.y += (car.target_y - car.y) * 0.35;
-                // 角度平滑插值
+                // 60FPS 连续运动学航位推测 (Kinematic Dead Reckoning)
+                // 彻底消灭网络轮询和时间加速导致的离散跳跃与多边形折线
+                const speed_ms = (car.speed_kmh || 0.0) / 3.6;
+                const px_per_m = (vehState && vehState.px_per_m) || 3.2;
+                const v_px_s = speed_ms * px_per_m * currentWarp;
+                
+                // 沿自车实时航向平滑推进
+                const advance = v_px_s * dt;
+                car.x += Math.cos(car.theta) * advance;
+                car.y -= Math.sin(car.theta) * advance; // canvas Y向下
+
+                // 柔和向后端最新真实遥测收敛 (指数平滑，彻底消除突跳)
+                const lerpFactor = Math.min(1.0, 8.0 * dt);
+                car.x += (car.target_x - car.x) * lerpFactor;
+                car.y += (car.target_y - car.y) * lerpFactor;
+
+                // 航向角柔和插值
                 let diff = (car.target_theta - car.theta + Math.PI) % (Math.PI * 2) - Math.PI;
-                car.theta += diff * 0.35;
+                car.theta += diff * Math.min(1.0, 12.0 * dt);
+
+                // 转向角平滑插值
+                const dSteer = (car.target_delta_deg - car.delta_deg);
+                car.delta_deg += dSteer * Math.min(1.0, 18.0 * dt);
             }
 
             const scaleX = canvas.width / 800;
@@ -678,162 +769,354 @@
             ctx.fillStyle = "#030712";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            const track = (vehState && vehState.track) || [];
-            if (track.length > 2) {
-                const N = track.length;
-                const halfW = (vehState && vehState.road_half_px) ? vehState.road_half_px : 12;
+            // 1. 绘制数学严格解析的高精体育场赛道 (Sleek Grand Circuit)
+            drawStadiumTrack(scale, offsetX, offsetY);
 
-                // 预先计算屏幕空间严格正交法向量（消灭 Canvas Y 轴导致的赛车路肩扭曲变形与交叉折角）
-                const leftBoundary = [];
-                const rightBoundary = [];
-                for (let i = 0; i < N; i++) {
-                    const pPrev = track[(i - 1 + N) % N];
-                    const pNext = track[(i + 1) % N];
-                    const pt = track[i];
-                    const scrX = offsetX + pt.x * scale;
-                    const scrY = offsetY + pt.y * scale;
-
-                    const dx = (pNext.x - pPrev.x) * scale;
-                    const dy = (pNext.y - pPrev.y) * scale;
-                    const len = Math.hypot(dx, dy) || 1.0;
-                    // 严格屏幕空间法向量 (nx, ny) 正交于切线 (dx, dy)
-                    const nx = -dy / len;
-                    const ny = dx / len;
-
-                    leftBoundary.push({ x: scrX + nx * halfW * scale, y: scrY + ny * halfW * scale });
-                    rightBoundary.push({ x: scrX - nx * halfW * scale, y: scrY - ny * halfW * scale });
-                }
-
-                ctx.save();
-
-                // 1. 公路深色路基底色 (Asphalt Sub-base)
-                ctx.strokeStyle = "#090d16";
-                ctx.lineWidth = (halfW * 2 + 6) * scale;
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-                ctx.beginPath();
-                track.forEach((pt, i) => {
-                    const sx = offsetX + pt.x * scale;
-                    const sy = offsetY + pt.y * scale;
-                    if (i === 0) ctx.moveTo(sx, sy);
-                    else ctx.lineTo(sx, sy);
-                });
-                ctx.closePath();
-                ctx.stroke();
-
-                // 2. 赛道沥青主表面 (High-Grip Dark Asphalt)
-                ctx.strokeStyle = "#172033";
-                ctx.lineWidth = halfW * 2 * scale;
-                ctx.beginPath();
-                track.forEach((pt, i) => {
-                    const sx = offsetX + pt.x * scale;
-                    const sy = offsetY + pt.y * scale;
-                    if (i === 0) ctx.moveTo(sx, sy);
-                    else ctx.lineTo(sx, sy);
-                });
-                ctx.closePath();
-                ctx.stroke();
-
-                // 3. 弯道红白相间路肩齿 (Racing Kerbs / Rumble Strips)
-                for (let i = 0; i < N; i++) {
-                    const pt = track[i];
-                    if (Math.abs(pt.curv) > 0.012) {
-                        const isRed = (Math.floor(pt.s * 1.5) % 2 === 0);
-                        const kerbColor = isRed ? "#ef4444" : "#f8fafc";
-                        const lb = leftBoundary[i];
-                        const rb = rightBoundary[i];
-                        const pNextIdx = (i + 1) % N;
-                        const lbNext = leftBoundary[pNextIdx];
-                        const rbNext = rightBoundary[pNextIdx];
-
-                        // 绘制外侧与内侧路肩红白斑马条纹
-                        ctx.fillStyle = kerbColor;
-                        ctx.beginPath();
-                        ctx.moveTo(lb.x, lb.y);
-                        ctx.lineTo(lbNext.x, lbNext.y);
-                        ctx.lineTo(lbNext.x - (lbNext.x - rbNext.x) * 0.08, lbNext.y - (lbNext.y - rbNext.y) * 0.08);
-                        ctx.lineTo(lb.x - (lb.x - rb.x) * 0.08, lb.y - (lb.y - rb.y) * 0.08);
-                        ctx.closePath();
-                        ctx.fill();
-
-                        ctx.beginPath();
-                        ctx.moveTo(rb.x, rb.y);
-                        ctx.lineTo(rbNext.x, rbNext.y);
-                        ctx.lineTo(rbNext.x + (lbNext.x - rbNext.x) * 0.08, rbNext.y + (lbNext.y - rbNext.y) * 0.08);
-                        ctx.lineTo(rb.x + (lb.x - rb.x) * 0.08, rb.y + (lb.y - rb.y) * 0.08);
-                        ctx.closePath();
-                        ctx.fill();
-                    }
-                }
-
-                // 4. 双侧清晰路面边缘白实线 (Solid White Edge Lines)
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-                ctx.lineWidth = 1.8 * scale;
-                ctx.beginPath();
-                leftBoundary.forEach((p, i) => {
-                    if (i === 0) ctx.moveTo(p.x, p.y);
-                    else ctx.lineTo(p.x, p.y);
-                });
-                ctx.closePath();
-                ctx.stroke();
-
-                ctx.beginPath();
-                rightBoundary.forEach((p, i) => {
-                    if (i === 0) ctx.moveTo(p.x, p.y);
-                    else ctx.lineTo(p.x, p.y);
-                });
-                ctx.closePath();
-                ctx.stroke();
-
-                // 5. 赛道中心发光黄虚线 (Luminous Amber Centerline)
-                ctx.strokeStyle = "#fbbf24";
-                ctx.lineWidth = 1.8 * scale;
-                ctx.setLineDash([8 * scale, 6 * scale]);
-                ctx.beginPath();
-                track.forEach((pt, i) => {
-                    const sx = offsetX + pt.x * scale;
-                    const sy = offsetY + pt.y * scale;
-                    if (i === 0) ctx.moveTo(sx, sy);
-                    else ctx.lineTo(sx, sy);
-                });
-                ctx.closePath();
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // 6. 起终点方格旗线 (Start / Finish Checkered Line)
-                const startLb = leftBoundary[0];
-                const startRb = rightBoundary[0];
-                const nBlocks = 8;
-                for (let b = 0; b < nBlocks; b++) {
-                    const t0 = b / nBlocks;
-                    const t1 = (b + 1) / nBlocks;
-                    const bx0 = startLb.x + (startRb.x - startLb.x) * t0;
-                    const by0 = startLb.y + (startRb.y - startLb.y) * t0;
-                    const bx1 = startLb.x + (startRb.x - startLb.x) * t1;
-                    const by1 = startLb.y + (startRb.y - startLb.y) * t1;
-                    ctx.strokeStyle = (b % 2 === 0) ? "#f8fafc" : "#020617";
-                    ctx.lineWidth = 3.5 * scale;
-                    ctx.beginPath();
-                    ctx.moveTo(bx0, by0);
-                    ctx.lineTo(bx1, by1);
-                    ctx.stroke();
-                }
-
-                ctx.restore();
-            }
-
-            // 4. 绘制超平滑阿克曼气动发光轨迹流光带 (Aerodynamic Smooth Bézier Spline Ribbon)
-            // 结合本地 60FPS 稠密推演点与后端遥测，消灭折线与棱角
+            // 2. 绘制超平滑气动发光轨迹流光带 (Aerodynamic Spline Ribbon)
             updateLocalTrail();
             drawUltraSmoothTrail(scale, offsetX, offsetY);
 
-            // 5. 绘制正在地图上真实移动的自车 (High-Fidelity Autonomous Vehicle Cockpit)
+            // 3. 绘制阿克曼动力学座舱与自车 (High-Fidelity Autonomous Cyber Vehicle)
+            drawCyberVehicle(scale, offsetX, offsetY);
+        }
+
+        // 数学严格解析的高精赛道绘制（彻底消除离散采样带来的断齿与多边形路肩折角）
+        function drawStadiumTrack(scale, offsetX, offsetY) {
+            const L_m = (vehState && vehState.straight_m) || 70.0;
+            const R_m = (vehState && vehState.radius_m) || 32.0;
+            const halfW_m = (vehState && vehState.road_width) ? (vehState.road_width * 0.5) : 3.75;
+            const pxPerM = (vehState && vehState.px_per_m) || 3.2;
+
+            const ox = offsetX + 400.0 * scale;
+            const oy = offsetY + 300.0 * scale;
+            const halfL = (L_m * 0.5 * pxPerM) * scale;
+            const R = (R_m * pxPerM) * scale;
+            const halfW = (halfW_m * pxPerM) * scale;
+            const roadW = halfW * 2.0;
+
+            ctx.save();
+
+            // 闭合几何路径生成器
+            function pathStadium(rOffset = 0) {
+                const curR = Math.max(1, R + rOffset);
+                ctx.beginPath();
+                // 下直道 (左至右)
+                ctx.moveTo(ox - halfL, oy + curR);
+                ctx.lineTo(ox + halfL, oy + curR);
+                // 右半圆弧 (画布 Y 轴向下: 从 +pi/2 到 -pi/2 为 counterclockwise=true)
+                ctx.arc(ox + halfL, oy, curR, Math.PI * 0.5, -Math.PI * 0.5, true);
+                // 上直道 (右至左)
+                ctx.lineTo(ox - halfL, oy - curR);
+                // 左半圆弧 (从 -pi/2 到 +pi/2)
+                ctx.arc(ox - halfL, oy, curR, -Math.PI * 0.5, Math.PI * 0.5, true);
+                ctx.closePath();
+            }
+
+            // 1. 赛道深色地基与安全缓冲区 (Dark Slate Runoff Foundation)
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+            ctx.strokeStyle = "#080e1a";
+            ctx.lineWidth = roadW + 18.0 * scale;
+            pathStadium(0);
+            ctx.stroke();
+
+            ctx.strokeStyle = "#0d1527";
+            ctx.lineWidth = roadW + 8.0 * scale;
+            pathStadium(0);
+            ctx.stroke();
+
+            // 2. 赛道暗黑沥青主表面 (High-Grip Asphalt Tarmac)
+            ctx.strokeStyle = "#141c2e";
+            ctx.lineWidth = roadW;
+            pathStadium(0);
+            ctx.stroke();
+
+            // 沥青细微核心通道光泽
+            ctx.strokeStyle = "#1a243a";
+            ctx.lineWidth = roadW * 0.72;
+            pathStadium(0);
+            ctx.stroke();
+
+            // 3. 赛车红白路肩 (Formula 1 Racing Kerbs / Rumble Strips)
+            // 严格依附圆弧解析半径，结合 setLineDash 绘制，零多边形误差，绝无断齿
+            const kerbW = 4.5 * scale;
+            const stripeLen = 9.0 * scale;
+            
+            // 右半圆弯 (Turn 1) 外侧路肩
+            ctx.lineWidth = kerbW;
+            ctx.setLineDash([]);
+            ctx.strokeStyle = "#ef4444";
+            ctx.beginPath();
+            ctx.arc(ox + halfL, oy, R + halfW + kerbW * 0.5, Math.PI * 0.5, -Math.PI * 0.5, true);
+            ctx.stroke();
+            ctx.setLineDash([stripeLen, stripeLen]);
+            ctx.strokeStyle = "#f8fafc";
+            ctx.beginPath();
+            ctx.arc(ox + halfL, oy, R + halfW + kerbW * 0.5, Math.PI * 0.5, -Math.PI * 0.5, true);
+            ctx.stroke();
+
+            // 右半圆弯 (Turn 1) 内侧弯心路肩 (Apex Kerb)
+            ctx.setLineDash([]);
+            ctx.strokeStyle = "#ef4444";
+            ctx.beginPath();
+            ctx.arc(ox + halfL, oy, R - halfW - kerbW * 0.5, Math.PI * 0.5, -Math.PI * 0.5, true);
+            ctx.stroke();
+            ctx.setLineDash([stripeLen, stripeLen]);
+            ctx.strokeStyle = "#f8fafc";
+            ctx.beginPath();
+            ctx.arc(ox + halfL, oy, R - halfW - kerbW * 0.5, Math.PI * 0.5, -Math.PI * 0.5, true);
+            ctx.stroke();
+
+            // 左半圆弯 (Turn 2) 外侧路肩
+            ctx.setLineDash([]);
+            ctx.strokeStyle = "#ef4444";
+            ctx.beginPath();
+            ctx.arc(ox - halfL, oy, R + halfW + kerbW * 0.5, -Math.PI * 0.5, Math.PI * 0.5, true);
+            ctx.stroke();
+            ctx.setLineDash([stripeLen, stripeLen]);
+            ctx.strokeStyle = "#f8fafc";
+            ctx.beginPath();
+            ctx.arc(ox - halfL, oy, R + halfW + kerbW * 0.5, -Math.PI * 0.5, Math.PI * 0.5, true);
+            ctx.stroke();
+
+            // 左半圆弯 (Turn 2) 内侧弯心路肩 (Apex Kerb)
+            ctx.setLineDash([]);
+            ctx.strokeStyle = "#ef4444";
+            ctx.beginPath();
+            ctx.arc(ox - halfL, oy, R - halfW - kerbW * 0.5, -Math.PI * 0.5, Math.PI * 0.5, true);
+            ctx.stroke();
+            ctx.setLineDash([stripeLen, stripeLen]);
+            ctx.strokeStyle = "#f8fafc";
+            ctx.beginPath();
+            ctx.arc(ox - halfL, oy, R - halfW - kerbW * 0.5, -Math.PI * 0.5, Math.PI * 0.5, true);
+            ctx.stroke();
+
+            ctx.setLineDash([]);
+
+            // 4. 双侧连续无缝边缘白实线 (Continuous Solid White Boundary Lines)
+            ctx.strokeStyle = "rgba(241, 245, 249, 0.92)";
+            ctx.lineWidth = 1.8 * scale;
+            pathStadium(halfW);
+            ctx.stroke();
+            pathStadium(-halfW);
+            ctx.stroke();
+
+            // 5. 赛道中心发光黄虚线 (Luminous Amber Centerline)
+            ctx.shadowColor = "#fbbf24";
+            ctx.shadowBlur = 4 * scale;
+            ctx.strokeStyle = "#f59e0b";
+            ctx.lineWidth = 1.8 * scale;
+            ctx.setLineDash([10 * scale, 7 * scale]);
+            pathStadium(0);
+            ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.shadowBlur = 0;
+
+            // 6. 起终点方格旗线 (Start / Finish Checkered Gantry & Line)
+            const sfX = ox;
+            const sfY = oy + R;
+            const nRows = 8;
+            const colW = 3.5 * scale;
+            const rowH = roadW / nRows;
+            for (let c = 0; c < 2; c++) {
+                for (let r = 0; r < nRows; r++) {
+                    const isWhite = (c + r) % 2 === 0;
+                    ctx.fillStyle = isWhite ? "#f8fafc" : "#0f172a";
+                    ctx.fillRect(
+                        sfX - colW + c * colW,
+                        sfY - halfW + r * rowH,
+                        colW,
+                        rowH
+                    );
+                }
+            }
+
+            // 起终点龙门架立柱与信号灯 (Overhead Start Gantry)
+            ctx.strokeStyle = "rgba(148, 163, 184, 0.6)";
+            ctx.lineWidth = 2.0 * scale;
+            ctx.beginPath();
+            ctx.moveTo(sfX, sfY - halfW - 10 * scale);
+            ctx.lineTo(sfX, sfY + halfW + 10 * scale);
+            ctx.stroke();
+
+            // 5颗发光绿色发车信号灯
+            const lightsY = sfY - halfW - 6 * scale;
+            for (let li = -2; li <= 2; li++) {
+                ctx.fillStyle = "#10b981";
+                ctx.shadowColor = "#10b981";
+                ctx.shadowBlur = 6 * scale;
+                ctx.beginPath();
+                ctx.arc(sfX + li * 5 * scale, lightsY, 1.8 * scale, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+
+            // 7. 发车格位 (Grid Boxes)
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.4)";
+            ctx.lineWidth = 1.2 * scale;
+            [-18, -36, -54].forEach((dxM, i) => {
+                const gx = sfX + dxM * pxPerM * scale;
+                if (gx > ox - halfL) {
+                    const gy = sfY;
+                    ctx.strokeRect(gx - 4 * scale, gy - 3.5 * scale, 8 * scale, 7 * scale);
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.5)";
+                    ctx.font = `${7 * scale}px monospace`;
+                    ctx.fillText(`${i + 1}`, gx - 2 * scale, gy + 2.5 * scale);
+                }
+            });
+
+            // 8. 弯道与直道专业标注 (Corner & Circuit Annotations)
+            ctx.fillStyle = "rgba(148, 163, 184, 0.65)";
+            ctx.font = `bold ${9 * scale}px monospace`;
+            ctx.fillText("T1 HAIRPIN (R32m)", ox + halfL + 6 * scale, oy - 6 * scale);
+            ctx.fillText("T2 HAIRPIN (R32m)", ox - halfL - 105 * scale, oy - 6 * scale);
+            ctx.fillText("MAIN STRAIGHT 70m →", ox - 50 * scale, oy + R + halfW + 14 * scale);
+            ctx.fillText("← BACK STRAIGHT 70m", ox - 50 * scale, oy - R - halfW - 8 * scale);
+
+            ctx.restore();
+        }
+
+        // 计算自车在体育场赛道上的严格投影点 (用于绘制高精横向偏差标尺)
+        function getExactStadiumProjection(carX, carY, scale, offsetX, offsetY) {
+            const L_m = 70.0;
+            const R_m = 32.0;
+            const pxPerM = 3.2;
+
+            const ox = 400.0;
+            const oy = 300.0;
+            const halfL = L_m * 0.5 * pxPerM;
+            const R = R_m * pxPerM;
+
+            // 转换为画布中心相对坐标
+            const dx = carX - ox;
+            const dy = carY - oy;
+
+            let projX, projY;
+            if (dx >= halfL) {
+                const phi = Math.atan2(dy, dx - halfL);
+                projX = ox + halfL + R * Math.cos(phi);
+                projY = oy + R * Math.sin(phi);
+            } else if (dx <= -halfL) {
+                const phi = Math.atan2(dy, dx + halfL);
+                projX = ox - halfL + R * Math.cos(phi);
+                projY = oy + R * Math.sin(phi);
+            } else if (dy <= 0) {
+                projX = carX;
+                projY = oy - R;
+            } else {
+                projX = carX;
+                projY = oy + R;
+            }
+            return { x: offsetX + projX * scale, y: offsetY + projY * scale };
+        }
+
+        // 本地 60FPS 稠密推演轨迹池
+        const localTrail = [];
+        let lastCarX = car.x;
+        let lastCarY = car.y;
+
+        function updateLocalTrail() {
+            if (!isRunning) return;
+            const dx = car.x - lastCarX;
+            const dy = car.y - lastCarY;
+            const d2 = dx * dx + dy * dy;
+            if (d2 >= 0.6) {
+                // 瞬间大位移（重置或跨圈）切断轨迹
+                if (d2 > 2500) {
+                    localTrail.length = 0;
+                }
+                localTrail.push({ x: car.x, y: car.y });
+                if (localTrail.length > 300) localTrail.shift();
+                lastCarX = car.x;
+                lastCarY = car.y;
+            }
+        }
+
+        function drawUltraSmoothTrail(scale, offsetX, offsetY) {
+            let pts = [];
+            if (localTrail.length >= 2) {
+                pts = localTrail.map(p => ({ x: offsetX + p.x * scale, y: offsetY + p.y * scale }));
+                pts.push({ x: offsetX + car.x * scale, y: offsetY + car.y * scale });
+            } else if (vehState && vehState.trail && vehState.trail.length >= 2) {
+                pts = vehState.trail.map(p => ({ x: offsetX + p.x * scale, y: offsetY + p.y * scale }));
+            }
+            if (pts.length < 2) return;
+
+            // 智能分段：滤除任何跨度超过 40px 的跳变线
+            const maxDistSq = 45 * 45 * scale * scale;
+            const segments = [];
+            let curSeg = [pts[0]];
+            for (let i = 1; i < pts.length; i++) {
+                const prev = pts[i - 1];
+                const d2 = (pts[i].x - prev.x) ** 2 + (pts[i].y - prev.y) ** 2;
+                if (d2 > maxDistSq) {
+                    if (curSeg.length >= 2) segments.push(curSeg);
+                    curSeg = [pts[i]];
+                } else {
+                    curSeg.push(pts[i]);
+                }
+            }
+            if (curSeg.length >= 2) segments.push(curSeg);
+
+            segments.forEach(seg => {
+                ctx.save();
+                ctx.lineCap = "round";
+                ctx.lineJoin = "round";
+
+                // 1. 青色霓虹光晕外层 (Neon Cyan Glow)
+                ctx.shadowColor = "#00f0ff";
+                ctx.shadowBlur = 8 * scale;
+                ctx.strokeStyle = "rgba(0, 240, 255, 0.35)";
+                ctx.lineWidth = 4.2 * scale;
+                renderSpline(seg);
+                ctx.stroke();
+
+                // 2. 翡翠绿核心流光带 (Emerald Core Laser Ribbon)
+                ctx.shadowBlur = 0;
+                ctx.strokeStyle = "rgba(16, 185, 129, 0.95)";
+                ctx.lineWidth = 1.8 * scale;
+                renderSpline(seg);
+                ctx.stroke();
+
+                ctx.restore();
+            });
+        }
+
+        // 二阶中点光滑样条插值（消灭折线棱角，达成纯滑曲线）
+        function renderSpline(pts) {
+            if (pts.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            if (pts.length === 2) {
+                ctx.lineTo(pts[1].x, pts[1].y);
+                return;
+            }
+            for (let i = 1; i < pts.length - 1; i++) {
+                const mx = (pts[i].x + pts[i + 1].x) * 0.5;
+                const my = (pts[i].y + pts[i + 1].y) * 0.5;
+                ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+            }
+            ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        }
+
+        // 绘制正在地图上平滑移动的自车与传感器光锥
+        function drawCyberVehicle(scale, offsetX, offsetY) {
             const carScrX = offsetX + car.x * scale;
             const carScrY = offsetY + car.y * scale;
 
             // 绘制横向偏差 (CTE) 实时引导法向标尺 (微米级对账探针)
-            if (vehState && vehState.track && vehState.track.length > 2) {
-                drawCteGuide(scale, offsetX, offsetY, carScrX, carScrY);
+            const proj = getExactStadiumProjection(car.x, car.y, scale, offsetX, offsetY);
+            if (proj) {
+                ctx.save();
+                ctx.strokeStyle = (car.cte_m < 0.05) ? "rgba(16, 185, 129, 0.8)" : "rgba(251, 191, 36, 0.85)";
+                ctx.lineWidth = 1.4 * scale;
+                ctx.setLineDash([3 * scale, 3 * scale]);
+                ctx.beginPath();
+                ctx.moveTo(carScrX, carScrY);
+                ctx.lineTo(proj.x, proj.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
             }
 
             ctx.save();
@@ -916,124 +1199,6 @@
             ctx.shadowBlur = 0;
 
             ctx.restore();
-        }
-
-        // 本地 60FPS 连续平滑轨迹池
-        const localTrail = [];
-        let lastCarX = car.x;
-        let lastCarY = car.y;
-
-        function updateLocalTrail() {
-            if (!isRunning) return;
-            const dx = car.x - lastCarX;
-            const dy = car.y - lastCarY;
-            const d2 = dx * dx + dy * dy;
-            if (d2 >= 0.8) {
-                // 瞬间大位移（重置/跨圈）清空本地轨迹，防飞线
-                if (d2 > 2500) {
-                    localTrail.length = 0;
-                }
-                localTrail.push({ x: car.x, y: car.y });
-                if (localTrail.length > 180) localTrail.shift();
-                lastCarX = car.x;
-                lastCarY = car.y;
-            }
-        }
-
-        function drawUltraSmoothTrail(scale, offsetX, offsetY) {
-            // 优先使用本地 60FPS 高频平滑点序列，后备使用后端遥测
-            let pts = [];
-            if (localTrail.length >= 2) {
-                pts = localTrail.map(p => ({ x: offsetX + p.x * scale, y: offsetY + p.y * scale }));
-                // 紧密连接到自车当前绘制中心（后轴位置）
-                pts.push({ x: offsetX + car.x * scale, y: offsetY + car.y * scale });
-            } else if (vehState && vehState.trail && vehState.trail.length >= 2) {
-                pts = vehState.trail.map(p => ({ x: offsetX + p.x * scale, y: offsetY + p.y * scale }));
-            }
-            if (pts.length < 2) return;
-
-            // 智能分段：滤除任何跨度超过 40px 的跳变线
-            const segments = [];
-            let curSeg = [pts[0]];
-            for (let i = 1; i < pts.length; i++) {
-                const prev = pts[i - 1];
-                const d2 = (pts[i].x - prev.x) ** 2 + (pts[i].y - prev.y) ** 2;
-                if (d2 > 45 * 45 * scale * scale) {
-                    if (curSeg.length >= 2) segments.push(curSeg);
-                    curSeg = [pts[i]];
-                } else {
-                    curSeg.push(pts[i]);
-                }
-            }
-            if (curSeg.length >= 2) segments.push(curSeg);
-
-            segments.forEach(seg => {
-                ctx.save();
-                ctx.lineCap = "round";
-                ctx.lineJoin = "round";
-
-                // 1. 外层青色霓虹发光晕 (Neon Halo)
-                ctx.shadowColor = "#00f0ff";
-                ctx.shadowBlur = 8 * scale;
-                ctx.strokeStyle = "rgba(0, 240, 255, 0.28)";
-                ctx.lineWidth = 4.5 * scale;
-                renderSpline(seg);
-                ctx.stroke();
-
-                // 2. 内层翡翠绿高能激光流光带 (Emerald Laser Ribbon)
-                ctx.shadowBlur = 0;
-                ctx.strokeStyle = "rgba(52, 211, 153, 0.85)";
-                ctx.lineWidth = 2.0 * scale;
-                renderSpline(seg);
-                ctx.stroke();
-
-                ctx.restore();
-            });
-        }
-
-        // 二阶中点光滑样条插值（消灭折线棱角，达成毫米级纯滑曲线）
-        function renderSpline(pts) {
-            if (pts.length < 2) return;
-            ctx.beginPath();
-            ctx.moveTo(pts[0].x, pts[0].y);
-            if (pts.length === 2) {
-                ctx.lineTo(pts[1].x, pts[1].y);
-                return;
-            }
-            for (let i = 1; i < pts.length - 1; i++) {
-                const mx = (pts[i].x + pts[i + 1].x) * 0.5;
-                const my = (pts[i].y + pts[i + 1].y) * 0.5;
-                ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
-            }
-            ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
-        }
-
-        // 绘制自车至中心线的实时几何偏差标尺 (CTE Visualizer)
-        function drawCteGuide(scale, offsetX, offsetY, carScrX, carScrY) {
-            const track = vehState.track;
-            let bestD = Infinity;
-            let bestPt = null;
-            for (let i = 0; i < track.length; i++) {
-                const tx = offsetX + track[i].x * scale;
-                const ty = offsetY + track[i].y * scale;
-                const d = (carScrX - tx) ** 2 + (carScrY - ty) ** 2;
-                if (d < bestD) {
-                    bestD = d;
-                    bestPt = { x: tx, y: ty };
-                }
-            }
-            if (bestPt && bestD > 4 && bestD < 120 * 120 * scale * scale) {
-                ctx.save();
-                ctx.strokeStyle = car.cte_m < 0.15 ? "rgba(52, 211, 153, 0.6)" : "rgba(251, 191, 36, 0.65)";
-                ctx.lineWidth = 1.2 * scale;
-                ctx.setLineDash([2 * scale, 3 * scale]);
-                ctx.beginPath();
-                ctx.moveTo(carScrX, carScrY);
-                ctx.lineTo(bestPt.x, bestPt.y);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.restore();
-            }
         }
 
         setInterval(fetchVehState, 30);

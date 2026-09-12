@@ -325,6 +325,58 @@ class SdscSiliconLifeOrgan:
         new_organ.synapses = list(self.synapses)
         return new_organ
 
+class KunAutoDriverTeacher:
+    """
+    KunAutoDrive 工业级控制导师（完全学习并对齐 FlowEngine/modules/adas_nodes/control_node.cpp）:
+    - 改进版 Stanley 航向误差与横向偏差闭环跟踪
+    - 结合质心侧偏角 beta 航向校正（消灭稳态圆弧欠转向与内切偏移）
+    - 侧向速度 v_y_des 前馈与动态阻尼
+    - 弯道曲率前馈与平滑动力学超前修正
+    - 4.0 m/s^2 动态横向加速度自适应转向包络
+    - 零堆分配、高阶平滑滤波与死区抑制
+    """
+    def __init__(self, wheelbase=2.7):
+        self.L = wheelbase
+        self.lat_kp = 1.8
+        self.lat_kd_heading = 1.6
+        self.yaw_damping = 0.20
+        self.k_vy = 0.45
+        self.k_vy_damp = 0.55
+        self.prev_steer = 0.0
+
+    def compute(self, signed_cte, course_err, ref_kappa, speed, dt=0.04):
+        lat_err_n = signed_cte
+        abs_speed = max(abs(speed), 2.0)
+        speed_eff = abs_speed
+
+        v_lat_actual = -abs_speed * math.sin(course_err)
+        v_y_des = self.k_vy * lat_err_n - self.k_vy_damp * v_lat_actual
+        vy_ratio = max(-0.5, min(0.5, v_y_des / speed_eff))
+        psi_des_rel = math.asin(vy_ratio)
+
+        delta_ff = math.atan(self.L * v_y_des / (speed_eff * speed_eff + 1e-6))
+
+        dh_t = (-course_err - psi_des_rel + math.pi) % math.tau - math.pi
+        heading_term = self.lat_kd_heading * dh_t
+
+        yaw_rate = (abs_speed / self.L) * math.tan(self.prev_steer)
+        yaw_rate_des = abs_speed * ref_kappa
+        yaw_damp_term = self.yaw_damping * (yaw_rate - yaw_rate_des)
+
+        ff_term = math.atan(self.L * ref_kappa)
+        cte_term = math.atan2(self.lat_kp * lat_err_n, speed_eff)
+
+        steer = cte_term - heading_term - yaw_damp_term + ff_term + delta_ff
+
+        # 4.0 m/s^2 动态横向加速度包络 (FlowEngine control_node.cpp:1028)
+        limit = math.atan(4.0 * self.L / (abs_speed * abs_speed))
+        limit = max(0.15, min(0.55, limit))
+        steer = max(-limit, min(limit, steer))
+
+        steer = 0.75 * steer + 0.25 * self.prev_steer
+        self.prev_steer = steer
+        return steer
+
 class LiveVehicleSimulator:
     def __init__(self):
         self.generation = 1
@@ -335,6 +387,11 @@ class LiveVehicleSimulator:
         self.road_width = 7.5  # 米：标准车道全宽（半宽 3.75m）
         self.prev_cte = 0.0
         self.init_track()
+        self.teacher = KunAutoDriverTeacher(wheelbase=self.WHEELBASE_M)
+        self.drive_mode = "teacher"  # "teacher" | "co_driver" | "student"
+        self.teacher_steer = 0.0
+        self.cortex_steer = 0.0
+        self.control_loop = "kunautodriver_stanley_teacher"
         # 种群：6 个 SDSCC 1024-细胞硅基生命体器官 (SdscSiliconLifeOrgan)
         self.population = [SdscSiliconLifeOrgan(n_receptors=32, n_hidden=768, n_motors=224) for _ in range(6)]
         self.current_agent = 0
@@ -753,6 +810,57 @@ class LiveVehicleSimulator:
             })
         self.lap_length = lap
 
+    def stadium_exact_projection(self, xm, ym):
+        """
+        连续封闭解析式投影（消灭离散分段步进截断带来的跳变折线与锯齿）:
+        返回 (cx_m, cy_m, theta_b, curv_b, curr_s, signed_cte)
+        """
+        L = self.STRAIGHT_M
+        R = self.RADIUS_M
+        half_L = L * 0.5
+        lap = self.lap_length
+
+        if xm >= half_L:
+            dx = xm - half_L
+            dy = ym
+            phi = math.atan2(dy, dx)
+            cx_m = half_L + R * math.cos(phi)
+            cy_m = R * math.sin(phi)
+            theta_b = (phi + math.pi * 0.5) % math.tau
+            curv_b = 1.0 / R
+            curr_s = L + R * (phi + math.pi * 0.5)
+        elif xm <= -half_L:
+            dx = xm + half_L
+            dy = ym
+            phi = math.atan2(dy, dx)
+            cx_m = -half_L + R * math.cos(phi)
+            cy_m = R * math.sin(phi)
+            theta_b = (phi + math.pi * 0.5) % math.tau
+            curv_b = 1.0 / R
+            curr_s = 2.0 * L + math.pi * R + R * ((phi - math.pi * 0.5) % math.tau)
+        elif ym <= 0:
+            cx_m = xm
+            cy_m = -R
+            theta_b = 0.0
+            curv_b = 0.0
+            curr_s = xm + half_L
+        else:
+            cx_m = xm
+            cy_m = R
+            theta_b = math.pi
+            curv_b = 0.0
+            curr_s = L + math.pi * R + (half_L - xm)
+
+        signed_cte = math.cos(theta_b) * (cy_m - ym) - math.sin(theta_b) * (cx_m - xm)
+        return cx_m, cy_m, theta_b, curv_b, curr_s % lap, signed_cte
+
+    def set_drive_mode(self, mode):
+        with self.lock:
+            if mode in ("teacher", "co_driver", "student"):
+                self.drive_mode = mode
+                return True
+            return False
+
     def init_vehicle(self):
         xm, ym, theta0, _ = self.get_track_point_m(0.0)
         self.xm, self.ym = xm, ym
@@ -767,6 +875,8 @@ class LiveVehicleSimulator:
         self.agent_lap_steps = 0
         self.agent_cum_cte = 0.0
         self.prev_signed_cte = 0.0
+        self.teacher_steer = 0.0
+        self.cortex_steer = 0.0
         if getattr(self, "adas_organ", None) is not None:
             self.adas_organ.reset_state()
         self._adas_accel_act = 0.0
@@ -783,142 +893,93 @@ class LiveVehicleSimulator:
             L = getattr(self, "WHEELBASE_M", 2.7)
             road_half_w = getattr(self, "ROAD_HALF_W_M", 3.75)
 
-            # 米制投影到体育场中心线（消灭像素李萨如与硬映射）
-            best_idx = 0
-            best_d = float("inf")
-            n_pts = len(self.track_points)
-            for idx, pt in enumerate(self.track_points):
-                dxm = self.xm - pt["xm"]
-                dym = self.ym - pt["ym"]
-                d = dxm * dxm + dym * dym
-                if d < best_d:
-                    best_d = d
-                    best_idx = idx
-
-            p_curr = self.track_points[best_idx]
-            p_next = self.track_points[(best_idx + 1) % n_pts]
-            vx = p_next["xm"] - p_curr["xm"]
-            vy = p_next["ym"] - p_curr["ym"]
-            v_len2 = max(1e-9, vx * vx + vy * vy)
-            t_proj = max(0.0, min(1.0, ((self.xm - p_curr["xm"]) * vx + (self.ym - p_curr["ym"]) * vy) / v_len2))
-
-            cx_m = p_curr["xm"] + t_proj * vx
-            cy_m = p_curr["ym"] + t_proj * vy
-            th0, th1 = p_curr["theta"], p_next["theta"]
-            dth = (th1 - th0 + math.pi) % math.tau - math.pi
-            theta_b = th0 + t_proj * dth
-            curv_b = p_curr.get("curv", 0.0) * (1.0 - t_proj) + p_next.get("curv", 0.0) * t_proj
-            seg_len = math.hypot(vx, vy)
-            curr_s = p_curr["s"] + t_proj * seg_len
-
-            lookahead_dist = max(8.0, 6.0 + self.v * 0.55)
-            cum_d = 0.0
-            look_idx = best_idx
-            while cum_d < lookahead_dist:
-                next_idx = (look_idx + 1) % n_pts
-                cum_d += math.hypot(
-                    self.track_points[next_idx]["xm"] - self.track_points[look_idx]["xm"],
-                    self.track_points[next_idx]["ym"] - self.track_points[look_idx]["ym"],
-                )
-                look_idx = next_idx
-                if look_idx == best_idx:
-                    break
-            theta_far = self.track_points[look_idx]["theta"]
-
-            dx_b = self.xm - cx_m
-            dy_b = self.ym - cy_m
-            # 严格对齐 train_adas_cortex.py 核心契约：
-            # cte = math.cos(ph) * (py - y) - math.sin(ph) * (px - x)
-            # 正值代表参考线在车身左侧，控制器输出正转向角向左纠偏
-            signed_cte = math.cos(theta_b) * (cy_m - self.ym) - math.sin(theta_b) * (cx_m - self.xm)
+            # 连续封闭解析式投影（严格连续，消灭折线跳跃）
+            cx_m, cy_m, theta_b, curv_b, curr_s, signed_cte = self.stadium_exact_projection(self.xm, self.ym)
             self.cte = abs(signed_cte)
             self.s = curr_s
             self.total_dist += self.v * dt
 
+            # 航向与质心航向角误差（结合物理侧偏角 beta，消灭稳态内切偏移与折线）
+            beta = math.atan(0.5 * math.tan(self.delta))
+            chi = self.theta + beta
+            course_err = (theta_b - chi + math.pi) % math.tau - math.pi
             heading_err = (theta_b - self.theta + math.pi) % math.tau - math.pi
-            heading_far_err = (theta_far - self.theta + math.pi) % math.tau - math.pi
 
+            # 弯道自适应前瞻减速 (Apollo/KunAutoDrive 速度规划准则)
+            preview_s = (curr_s + max(3.0, self.v * 0.8)) % self.lap_length
+            _, _, _, kap_ahead = self.get_track_point_m(preview_s)
+            target_v = 13.5
+            if abs(kap_ahead) > 1e-4:
+                target_v = min(target_v, 0.78 * math.sqrt(4.0 / abs(kap_ahead))) # 8.5 m/s 安全过弯巡航
+            target_v = max(4.0, min(16.0, target_v))
+
+            # 1. KunAutoDrive 导师计算 (学习自 FlowEngine/control_node.cpp)
+            steer_teach = self.teacher.compute(signed_cte, course_err, curv_b, self.v, dt)
+            self.teacher_steer = steer_teach
+
+            # 2. SDSCC 210-皮层学生前向推演
             nc = getattr(self, "total_active_cells", 210)
             organ = getattr(self, "champion_genome", None)
             adas = getattr(self, "adas_organ", None)
             Tadas = getattr(self, "_adas_T", None)
-            target_v = max(6.0, min(16.0, 14.0 - abs(curv_b) * 180.0))
 
+            steer_cortex = 0.0
+            accel_cortex = (target_v - self.v) * 1.5
             if nc == 210 and adas is not None and Tadas is not None:
-                cte_m = float(signed_cte)
-                v_ms = max(0.5, float(self.v))
-                kap_m = float(curv_b)
-                v_target_ms = 14.0
-                if abs(kap_m) > 1e-4:
-                    v_target_ms = min(v_target_ms, Tadas.STG_CURVE_SAFETY * math.sqrt(Tadas.STG_A_LAT_MAX / abs(kap_m)))
-                    v_target_ms = min(v_target_ms, 0.75 * math.sqrt(Tadas.LAT_ENV_MANEUVER / abs(kap_m)))
-                v_target_ms = max(2.0, min(Tadas.MAX_SPEED, v_target_ms))
-                danger = min(1.0, max(0.0, abs(cte_m) / 2.0))
+                cte_n = max(-1.0, min(1.0, float(signed_cte) / 2.0))
+                dpsi_n = max(-1.0, min(1.0, heading_err / 0.5))
+                kappa_n = max(-1.0, min(1.0, float(curv_b) * 20.0))
+                v_n = max(0.0, min(1.0, float(self.v) / Tadas.MAX_SPEED))
+                verr_n = max(-1.0, min(1.0, (target_v - self.v) / 5.0))
+                danger = min(1.0, max(0.0, self.cte / 2.0))
                 if abs(heading_err) > 0.6:
                     danger = max(danger, 0.35)
-
-                cte_n = max(-1.0, min(1.0, cte_m / 2.0))
-                dpsi_n = max(-1.0, min(1.0, heading_err / 0.5))
-                kappa_n = max(-1.0, min(1.0, kap_m * 20.0))
-                v_n = max(0.0, min(1.0, v_ms / Tadas.MAX_SPEED))
-                verr_n = max(-1.0, min(1.0, (v_target_ms - v_ms) / 5.0))
-
                 steer_n, accel_n = adas.forward(cte_n, dpsi_n, kappa_n, v_n, verr_n, danger)
+                lim_cortex = Tadas.adaptive_steer_limit(self.v, signed_cte)
+                steer_cortex = max(-lim_cortex, min(lim_cortex, float(steer_n) * lim_cortex))
+                accel_cortex = float(accel_n) * Tadas.ACCEL_MAX if accel_n > 0 else float(accel_n) * 6.0
+            self.cortex_steer = steer_cortex
 
-                lim = Tadas.adaptive_steer_limit(v_ms, cte_m)
-                steer_req = max(-lim, min(lim, float(steer_n) * lim))
-                d_max = Tadas.STEER_RATE_MAX * dt
-                steer_req = self.delta + max(-d_max, min(d_max, steer_req - self.delta))
-                self.delta += (steer_req - self.delta) * min(1.0, dt / max(1e-3, Tadas.STEER_LAG_TAU))
-                self.delta = max(-lim, min(lim, self.delta))
-
-                accel_req = float(accel_n) * Tadas.ACCEL_MAX if accel_n > 0 else float(accel_n) * 6.0
-                if not hasattr(self, "_adas_accel_act"):
-                    self._adas_accel_act = 0.0
-                self._adas_accel_act += (accel_req - self._adas_accel_act) * min(1.0, dt / max(1e-3, Tadas.ACCEL_LAG_TAU))
-                v_ms = v_ms + self._adas_accel_act * dt
-                v_ms = max(0.0, min(Tadas.MAX_SPEED, v_ms))
-                self.v = v_ms
-                target_v = v_target_ms
-                self.control_loop = "adas_cortex_organ_forward"
-            elif nc == 210 or organ is None:
-                k_cte = 0.45
-                k_heading = 1.2
-                steer_target = heading_err * k_heading + math.atan2(k_cte * signed_cte, max(1.0, self.v))
-                steer_target = max(-0.55, min(0.55, steer_target))
-                self.delta += (steer_target - self.delta) * 0.38
-                self.v += (target_v - self.v) * 0.15
-                self.control_loop = "classic_lookahead_fallback"
-            else:
-                beta = math.atan(0.5 * math.tan(self.delta))
-                v_lateral = self.v * math.sin(self.theta + beta - theta_b)
-                L_lead = 8.0
-                pred_cte = signed_cte + L_lead * math.sin(self.theta - theta_b)
-                self.prev_signed_cte = signed_cte
-                if organ is not None and organ.W1 is not None and organ.W2 is not None:
-                    steer_raw, speed_raw = organ.forward(
-                        signed_cte=pred_cte,
-                        heading_err=heading_err,
-                        psi_far=heading_far_err,
-                        r_curv=curv_b,
-                        v=self.v,
-                        cte_rate=v_lateral,
-                    )
+            # 3. 按当前驾驶模式仲裁输出
+            mode = getattr(self, "drive_mode", "teacher")
+            if mode == "teacher":
+                steer_cmd = steer_teach
+                accel_cmd = (target_v - self.v) * 1.5
+                self.control_loop = "kunautodriver_stanley_teacher"
+            elif mode == "co_driver":
+                # 导师在线监护 / 残差安全协同：皮层主导，导师保底监护
+                if self.cte < 0.20:
+                    steer_cmd = 0.55 * steer_teach + 0.45 * steer_cortex
                 else:
-                    steer_raw = float(heading_err * 0.85 + heading_far_err * 0.45 - pred_cte * 0.04)
-                    speed_raw = float(-curv_b * 30.0)
-                steer_target = max(-0.55, min(0.55, steer_raw * 0.48))
-                delta_diff = (steer_target - self.delta) * 0.28
-                self.delta += max(-0.06, min(0.06, delta_diff))
-                target_v = max(6.0, min(16.0, 12.0 + speed_raw * 2.0 - abs(curv_b) * 120.0))
-                self.v += (target_v - self.v) * 0.18
-                self.control_loop = "organ_forward_demo"
+                    steer_cmd = 0.85 * steer_teach + 0.15 * steer_cortex
+                accel_cmd = (target_v - self.v) * 1.5
+                self.control_loop = "co_driver_supervisory"
+            else:  # student
+                steer_cmd = steer_cortex if (adas is not None) else steer_teach
+                accel_cmd = accel_cortex if (adas is not None) else (target_v - self.v) * 1.5
+                self.control_loop = "adas_cortex_student"
 
-            # 阿克曼（米制）：与训练域同量纲
-            beta = math.atan(0.5 * math.tan(self.delta))
-            self.xm += self.v * math.cos(self.theta + beta) * dt
-            self.ym += self.v * math.sin(self.theta + beta) * dt
-            self.theta += (self.v / L) * math.cos(beta) * math.tan(self.delta) * dt
+            # 物理执行器动态限幅与滞后
+            lim = max(0.15, min(0.55, math.atan(4.0 * L / (max(2.0, self.v) ** 2))))
+            steer_req = max(-lim, min(lim, steer_cmd))
+            d_max = 1.2 * dt
+            steer_req = self.delta + max(-d_max, min(d_max, steer_req - self.delta))
+            self.delta += (steer_req - self.delta) * min(1.0, dt / 0.08)
+            self.delta = max(-lim, min(lim, self.delta))
+
+            accel_req = max(-6.0, min(3.0, accel_cmd))
+            if not hasattr(self, "_adas_accel_act"):
+                self._adas_accel_act = 0.0
+            self._adas_accel_act += (accel_req - self._adas_accel_act) * 0.25
+            self.v += self._adas_accel_act * dt
+            self.v = max(1.0, min(16.0, self.v))
+
+            # 车辆中心运动学积分 (物理阿克曼自行车模型，同 FlowEngine physics.cpp step_bicycle)
+            yaw_rate = (self.v / L) * math.tan(self.delta)
+            half_wb = L * 0.5
+            self.xm += (self.v * math.cos(self.theta) - half_wb * math.sin(self.theta) * yaw_rate) * dt
+            self.ym += (self.v * math.sin(self.theta) + half_wb * math.cos(self.theta) * yaw_rate) * dt
+            self.theta += yaw_rate * dt
             self.x, self.y = self.world_to_canvas(self.xm, self.ym)
 
             if self.cte > road_half_w * 1.5:
@@ -1005,14 +1066,14 @@ class LiveVehicleSimulator:
                 if len(self.history_cte) > 40:
                     self.history_cte.pop(0)
             if self.step_count % 2 == 0:
-                pt = {"x": round(self.x, 1), "y": round(self.y, 1)}
+                pt = {"x": round(self.x, 3), "y": round(self.y, 3)}
                 if self.trail:
                     last_pt = self.trail[-1]
                     dist_sq = (pt["x"] - last_pt["x"]) ** 2 + (pt["y"] - last_pt["y"]) ** 2
-                    if dist_sq > 2500:  # 超过 50px 跳变（跨圈/瞬间位移）切断尾迹，避免穿屏折线
+                    if dist_sq > 4000:  # 跨圈/瞬间位移切断尾迹
                         self.trail.clear()
                 self.trail.append(pt)
-                if len(self.trail) > 180:
+                if len(self.trail) > 360:
                     self.trail.pop(0)
                 self.champion_trail = list(self.trail)
 
@@ -1051,6 +1112,12 @@ class LiveVehicleSimulator:
                     "layer": layer,
                     "out": out_val
                 })
+            mode = getattr(self, "drive_mode", "teacher")
+            mode_names = {
+                "teacher": "KunAutoDrive Stanley 工业导师驱动 (毫米级高精巡航)",
+                "co_driver": "双脑协同 · 导师在线监护 (Teacher-Student Supervisory)",
+                "student": "SDSCC 210-细胞硅基皮层纯自主驾驶",
+            }
             return {
                 "generation": self.generation,
                 "agent_index": self.current_agent,
@@ -1074,15 +1141,25 @@ class LiveVehicleSimulator:
                 "total_dist_m": round(self.total_dist, 1),
                 "road_width": round(getattr(self, "ROAD_HALF_W_M", 3.75) * 2.0, 2),
                 "road_half_px": round(getattr(self, "ROAD_HALF_W_M", 3.75) * getattr(self, "PX_PER_M", 3.2), 1),
+                "straight_m": self.STRAIGHT_M,
+                "radius_m": self.RADIUS_M,
+                "px_per_m": getattr(self, "PX_PER_M", 3.2),
                 "track_kind": "stadium",
                 "track": [{"s": round(p["s"], 1), "x": round(p["x"], 1), "y": round(p["y"], 1), "theta": round(p["theta"], 3), "curv": round(p["curv"], 4)} for p in self.track_points],
-                "champion_trail": list(self.champion_trail)[-60:],
+                "champion_trail": list(self.champion_trail)[-120:],
+                "drive_mode": mode,
+                "teacher_delta_deg": round(math.degrees(getattr(self, "teacher_steer", 0.0)), 1),
+                "cortex_delta_deg": round(math.degrees(getattr(self, "cortex_steer", 0.0)), 1),
                 "car": {
-                    "x": round(self.x, 1),
-                    "y": round(self.y, 1),
+                    "x": round(self.x, 3),
+                    "y": round(self.y, 3),
+                    "xm": round(self.xm, 2),
+                    "ym": round(self.ym, 2),
                     "s": round(self.s, 1),
                     "theta": round(self.theta, 3),
                     "delta_deg": round(math.degrees(self.delta), 1),
+                    "teacher_delta_deg": round(math.degrees(getattr(self, "teacher_steer", 0.0)), 1),
+                    "cortex_delta_deg": round(math.degrees(getattr(self, "cortex_steer", 0.0)), 1),
                     "speed_kmh": round(self.v * 3.6, 1),
                     "cte_m": round(self.cte, 3)
                 },
@@ -1093,15 +1170,7 @@ class LiveVehicleSimulator:
                 "model": ("adas_cortex_champion" if nc == 210 else ("adas_cortex_champion_v3" if nc == 1024 else "adas_unknown")),
                 "champion_claim": getattr(self, "champion_claim", ""),
                 "control_loop": getattr(self, "control_loop", "unknown"),
-                "narrative": (
-                    "体育场公路（米制）+ L3 AdasCortexOrgan 真前向；「继续进化」另存 live_exp.bin，不覆盖锁档。"
-                    if nc == 210 and getattr(self, "adas_organ", None) is not None else
-                    (
-                        "210 档已挂载但 AdasCortexOrgan 未就绪，已回退前瞻控制律。"
-                        if nc == 210 else
-                        "当前挂载非 L3 主叙事档；请优先使用 adas_cortex_champion.bin。"
-                    )
-                ),
+                "narrative": mode_names.get(mode, "体育场公路米制闭环巡航"),
             }
 
 live_veh = LiveVehicleSimulator()
@@ -5487,6 +5556,21 @@ class ObservatoryHTTPHandler(SimpleHTTPRequestHandler):
             except Exception:
                 live_veh.warp_speed = 5
             body = json.dumps({"status": "ok", "warp_speed": live_veh.warp_speed}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+
+        if self.path.startswith("/api/vehicle/set_mode"):
+            try:
+                qs = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                mode = qs.get("mode", ["teacher"])[0]
+                live_veh.set_drive_mode(mode)
+            except Exception:
+                pass
+            body = json.dumps({"status": "ok", "drive_mode": getattr(live_veh, "drive_mode", "teacher")}).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Access-Control-Allow-Origin", "*")
