@@ -148,14 +148,10 @@ kun-cellular/
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j$(nproc)
 ctest --test-dir build --output-on-failure
-# 87/87 Test suites passed
 
-# 流体压测
-./build/test_multiphase_fluid_stress
-
-# 启动沙盒服务
-python3 tools/cellular_live_backend.py --port 8833
-# http://localhost:8833/
+# 一键观测台（编译演示 .so + 监听 8833）
+bash tools/run_observatory.sh
+# http://localhost:8833/vehicle.html
 ```
 
 ---

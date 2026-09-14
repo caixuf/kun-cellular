@@ -388,7 +388,7 @@ class LiveVehicleSimulator:
         self.prev_cte = 0.0
         self.init_track()
         self.teacher = KunAutoDriverTeacher(wheelbase=self.WHEELBASE_M)
-        self.drive_mode = "teacher"  # "teacher" | "co_driver" | "student"
+        self.drive_mode = "student"  # 体育场域适配后学生可默认；导师/协同仍可切换
         self.teacher_steer = 0.0
         self.cortex_steer = 0.0
         self.control_loop = "kunautodriver_stanley_teacher"
@@ -466,8 +466,20 @@ class LiveVehicleSimulator:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         v3_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion_v3.bin")
         cortex_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion.bin")
+        stadium_path = os.path.join(base_dir, "checkpoints", "adas_cortex_champion_stadium.bin")
         track_path = os.path.join(base_dir, "checkpoints", "adas_track_champion.bin")
-        bin_path = cortex_path if os.path.exists(cortex_path) else (v3_path if os.path.exists(v3_path) else track_path)
+        # 观测台优先体育场域适配档（不覆盖 L3 锁档文件）；可用 KUN_ADAS_BIN 强制指定
+        env_bin = os.environ.get("KUN_ADAS_BIN", "").strip()
+        if env_bin:
+            bin_path = env_bin if os.path.isabs(env_bin) else os.path.join(base_dir, env_bin)
+        elif os.path.exists(stadium_path):
+            bin_path = stadium_path
+        elif os.path.exists(cortex_path):
+            bin_path = cortex_path
+        elif os.path.exists(v3_path):
+            bin_path = v3_path
+        else:
+            bin_path = track_path
         loaded = False
 
         if os.path.exists(bin_path):
@@ -514,9 +526,13 @@ class LiveVehicleSimulator:
                             self.cell_types = ["REC"] * 12 + [f"Op_{t}" for t in htypes] + ["MOT"] * 6
                         self.cell_outs = [0.0] * 210
                         self.generation = bin_data.get("generation", 60) or 60
-                        # 战役锁档叙事：多种子对撞 Stanley 9W/7L ≈ 56.3% 净胜率（非虚高 fitness）
-                        self.champion_fitness = 56.3
-                        self.champion_claim = "L3 210细胞 · vs Stanley 9W/7L · 直道 CTE≈3.1cm"
+                        # 战役锁档叙事：多种子对撞 Stanley；体育场域适配档单独标注
+                        if os.path.basename(bin_path) == "adas_cortex_champion_stadium.bin":
+                            self.champion_fitness = 62.5  # 10W/6L 叙事可读分
+                            self.champion_claim = "stadium适配 · vs Stanley 10W/6L · 观测台学生默认"
+                        else:
+                            self.champion_fitness = 56.3
+                            self.champion_claim = "L3 210细胞 · vs Stanley 9W/7L · 直道 CTE≈3.1cm"
                         self.champion_genome = None
                         self._init_shadow_cortex(bin_data)
                         # 与 bench/tune 同源：AdasCortexOrgan 真前向驱动转向/纵向

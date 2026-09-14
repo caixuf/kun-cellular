@@ -1,0 +1,30 @@
+{
+  "tool": "eval_cortical_array_bin",
+  "cold_eval": true,
+  "gain_quantization": "u8/64",
+  "bin": "checkpoints/quant_cortical_array_champion.bin",
+  "n_cells": 1032,
+  "n_synapses": 1634,
+  "n_columns": 43,
+  "n_macro_axons": 258,
+  "n_assets": 43,
+  "val_days": 740,
+  "test_days": 2593,
+  "test_start": "2016-01-04",
+  "test_end": "2026-09-01",
+  "val": {
+    "sharpe": 0.737555,
+    "cum_return": 0.157479,
+    "max_drawdown": 0.075150
+  },
+  "oos": {
+    "sharpe": 0.143702,
+    "cum_return": 0.063216,
+    "max_drawdown": 0.255508,
+    "calmar": 0.247414,
+    "trades": 1125,
+    "final_capital": 1063216.245043
+  },
+  "paper_anchor": {"sharpe": 0.22, "cum_return": 0.1355, "max_drawdown": 0.2011, "calmar": 0.67},
+  "note": "persisted u8-gain phenotype; not in-memory retrain; does not mutate frozen oos_repro JSON"
+}

@@ -14,9 +14,11 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <set>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace kunquant {
@@ -373,6 +375,150 @@ inline void seed_column(CorticalMicroColumn& col, uint32_t seed) {
     }
     g.inc_off[g.num_cells] = syn_idx;
     g.num_synapses = syn_idx;
+}
+
+// SDSC-BIN v2 → CorticalMacroArray（任务层冷评加载；不改底座）。
+// 存盘把柱内突触与 macro_axons 压成全局 outgoing CSR，增益量化为 u8/64。
+// 冷评对象是磁盘表型，不是训练期内存里的 float 冠军。
+struct CorticalArrayBinInfo {
+    uint32_t n_cells{0};
+    uint32_t n_synapses{0};
+    uint32_t n_columns{0};
+    uint32_t cells_per_column{0};
+    uint32_t n_macro_axons{0};
+    uint32_t n_intra_synapses{0};
+    uint32_t in_dim{0};
+    uint32_t out_dim{0};
+    std::string path;
+};
+
+struct LoadedCorticalArray {
+    CorticalMacroArray array;
+    CorticalArrayBinInfo info;
+    LoadedCorticalArray(CorticalMacroArray&& a, CorticalArrayBinInfo i)
+        : array(std::move(a)), info(std::move(i)) {}
+};
+
+inline std::optional<LoadedCorticalArray> load_cortical_array_from_sdsc_bin(
+    const std::string& path,
+    uint32_t cells_per_col = 24,
+    std::string* err = nullptr) {
+    auto fail = [&](const char* msg) -> std::optional<LoadedCorticalArray> {
+        if (err) *err = msg;
+        return std::nullopt;
+    };
+    if (cells_per_col == 0) return fail("cells_per_col must be > 0");
+
+    SDSCBinaryGraph* graph = sdsc_binary_load(path.c_str());
+    if (!graph) return fail("sdsc_binary_load failed (bad magic/version/path)");
+
+    const uint32_t n_cells = graph->header.num_cells;
+    const uint32_t n_syns = graph->header.num_synapses;
+    const uint32_t in_dim = graph->header.input_dim;
+    const uint32_t out_dim = graph->header.output_dim;
+    if (n_cells == 0 || n_cells % cells_per_col != 0) {
+        sdsc_binary_free(graph);
+        return fail("n_cells is 0 or not divisible by cells_per_col");
+    }
+    if (!graph->cells || !graph->row_ptr || (n_syns > 0 && (!graph->col_idx || !graph->weights))) {
+        sdsc_binary_free(graph);
+        return fail("CSR pointers missing");
+    }
+
+    const uint32_t n_cols = n_cells / cells_per_col;
+    std::vector<std::vector<std::vector<std::pair<uint32_t, float>>>> intra(
+        n_cols, std::vector<std::vector<std::pair<uint32_t, float>>>(cells_per_col));
+    std::vector<kun::MacroAxon> axons;
+    axons.reserve(n_syns);
+
+    for (uint32_t src = 0; src < n_cells; ++src) {
+        const uint32_t begin = graph->row_ptr[src];
+        const uint32_t end = graph->row_ptr[src + 1];
+        if (end < begin || end > n_syns) {
+            sdsc_binary_free(graph);
+            return fail("CSR row_ptr out of range");
+        }
+        const uint32_t src_col = src / cells_per_col;
+        const uint32_t src_cell = src % cells_per_col;
+        for (uint32_t e = begin; e < end; ++e) {
+            const uint32_t dst = graph->col_idx[e];
+            if (dst >= n_cells) {
+                sdsc_binary_free(graph);
+                return fail("CSR col_idx out of range");
+            }
+            const float w = graph->weights[e];
+            const uint32_t dst_col = dst / cells_per_col;
+            const uint32_t dst_cell = dst % cells_per_col;
+            if (src_col == dst_col) {
+                intra[dst_col][dst_cell].push_back({src_cell, w});
+            } else {
+                kun::MacroAxon ax;
+                ax.src_column_idx = src_col;
+                ax.src_cell_idx = src_cell;
+                ax.dst_column_idx = dst_col;
+                ax.dst_cell_idx = dst_cell;
+                ax.weight = w;
+                axons.push_back(ax);
+            }
+        }
+    }
+
+    uint32_t max_intra = 1;
+    uint32_t intra_total = 0;
+    for (uint32_t c = 0; c < n_cols; ++c) {
+        uint32_t col_syns = 0;
+        for (uint32_t i = 0; i < cells_per_col; ++i) {
+            col_syns += static_cast<uint32_t>(intra[c][i].size());
+        }
+        intra_total += col_syns;
+        if (col_syns > max_intra) max_intra = col_syns;
+    }
+
+    CorticalMacroArray arr(n_cols, cells_per_col, max_intra, in_dim, out_dim);
+    for (uint32_t c = 0; c < n_cols; ++c) {
+        auto& col = arr.columns()[c];
+        auto& g = col.genome;
+        for (uint32_t i = 0; i < cells_per_col; ++i) {
+            const uint32_t gid = c * cells_per_col + i;
+            const SDSCBinaryCellMeta meta = graph->cells[gid];
+            g.op_types[i] = meta.op_type;
+            g.gains[i] = static_cast<float>(meta.param1_u8) / 64.0f;
+        }
+        uint32_t syn_idx = 0;
+        for (uint32_t i = 0; i < cells_per_col; ++i) {
+            g.inc_off[i] = syn_idx;
+            for (const auto& edge : intra[c][i]) {
+                if (syn_idx >= g.inc_from.size()) {
+                    g.inc_from.push_back(edge.first);
+                    g.inc_weight.push_back(edge.second);
+                } else {
+                    g.inc_from[syn_idx] = edge.first;
+                    g.inc_weight[syn_idx] = edge.second;
+                }
+                syn_idx++;
+            }
+        }
+        g.inc_off[cells_per_col] = syn_idx;
+        g.num_synapses = syn_idx;
+    }
+    arr.macro_axons() = std::move(axons);
+    sdsc_binary_free(graph);
+
+    CorticalArrayBinInfo info;
+    info.n_cells = n_cells;
+    info.n_synapses = n_syns;
+    info.n_columns = n_cols;
+    info.cells_per_column = cells_per_col;
+    info.n_macro_axons = static_cast<uint32_t>(arr.macro_axons().size());
+    info.n_intra_synapses = intra_total;
+    info.in_dim = in_dim;
+    info.out_dim = out_dim;
+    info.path = path;
+    if (info.n_intra_synapses + info.n_macro_axons != n_syns) {
+        if (err) *err = "reconstructed synapse count != header n_synapses";
+        return std::nullopt;
+    }
+    return LoadedCorticalArray(std::move(arr), std::move(info));
 }
 
 inline void run_cortical_array_on_task(CorticalMacroArray& array, CorticalQuantTask& task, size_t n_assets) {
