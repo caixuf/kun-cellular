@@ -30,7 +30,7 @@
 | **ADAS**<br>(具身驾驶) | `checkpoints/adas_cortex_champion.bin`<br>*(210 细胞 / 659 突触)* | `tests/test_gate5_gate6_replay_shadow.py`<br>`tests/test_adas_cortex_parity.py`<br>`tests/test_adas_topology_ablation.py` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6 全闭环** + 战役 #4 拓扑消融 PASS（重连 34× / E-I 11×）。 |
 | **maze**<br>(空间迷宫) | `checkpoints/maze_navigation_champion.bin`<br>*(11 细胞 / 15 突触)* | `tests/test_flow_maze_navigation.cpp`<br>`tests/test_flow_maze_gate5_replay.cpp`<br>`tests/test_flow_maze_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。测地冷评 96/100；G5 同种子两次独立回放位级重合；G6 BFS 测地专家与冠军均为 20/20，冠军 mean\|Δneg\|=0.306。 |
 | **doudizhu**<br>(斗地主) | `checkpoints/doudizhu_cand_scorer.bin`<br>*(82 细胞 / 425 突触)* | `tests/test_flow_doudizhu_card_game.cpp`<br>`tools/p9_runner.cpp` | **PASS** | **PASS** | **PASS** | **未测**<br>*(部分等价)* | **未测**<br>*(明确未做)* | **未测**<br>*(明确未做)* | **3/6**。使命胜率 57.0% 持平教师；位级等价已通但零堆分配未重测；STATUS_BOARD 明文严禁宣称 G5/G6。 |
-| **cartpole**<br>(倒立摆) | `checkpoints/cartpole_balance_champion.bin`<br>*(13 细胞 / 49 突触)* | `tests/test_flow_cartpole_balance.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **未测** | **未测** | **4/6**。T4 易任务重训修复 initial_weight 同步；ID/OOD 冷评 20/20 满分；BIBO 零漂移证书；缺 G5/G6。 |
+| **cartpole**<br>(倒立摆) | `checkpoints/cartpole_balance_champion.bin`<br>*(13 细胞 / 49 突触)* | `tools/bench_easy_task_regression.cpp`<br>`tests/test_flow_cartpole_gate5_replay.cpp`<br>`tests/test_flow_cartpole_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。T4 ID/OOD 20/20；G5 同种子 300 步回放差分全 0；G6 PD 专家与冠军 20/20，mean\|ΔF\|=0.455。无 `test_flow_cartpole_balance.cpp`。 |
 | **DomainZoo**<br>(动力学12域) | `checkpoints/domain_zoo_report.json`<br>`checkpoints/zoo_*.bin` *(12域)* | `tools/train_domain_zoo.cpp` | **PASS**<br>*(现仓12/12)* | **PASS** | **PASS** | **未测** | **未测** | **未测** | **3/6**。2026-09-14 复跑锁档 **12/12**（战役 #3）；历史 9/12 仅为中间窗，已勘误；无单独 C11/回放。 |
 | **household**<br>(全屋覆盖) | `checkpoints/household_coverage_champion.bin`<br>*(11 细胞 / 11 突触)* | `tests/test_flow_household_coverage.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **未测** | **未测** | **4/6**。T2 战役根除 reset_state 覆盖权重缺陷；ID 88.2%，OOD 大户型 83.1%，回充 100%；BIBO 证书；缺 G5/G6。 |
 | **quant**<br>(量化皮层) | `checkpoints/quant_cortical_array_champion.bin`<br>*(1032 细胞 / 1634 突触)* | `tools/train_multi_asset_cortical_array.cpp`<br>`tools/eval_cortical_array_bin.cpp`<br>`tests/test_quant_oos_discipline.py` | **PASS**<br>*(稳态基线)* | **PASS**<br>*(复训过拟合)* | **FAIL**<br>*(锚点 0.22 未复现)* | **未测**<br>*(C11 未测)* | **未测** | **未测** | **1/6 (G3 对锚点仍 FAIL)**。`--seed 0` 复训 OOS -0.03 冻结；正式 bin 任务层冷评 OOS **+0.14**（不是 0.22）。已撤实盘宣称。 |
@@ -76,7 +76,8 @@
 - **Gate 2 (选择收敛)**：`PASS`。Manifest 记录 T4 重训并同步 `initial_weight`，根除权重抹掉缺陷。
 - **Gate 3 (OOD 盲测)**：`PASS`。Manifest 记录【T4 易任务锁档】ID 与 OOD 冷评均为 20/20 满分；`STATUS_BOARD.md` T4 C1 ✅。
 - **Gate 4 (纯 C 零 GC)**：`PASS`。`cartpole_balance_champion.bin.cert.json` 签署 BIBO 稳态与 50,000 步位级零漂移证书。
-- **Gate 5 & 6 (管线回放 / 影子对账)**：`未测`。未针对倒立摆开发管线离线回放或影子对账测试。
+- **Gate 5 (管线回放)**：`PASS`。`tests/test_flow_cartpole_gate5_replay.cpp`：同一 `cartpole_balance_champion.bin`、ID 种子 `9017`、300 步，两次独立回放 max_dobs=0、max_dact=0。OOD `force_noise=2.0` 含高斯噪声，不可作为 G5 回放工况。
+- **Gate 6 (影子对账)**：`PASS`。`tests/test_flow_cartpole_gate6_shadow.cpp`：20 个 ID 种子（`9000+i*17`，300 步）。PD 专家 **20/20**，冠军 **20/20**，冠军推力 mean\|ΔF\|=**0.455**（阈值 < 0.80）。冠军与专家不必轨迹重合。
 
 ### 5. DomainZoo (物理动力学控制动物园 12 域)
 - **Gate 1 (基线探针 / M1 Gate)**：`PASS` *(现仓 12/12，战役 #3 已统一)*。`STATUS_BOARD.md` Line 101 记录“T1 ✅ 12/12”；2026-09-14 `./build/train_domain_zoo` 复跑 12/12；论文旧稿 9/12 仅为 2026-09-09 中间窗，已在双语论文勘误。
@@ -125,6 +126,10 @@ pytest tests/test_adas_cortex_contract.py tests/test_c_runtime_backend_parity.py
 # 迷宫 Gate 5 离线回放 + Gate 6 测地专家影子
 ./build/test_flow_maze_gate5_replay
 ./build/test_flow_maze_gate6_shadow
+
+# CartPole Gate 5 离线回放 + Gate 6 PD 影子（仅 ID，无推力噪声）
+./build/test_flow_cartpole_gate5_replay
+./build/test_flow_cartpole_gate6_shadow
 
 # 流体全动力学应力测试
 ./build/test_multiphase_fluid_stress

@@ -16,6 +16,7 @@
 | A | 口径对齐 + CI 挂门禁 | Cursor + agy | **✅** README/观测台拆开 L3 与体育场 |
 | C | 迷宫 Gate 5 回放 | Cursor + agy | **✅** `tests/test_flow_maze_gate5_replay.cpp`；G6 已补，见下行 |
 | C2 | 迷宫 Gate 6 影子 | Cursor | **✅** `tests/test_flow_maze_gate6_shadow.cpp`：专家 20/20、冠军 20/20、mean\|Δneg\|=0.306 |
+| C3 | CartPole Gate 5/6 | Cursor | **✅** G5 300 步差分全 0；G6 PD 与冠军 20/20，mean\|ΔF\|=0.455。OOD 噪声不可回放。 |
 | B | 形态发生旋钮 On/Off | Cursor + agy | **✅ 部分**：ZooCartPole 加边承重；有丝分裂/鲍德温 NEGATIVE；凋亡仍关不掉。见 `2026-09-15-morph-operator-ablation.md` |
 
 ## #1 成功判据（预注册）
