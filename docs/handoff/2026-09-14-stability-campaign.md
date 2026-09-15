@@ -1,7 +1,8 @@
 # 稳定性战役（2026-09-14）
 
 > 目标：对外可宣称「稳定」= 每生境 **锁档 bin + 门禁证据 + OOD/消融 + 一键复现**。  
-> 纪律：默认不改 `include/kun/cellular/` 热路径；失败如实记；禁止冒领。T2 为用户授权的描述带构造器加法（不改 Cell/`mutate`）。
+> 纪律：默认不改 `include/kun/cellular/` 热路径；失败如实记；禁止冒领。T2 为用户授权的描述带构造器加法（不改 Cell/`mutate`）。  
+> **2026-09-15 冻结**：结案见 `2026-09-15-cellular-closeout.md`。不再扩生境。infra 走 `flowserve` / `flowtrain`。
 
 ## 顺序（一个一个做）
 
@@ -24,6 +25,7 @@
 | T2 | 描述带构造最小协议 | Cursor | **✅** `von_neumann_constructor.hpp`；切断构造器失败；非 C++ 拷贝、非通用构造器 |
 | T3 | agy 口号审稿筛想法 | Cursor + agy | **✅** `2026-09-15-agy-slogan-review.md`。收下双锚点+脏磁带负例；拒 12/12 回填与「非冯自复制」包装 |
 | B | 形态发生旋钮 On/Off | Cursor + agy | **✅ 部分**：ZooCartPole 加边承重；有丝分裂/鲍德温 NEGATIVE；凋亡仍关不掉。见 `2026-09-15-morph-operator-ablation.md` |
+| Z | 细胞生命体结案冻结 | Cursor | **✅ 冻结** `2026-09-15-cellular-closeout.md`。主矩阵 4×6/6；Zoo 隔离 10/12 + G6 FAIL；量化 G3 FAIL。 |
 
 ## #1 成功判据（预注册）
 

@@ -55,11 +55,11 @@
 | **流体阻尼控制** | 40 细胞 / 86 突触 | `checkpoints/fluid_damper_champion.bin` (5.0 KB) | Aero / Hydro / Vacuum 三态 3000 步极限扰动 100% 收敛（`test_multiphase_fluid_stress`） |
 | **ADAS 循迹皮层（L3 锁档）** | 210 细胞 / ~659 突触 | `checkpoints/adas_cortex_champion.bin` | 16 场景多种子 **9 胜 / 7 负**（见下表；2026-09-11） |
 | **ADAS 体育场学生档（观测台默认）** | 210 细胞 | `checkpoints/adas_cortex_champion_stadium.bin` | 体育场公路学生 p95 CTE **0.145 m**；叙事 **10 胜 / 6 负**（不覆盖 L3） |
-| **12 任务控制动物园** | 9~35 细胞 / 9~89 突触 | `checkpoints/zoo_*.bin` | **12/12 门禁通过**（`8ea0c61`：servo/dc_motor 植物修复 + maglev 课程复用），训练耗时秒级/任务 |
+| **12 任务控制动物园** | 9~35 细胞 / 9~89 突触 | `checkpoints/zoo_*.bin` | 冻结 JSON **12/12** 是训练当场评（泄漏）。`o_[]` 卫生后隔离冷评 **10/12**；G6 抖动 8/12 FAIL。不得把 JSON 写成隔离可复现。 |
 | **多足步态 (organism 真前向)** | 11 细胞 / 13 突触 | `checkpoints/locomotion_gait_champion.bin` | Train/ID/OOD **100%**（前进 ≥80px，固定表型冷评；`locomotion_gait_report.json`） |
 | **三体引力弹射导航** | 17 细胞 / 39 突触 | `checkpoints/slingshot_nav_champion.bin` | Train 100% / ID 80% / OOD 50%（门禁达标；OOD 为温和 G 扰动 1.5→1.6；`slingshot_nav_report.json`） |
 
-> **动物园勘误史**：2026-09-09 曾因报告与 bin 漂移回落为 **9/12**（maglev / dc_motor / servo）。2026-09-10 在 **Task 层**修复被控对象与课程后重跑对齐为 **12/12**（`checkpoints/domain_zoo_report.json` 的 `gate: true`）。不得引用过期的 9/12 作为当前状态。
+> **动物园勘误史**：2026-09-09 曾因报告与 bin 漂移回落为 **9/12**。2026-09-10 Task 层修复后 JSON 对齐为 **12/12**。2026-09-15 隔离冷评锁定 **10/12**（cartpole ID 0.1，ballbeam OOD 0.4）。不得引用过期 9/12，也不得把 JSON 12/12 写成隔离可复现。
 
 ### ADAS vs Stanley 完整基准（16 场景，10-seed 平均）
 
