@@ -1,7 +1,7 @@
 # 稳定性战役（2026-09-14）
 
 > 目标：对外可宣称「稳定」= 每生境 **锁档 bin + 门禁证据 + OOD/消融 + 一键复现**。  
-> 纪律：不改 `include/kun/cellular/` 底座；失败如实记；禁止冒领。
+> 纪律：默认不改 `include/kun/cellular/` 热路径；失败如实记；禁止冒领。T2 为用户授权的描述带构造器加法（不改 Cell/`mutate`）。
 
 ## 顺序（一个一个做）
 
@@ -19,7 +19,10 @@
 | C3 | CartPole Gate 5/6 | Cursor | **✅** G5 300 步差分全 0；G6 PD 与冠军 20/20，mean\|ΔF\|=0.455。OOD 噪声不可回放。 |
 | C4 | household Gate 5/6 | Cursor | **✅** G5 种子 1000 共 811 步差分全 0；G6 教师 20/20、冠军 17/20、均覆盖 0.927、零碰撞。 |
 | C5 | DomainZoo Gate 5/6 | Cursor | **G5 ✅ 12/12 回放差分 0；G6 ❌ FAIL** 抖动 8/12。cartpole 隔离 1/10 ≠ JSON 0.9。未覆盖 bin。 |
-| C6 | DomainZoo 评测隔离 | Cursor | **✅ 负例锁**：leaky M1 11/12，clone M1 **10/12**；cartpole ID JSON 0.9 / leaky 0.5 / clone=fresh **0.1**。未改冻结 JSON。 |
+| C6 | DomainZoo 评测隔离 | Cursor | **✅ 卫生后** cartpole ID 三口径皆 0.1；M1 **10/12**。JSON 0.9 仍不可复现。 |
+| T1 | 主定理卡（接线承重） | Cursor | **✅** `2026-09-15-main-theorem-topology.md` |
+| T2 | 描述带构造最小协议 | Cursor | **✅** `von_neumann_constructor.hpp`；切断构造器失败；非 C++ 拷贝、非通用构造器 |
+| T3 | agy 口号审稿筛想法 | Cursor + agy | **✅** `2026-09-15-agy-slogan-review.md`。收下双锚点+脏磁带负例；拒 12/12 回填与「非冯自复制」包装 |
 | B | 形态发生旋钮 On/Off | Cursor + agy | **✅ 部分**：ZooCartPole 加边承重；有丝分裂/鲍德温 NEGATIVE；凋亡仍关不掉。见 `2026-09-15-morph-operator-ablation.md` |
 
 ## #1 成功判据（预注册）

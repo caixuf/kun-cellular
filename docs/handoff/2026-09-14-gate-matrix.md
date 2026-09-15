@@ -1,7 +1,7 @@
 # 六道门禁 × 生境实证打勾矩阵 (2026-09-14)
 
 > **宪条纪律**：
-> 1. 不修改 `include/kun/cellular/` 底座；
+> 1. 默认不修改 `include/kun/cellular/` 热路径（Cell / `mutate` / 图编译）。2026-09-15 T2 为用户授权的**描述带构造器加法**（新头文件），禁止写成业务倒灌改底座；
 > 2. 绝对不编造 PASS；未找到证据一律如实标注「未测」，已知失败标注「FAIL」；
 > 3. 证据仅引用仓库四项法定凭据：
 >    - `tests/test_gate*.py` (`tests/test_gate5_gate6_replay_shadow.py`)
@@ -31,7 +31,7 @@
 | **maze**<br>(空间迷宫) | `checkpoints/maze_navigation_champion.bin`<br>*(11 细胞 / 15 突触)* | `tests/test_flow_maze_navigation.cpp`<br>`tests/test_flow_maze_gate5_replay.cpp`<br>`tests/test_flow_maze_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。测地冷评 96/100；G5 同种子两次独立回放位级重合；G6 BFS 测地专家与冠军均为 20/20，冠军 mean\|Δneg\|=0.306。 |
 | **doudizhu**<br>(斗地主) | `checkpoints/doudizhu_cand_scorer.bin`<br>*(82 细胞 / 425 突触)* | `tests/test_flow_doudizhu_card_game.cpp`<br>`tools/p9_runner.cpp` | **PASS** | **PASS** | **PASS** | **未测**<br>*(部分等价)* | **未测**<br>*(明确未做)* | **未测**<br>*(明确未做)* | **3/6**。使命胜率 57.0% 持平教师；位级等价已通但零堆分配未重测；STATUS_BOARD 明文严禁宣称 G5/G6。 |
 | **cartpole**<br>(倒立摆) | `checkpoints/cartpole_balance_champion.bin`<br>*(13 细胞 / 49 突触)* | `tools/bench_easy_task_regression.cpp`<br>`tests/test_flow_cartpole_gate5_replay.cpp`<br>`tests/test_flow_cartpole_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。T4 ID/OOD 20/20；G5 同种子 300 步回放差分全 0；G6 PD 专家与冠军 20/20，mean\|ΔF\|=0.455。无 `test_flow_cartpole_balance.cpp`。 |
-| **DomainZoo**<br>(动力学12域) | `checkpoints/domain_zoo_report.json`<br>`checkpoints/zoo_*.bin` *(12域)* | `tools/train_domain_zoo.cpp`<br>`tests/test_flow_domain_zoo_gate5_replay.cpp`<br>`tests/test_flow_domain_zoo_gate6_shadow.cpp`<br>`tests/test_flow_domain_zoo_eval_isolation.cpp` | **PASS**<br>*(JSON 12/12；隔离冷评 10/12)* | **PASS** | **PASS**<br>*(JSON；隔离 ballbeam OOD 0.4)* | **未测** | **PASS** | **FAIL** | **4/6 (G6 FAIL)**。G5 回放差分 0。G6 抖动 8/12。隔离冷评 clone M1 **10/12**（cartpole ID 0.1，JSON 0.9 不可复现）。未改冻结 JSON、未覆盖 bin。 |
+| **DomainZoo**<br>(动力学12域) | `checkpoints/domain_zoo_report.json`<br>`checkpoints/zoo_*.bin` *(12域)* | `tools/train_domain_zoo.cpp`<br>`tests/test_flow_domain_zoo_gate5_replay.cpp`<br>`tests/test_flow_domain_zoo_gate6_shadow.cpp`<br>`tests/test_flow_domain_zoo_eval_isolation.cpp` | **PASS**<br>*(JSON 12/12；隔离/卫生后 10/12)* | **PASS** | **PASS**<br>*(JSON；隔离 ballbeam OOD 0.4)* | **未测** | **PASS** | **FAIL** | **4/6 (G6 FAIL)**。`o_[]` 已清：cartpole ID leaky=clone=fresh **0.1**（JSON 0.9 仍不可复现）。隔离 M1 **10/12**。G5 回放差分 0。G6 抖动 8/12。 |
 | **household**<br>(全屋覆盖) | `checkpoints/household_coverage_champion.bin`<br>*(11 细胞 / 11 突触)* | `tests/test_flow_household_coverage.cpp`<br>`tests/test_flow_household_gate5_replay.cpp`<br>`tests/test_flow_household_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。T2 ID 88.2% / OOD 83.1%；G5 种子 1000 共 811 步差分全 0；G6 BFS 教师 20/20，冠军 **17/20**（均覆盖 0.927，零碰撞，mean\|Δneg\|=0.240）。教师握全图，禁止成功计数对撞。 |
 | **quant**<br>(量化皮层) | `checkpoints/quant_cortical_array_champion.bin`<br>*(1032 细胞 / 1634 突触)* | `tools/train_multi_asset_cortical_array.cpp`<br>`tools/eval_cortical_array_bin.cpp`<br>`tests/test_quant_oos_discipline.py` | **PASS**<br>*(稳态基线)* | **PASS**<br>*(复训过拟合)* | **FAIL**<br>*(锚点 0.22 未复现)* | **未测**<br>*(C11 未测)* | **未测** | **未测** | **1/6 (G3 对锚点仍 FAIL)**。`--seed 0` 复训 OOS -0.03 冻结；正式 bin 任务层冷评 OOS **+0.14**（不是 0.22）。已撤实盘宣称。 |
 
@@ -80,7 +80,7 @@
 - **Gate 6 (影子对账)**：`PASS`。`tests/test_flow_cartpole_gate6_shadow.cpp`：20 个 ID 种子（`9000+i*17`，300 步）。PD 专家 **20/20**，冠军 **20/20**，冠军推力 mean\|ΔF\|=**0.455**（阈值 < 0.80）。冠军与专家不必轨迹重合。
 
 ### 5. DomainZoo (物理动力学控制动物园 12 域)
-- **Gate 1 (基线探针 / M1 Gate)**：`PASS` *(冻结 JSON 12/12)*；**隔离冷评不得写成 12/12**。`tests/test_flow_domain_zoo_eval_isolation.cpp`：磁盘 bin + `evaluate_organism` 泄漏评测 M1 **11/12**（cartpole 已 FAIL）；每回合新环境 clone M1 **10/12**（再掉 ballbeam OOD 0.4）。cartpole ID：JSON 0.9 / leaky 0.5 / clone=fresh **0.1**。污染源：`reset_physics` 不清 `o_[]`，第 2 种子起第一帧观测是上一回合终态。未改 `domain_zoo_report.json`。
+- **Gate 1 (基线探针 / M1 Gate)**：`PASS` *(冻结 JSON 12/12)*；**隔离冷评不得写成 12/12**。`ZooTask::reset` 已清 `o_[]` 后，cartpole ID：JSON 0.9 / leaky=clone=fresh **0.1**。M1 leaky 与 clone 均为 **10/12**（cartpole + ballbeam OOD 0.4）。卫生前 leaky 11/12 多出的一格是脏观测。残留 OOD 差距来自底座 `membrane_pores` 未被 `reset_state` 清掉。未改 `domain_zoo_report.json`。
 - **Gate 2 (选择收敛)**：`PASS`。`domain_zoo_report.json` 记录 12 域 train_sr 达 0.9 ~ 1.0（内存当场评，非隔离冷评）。
 - **Gate 3 (OOD 盲测)**：`PASS` *(JSON 口径)*。隔离冷评下 ballbeam OOD **0.4**，不得把 JSON 12 域 OOD 写成隔离可复现。
 - **Gate 4 (纯 C 零 GC)**：`未测`。未见针对 12 域各紧凑 `.bin` 的独立纯 C 零 GC 形式化测试。
@@ -175,4 +175,13 @@ OMP_NUM_THREADS=6 ./build/train_multi_asset_cortical_array --seed 0 --report run
 # 正式 champion.bin 任务层冷评（不覆盖 bin，不改冻结 JSON）
 ./build/eval_cortical_array_bin --bin checkpoints/quant_cortical_array_champion.bin --dry-load
 python3 tests/test_quant_cortical_array_cold_eval.py
+```
+
+### 7. 口号路线最小协议（描述带构造 + 接线承重）
+```bash
+# 基因型磁带构造；切断构造器 / 空磁带必须失败。不是 28 原语通用构造器，不是 C++ 拷贝。
+./build/test_flow_von_neumann_constructor
+
+# 主定理卡证据：ADAS 拓扑消融 + ZooCartPole 形态发生旋钮
+python3 tests/test_adas_topology_ablation.py
 ```

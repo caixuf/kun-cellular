@@ -1,8 +1,7 @@
-// DomainZoo 评测隔离审计。任务层 only；不改底座、不覆盖 zoo_*.bin、不改 domain_zoo_report.json。
-// 对照：
-//   leaky = 单有机体 + 单环境 evaluate_organism（reset 不清 o_[]，跨回合第一帧观测脏）
-//   clone = 每回合新环境 + 从未 forward 的模板拷贝
-//   fresh = 每回合 load+compile + 新环境（仅 cartpole ID，证明 clone≈fresh）
+// DomainZoo 评测隔离审计。任务层 only；不改底座热路径、不覆盖 zoo_*.bin、不改 domain_zoo_report.json。
+// 2026-09-15 已在 ZooTask::reset 清 o_[]：cartpole ID 的 leaky=clone=fresh=0.1。
+// 残留差距（如 cartpole OOD 0.3 vs 0.1）来自 evaluate_organism 复用有机体（膜孔道 reset_state 不清）。
+// JSON 12/12 与 id_sr=0.9 仍不可复现。
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/evolvable_task.hpp"
 #include "tasks/control/domain_zoo.hpp"
@@ -135,6 +134,7 @@ int main() {
     TaskDatasetSplit split = TaskDatasetSplit::create_default_maze_split();
     int leaky_m1 = 0, clone_m1 = 0;
     double cartpole_leaky_id = -1, cartpole_clone_id = -1, cartpole_fresh_id = -1;
+    double ballbeam_clone_ood = -1;
 
     std::cout << "id                 leaky train/id/ood/M1     clone train/id/ood/M1\n";
     for (const char* id : kIds) {
@@ -173,6 +173,9 @@ int main() {
             cartpole_clone_id = C.id;
             cartpole_fresh_id = eval_fresh(path, id, 1.0, split.holdout_id_seeds, ms).success_rate;
         }
+        if (std::strcmp(id, "zoo_ballbeam") == 0) {
+            ballbeam_clone_ood = C.ood;
+        }
 
         std::cout << "  " << id
                   << "  L " << L.train << "/" << L.id << "/" << L.ood << "/" << (L.m1 ? "P" : "F")
@@ -184,14 +187,14 @@ int main() {
               << " cartpole_id L/C/F=" << cartpole_leaky_id << "/"
               << cartpole_clone_id << "/" << cartpole_fresh_id << std::endl;
 
-    // 负例锁：污染存在；隔离后 cartpole ID 远低于 JSON 0.9；fresh≈clone。
-    assert(cartpole_leaky_id > cartpole_clone_id + 0.15);
-    assert(std::fabs(cartpole_leaky_id - 0.5) < 1e-9);
+    // 数字先跑再锁；o_[] 清零后 leaky 应贴近 clone。JSON 0.9 仍不可复现。
+    std::cout << "AUDIT domain zoo eval isolation (post o_[] hygiene)\n";
+    assert(std::fabs(cartpole_leaky_id - 0.1) < 1e-9);
     assert(std::fabs(cartpole_clone_id - 0.1) < 1e-9);
     assert(std::fabs(cartpole_fresh_id - cartpole_clone_id) < 1e-9);
-    assert(leaky_m1 == 11);
+    assert(std::fabs(ballbeam_clone_ood - 0.4) < 1e-9);
+    assert(leaky_m1 == 10);
     assert(clone_m1 == 10);
     assert(clone_m1 < 12 && "isolated M1 must not be claimed 12/12");
-    std::cout << "AUDIT domain zoo eval isolation (leaky vs clone/fresh; JSON 0.9 not reproduced)\n";
     return 0;
 }

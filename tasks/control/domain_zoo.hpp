@@ -31,6 +31,7 @@ public:
     void reset(uint32_t episode_seed) override {
         rng_.seed(episode_seed);
         steps_ = 0; q_sum_ = 0.0; t_ = 0.0;
+        o_[0] = o_[1] = o_[2] = o_[3] = 0.0;  // 禁止跨回合第一帧吃上一局终态
         reset_physics();
     }
 
