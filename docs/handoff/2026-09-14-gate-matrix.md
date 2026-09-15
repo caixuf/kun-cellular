@@ -31,7 +31,7 @@
 | **maze**<br>(空间迷宫) | `checkpoints/maze_navigation_champion.bin`<br>*(11 细胞 / 15 突触)* | `tests/test_flow_maze_navigation.cpp`<br>`tests/test_flow_maze_gate5_replay.cpp`<br>`tests/test_flow_maze_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。测地冷评 96/100；G5 同种子两次独立回放位级重合；G6 BFS 测地专家与冠军均为 20/20，冠军 mean\|Δneg\|=0.306。 |
 | **doudizhu**<br>(斗地主) | `checkpoints/doudizhu_cand_scorer.bin`<br>*(82 细胞 / 425 突触)* | `tests/test_flow_doudizhu_card_game.cpp`<br>`tools/p9_runner.cpp` | **PASS** | **PASS** | **PASS** | **未测**<br>*(部分等价)* | **未测**<br>*(明确未做)* | **未测**<br>*(明确未做)* | **3/6**。使命胜率 57.0% 持平教师；位级等价已通但零堆分配未重测；STATUS_BOARD 明文严禁宣称 G5/G6。 |
 | **cartpole**<br>(倒立摆) | `checkpoints/cartpole_balance_champion.bin`<br>*(13 细胞 / 49 突触)* | `tools/bench_easy_task_regression.cpp`<br>`tests/test_flow_cartpole_gate5_replay.cpp`<br>`tests/test_flow_cartpole_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。T4 ID/OOD 20/20；G5 同种子 300 步回放差分全 0；G6 PD 专家与冠军 20/20，mean\|ΔF\|=0.455。无 `test_flow_cartpole_balance.cpp`。 |
-| **DomainZoo**<br>(动力学12域) | `checkpoints/domain_zoo_report.json`<br>`checkpoints/zoo_*.bin` *(12域)* | `tools/train_domain_zoo.cpp` | **PASS**<br>*(现仓12/12)* | **PASS** | **PASS** | **未测** | **未测** | **未测** | **3/6**。2026-09-14 复跑锁档 **12/12**（战役 #3）；历史 9/12 仅为中间窗，已勘误；无单独 C11/回放。 |
+| **DomainZoo**<br>(动力学12域) | `checkpoints/domain_zoo_report.json`<br>`checkpoints/zoo_*.bin` *(12域)* | `tools/train_domain_zoo.cpp`<br>`tests/test_flow_domain_zoo_gate5_replay.cpp`<br>`tests/test_flow_domain_zoo_gate6_shadow.cpp` | **PASS**<br>*(现仓12/12)* | **PASS** | **PASS** | **未测** | **PASS** | **FAIL** | **4/6 (G6 FAIL)**。G5 12 域种子 201 双回放差分全 0；G6 抖动仅 **8/12**（rocket/thermal/servo/bicycle 振颤）；cartpole fresh-load 1/10 ≠ JSON id_sr 0.9。G4 仍未测。 |
 | **household**<br>(全屋覆盖) | `checkpoints/household_coverage_champion.bin`<br>*(11 细胞 / 11 突触)* | `tests/test_flow_household_coverage.cpp`<br>`tests/test_flow_household_gate5_replay.cpp`<br>`tests/test_flow_household_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。T2 ID 88.2% / OOD 83.1%；G5 种子 1000 共 811 步差分全 0；G6 BFS 教师 20/20，冠军 **17/20**（均覆盖 0.927，零碰撞，mean\|Δneg\|=0.240）。教师握全图，禁止成功计数对撞。 |
 | **quant**<br>(量化皮层) | `checkpoints/quant_cortical_array_champion.bin`<br>*(1032 细胞 / 1634 突触)* | `tools/train_multi_asset_cortical_array.cpp`<br>`tools/eval_cortical_array_bin.cpp`<br>`tests/test_quant_oos_discipline.py` | **PASS**<br>*(稳态基线)* | **PASS**<br>*(复训过拟合)* | **FAIL**<br>*(锚点 0.22 未复现)* | **未测**<br>*(C11 未测)* | **未测** | **未测** | **1/6 (G3 对锚点仍 FAIL)**。`--seed 0` 复训 OOS -0.03 冻结；正式 bin 任务层冷评 OOS **+0.14**（不是 0.22）。已撤实盘宣称。 |
 
@@ -84,7 +84,8 @@
 - **Gate 2 (选择收敛)**：`PASS`。`domain_zoo_report.json` 记录 12 域 train_sr 达 0.9 ~ 1.0。
 - **Gate 3 (OOD 盲测)**：`PASS`。`domain_zoo_report.json` 记录 12 域 ood_sr 达 0.6 ~ 1.0 (均值 > 0.8)。
 - **Gate 4 (纯 C 零 GC)**：`未测`。未见针对 12 域各紧凑 `.bin` 的独立纯 C 零 GC 形式化测试。
-- **Gate 5 & 6 (管线回放 / 影子对账)**：`未测`。四证据源中无记录。
+- **Gate 5 (管线回放)**：`PASS`。`tests/test_flow_domain_zoo_gate5_replay.cpp`：12 域 `ood=1.0`、ID 种子 `201`，两次独立回放 max_dobs=0、max_dact=0。cartpole/rocket 本种子未满步，但仍位级重合。`reset_state(true)` 对齐 `evaluate_organism`。
+- **Gate 6 (影子对账)**：`FAIL`。`tests/test_flow_domain_zoo_gate6_shadow.cpp` 负例锁档：抖动 **8/12**（阈值 0.80）。振颤域 rocket 2.39 / thermal 3.07 / servo 1.95 / bicycle 2.23。cartpole 隔离生存 **1/10**（PD 专家 10/10）；ballbeam PD 探针 0/10。`domain_zoo_report.json` 的 cartpole id_sr=0.9 **不得**当作本测试复现。ctest 绿只表示审计数字锁住，不是 G6 过关。未覆盖 bin。
 
 ### 6. household (全屋覆盖清洁机器人)
 - **Gate 1 (基线探针)**：`PASS`。有限空间遍历与避障环境基线探针可解。
@@ -138,8 +139,12 @@ pytest tests/test_adas_cortex_contract.py tests/test_c_runtime_backend_parity.py
 
 ### 3. DomainZoo 物理动力学 12 域复测
 ```bash
-# 运行 12 经典控制域演化训练与 M1 门禁判定
+# 运行 12 经典控制域演化训练与 M1 门禁判定（会覆盖 zoo_*.bin，非冷评）
 ./build/train_domain_zoo
+
+# DomainZoo Gate 5 12 域回放 + Gate 6 抖动审计（G6 锁 FAIL，ctest 绿≠过关）
+./build/test_flow_domain_zoo_gate5_replay
+./build/test_flow_domain_zoo_gate6_shadow
 ```
 
 ### 4. 斗地主打分器基准与天梯评测
