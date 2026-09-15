@@ -259,8 +259,8 @@
             <!-- 1. SDSCC 210-细胞 ADAS L3 锁档：AdasCortexOrgan 真前向闭环 -->
             <div class="viewport-card">
                 <div class="panel-header">
-                    <span id="cortex-panel-title">[SDSCC_ADAS_L3_210]</span>
-                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">L3 · 真闭环 · 9W/7L</span>
+                    <span id="cortex-panel-title">[SDSCC_ADAS_STADIUM_210]</span>
+                    <span style="color:var(--emerald-glow);" id="stat-gen-badge">stadium · 等待后端口径</span>
                 </div>
                 
                 <div class="stat-grid">
@@ -270,7 +270,7 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">VS_STANLEY_WIN%</div>
-                        <div class="stat-val amber" id="stat-fit">56.3</div>
+                        <div class="stat-val amber" id="stat-fit">—</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">ACTIVE_CELLS</div>
@@ -548,7 +548,7 @@
                 // 尺度真理: 细胞/突触数一律读后端真实值，无数据时显示占位符，严禁硬编码兜底
                 const nCells = vehState.n_cells || 0;
                 const nSyns = vehState.n_synapses || 0;
-                const claim = vehState.champion_claim || (nCells === 210 ? "L3 210 · 9W/7L" : "");
+                const claim = vehState.champion_claim || "";
                 document.getElementById("stat-gen-badge").innerText = claim || `GEN: ${gen}`;
                 document.getElementById("stat-fit").innerText = `${vehState.champion_fitness || 0.0}`;
                 document.getElementById("stat-cells").innerText = nCells > 0 ? `${nCells.toLocaleString()} 细胞` : "… 细胞";
@@ -557,17 +557,26 @@
                 // 动态渲染 原语链路徽章与微柱皮层标识
                 const titleEl = document.getElementById("cortex-panel-title");
                 if (titleEl) {
-                    titleEl.innerText = (nCells === 210)
-                        ? "[SDSCC_ADAS_L3_210]"
-                        : ((nCells === 1024) ? "[SDSCC_1024_MULTI_COLUMN_CORTEX]" : `[SDSCC_${nCells}_CELL_PARALLEL_CORTEX]`);
+                    const claimHint = (vehState.champion_claim || "").toLowerCase();
+                    if (claimHint.includes("stadium")) {
+                        titleEl.innerText = "[SDSCC_ADAS_STADIUM_210]";
+                    } else if (nCells === 210) {
+                        titleEl.innerText = "[SDSCC_ADAS_L3_210]";
+                    } else if (nCells === 1024) {
+                        titleEl.innerText = "[SDSCC_1024_MULTI_COLUMN_CORTEX]";
+                    } else {
+                        titleEl.innerText = `[SDSCC_${nCells}_CELL_PARALLEL_CORTEX]`;
+                    }
                 }
 
                 const modeBadge = document.getElementById("cortex-mode-badge");
                 if (modeBadge) {
                     if (nCells === 210) {
+                        const stadium = (vehState.champion_claim || "").toLowerCase().includes("stadium");
+                        const tag = stadium ? "210 stadium" : "210 L3";
                         modeBadge.textContent = vehState.cortex_real
-                            ? `[210 L3 | 真闭环 ${vehState.control_loop === 'adas_cortex_organ_forward' ? 'AdasCortexOrgan' : 'fallback'}]`
-                            : "[210 L3 | 皮层离线]";
+                            ? `[${tag} | 真闭环 ${vehState.control_loop === 'adas_cortex_organ_forward' ? 'AdasCortexOrgan' : 'fallback'}]`
+                            : `[${tag} | 皮层离线]`;
                     } else if (nCells === 1024) {
                         modeBadge.textContent = vehState.cortex_real ? "[1,024 CELLS | 16-微柱 C11 直连]" : "[1,024 CELLS | 皮层离线]";
                     } else {

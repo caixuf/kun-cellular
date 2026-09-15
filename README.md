@@ -53,7 +53,8 @@
 | **CartPole 平衡** | 13 细胞 / 49 突触 | `checkpoints/cartpole_balance_champion.bin`（另：`cartpole_tripartite_champion.bin`） | 冷评 ID/OOD **20/20**（MAX_STEPS=300；三权版 500 步亦满额） |
 | **空间迷宫自主脱困** | 11 细胞 / 15 突触 | `checkpoints/maze_navigation_champion.bin` | 测地势场方位观测下 100 未见种子 **96%** @250 步 / **100%** @400 步（L3；欧氏方位对照约 86%） |
 | **流体阻尼控制** | 40 细胞 / 86 突触 | `checkpoints/fluid_damper_champion.bin` (5.0 KB) | Aero / Hydro / Vacuum 三态 3000 步极限扰动 100% 收敛（`test_multiphase_fluid_stress`） |
-| **ADAS 循迹皮层** | 210 细胞 / ~659 突触 | `checkpoints/adas_cortex_champion.bin` | L3 重调后 **9 胜 / 7 负**（见下表；2026-09-11） |
+| **ADAS 循迹皮层（L3 锁档）** | 210 细胞 / ~659 突触 | `checkpoints/adas_cortex_champion.bin` | 16 场景多种子 **9 胜 / 7 负**（见下表；2026-09-11） |
+| **ADAS 体育场学生档（观测台默认）** | 210 细胞 | `checkpoints/adas_cortex_champion_stadium.bin` | 体育场公路学生 p95 CTE **0.145 m**；叙事 **10 胜 / 6 负**（不覆盖 L3） |
 | **12 任务控制动物园** | 9~35 细胞 / 9~89 突触 | `checkpoints/zoo_*.bin` | **12/12 门禁通过**（`8ea0c61`：servo/dc_motor 植物修复 + maglev 课程复用），训练耗时秒级/任务 |
 | **多足步态 (organism 真前向)** | 11 细胞 / 13 突触 | `checkpoints/locomotion_gait_champion.bin` | Train/ID/OOD **100%**（前进 ≥80px，固定表型冷评；`locomotion_gait_report.json`） |
 | **三体引力弹射导航** | 17 细胞 / 39 突触 | `checkpoints/slingshot_nav_champion.bin` | Train 100% / ID 80% / OOD 50%（门禁达标；OOD 为温和 G 扰动 1.5→1.6；`slingshot_nav_report.json`） |
@@ -62,7 +63,9 @@
 
 ### ADAS vs Stanley 完整基准（16 场景，10-seed 平均）
 
-> **当前口径（2026-09-11）**：`checkpoints/adas_cortex_champion.bin` = L3 sep-CMA-ES 重调产物。数据：`runs/adas_champion_vs_stanley_seeds1-10_tuned_20260911.json`。指标 CTE（m），**越小越好**。战绩 **9 胜 / 7 负**。
+> **L3 锁档口径（2026-09-11）**：`checkpoints/adas_cortex_champion.bin`。数据：`runs/adas_champion_vs_stanley_seeds1-10_tuned_20260911.json`。指标 CTE（m），**越小越好**。战绩 **9 胜 / 7 负**。
+>
+> **观测台默认不是这张表。** `vehicle.html` 默认加载 `adas_cortex_champion_stadium.bin`（体育场学生档，10W/6L 叙事，p95 CTE 0.145 m）。两把锁档不要混报。
 >
 > 历史快照：`runs/adas_champion_vs_stanley_seeds1-10.json`（7W/9L）；未调参复现：`…_repro_20260911.json`（5W/11L）。预注册：`docs/superpowers/plans/2026-09-11-adas-l3-retune.md`。
 
@@ -109,7 +112,7 @@
 
 - **斗地主对战 (`frontend/doudizhu.html`)**：标准三人斗地主规则界面，支持人机对战与 AI 全自动观战。挂载 82 细胞候选打分生命体（C++ 真前向）；天梯 57.0% 为简化合成环境对教师配对结果（McNemar p=0.13 统计持平），不构成真实斗地主 AI 能力宣称。
 - **3D 细胞观测台 (`frontend/cellular.html`)**：WebGL 实时渲染细胞微柱网络，LOD 动态调度。
-- **自动驾驶仿真 (`frontend/vehicle.html`)**：210 细胞 ADAS 皮层闭环仿真可视化（AdasCortexOrgan 真前向；对 Stanley 16 场景 9W/7L）。
+- **自动驾驶仿真 (`frontend/vehicle.html`)**：默认体育场公路 + 学生档 `adas_cortex_champion_stadium.bin`（真前向；叙事 10W/6L，p95 CTE 0.145 m）。L3 锁档 9W/7L 是另一份 bin，不在本页默认加载。
 - **迷宫脱困 (`frontend/maze.html`)**：11 细胞 `maze_navigation_champion` 真前向避障演示（测地方位冷评 96/100）。
 - **硅基天籁钢琴 (`frontend/music.html`)**：WebAudio 物理建模钢琴音色 + SDSC-BIN v2 权重浏览器内推演（**玩具级声光演示**；权重 = 随机初始化 + 高斯变异，不构成"音乐智能"宣称）。
 - **生物圈生态 (`frontend/ecosystem.html`)**：复用底座 C 生态圈 `EcoBiosphere`（代谢/捕食/气候/香农多样性）。真实信号为生态位种群与捕食事件；`prey/predator` 的位移为显示层合成（底座 `EcoAgent` 坐标为静态）。
@@ -132,11 +135,12 @@ kun-cellular/
 │   └── ecosystem_biosphere.hpp    # 多相生态圈
 ├── frontend/                      # 浏览器交互沙盒
 ├── checkpoints/                   # 真实演化产物（SDSC-BIN v2 二进制检查点）
-│   └── domain_zoo_report.json     # 12 任务控制动物园报告
+│   ├── domain_zoo_report.json     # 12 任务控制动物园报告
+│   └── adas_cortex_champion_stadium.bin  # 观测台默认学生档（非 L3）
 ├── tools/                         # 演化工具链与后端网关
 ├── tests/                         # 87 组回归测试（ctest 87/87 PASS）
 └── runs/                          # 基准数据（含完整 ADAS 10-seed 结果）
-    └── adas_champion_vs_stanley_seeds1-10.json  # 完整基准（7W / 9L）
+    └── adas_champion_vs_stanley_seeds1-10_tuned_20260911.json  # L3 当前 9W/7L
 ```
 
 ---
@@ -161,7 +165,7 @@ bash tools/run_observatory.sh
 **KunCellular 是什么：**
 - 约 11,000 行 C/C++ 演化计算底座，28 种动力学原语构成的通用算存一体框架
 - 在玩具级控制任务（CartPole、迷宫、流体阻尼、定速巡航）上，演化算法可在数秒内得到小规模（8~40 细胞）的可用控制器
-- ADAS 皮层在 16 场景中击败 Stanley 基准 7 次（输 9 次），部分弯道场景具备竞争力
+- ADAS L3 锁档在 16 场景中对 Stanley **9 胜 / 7 负**；观测台体育场学生档是另一把锁（10W/6L 叙事），部分弯道具备竞争力
 - 适合研究"极小神经元数量下非冯·诺依曼动力学"的教学/实验平台
 
 **KunCellular 不是什么：**

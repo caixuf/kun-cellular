@@ -28,7 +28,7 @@
 | 生境 (Habitat) | 锁档路径 (Checkpoint) | 核心测试/验证文件 | Gate 1<br>(基线探针) | Gate 2<br>(选择收敛) | Gate 3<br>(OOD盲测) | Gate 4<br>(纯C零GC) | Gate 5<br>(管线回放) | Gate 6<br>(影子对账) | 综合评级 / 状态速记 |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
 | **ADAS**<br>(具身驾驶) | `checkpoints/adas_cortex_champion.bin`<br>*(210 细胞 / 659 突触)* | `tests/test_gate5_gate6_replay_shadow.py`<br>`tests/test_adas_cortex_parity.py`<br>`tests/test_adas_topology_ablation.py` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6 全闭环** + 战役 #4 拓扑消融 PASS（重连 34× / E-I 11×）。 |
-| **maze**<br>(空间迷宫) | `checkpoints/maze_navigation_champion.bin`<br>*(11 细胞 / 15 突触)* | `tests/test_flow_maze_spatial_memory.cpp`<br>`tests/test_flow_maze_navigation.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **未测** | **未测** | **4/6**。经 L3 测地脚手架解除死胡同欧氏反向梯度，冷评 96/100 (400步100%)；BIBO 零漂移证书；缺 G5/G6。 |
+| **maze**<br>(空间迷宫) | `checkpoints/maze_navigation_champion.bin`<br>*(11 细胞 / 15 突触)* | `tests/test_flow_maze_navigation.cpp`<br>`tests/test_flow_maze_gate5_replay.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **未测** | **5/6**。测地冷评 96/100；G5 同种子两次独立回放位级重合；G6 未做。 |
 | **doudizhu**<br>(斗地主) | `checkpoints/doudizhu_cand_scorer.bin`<br>*(82 细胞 / 425 突触)* | `tests/test_flow_doudizhu_card_game.cpp`<br>`tools/p9_runner.cpp` | **PASS** | **PASS** | **PASS** | **未测**<br>*(部分等价)* | **未测**<br>*(明确未做)* | **未测**<br>*(明确未做)* | **3/6**。使命胜率 57.0% 持平教师；位级等价已通但零堆分配未重测；STATUS_BOARD 明文严禁宣称 G5/G6。 |
 | **cartpole**<br>(倒立摆) | `checkpoints/cartpole_balance_champion.bin`<br>*(13 细胞 / 49 突触)* | `tests/test_flow_cartpole_balance.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **未测** | **未测** | **4/6**。T4 易任务重训修复 initial_weight 同步；ID/OOD 冷评 20/20 满分；BIBO 零漂移证书；缺 G5/G6。 |
 | **DomainZoo**<br>(动力学12域) | `checkpoints/domain_zoo_report.json`<br>`checkpoints/zoo_*.bin` *(12域)* | `tools/train_domain_zoo.cpp` | **PASS**<br>*(现仓12/12)* | **PASS** | **PASS** | **未测** | **未测** | **未测** | **3/6**。2026-09-14 复跑锁档 **12/12**（战役 #3）；历史 9/12 仅为中间窗，已勘误；无单独 C11/回放。 |
@@ -61,7 +61,8 @@
 - **Gate 2 (选择收敛)**：`PASS`。Manifest 记录 11 细胞微柱在测地先验下稳定演化，权重与初始权重严格同步。
 - **Gate 3 (OOD 盲测)**：`PASS`。Manifest 记录未参与选择的盲测迷宫中 250 步 96/100，400 步 100/100；`STATUS_BOARD.md` 记录 T4 L3-M1/M2/M3 ✅。
 - **Gate 4 (纯 C 零 GC)**：`PASS`。`maze_navigation_champion.bin.cert.json` 签署 BIBO 稳态与 50,000 步位级零漂移证书。
-- **Gate 5 & 6 (管线回放 / 影子对账)**：`未测`。`test_gate5_gate6_replay_shadow.py` 仅针对 ADAS，未包含 maze；无生产管线回放及影子对账脚本。
+- **Gate 5 (管线回放)**：`PASS`。`tests/test_flow_maze_gate5_replay.cpp`：同一 `maze_navigation_champion.bin`、同一未见种子，两次独立加载回放，位姿与动作最大差分 < 1e-6。
+- **Gate 6 (影子对账)**：`未测`。无专家控制器双轨影子脚本。
 
 ### 3. doudizhu (斗地主博弈打分)
 - **Gate 1 (基线探针)**：`PASS`。`STATUS_BOARD.md` 记录 P0 教师对照验证环境健康可解；完整规则引擎与启发式对手基准正常。

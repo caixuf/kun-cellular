@@ -419,4 +419,13 @@ if(Python3_FOUND)
     set_tests_properties(test_op_vjp_finite_difference PROPERTIES ENVIRONMENT "PYTHONPATH=${CMAKE_CURRENT_SOURCE_DIR}:$ENV{PYTHONPATH}")
 
     add_test(NAME test_formal_certification COMMAND ${CMAKE_CURRENT_BINARY_DIR}/kun_certify --organism ${CMAKE_CURRENT_SOURCE_DIR}/checkpoints/cartpole_balance_champion.bin --regression-steps 50000 --out ${CMAKE_CURRENT_BINARY_DIR}/cartpole.cert.json)
+
+    add_test(NAME test_quant_oos_discipline COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_quant_oos_discipline.py)
+    add_test(NAME test_quant_cortical_array_cold_eval COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_quant_cortical_array_cold_eval.py)
+    set_tests_properties(test_quant_cortical_array_cold_eval PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_test(NAME test_adas_topology_ablation COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_adas_topology_ablation.py)
+    set_tests_properties(test_adas_topology_ablation PROPERTIES
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        TIMEOUT 90)
 endif()
