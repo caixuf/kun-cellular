@@ -69,6 +69,11 @@
 
 ## Cursor 筛后（2026-09-15）
 
-- **收下**：isolation 补 `ballbeam_clone_ood==0.4`；构造器补脏 magic / 截断磁带负例。
+- **收下**：isolation 补 `ballbeam_clone_ood` 法定断言（后随 harness 对齐改为 **0.3**）。
 - **不收**：<100ms 时限（隔离测试实测约 3s，不是门禁）；另做 pre-commit 发现层（CMake `GLOB tests/test_*.cpp` 已自动挂上）。
-- **仍推迟**：`reset_state` 清膜孔道、凋亡解耦、28 原语图内构造器。
+- **仍推迟**：凋亡从 `mutate()` 解耦、28 原语图内构造器。
+- **同日收尾已做**：`reset_state` 清膜孔道；隔离 OOD 地平线与 clone 路径对齐后 leaky=clone，cartpole OOD 0.1，ballbeam OOD 0.3。旧「leaky 0.3 vs clone 0.1」是计分口径差，不是孔道因果。
+
+## 收尾勘误 (2026-09-15 发版前)
+
+审稿时把 cartpole OOD leaky/clone 差归因于 `membrane_pores`。复测：孔道复位不改变控制 SR；把 OOD `max_steps_` 与 clone 接到 `evaluate_organism` 后 12 域 leaky=clone。ballbeam 隔离 OOD 锁定 **0.3**，不再写 0.4。

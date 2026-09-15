@@ -98,8 +98,8 @@ echo "  |    |  \\|  |  /   |  \\     \\___\\  ___/|  |_|  |_|  |  /|  |__/ __ \
 echo "  |____|__ \\____/|___|  /\\______  /\\___  >____/____/____/ |____(____  /__|   "
 echo "          \\/          \\/        \\/     \\/                           \\/        "
 echo "======================================================================"
-echo " Software-Defined Silicon Cellular Computer (SDSCC) v1.0.0"
-echo " Zero Heap Allocation | 19ns Hard Real-Time | Non-Von-Neumann Substrate"
+echo " Software-Defined Silicon Cellular Computer (SDSCC) __KUN_VERSION__"
+echo " Zero Heap Allocation | Deterministic C Runtime | Task-Orthogonal Substrate"
 echo "======================================================================"
 echo ""
 
@@ -135,6 +135,7 @@ echo ""
 exec python3 tools/cellular_live_backend.py --port "${PORT}"
 LAUNCH_EOF
 
+sed -i "s/__KUN_VERSION__/${VERSION}/" "${STAGE_DIR}/start.sh"
 chmod +x "${STAGE_DIR}/start.sh"
 chmod +x "${STAGE_DIR}/bin/"* 2>/dev/null || true
 

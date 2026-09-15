@@ -105,7 +105,7 @@ export function renderActiveOrganismProfile(meta) {
   if (!meta) return;
   const orgId = meta.organism_id || meta.id || currentSelectedOrgId;
   const orgName = meta.name || meta.organism_name || orgId;
-  const orgDomain = meta.domain || meta.organism_domain || '通用非冯算存一体计算';
+  const orgDomain = meta.domain || meta.organism_domain || '通用动力学计算';
   const orgTag = meta.tag || (orgDomain ? orgDomain.slice(0, 8) : '生命体');
   const orgReport = meta.validation_report || 'C++ 原生零 GC、确定性执行与实证门禁通过。';
   const cellsCount = meta.cells_count || (meta.cells && meta.cells.length) || meta.total_cells || 0;
@@ -473,8 +473,8 @@ export async function loadPreset(type) {
       "1m": "SDSCC 旗舰微柱阵列全息大生命体",
       real: "三十年商品期货量化演化冠军",
       quant: "三十年商品期货量化演化冠军",
-      adas: "SDSCC 车规级微柱皮层",
-      vehicle: "SDSCC 车规级微柱皮层",
+      adas: "SDSCC 循迹微柱皮层（L3 锁档）",
+      vehicle: "SDSCC 循迹微柱皮层（体育场学生档）",
       primordial: "无目标原始进化生命体冠军"
     };
     const name = NAME_MAP[type] || s.organism_id || "SDSCC 冠军生命体";

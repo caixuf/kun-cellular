@@ -204,7 +204,7 @@ export class PatchClampHUD {
     const eqInfo = PRIMITIVE_EQUATIONS[ctype] || {
       name: `${ctype} 动力学原语`,
       c_op: ctype.toUpperCase(),
-      category: "通用非冯算存一体计算元",
+      category: "通用动力学原语",
       ode: "s[t] = f(u[t], s[t-1])",
       discrete: "Atomic C11 Kernel Function",
       desc: "执行单步纳秒级硬件原子操作。"

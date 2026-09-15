@@ -1,6 +1,6 @@
 // DomainZoo 评测隔离审计。任务层 only；不改底座热路径、不覆盖 zoo_*.bin、不改 domain_zoo_report.json。
 // 2026-09-15 已在 ZooTask::reset 清 o_[]：cartpole ID 的 leaky=clone=fresh=0.1。
-// 残留差距（如 cartpole OOD 0.3 vs 0.1）来自 evaluate_organism 复用有机体（膜孔道 reset_state 不清）。
+// 同日 reset_state 清 membrane_pores：堵住 evaluate_organism 复用有机体的代谢门控泄漏。
 // JSON 12/12 与 id_sr=0.9 仍不可复现。
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/evolvable_task.hpp"
@@ -62,37 +62,10 @@ static bool m1_pass(double train_sr, double id_sr, double ood_sr) {
 
 static TaskEvalMetrics eval_clone(const char* id, double ood, const CellularOrganism& tmpl,
                                   const std::vector<uint32_t>& seeds, int max_steps) {
-    TaskEvalMetrics metrics;
-    metrics.num_episodes = seeds.size();
-    if (seeds.empty()) return metrics;
-    size_t successes = 0;
-    double total_fit = 0, total_steps = 0;
-    for (uint32_t seed : seeds) {
-        CellularOrganism org = tmpl;
-        org.reset_state(true);
-        auto env = make_zoo(id, ood);
-        env->set_max_steps(max_steps);
-        env->reset(seed);
-        auto obs = env->current_observation();
-        int step_i = 0;
-        bool reached = false;
-        for (; step_i < max_steps; ++step_i) {
-            double inps[4] = {obs[0], obs[1], obs[2], obs[3]};
-            auto acts = org.forward(inps, false);
-            auto res = env->step_continuous(acts);
-            obs = res.obs;
-            if (res.success) reached = true;
-            if (res.done) break;
-        }
-        if (reached) successes++;
-        total_fit += env->current_fitness();
-        total_steps += static_cast<double>(step_i);
-    }
-    metrics.success_episodes = successes;
-    metrics.success_rate = static_cast<double>(successes) / static_cast<double>(seeds.size());
-    metrics.mean_fitness = total_fit / static_cast<double>(seeds.size());
-    metrics.mean_steps = total_steps / static_cast<double>(seeds.size());
-    return metrics;
+    CellularOrganism org = tmpl;
+    auto env = make_zoo(id, ood);
+    env->set_max_steps(max_steps);
+    return env->evaluate_organism(org, seeds, max_steps, false);
 }
 
 static TaskEvalMetrics eval_fresh(const std::string& path, const char* id, double ood,
@@ -134,6 +107,7 @@ int main() {
     TaskDatasetSplit split = TaskDatasetSplit::create_default_maze_split();
     int leaky_m1 = 0, clone_m1 = 0;
     double cartpole_leaky_id = -1, cartpole_clone_id = -1, cartpole_fresh_id = -1;
+    double cartpole_leaky_ood = -1, cartpole_clone_ood = -1;
     double ballbeam_clone_ood = -1;
 
     std::cout << "id                 leaky train/id/ood/M1     clone train/id/ood/M1\n";
@@ -151,7 +125,7 @@ int main() {
         auto ood_env = make_zoo(id, 2.0);
         train_env->set_max_steps(ms);
         id_env->set_max_steps(ms);
-        ood_env->set_max_steps(ms);
+        ood_env->set_max_steps(ms * 2);  // 与 evaluate 循环及 clone 对齐；success 判定是 steps_ >= max_steps_
         SplitSR L;
         L.train = train_env->evaluate_organism(leaky, split.train_seeds, ms, false).success_rate;
         L.id = id_env->evaluate_organism(leaky, split.holdout_id_seeds, ms, false).success_rate;
@@ -171,6 +145,8 @@ int main() {
         if (std::strcmp(id, "zoo_cartpole") == 0) {
             cartpole_leaky_id = L.id;
             cartpole_clone_id = C.id;
+            cartpole_leaky_ood = L.ood;
+            cartpole_clone_ood = C.ood;
             cartpole_fresh_id = eval_fresh(path, id, 1.0, split.holdout_id_seeds, ms).success_rate;
         }
         if (std::strcmp(id, "zoo_ballbeam") == 0) {
@@ -185,14 +161,18 @@ int main() {
 
     std::cout << "GATE_ISO leaky_m1=" << leaky_m1 << "/12 clone_m1=" << clone_m1 << "/12"
               << " cartpole_id L/C/F=" << cartpole_leaky_id << "/"
-              << cartpole_clone_id << "/" << cartpole_fresh_id << std::endl;
+              << cartpole_clone_id << "/" << cartpole_fresh_id
+              << " cartpole_ood L/C=" << cartpole_leaky_ood << "/" << cartpole_clone_ood
+              << std::endl;
 
-    // 数字先跑再锁；o_[] 清零后 leaky 应贴近 clone。JSON 0.9 仍不可复现。
-    std::cout << "AUDIT domain zoo eval isolation (post o_[] hygiene)\n";
+    // 数字先跑再锁。评测路径对齐后 leaky=clone；JSON 0.9 / JSON 12/12 仍不可复现。
+    std::cout << "AUDIT domain zoo eval isolation (post o_[] + membrane_pores + eval-path hygiene)\n";
     assert(std::fabs(cartpole_leaky_id - 0.1) < 1e-9);
     assert(std::fabs(cartpole_clone_id - 0.1) < 1e-9);
     assert(std::fabs(cartpole_fresh_id - cartpole_clone_id) < 1e-9);
-    assert(std::fabs(ballbeam_clone_ood - 0.4) < 1e-9);
+    assert(std::fabs(cartpole_leaky_ood - 0.1) < 1e-9);
+    assert(std::fabs(cartpole_clone_ood - 0.1) < 1e-9);
+    assert(std::fabs(ballbeam_clone_ood - 0.3) < 1e-9);
     assert(leaky_m1 == 10);
     assert(clone_m1 == 10);
     assert(clone_m1 < 12 && "isolated M1 must not be claimed 12/12");

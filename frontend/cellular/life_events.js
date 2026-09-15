@@ -226,9 +226,9 @@ export function playLifeEpicStory(views, bounds, logFn, triggerExtinctionWS, tri
   epicTourTimers.push(setTimeout(async () => {
     if (!isEpicTourPlaying) return;
     await requestEpicStage(5);
-    if (logFn) logFn('【第五幕：李雅普诺夫稳态重组 (BIBO Stabilization)】非线性耗散吸收冲击，演化收敛至 210 细胞车规级驾驶皮层冠军！', true);
-    if (phaseEl) { phaseEl.textContent = '第五幕 · 210细胞驾驶皮层重生'; phaseEl.style.color = 'var(--emerald)'; }
-    if (phaseSubEl) phaseSubEl.textContent = '极限环能量收敛 · 经历危机后的更强成熟生命形态 (210 细胞 · 630 突触)';
+    if (logFn) logFn('【第五幕：李雅普诺夫稳态重组 (BIBO Stabilization)】非线性耗散吸收冲击，演化收敛至 210 细胞 / 659 突触循迹皮层冠军！', true);
+    if (phaseEl) { phaseEl.textContent = '第五幕 · 210细胞循迹皮层重生'; phaseEl.style.color = 'var(--emerald)'; }
+    if (phaseSubEl) phaseSubEl.textContent = '极限环能量收敛 · 经历危机后的更强成熟生命形态 (210 细胞 · 659 突触)';
     if (stabilityEl) { stabilityEl.textContent = '超稳吸引子达成 (BIBO Stable)'; stabilityEl.style.color = 'var(--emerald)'; }
     const shockwave = document.getElementById('global-shockwave');
     if (shockwave) {

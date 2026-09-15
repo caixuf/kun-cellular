@@ -117,9 +117,10 @@
 ## 三、 遗留修补执行清单 (Checklist for Next Commit)
 
 - [x] `frontend/vehicle.html` 静态标题/徽章/info-box（首帧不再写死 9W/7L）
-- [x] `frontend/index.html` 入口卡拆开沙盒与 L3
+- [x] `frontend/index.html` 入口卡拆开沙盒与 L3（观测台卡不再把默认演示写成 L3 9W/7L）
+- [x] `frontend/cellular.html` / JS 去掉「车规」与 630 突触占位（L3 为 659）
 - [x] `README.md` 目录树同时列出两把锁档
 - [ ] 论文摘要补一句观测台边界（未改，避免大段论文漂移）
-- [ ] `dist/` 发行包 README 属历史包，不回改
+- [ ] `dist/` 历史发行包 README 不回改；新口径只进 v1.4.0 包
 
 > **2026-09-15**：上两项列入结案 WON'T。战役冻结，见 `2026-09-15-cellular-closeout.md`。

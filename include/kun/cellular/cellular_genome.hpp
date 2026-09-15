@@ -82,6 +82,11 @@ struct Synapse {
     bool   is_recurrent{false}; // 是否为时序反馈循环突触
 };
 
+// 膜孔道默认开度：Cell 初值与 reset_state 共用，杜绝评测复用时的代谢门控泄漏。
+inline constexpr float kDefaultMembranePores[8] = {
+    0.20f, 0.20f, 0.10f, 0.10f, 0.40f, 0.30f, 0.05f, 0.05f
+};
+
 // ============================================================================
 // 3. 细胞实例 (Cell): 独立生命计算节点 (原生内嵌 3D 坐标、力学与生物发光)
 // ============================================================================
@@ -127,7 +132,12 @@ struct Cell {
 
     // === 膜孔道与微观跨膜电位及代谢动力学 (Transmembrane Pores & Metabolic Gating) ===
     float membrane_potential{-70.0f};      // 跨膜电位 (mV)
-    float membrane_pores[8]{0.20f, 0.20f, 0.10f, 0.10f, 0.40f, 0.30f, 0.05f, 0.05f}; // 8 个膜孔道开度
+    float membrane_pores[8]{
+        kDefaultMembranePores[0], kDefaultMembranePores[1],
+        kDefaultMembranePores[2], kDefaultMembranePores[3],
+        kDefaultMembranePores[4], kDefaultMembranePores[5],
+        kDefaultMembranePores[6], kDefaultMembranePores[7]
+    };                                     // 8 个膜孔道开度（与 kDefaultMembranePores 同源）
     uint8_t organ_type{1};                 // 所属器官归属 (0=Sensory, 1=Association, 2=Motor)
     float morphogen_concentration{0.50f};  // 局部感受到的图灵形态发生素浓度
 
@@ -457,7 +467,8 @@ public:
     CellularOrganism(CellularOrganism&&) = default;
     CellularOrganism& operator=(CellularOrganism&&) = default;
 
-    // 回合间状态重置: 清零动态膜电位与记忆, 保留基因组 (参数/拓扑/坐标) 不变。
+    // 回合间状态重置: 清零动态膜电位、膜孔道开度与记忆, 保留基因组 (参数/拓扑/坐标) 不变。
+    // 膜孔道必须回到默认开度，否则 evaluate_organism 复用有机体时会跨回合泄漏代谢门控。
     // reset_plasticity: 是否将在线学习调整的突触权重重置回初始基因组权重
     void reset_state(bool reset_plasticity = false) {
         for (auto& c : cells) {
@@ -470,6 +481,8 @@ public:
             c.activation_count = 0;
             c.glow_charge = 0.0f;
             c.membrane_potential = -70.0f;
+            std::copy(std::begin(kDefaultMembranePores), std::end(kDefaultMembranePores),
+                      std::begin(c.membrane_pores));
             std::fill(std::begin(c.delay_buffer), std::end(c.delay_buffer), 0.0);
             c.delay_idx = 0;
         }

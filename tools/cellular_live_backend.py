@@ -1101,7 +1101,7 @@ class LiveVehicleSimulator:
     def get_snapshot(self):
         with self.lock:
             nc = getattr(self, "total_active_cells", 210)
-            ns = getattr(self, "total_active_synapses", 630)
+            ns = getattr(self, "total_active_synapses", 659)
             htypes = getattr(self, "dominant_hidden_types", ["DIFF", "INTEGRATE", "DAMPER", "HYSTERESIS", "DEADZONE", "INHIBIT"])
             ctypes = getattr(self, "cell_types", ["REC"] * 12 + ["DIFF"] * 192 + ["MOT"] * 6)
             organ = getattr(self, "champion_genome", None)
@@ -3406,6 +3406,10 @@ class SiliconLifeformLibrary:
                     if d and d["num_cells"] > 0:
                         nc = d["num_cells"]
                         ns = d["num_synapses"]
+                        if nc > 0:
+                            cells_scale = nc
+                        if ns > 0:
+                            syns_scale = ns
                         cb = d.get("cells_bytes", b"")
                         ops = [cb[i*4] for i in range(nc)] if len(cb) >= nc * 4 else []
                         counts = collections.Counter(ops)
@@ -4580,7 +4584,7 @@ def answer_cellular_dialogue(prompt: str) -> dict:
             manifest = load_business_lifeform_manifest()
             cur_biz = next((x for x in manifest if x.get("id") == getattr(organism, "current_organism_id", "adas_cortex_champion")), {})
         c_name = cur_biz.get("name", "SDSCC 硅基超级生命体")
-        c_domain = cur_biz.get("domain", "非冯形态发生自组织")
+        c_domain = cur_biz.get("domain", "算存一体动力学计算")
         c_report = cur_biz.get("validation_report", "物理门禁验证达标")
         c_ins = "、".join(cur_biz.get("input_signals", [])[:3])
         c_outs = "、".join(cur_biz.get("action_outputs", [])[:3])

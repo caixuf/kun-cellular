@@ -33,7 +33,7 @@
     {
       "id": "adas_tripartite_champion",
       "name": "具身智能驾驶三方稳态微柱 (18细胞·通过回放测试套件)",
-      "domain": "车规级李雅普诺夫稳态转向制动控制",
+      "domain": "李雅普诺夫稳态转向制动控制",
       "cells_scale": 18,
       "synapses_scale": 25,
       "checkpoint": "checkpoints/adas_tripartite_champion.bin",
@@ -62,7 +62,7 @@
       "name": "具身智能驾驶 210细胞物理微柱皮层 (真实阿克曼巡航·直弯双优)",
       "domain": "具身物理控制与阿克曼运动学自组织",
       "cells_scale": 210,
-      "synapses_scale": 630,
+      "synapses_scale": 659,
       "checkpoint": "checkpoints/adas_cortex_champion.bin",
       "c_header": "include/kun/cellular/sdsc_cortex.h",
       "test_suite": "tests/test_gate5_gate6_replay_shadow.py",

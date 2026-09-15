@@ -59,7 +59,7 @@
 | **多足步态 (organism 真前向)** | 11 细胞 / 13 突触 | `checkpoints/locomotion_gait_champion.bin` | Train/ID/OOD **100%**（前进 ≥80px，固定表型冷评；`locomotion_gait_report.json`） |
 | **三体引力弹射导航** | 17 细胞 / 39 突触 | `checkpoints/slingshot_nav_champion.bin` | Train 100% / ID 80% / OOD 50%（门禁达标；OOD 为温和 G 扰动 1.5→1.6；`slingshot_nav_report.json`） |
 
-> **动物园勘误史**：2026-09-09 曾因报告与 bin 漂移回落为 **9/12**。2026-09-10 Task 层修复后 JSON 对齐为 **12/12**。2026-09-15 隔离冷评锁定 **10/12**（cartpole ID 0.1，ballbeam OOD 0.4）。不得引用过期 9/12，也不得把 JSON 12/12 写成隔离可复现。
+> **动物园勘误史**：2026-09-09 曾因报告与 bin 漂移回落为 **9/12**。2026-09-10 Task 层修复后 JSON 对齐为 **12/12**。2026-09-15 隔离冷评锁定 **10/12**（cartpole ID/OOD 0.1，ballbeam OOD 0.3）。不得引用过期 9/12，也不得把 JSON 12/12 写成隔离可复现。
 
 ### ADAS vs Stanley 完整基准（16 场景，10-seed 平均）
 

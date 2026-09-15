@@ -1,6 +1,7 @@
 # 细胞生命体战役结案 (2026-09-15)
 
-> 稳定性战役 **冻结**。不再为填表扩生境、不重训 Zoo 回填 12/12、不改 `mutate` / Cell 热路径。  
+> 稳定性战役 **冻结**。不再为填表扩生境、不重训 Zoo 回填 12/12、不改 `mutate` 凋亡硬编码。  
+> 收尾（同日）：`reset_state` 清膜孔道、前端口径、发版 v1.4.0。  
 > 工程主线转到兄弟仓：[flowserve](https://github.com/caixuf/flowserve)（推理）、[flowtrain](https://github.com/caixuf/flowtrain)（训练切分）。
 
 ## 冻结时能说的
@@ -9,7 +10,7 @@
 - 接线承重、有丝分裂不承重（ADAS 拓扑消融 + ZooCartPole 旋钮）。§5.9 四启发式默认仍未进 `evolve_generation`。
 - 图是确定性前向机：同 bin 同种子 G5 回放位级重合。
 - 描述带 + 构造器开关的最小协议（切断/脏带失败）。不是 28 原语通用构造器，不是 C++ 拷贝。
-- DomainZoo：**冻结 JSON 12/12 是泄漏评测**；`o_[]` 卫生后隔离 **10/12**。G6 抖动 8/12 **FAIL**。
+- DomainZoo：**冻结 JSON 12/12 是泄漏评测**；隔离 **10/12**（cartpole ID/OOD 0.1，ballbeam OOD 0.3）。G6 抖动 8/12 **FAIL**。
 
 ## 冻结时不能说的
 
@@ -19,8 +20,8 @@
 
 | 项 | 原因 |
 |---|---|
-| `reset_state` 清 `membrane_pores` | 底座热路径，需全域回归 |
-| 凋亡从 `mutate()` 解耦 | 同上 |
+| `reset_state` 清 `membrane_pores` | **已做**（评测卫生；G5 cartpole/maze/household/Zoo 差分仍为 0） |
+| 凋亡从 `mutate()` 解耦 | 底座热路径，下一场 |
 | 重训 Zoo 填回 12/12 | 粉饰隔离负例 |
 | 斗地主 G5/G6、量化 G4/G5/G6 | 未测就是未测 |
 | 改论文摘要 / 回改 `dist/` | 避免大段漂移；发行包属历史 |
