@@ -13,8 +13,9 @@
 | 4 | 拓扑消融（重连 / E-I） | Cursor 主线 | **✅ PASS**：L3 重连 34.1× / E-I 10.8×；stadium 23.9× / 22.0×；见 `2026-09-14-topology-ablation.md` |
 | 5 | 量化 OOS 纪律门槛 | Cursor 主线 | **✅ 复训锁 FAIL**（-0.03）。正式 bin 冷评已补：OOS **+0.14** ≠ 锚点 0.22；见 `2026-09-14-quant-cold-eval-gap.md` |
 | 6 | 观测台一键 clone→cmake→8833 | Cursor 主线 | **✅** `bash tools/run_observatory.sh` → `http://localhost:8833/` |
-| A | 口径对齐 + CI 挂门禁 | Cursor + agy | **进行中（2026-09-15）**：README/观测台区分 L3 9W/7L 与体育场 10W/6L |
+| A | 口径对齐 + CI 挂门禁 | Cursor + agy | **✅** README/观测台拆开 L3 与体育场 |
 | C | 迷宫 Gate 5 回放 | Cursor + agy | **✅** `tests/test_flow_maze_gate5_replay.cpp`；G6 仍未测 |
+| B | 形态发生旋钮 On/Off | Cursor + agy | **✅ 部分**：ZooCartPole 加边承重；有丝分裂/鲍德温 NEGATIVE；凋亡仍关不掉。见 `2026-09-15-morph-operator-ablation.md` |
 
 ## #1 成功判据（预注册）
 

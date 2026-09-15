@@ -394,7 +394,7 @@ To evaluate SDSCC's large-scale cortical reasoning and self-organizing decision-
 3. **`tests/test_flow_sota_benchmark.cpp` is not a SOTA comparison**: its "Dense MLP" has constant untrained weights, its "NEAT" is a hand-built static graph, and its data is a synthetic random walk. Those results are excluded from this paper. The Stanley head-to-head (§5.2) is currently the only classical baseline.
 4. **Single training seed for driving**; the 10 seeds of Table 2b are *evaluation-noise* seeds for one champion, not independent training runs.
 5. **Primitive-set necessity**: the quant champion uses 6 of 28 primitives; the ADAS 18-type histogram is the initialisation prior of `train_adas_cortex.py`. Necessity of the remaining primitives is unshown.
-6. **Operator ablation missing** for the four morphogenetic operators (§5.9); the earlier "Table 5b" is withdrawn.
+6. **Operator-knob ablation (partial)**: §5.9's four heuristics still lack on/off switches. A task-layer ZooCartPole sweep (`ablate_morph_operators`, 2026-09-15) shows synapse growth is load-bearing (ID 1.00→0.43); mitosis and Baldwin are not at this scale; apoptosis still cannot be disabled. Do not treat this as completing §5.9.
 7. **Stability claim is a screen, not a proof** (§5.9 item 3); the dissipative-gate exemption is known to be too permissive.
 8. **No sample-complexity / hypothesis-class-size analysis** for typed graphs versus dense networks (§1.2).
 9. **Daily-bar backtest** without order-book friction for the quant results.

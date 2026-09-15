@@ -1,0 +1,27 @@
+{
+  "tool": "ablate_morph_operators",
+  "task": "zoo_cartpole",
+  "pop": 32, "gens": 120,
+  "apoptosis": "hardcoded_0.05_cannot_disable",
+  "overwrite_zoo_bin": false,
+  "runs": [
+    {"arm":"full","seed":1,"train_sr":1.000000,"id_sr":1.000000,"ood_sr":0.800000,"gate":true,"cells":12,"synapses":39,"sec":1.808939},
+    {"arm":"full","seed":2,"train_sr":0.900000,"id_sr":1.000000,"ood_sr":0.900000,"gate":true,"cells":13,"synapses":29,"sec":1.293054},
+    {"arm":"full","seed":3,"train_sr":1.000000,"id_sr":1.000000,"ood_sr":0.800000,"gate":true,"cells":13,"synapses":39,"sec":1.718492},
+    {"arm":"no_mitosis","seed":1,"train_sr":1.000000,"id_sr":0.900000,"ood_sr":0.400000,"gate":false,"cells":8,"synapses":40,"sec":1.318239},
+    {"arm":"no_mitosis","seed":2,"train_sr":1.000000,"id_sr":1.000000,"ood_sr":0.900000,"gate":true,"cells":9,"synapses":47,"sec":1.507060},
+    {"arm":"no_mitosis","seed":3,"train_sr":1.000000,"id_sr":1.000000,"ood_sr":0.900000,"gate":true,"cells":9,"synapses":29,"sec":1.422563},
+    {"arm":"no_rewire","seed":1,"train_sr":0.900000,"id_sr":0.800000,"ood_sr":0.300000,"gate":false,"cells":12,"synapses":11,"sec":0.878522},
+    {"arm":"no_rewire","seed":2,"train_sr":1.000000,"id_sr":0.500000,"ood_sr":0.300000,"gate":false,"cells":11,"synapses":10,"sec":1.397918},
+    {"arm":"no_rewire","seed":3,"train_sr":0.000000,"id_sr":0.000000,"ood_sr":0.000000,"gate":false,"cells":11,"synapses":13,"sec":0.270890},
+    {"arm":"param_only","seed":1,"train_sr":1.000000,"id_sr":0.900000,"ood_sr":0.600000,"gate":true,"cells":8,"synapses":7,"sec":0.952929},
+    {"arm":"param_only","seed":2,"train_sr":1.000000,"id_sr":0.700000,"ood_sr":0.500000,"gate":true,"cells":9,"synapses":7,"sec":0.696058},
+    {"arm":"param_only","seed":3,"train_sr":1.000000,"id_sr":0.700000,"ood_sr":0.500000,"gate":true,"cells":8,"synapses":7,"sec":1.065652},
+    {"arm":"no_baldwin","seed":1,"train_sr":0.900000,"id_sr":1.000000,"ood_sr":0.800000,"gate":true,"cells":12,"synapses":39,"sec":1.868734},
+    {"arm":"no_baldwin","seed":2,"train_sr":0.900000,"id_sr":1.000000,"ood_sr":0.800000,"gate":true,"cells":13,"synapses":37,"sec":1.512535},
+    {"arm":"no_baldwin","seed":3,"train_sr":1.000000,"id_sr":1.000000,"ood_sr":0.900000,"gate":true,"cells":13,"synapses":42,"sec":1.910172},
+    {"arm":"no_mechano","seed":1,"train_sr":0.900000,"id_sr":1.000000,"ood_sr":0.000000,"gate":false,"cells":13,"synapses":39,"sec":1.859931},
+    {"arm":"no_mechano","seed":2,"train_sr":1.000000,"id_sr":0.800000,"ood_sr":0.000000,"gate":false,"cells":28,"synapses":66,"sec":3.132861},
+    {"arm":"no_mechano","seed":3,"train_sr":1.000000,"id_sr":0.900000,"ood_sr":0.400000,"gate":false,"cells":25,"synapses":49,"sec":2.887013}
+  ]
+}
