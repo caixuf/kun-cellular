@@ -1,0 +1,24 @@
+{
+  "note": "Task-layer isolation audit. Does not overwrite domain_zoo_report.json or zoo_*.bin. Leaky = evaluate_organism (shared env, dirty o_[]). Clone = new env per episode + copy of never-forwarded template. Fresh = load+compile per episode (cartpole ID only).",
+  "date": "2026-09-15",
+  "frozen_report": "checkpoints/domain_zoo_report.json",
+  "frozen_claim": "12/12 M1, zoo_cartpole id_sr=0.9",
+  "leaky_m1": 11,
+  "clone_m1": 10,
+  "cartpole_id_sr": {"leaky": 0.5, "clone": 0.1, "fresh": 0.1, "json": 0.9},
+  "isolated_m1_fails": ["zoo_cartpole", "zoo_ballbeam (OOD 0.4)"],
+  "domains": [
+    {"id": "zoo_cartpole", "leaky": [0.5, 0.5, 0.5, false], "clone": [0.0, 0.1, 0.1, false]},
+    {"id": "zoo_ballbeam", "leaky": [0.9, 1.0, 0.7, true], "clone": [1.0, 1.0, 0.4, false]},
+    {"id": "zoo_maglev", "leaky": [1.0, 1.0, 1.0, true], "clone": [1.0, 1.0, 1.0, true]},
+    {"id": "zoo_rocket_hover", "leaky": [1.0, 0.8, 0.7, true], "clone": [1.0, 0.8, 0.6, true]},
+    {"id": "zoo_cruise", "leaky": [1.0, 1.0, 1.0, true], "clone": [1.0, 1.0, 1.0, true]},
+    {"id": "zoo_thermal", "leaky": [0.9, 1.0, 0.9, true], "clone": [1.0, 1.0, 0.9, true]},
+    {"id": "zoo_water_tank", "leaky": [1.0, 1.0, 1.0, true], "clone": [1.0, 1.0, 1.0, true]},
+    {"id": "zoo_dc_motor", "leaky": [1.0, 1.0, 1.0, true], "clone": [1.0, 1.0, 1.0, true]},
+    {"id": "zoo_vibration", "leaky": [1.0, 1.0, 1.0, true], "clone": [1.0, 1.0, 1.0, true]},
+    {"id": "zoo_servo", "leaky": [1.0, 1.0, 1.0, true], "clone": [1.0, 1.0, 1.0, true]},
+    {"id": "zoo_boiler", "leaky": [1.0, 1.0, 1.0, true], "clone": [1.0, 1.0, 1.0, true]},
+    {"id": "zoo_bicycle", "leaky": [1.0, 1.0, 0.6, true], "clone": [1.0, 1.0, 0.7, true]}
+  ]
+}
