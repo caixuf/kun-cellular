@@ -32,7 +32,7 @@
 | **doudizhu**<br>(斗地主) | `checkpoints/doudizhu_cand_scorer.bin`<br>*(82 细胞 / 425 突触)* | `tests/test_flow_doudizhu_card_game.cpp`<br>`tools/p9_runner.cpp` | **PASS** | **PASS** | **PASS** | **未测**<br>*(部分等价)* | **未测**<br>*(明确未做)* | **未测**<br>*(明确未做)* | **3/6**。使命胜率 57.0% 持平教师；位级等价已通但零堆分配未重测；STATUS_BOARD 明文严禁宣称 G5/G6。 |
 | **cartpole**<br>(倒立摆) | `checkpoints/cartpole_balance_champion.bin`<br>*(13 细胞 / 49 突触)* | `tools/bench_easy_task_regression.cpp`<br>`tests/test_flow_cartpole_gate5_replay.cpp`<br>`tests/test_flow_cartpole_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。T4 ID/OOD 20/20；G5 同种子 300 步回放差分全 0；G6 PD 专家与冠军 20/20，mean\|ΔF\|=0.455。无 `test_flow_cartpole_balance.cpp`。 |
 | **DomainZoo**<br>(动力学12域) | `checkpoints/domain_zoo_report.json`<br>`checkpoints/zoo_*.bin` *(12域)* | `tools/train_domain_zoo.cpp` | **PASS**<br>*(现仓12/12)* | **PASS** | **PASS** | **未测** | **未测** | **未测** | **3/6**。2026-09-14 复跑锁档 **12/12**（战役 #3）；历史 9/12 仅为中间窗，已勘误；无单独 C11/回放。 |
-| **household**<br>(全屋覆盖) | `checkpoints/household_coverage_champion.bin`<br>*(11 细胞 / 11 突触)* | `tests/test_flow_household_coverage.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **未测** | **未测** | **4/6**。T2 战役根除 reset_state 覆盖权重缺陷；ID 88.2%，OOD 大户型 83.1%，回充 100%；BIBO 证书；缺 G5/G6。 |
+| **household**<br>(全屋覆盖) | `checkpoints/household_coverage_champion.bin`<br>*(11 细胞 / 11 突触)* | `tests/test_flow_household_coverage.cpp`<br>`tests/test_flow_household_gate5_replay.cpp`<br>`tests/test_flow_household_gate6_shadow.cpp` | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **PASS** | **6/6**。T2 ID 88.2% / OOD 83.1%；G5 种子 1000 共 811 步差分全 0；G6 BFS 教师 20/20，冠军 **17/20**（均覆盖 0.927，零碰撞，mean\|Δneg\|=0.240）。教师握全图，禁止成功计数对撞。 |
 | **quant**<br>(量化皮层) | `checkpoints/quant_cortical_array_champion.bin`<br>*(1032 细胞 / 1634 突触)* | `tools/train_multi_asset_cortical_array.cpp`<br>`tools/eval_cortical_array_bin.cpp`<br>`tests/test_quant_oos_discipline.py` | **PASS**<br>*(稳态基线)* | **PASS**<br>*(复训过拟合)* | **FAIL**<br>*(锚点 0.22 未复现)* | **未测**<br>*(C11 未测)* | **未测** | **未测** | **1/6 (G3 对锚点仍 FAIL)**。`--seed 0` 复训 OOS -0.03 冻结；正式 bin 任务层冷评 OOS **+0.14**（不是 0.22）。已撤实盘宣称。 |
 
 ### 补充生境清单 (Manifest 登记其余生命体)
@@ -91,7 +91,8 @@
 - **Gate 2 (选择收敛)**：`PASS`。Manifest 记录 T2 战役修复 `reset_state(true)` 抹除权重的缺陷，同步 `initial_weight` 后 50 种子基准收敛；`STATUS_BOARD.md` T2 ✅。
 - **Gate 3 (OOD 盲测)**：`PASS`。Manifest 记录 ID 覆盖率 88.2%，OOD 异构大户型覆盖率 83.1%，安全回充率 100%，障碍愈合率 100%。
 - **Gate 4 (纯 C 零 GC)**：`PASS`。`household_coverage_champion.bin.cert.json` 签署 BIBO 零漂移证书。
-- **Gate 5 & 6 (管线回放 / 影子对账)**：`未测`。四证据源中无记录。
+- **Gate 5 (管线回放)**：`PASS`。`tests/test_flow_household_gate5_replay.cpp`：同一 `household_coverage_champion.bin`、ID 种子 `1000`、24×16、1200 步上限，两次独立回放 811 步，位姿/覆盖/电量/动作差分全 0。不注入动态障碍。
+- **Gate 6 (影子对账)**：`PASS`。`tests/test_flow_household_gate6_shadow.cpp`：20 个 ID 种子 `1000..1019`。BFS 最近污渍教师 **20/20**（均覆盖 1.0）；冠军 **17/20** 达 0.70+回桩（均覆盖 **0.927**，20/20 回桩，碰撞 0，mean\|Δneg\|=**0.240**）。未达标种子 1002/1005/1018 均已回桩但覆盖 0.69/0.57/0.48。教师握全图、冠军仅 4 维局部，**禁止**用成功计数对撞。OOD 动态障碍自愈仍走既有 G3，不写入本 G6。
 
 ### 7. quant (多资产量化皮层阵列 / 三方稳态微柱)
 - **Gate 1 (基线探针)**：`PASS` *(仅三方稳态基线)*。Manifest 记录 9 细胞 `quant_tripartite_champion.bin` Lyapunov 最大增益 $\rho=0.019 < 1.0$，BIBO 严格收敛。
@@ -152,8 +153,12 @@ pytest tests/test_adas_cortex_contract.py tests/test_c_runtime_backend_parity.py
 
 ### 5. 全屋清洁覆盖机器人回归
 ```bash
-# 验证覆盖率 (ID 88.2% / OOD 83.1%) 及 initial_weight 同步
+# 验证覆盖率环境契约（非冠军冷评）
 ./build/test_flow_household_coverage
+
+# 全屋覆盖 Gate 5 离线回放 + Gate 6 BFS 教师影子（ID 24×16）
+./build/test_flow_household_gate5_replay
+./build/test_flow_household_gate6_shadow
 ```
 
 ### 6. 量化多资产皮层阵列复现 (负例断言)
