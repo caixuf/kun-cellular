@@ -135,8 +135,9 @@ kun-cellular/
 │   └── ecosystem_biosphere.hpp    # 多相生态圈
 ├── frontend/                      # 浏览器交互沙盒
 ├── checkpoints/                   # 真实演化产物（SDSC-BIN v2 二进制检查点）
-│   ├── domain_zoo_report.json     # 12 任务控制动物园报告
-│   └── adas_cortex_champion_stadium.bin  # 观测台默认学生档（非 L3）
+│   ├── adas_cortex_champion.bin           # L3 锁档 9W/7L
+│   ├── adas_cortex_champion_stadium.bin   # 观测台默认学生档 10W/6L
+│   └── domain_zoo_report.json             # 12 任务控制动物园报告
 ├── tools/                         # 演化工具链与后端网关
 ├── tests/                         # 87 组回归测试（ctest 87/87 PASS）
 └── runs/                          # 基准数据（含完整 ADAS 10-seed 结果）
