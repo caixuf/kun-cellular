@@ -50,7 +50,7 @@
 
 | 任务 | 规模（细胞 / 突触） | 检查点 | 实测结果 |
 | :--- | :--- | :--- | :--- |
-| **CartPole 平衡** | 13 细胞 / 49 突触 | `checkpoints/cartpole_balance_champion.bin`（另：`cartpole_tripartite_champion.bin`） | 冷评 ID/OOD **20/20**（MAX_STEPS=300；三权版 500 步亦满额） |
+| **CartPole 平衡** | 13 细胞 / 49 突触（W1b 候选 13/64） | `checkpoints/cartpole_balance_champion.bin`（另：`cartpole_tripartite_champion.bin`；W1b 候选 `cartpole_balance_champion_w1b_20261023.bin`，待 promote） | 冷评 ID/OOD **20/20**（MAX_STEPS=300；三权版 500 步亦满额）；**W1b Prefer A** vs Gate-6 named PD pack S **28/40 > 26/40**（T4 floors 20/20+20/20；handoff `docs/handoff/2026-10-23-w1b-cartpole-pd.md`；锁档 bin 未覆盖） |
 | **空间迷宫自主脱困** | 11 细胞 / 15 突触 | `checkpoints/maze_navigation_champion.bin` | 测地势场方位观测下 100 未见种子 **96%** @250 步 / **100%** @400 步（L3；欧氏方位对照约 86%） |
 | **流体阻尼控制** | 40 细胞 / 86 突触 | `checkpoints/fluid_damper_champion.bin` (5.0 KB) | Aero / Hydro / Vacuum 三态 3000 步极限扰动 100% 收敛（`test_multiphase_fluid_stress`） |
 | **ADAS 循迹皮层（L3 锁档）** | 210 细胞 / ~659 突触 | `checkpoints/adas_cortex_champion.bin` | 16 场景多种子 **9 胜 / 7 负**（见下表；2026-09-11） |
