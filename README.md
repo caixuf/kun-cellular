@@ -64,6 +64,8 @@
 ### ADAS vs Stanley 完整基准（16 场景，10-seed 平均）
 
 > **L3 锁档口径（2026-09-11）**：`checkpoints/adas_cortex_champion.bin`。数据：`runs/adas_champion_vs_stanley_seeds1-10_tuned_20260911.json`。指标 CTE（m），**越小越好**。战绩 **9 胜 / 7 负**。
+
+> **W1 Prefer A (P0) 2026-10-23**：registered sep-CMA budget exhausted (`iters=200 pop=24 seed=20261023` + retry `20261024`). Best still **9W/7L**. Hard ≥12W/4L **not met** — A6 ceiling dossier `docs/handoff/2026-10-23-w1-adas-win.md`. Lock bin unchanged. No P1.
 >
 > **观测台默认不是这张表。** `vehicle.html` 默认加载 `adas_cortex_champion_stadium.bin`（体育场学生档，10W/6L 叙事，p95 CTE 0.145 m）。两把锁档不要混报。
 >
