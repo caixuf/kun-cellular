@@ -1709,33 +1709,38 @@
     </div>
   </div>
 
-  <!-- 卡片 1.7: 跨物种器官冷冻库与借用剪裁 (Exaptation Bank & Splice) -->
-  <div class="card" id="card-organ-bank" style="border: 1px solid rgba(168,85,247,0.45); background: linear-gradient(180deg, rgba(168,85,247,0.1), rgba(18,26,44,0.85));">
+  <!-- A1 Vault demote: hidden from default dock; re-entry via advanced/devtools -->
+  <div class="card" id="card-organ-bank" style="display:none; border: 1px solid rgba(168,85,247,0.45); background: linear-gradient(180deg, rgba(168,85,247,0.1), rgba(18,26,44,0.85));">
     <div class="card-title">
       <span style="color:#c084fc;display:flex;align-items:center;gap:6px;">
         <span>[冷冻器官库]</span>
-        <span>跨物种器官冷冻库</span>
+        <span>冷冻器官（实验·非检查点生命体）</span>
       </span>
-      <span class="card-title-badge" id="st-organ-bank-badge" style="background:rgba(168,85,247,0.2);color:#c084fc;">器官借用库</span>
+      <span class="card-title-badge" id="st-organ-bank-badge" style="background:rgba(168,85,247,0.2);color:#c084fc;">实验·非检查点</span>
     </div>
     <div style="font-size:10px;color:var(--text-dim);line-height:1.45;">
-      进化学公理：进化不造新轮子，全靠旧零件改用途。从冷冻库借用成熟器官并剪裁重组。
+      Vault 实验件（非检查点生命体）。选项由 OrganFrozenBank API 填充。
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
       <select id="sel-frozen-organ" onchange="onOrganSelectionChange()" style="background:rgba(10,16,28,0.95);border:1px solid rgba(168,85,247,0.45);color:var(--text-main);padding:5px 8px;border-radius:4px;font-size:11px;font-family:var(--font-mono);outline:none;">
-        <option value="schmitt_damping_column">施密特迟滞抗震颤阻尼柱 [EMA+HYST]</option>
-        <option value="prefrontal_executive_gate">前额叶形式化防御执行门 [SUM+THRESH+AMP]</option>
-        <option value="fast_fourier_sensory_pod">高频差分微积分感知微囊 [DIFF+INT]</option>
-        <option value="reflex_arc_fast_extensor">脊髓反射弧快速伸肌单元 [THRESH+AMP+DAMP]</option>
-        <option value="quantum_entropy_sentinel">量子极限环混沌熵哨兵 [OSC+THRESH]</option>
+        <option value="" disabled selected>暂无冷冻器官</option>
       </select>
-      <div id="organ-preview-desc" style="font-size:9px;color:var(--cyan);line-height:1.4;background:rgba(56,189,248,0.08);padding:4px 6px;border-radius:4px;border:1px solid rgba(56,189,248,0.2);">
-        施密特迟滞强抗震颤阻尼柱 (EMA滤波 + 双阈值迟滞比较，消除高频抖动)
+      <div id="organ-preview-desc" style="font-size:9px;color:#64748b;line-height:1.4;background:rgba(56,189,248,0.08);padding:4px 6px;border-radius:4px;border:1px solid rgba(56,189,248,0.2);">
+        暂无冷冻器官
       </div>
       <button class="btn-ctrl" onclick="triggerOrganSplice()" id="btn-splice-organ" style="background:rgba(168,85,247,0.22);border-color:rgba(168,85,247,0.55);color:#d8b4fe;font-weight:bold;padding:7px 8px;font-size:11px;box-shadow:0 0 10px rgba(168,85,247,0.25);">
-        [器官借用] 剪裁接入器官 (外适应借用)
+        [实验] 剪裁接入器官
       </button>
     </div>
+  </div>
+  <div class="card" id="card-advanced-devtools" style="border:1px dashed rgba(100,116,139,0.45);background:rgba(15,23,42,0.5);">
+    <div class="card-title">
+      <span style="color:#94a3b8;">[高级 / DevTools]</span>
+      <span class="card-title-badge" style="background:rgba(100,116,139,0.2);color:#94a3b8;">隐藏实验</span>
+    </div>
+    <button class="btn-ctrl" id="btn-toggle-vault" onclick="(function(){var c=document.getElementById('card-organ-bank');if(!c)return;var on=c.style.display==='none';c.style.display=on?'block':'none';if(on&&window.populateFrozenOrganSelect)window.populateFrozenOrganSelect();})()" style="font-size:10px;color:#94a3b8;border-color:#475569;">
+      [显示/隐藏] 冷冻器官（实验·非检查点生命体）
+    </button>
   </div>
 
   <!-- 卡片 2: 生态圈多样性 -->

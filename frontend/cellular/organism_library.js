@@ -20,18 +20,69 @@ export let currentRenderMode = "symbiosis"; // "instrument" | "symbiosis" | "pur
 export let currentLOD = "1m";
 
 export const ORGAN_DESCRIPTIONS = {
-  "schmitt_damping_column": "施密特迟滞强抗震颤阻尼柱 (EMA滤波 + 双阈值迟滞比较，消除高频抖动)",
-  "prefrontal_executive_gate": "前额叶形式化防御阻断执行门 (防范恶意越界决策，提供不可违逆的形式化安全契约)",
-  "fast_fourier_sensory_pod": "快速高频差分微积分感知微囊 (微分提取突变斜率 + 积分稳态跟踪，捕捉非平稳冲击)",
-  "reflex_arc_fast_extensor": "脊髓反射弧快速伸肌单元 (小脑皮层毫秒级硬反馈短路回路，提供姿态回正保护)",
-  "quantum_entropy_sentinel": "量子极限环混沌熵哨兵 (极限环周期振荡器 + 非线性死区调制，监控红皇后熵增)"
+  "schmitt_damping_column": "EMA+HYST 抗震颤阻尼柱（vault 实验件）",
+  "prefrontal_executive_gate": "SUM+THRESH+AMP 执行门（vault 实验件）",
+  "fast_fourier_sensory_pod": "DIFF+INT 感知微囊（vault 实验件）",
+  "reflex_arc_fast_extensor": "THRESH+AMP+DAMP 伸肌单元（vault 实验件）",
+  "quantum_entropy_sentinel": "OSC+THRESH 极限环哨兵（vault 实验件）"
 };
+
+/** Fill vault select from OrganFrozenBank API; empty → muted placeholder. */
+export async function populateFrozenOrganSelect() {
+  const sel = document.getElementById("sel-frozen-organ");
+  const descEl = document.getElementById("organ-preview-desc");
+  if (!sel) return;
+  const MOTIF = ORGAN_DESCRIPTIONS;
+  try {
+    const r = await fetch("/api/organ/list", { signal: AbortSignal.timeout(3000) });
+    const j = await r.json();
+    const bank = (j && (j.bank || j.organs || j.organ_bank)) || [];
+    sel.innerHTML = "";
+    if (!bank.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "暂无冷冻器官";
+      opt.disabled = true;
+      opt.selected = true;
+      sel.appendChild(opt);
+      if (descEl) {
+        descEl.textContent = "暂无冷冻器官";
+        descEl.style.color = "#64748b";
+      }
+      return;
+    }
+    for (const o of bank) {
+      const id = o.name || o.id || o.organ_id;
+      if (!id) continue;
+      const opt = document.createElement("option");
+      opt.value = id;
+      opt.textContent = MOTIF[id] || id;
+      sel.appendChild(opt);
+    }
+    if (descEl) {
+      descEl.textContent = MOTIF[sel.value] || "vault 实验件";
+      descEl.style.color = "";
+    }
+  } catch (e) {
+    sel.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "暂无冷冻器官";
+    opt.disabled = true;
+    opt.selected = true;
+    sel.appendChild(opt);
+    if (descEl) {
+      descEl.textContent = "暂无冷冻器官";
+      descEl.style.color = "#64748b";
+    }
+  }
+}
 
 export function onOrganSelectionChange() {
   const sel = document.getElementById("sel-frozen-organ");
   const descEl = document.getElementById("organ-preview-desc");
   if (sel && descEl) {
-    const desc = ORGAN_DESCRIPTIONS[sel.value] || "成熟模块化冷冻器官";
+    const desc = ORGAN_DESCRIPTIONS[sel.value] || (sel.value ? sel.value : "暂无冷冻器官");
     descEl.textContent = desc;
   }
 }
@@ -468,16 +519,7 @@ export async function loadPreset(type) {
     const s = await r.json();
     const cells = (s.macro_cells || s.n_macro_cells || (s.stats && s.stats.active_cells) || (s.cells && s.cells.length) || 0);
     const syns  = (s.macro_synapses || s.n_macro_synapses || (s.stats && s.stats.total_synapses) || (s.syns && s.syns.length) || 0);
-    const NAME_MAP = {
-      mega: "SDSCC 旗舰微柱阵列全息大生命体",
-      "1m": "SDSCC 旗舰微柱阵列全息大生命体",
-      real: "三十年商品期货量化演化冠军",
-      quant: "三十年商品期货量化演化冠军",
-      adas: "SDSCC 循迹微柱皮层（L3 锁档）",
-      vehicle: "SDSCC 循迹微柱皮层（体育场学生档）",
-      primordial: "无目标原始进化生命体冠军"
-    };
-    const name = NAME_MAP[type] || s.organism_id || "SDSCC 冠军生命体";
+    const name = s.organism_id || s.name || type;
     log(`已切换至: ${name} (${cells.toLocaleString()} 细胞 / ${syns.toLocaleString()} 突触 · 后端实时读取)`, true);
     return;
   } catch (e) {}
@@ -498,7 +540,6 @@ export function switchLOD(mode) {
     log(" 聚焦至: 本能器官微观特写视距 (全细节细胞膜/核仁/线粒体)");
   } else if (mode === "1k") {
     camState.targetCamR = Math.max(30, (currentOrganismBounds.microDist || 140) * 1.6);
-    loadPreset("adas");
     log(" 聚焦至: 皮层柱介观视距");
   } else if (mode === "10k") {
     camState.targetCamR = Math.max(60, (currentOrganismBounds.macroDist || 460) * 0.7);
@@ -507,7 +548,6 @@ export function switchLOD(mode) {
     camState.targetCamR = currentOrganismBounds.macroDist || 580;
     camState.camR = currentOrganismBounds.macroDist || 580;
     camState.isCamTransitioning = false;
-    loadPreset("1m");
     log(" 聚焦至: 1M 宏观点云流形 (纯点云流形呈现，推近按像素门禁局部实化)");
   }
 }
@@ -619,10 +659,18 @@ export async function pollLibrary() {
           </div>
         `;
 
-        shelf.innerHTML = `<div class="win-tree">` + foundationsHtml + motifBooksHtml + j.organisms.map((orgItem, idx) => {
+        const shelfOrgs = (j.organisms || []).filter(orgItem => {
+          if (orgItem.has_checkpoint === false) return false;
+          if (!orgItem.total_cells) return false;
+          return true;
+        });
+        shelf.innerHTML = `<div class="win-tree">` + foundationsHtml + motifBooksHtml + shelfOrgs.map((orgItem, idx) => {
           const isOpen = idx === 0 ? "open" : "";
           const isSelected = orgItem.organism_id === currentSelectedOrgId ? "selected" : "";
-          const cellDesc = orgItem.total_cells >= 100000000 ? '1亿细胞' : orgItem.total_cells >= 10000 ? ((orgItem.total_cells / 10000).toFixed(1) + '万细胞') : (orgItem.total_cells + ' 细胞 / ' + (orgItem.total_synapses || orgItem.total_cells) + ' 突触');
+          const cellDesc = orgItem.total_cells >= 10000
+            ? ((orgItem.total_cells / 10000).toFixed(1) + '万细胞')
+            : (orgItem.total_cells + ' 细胞 / ' + (orgItem.total_synapses || orgItem.total_cells) + ' 突触');
+          const demoBadge = (orgItem.demo || orgItem.tag === '演示') ? '<span class="org-tag" style="margin-left:4px;background:rgba(148,163,184,0.2);color:#94a3b8;">演示/无检查点</span>' : '';
 
           const booksHtml = (orgItem.books || orgItem.specs || []).map(b => {
             const isLeafActive = b.book_id === currentHighlightedBookId ? "active-leaf" : "";
@@ -658,8 +706,8 @@ export async function pollLibrary() {
               </div>
               <div class="tree-label">
                 <div>
-                  <span style="color:#f8fafc;font-weight:700;font-size:11px;">${orgItem.name}</span>
-                  <span class="org-tag" style="margin-left:6px;">${orgItem.tag || '生命体'}</span>
+                  <span style="color:#f8fafc;font-weight:700;font-size:11px;">${orgItem.name || orgItem.organism_id}</span>
+                  <span class="org-tag" style="margin-left:6px;">${orgItem.tag || '生命体'}</span>${demoBadge}
                 </div>
                 <div style="display:flex;align-items:center;gap:6px;">
                   <span style="color:var(--cyan);font-size:10px;font-family:var(--font-mono);">${cellDesc}</span>
@@ -677,9 +725,9 @@ export async function pollLibrary() {
 
         const presetDeck = document.getElementById('preset-buttons-deck');
         if (presetDeck) {
-          presetDeck.innerHTML = j.organisms.map(orgItem => {
-            const shortName = (orgItem.name || "").split(' ')[0] || orgItem.name;
-            const cellTxt = orgItem.total_cells >= 100000000 ? ((orgItem.total_cells / 100000000).toFixed(0) + '亿') : (orgItem.total_cells >= 10000 ? ((orgItem.total_cells / 10000).toFixed(0) + '万') : orgItem.total_cells);
+          presetDeck.innerHTML = shelfOrgs.map(orgItem => {
+            const shortName = (orgItem.name || orgItem.organism_id || "").split(' ')[0] || orgItem.name || orgItem.organism_id;
+            const cellTxt = orgItem.total_cells >= 10000 ? ((orgItem.total_cells / 10000).toFixed(0) + '万') : orgItem.total_cells;
             const isSel = orgItem.organism_id === currentSelectedOrgId;
             return `<button class="btn-ctrl ${isSel ? 'active' : ''}" style="${isSel ? 'border-color:var(--cyan);color:var(--cyan);font-weight:bold;' : ''}" onclick="selectOrganism('${orgItem.organism_id}', '${orgItem.name}')" title="${orgItem.name} (${orgItem.total_cells} 细胞 / ${orgItem.total_synapses} 突触)">
               ${shortName} (${cellTxt})

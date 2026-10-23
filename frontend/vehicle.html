@@ -240,7 +240,7 @@
                     </div>
                     <button class="nav-btn" id="btn-toggle" onclick="toggleSim()">[PAUSE / RESUME]</button>
                     <button class="nav-btn" onclick="resetVeh()">[RESET_POSITION]</button>
-                    <button class="nav-btn" onclick="fastEvolve(8)" style="background:rgba(16,185,129,0.3); border-color:var(--emerald-glow); color:var(--emerald-glow); font-weight:bold;">[继续进化 +8代 → live_exp]</button>
+                    <button class="nav-btn" onclick="fastEvolve(8)" style="background:rgba(16,185,129,0.3); border-color:var(--emerald-glow); color:var(--emerald-glow); font-weight:bold;">[实验：续演化 +8代 → live_exp（非锁档）]</button>
                 </div>
                 <div style="font-size:11px;color:var(--text-dim);">
                     <span style="color:#00f0ff;">■ 高精沥青赛道</span> &nbsp;|&nbsp;
@@ -274,7 +274,7 @@
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">ACTIVE_CELLS</div>
-                        <div class="stat-val cyan" id="stat-cells">210 细胞</div>
+                        <div class="stat-val cyan" id="stat-cells">— 细胞</div>
                     </div>
                     <div class="stat-box">
                         <div class="stat-label">SYNAPSE_EDGES</div>
@@ -286,7 +286,7 @@
                 <div style="padding: 4px 12px 6px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                         <span class="stat-label">ORGAN PULSE (微柱皮层点阵):</span>
-                        <span style="font-size:9px; color:var(--cyan-glow);" id="cortex-mode-badge">[真实前向]</span>
+                        <span style="font-size:9px; color:var(--text-dim);" id="cortex-mode-badge">[离线]</span>
                     </div>
                     <canvas id="cortex-canvas" width="340" height="96" style="background:#020617; border:1px solid #1e293b; border-radius:4px; display:block; width:100%;"></canvas>
                 </div>
@@ -304,12 +304,7 @@
                 <div style="padding: 2px 12px 10px;">
                     <div class="stat-label" style="margin-bottom:4px;">DOMINANT_PRIMITIVES // 优势原语基因:</div>
                     <div id="primitive-chain" style="display:flex; flex-wrap:wrap; gap:3px; font-size:9px;">
-                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">12 REC</span>
-                        <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">DIFF + DAMPER</span>
-                        <span style="background:rgba(251,191,36,0.2); color:#fbbf24; padding:1px 5px; border-radius:3px; border:1px solid #fbbf24;">HYSTERESIS + DEADZONE</span>
-                        <span style="color:var(--text-dim); align-self:center;">→</span>
-                        <span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">6 MOT</span>
+                        <span style="background:#1e293b; color:#64748b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">等待遥测</span>
                     </div>
                 </div>
             </div>
@@ -476,7 +471,7 @@
                 } else {
                     const g = result.trained_generations || gens;
                     const tip = result.capped ? ` (顶${g}代)` : "";
-                    if (hud) hud.innerText = `STATUS: LIVE_EXP +${g}${tip} cost=${result.cost ?? "?"} → live_exp.bin`;
+                    if (hud) hud.innerText = `实验档 live_exp · 非 L3/stadium 锁档 (+${g}${tip} cost=${result.cost ?? "?"})`;
                 }
                 fetchVehState();
             } catch(e) {
@@ -551,67 +546,62 @@
                 const claim = vehState.champion_claim || "";
                 document.getElementById("stat-gen-badge").innerText = claim || `GEN: ${gen}`;
                 document.getElementById("stat-fit").innerText = `${vehState.champion_fitness || 0.0}`;
-                document.getElementById("stat-cells").innerText = nCells > 0 ? `${nCells.toLocaleString()} 细胞` : "… 细胞";
+                document.getElementById("stat-cells").innerText = nCells > 0 ? `${nCells.toLocaleString()} 细胞` : "— 细胞";
                 document.getElementById("stat-synapses").innerText = nSyns > 0 ? `${nSyns.toLocaleString()} 突触` : "… 突触";
 
-                // 动态渲染 原语链路徽章与微柱皮层标识
+                // Obs P0: identity from claim/basename ONLY — never nCells===210 → L3
+                // Controller badge ≠ Checkpoint badge
                 const titleEl = document.getElementById("cortex-panel-title");
+                const claimRaw = (vehState.champion_claim || "").trim();
+                const ckptPath = (vehState.checkpoint || vehState.ckpt || vehState.checkpoint_path || "").trim();
+                const basename = ckptPath ? ckptPath.split("/").pop().replace(/\.bin$/i, "") : "";
+                const liveExp = /live_exp/i.test(claimRaw + " " + basename);
                 if (titleEl) {
-                    const claimHint = (vehState.champion_claim || "").toLowerCase();
-                    if (claimHint.includes("stadium")) {
-                        titleEl.innerText = "[SDSCC_ADAS_STADIUM_210]";
-                    } else if (nCells === 210) {
-                        titleEl.innerText = "[SDSCC_ADAS_L3_210]";
-                    } else if (nCells === 1024) {
-                        titleEl.innerText = "[SDSCC_1024_MULTI_COLUMN_CORTEX]";
+                    if (liveExp) {
+                        titleEl.innerText = "[实验档 live_exp]";
+                    } else if (claimRaw) {
+                        titleEl.innerText = `[CKPT] ${claimRaw.slice(0, 48)}`;
+                    } else if (basename) {
+                        titleEl.innerText = `[CKPT] ${basename}`;
                     } else {
-                        titleEl.innerText = `[SDSCC_${nCells}_CELL_PARALLEL_CORTEX]`;
+                        titleEl.innerText = "[CKPT] —";
                     }
                 }
 
+                // Checkpoint badge (stat-gen-badge): claim/basename only
+                const ckptBadge = document.getElementById("stat-gen-badge");
+                if (ckptBadge) {
+                    if (liveExp) {
+                        ckptBadge.innerText = "实验档 live_exp · 非 L3/stadium 锁档";
+                    } else {
+                        ckptBadge.innerText = claimRaw || basename || "—";
+                    }
+                }
+
+                // Controller badge (cortex-mode-badge): online/offline only — no identity
                 const modeBadge = document.getElementById("cortex-mode-badge");
                 if (modeBadge) {
-                    if (nCells === 210) {
-                        const stadium = (vehState.champion_claim || "").toLowerCase().includes("stadium");
-                        const tag = stadium ? "210 stadium" : "210 L3";
-                        modeBadge.textContent = vehState.cortex_real
-                            ? `[${tag} | 真闭环 ${vehState.control_loop === 'adas_cortex_organ_forward' ? 'AdasCortexOrgan' : 'fallback'}]`
-                            : `[${tag} | 皮层离线]`;
-                    } else if (nCells === 1024) {
-                        modeBadge.textContent = vehState.cortex_real ? "[1,024 CELLS | 16-微柱 C11 直连]" : "[1,024 CELLS | 皮层离线]";
+                    if (!nCells) {
+                        modeBadge.textContent = "[离线]";
+                        modeBadge.style.color = "#94a3b8";
+                    } else if (vehState.cortex_real) {
+                        const loop = vehState.control_loop === "adas_cortex_organ_forward" ? "AdasCortexOrgan" : "C11";
+                        modeBadge.textContent = `[控制器 · 真闭环 ${loop}]`;
+                        modeBadge.style.color = "#34d399";
                     } else {
-                        modeBadge.textContent = vehState.cortex_real ? `[${nCells} CELLS | C11 真实前向]` : `[${nCells} CELLS | 皮层离线]`;
+                        modeBadge.textContent = "[控制器 · 离线]";
+                        modeBadge.style.color = "#f87171";
                     }
-                    modeBadge.style.color = vehState.cortex_real ? "#34d399" : "#f87171";
                 }
 
                 const chainDiv = document.getElementById("primitive-chain");
                 if (chainDiv) {
-                    let html = "";
-                    if (nCells === 1024) {
-                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">32 REC</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                        html += `<span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">DIFF+DAMP</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                        html += `<span style="background:rgba(251,191,36,0.2); color:#fbbf24; padding:1px 5px; border-radius:3px; border:1px solid #fbbf24;">INT+DAMP</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                        html += `<span style="background:rgba(168,85,247,0.2); color:#c084fc; padding:1px 5px; border-radius:3px; border:1px solid #a855f7;">HYST+DEAD</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                        html += `<span style="background:rgba(234,179,8,0.2); color:#facc15; padding:1px 5px; border-radius:3px; border:1px solid #eab308;">FAT+MULT</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                        html += `<span style="background:#1e293b; color:#f43f5e; padding:1px 5px; border-radius:3px; border:1px solid #f43f5e;">8 MOT</span>`;
-                    } else if (nCells === 210) {
-                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">12 REC</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                        html += `<span style="background:rgba(16,185,129,0.2); color:#10b981; padding:1px 5px; border-radius:3px; border:1px solid #10b981;">192 ASSOC</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">→</span>`;
-                        html += `<span style="background:#1e293b; color:#f43f5e; padding:1px 5px; border-radius:3px; border:1px solid #f43f5e;">6 MOT</span>`;
-                        html += `<span style="color:var(--text-dim); align-self:center;">·</span>`;
-                        html += `<span style="background:rgba(56,189,248,0.15); color:#38bdf8; padding:1px 5px; border-radius:3px; border:1px solid #0ea5e9;">真前向闭环</span>`;
+                    const prims = vehState.dominant_primitives || vehState.primitive_chain || null;
+                    if (Array.isArray(prims) && prims.length) {
+                        chainDiv.innerHTML = prims.map(p => `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">${p}</span>`).join('<span style="color:var(--text-dim); align-self:center;">→</span>');
                     } else {
-                        html += `<span style="background:#1e293b; color:#94a3b8; padding:1px 5px; border-radius:3px; border:1px solid #334155;">REC→INTER→MOT</span>`;
+                        chainDiv.innerHTML = `<span style="background:#1e293b; color:#64748b; padding:1px 5px; border-radius:3px; border:1px solid #334155;">等待遥测</span>`;
                     }
-                    chainDiv.innerHTML = html;
                 }
 
                 drawCortexMatrix(vehState.cell_activities);

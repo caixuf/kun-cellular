@@ -2364,8 +2364,12 @@ class SiliconCellularOrganism:
                     ns = int(pt_data["weights"].shape[0])
                     self.generation = 42
                 else:
-                    nc = int(biz.get("cells_scale", 100000000))
-                    ns = int(biz.get("synapses_scale", 200000000))
+                    # Honesty: never invent 1e8 scale when .pt lacks n_cells
+                    nc = int(biz.get("cells_scale") or 0)
+                    ns = int(biz.get("synapses_scale") or 0)
+                    if nc <= 0:
+                        print("[load_organism_by_id] refuse 1e8 fallback for missing cells_scale")
+                        return False
                     self.generation = 1
 
                 self.nominal_scale = nc
@@ -3429,8 +3433,18 @@ class SiliconLifeformLibrary:
                 try:
                     import torch
                     pt_ckpt = torch.load(ckpt_path, map_location="cpu", mmap=True)
-                    nc = int(pt_ckpt.get("n_cells", 100000000) if "n_cells" in pt_ckpt else pt_ckpt.get("state", np.zeros((1, 1000000))).shape[1])
-                    ns = int(pt_ckpt.get("n_synapses", 200000000) if "n_synapses" in pt_ckpt else pt_ckpt.get("weights", np.zeros(2000000)).shape[0])
+                    if "n_cells" in pt_ckpt:
+                        nc = int(pt_ckpt["n_cells"])
+                    elif "state" in pt_ckpt:
+                        nc = int(pt_ckpt["state"].shape[1])
+                    else:
+                        nc = 0
+                    if "n_synapses" in pt_ckpt:
+                        ns = int(pt_ckpt["n_synapses"])
+                    elif "weights" in pt_ckpt:
+                        ns = int(pt_ckpt["weights"].shape[0])
+                    else:
+                        ns = 0
                     sz_mb = round(os.path.getsize(ckpt_path) / (1024 * 1024), 1)
                     specs.append({
                         "book_id": f"{oid}_identity_card",
@@ -3556,6 +3570,27 @@ class SiliconLifeformLibrary:
             except Exception:
                 pass
 
+            # Thin P0 allowlist: real checkpoint only; quarantine macro/demo/ten_business
+            DEMO_SHELF = {
+                # music/eco/immune: demo-nav only — not champion shelf rows (rails KEEP)
+                "music_composer_cortex",
+                "eco_biosphere", "ecosystem_biosphere", "immune_hunter",
+                "immune_pathogen",
+            }
+            MACRO_QUARANTINE_SUFFIXES = ("_100m", "_10m", "_1m")
+            has_ckpt = bool(ckpt_rel) and os.path.exists(ckpt_path)
+            if not has_ckpt:
+                continue
+            if "ten_business" in (oid or "") or oid == "ten_business":
+                continue
+            if any((oid or "").endswith(sfx) for sfx in MACRO_QUARANTINE_SUFFIXES) or "world_model_100m" in (oid or "") or "mega_1million" in (oid or ""):
+                continue
+            if oid in DEMO_SHELF:
+                # Keep music/eco/immune as demo-nav only — not champion shelf rows
+                continue
+            if not cells_scale:
+                # Prefer real bin counts; skip zero-cell shelf noise
+                continue
             self.organisms.append({
                 "organism_id": oid,
                 "name": name,
@@ -3565,7 +3600,9 @@ class SiliconLifeformLibrary:
                 "total_synapses": syns_scale,
                 "description": v_report,
                 "specs": specs,
-                "books": specs
+                "books": specs,
+                "has_checkpoint": True,
+                "checkpoint": ckpt_rel,
             })
 
         # 从 library/motifs/ 自动加载硅基生命体自组织沉淀的真实因果模体
