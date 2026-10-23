@@ -134,7 +134,7 @@ export function makeMatureOrganism() {
     generation: 142,
     phySteps: 0,
     lastFingerprint: null,
-    lastOrganismId: 'adas_cortex_champion'
+    lastOrganismId: null
   };
 }
 

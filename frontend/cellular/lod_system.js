@@ -199,7 +199,7 @@ export function buildFullPointCloud(s = scene, o = defaultOrg, b = currentOrgani
   const cellScale = (bnds && bnds.cellScale) || n;
 
   if (cellScale >= 100000) {
-    const oid = (orgObj && orgObj.lastOrganismId) || (bnds && bnds.organismId) || (typeof window !== 'undefined' && window.currentSelectedOrgId) || 'quant_master_champion';
+    const oid = (orgObj && orgObj.lastOrganismId) || (bnds && bnds.organismId) || (typeof window !== 'undefined' && window.currentSelectedOrgId) || null;
     loadBinaryManifold(oid, scn, bnds);
     if (lodPointsMesh) { lodPointsMesh.visible = false; }
     return;
