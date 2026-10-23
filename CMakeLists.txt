@@ -248,6 +248,10 @@ target_include_directories(eval_cortical_array_bin PRIVATE "${CMAKE_CURRENT_SOUR
 add_executable(ablate_morph_operators "${CMAKE_CURRENT_SOURCE_DIR}/tools/ablate_morph_operators.cpp")
 target_link_libraries(ablate_morph_operators PRIVATE kun_cellular Threads::Threads m)
 
+# 原语普查 (S1, 只读报告工具, 非 ctest 门禁)
+add_executable(primitive_census "${CMAKE_CURRENT_SOURCE_DIR}/tools/primitive_census.cpp")
+target_link_libraries(primitive_census PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_quant_population_ecology "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_population_ecology.cpp")
 target_link_libraries(train_quant_population_ecology PRIVATE kun_population Threads::Threads m)
 target_include_directories(train_quant_population_ecology PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/tools")
