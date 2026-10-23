@@ -1,12 +1,12 @@
 {
   "schema": "SDSC-Formal-Cert-v1.0",
   "organism_bin": "checkpoints/cartpole_balance_champion.bin",
-  "wl_canonical_hash": "0xa23496b171ea63a7",
+  "wl_canonical_hash": "0x1328eb9130fc1e22",
   "topology": {
     "num_cells": 13,
-    "num_synapses": 49,
-    "core_nodes": 12,
-    "core_edges": 46
+    "num_synapses": 64,
+    "core_nodes": 13,
+    "core_edges": 64
   },
   "lyapunov_certificate": {
     "status": "CERTIFIED_BIBO_STABLE",
@@ -17,12 +17,12 @@
   "bit_exact_regression": {
     "status": "BIT_EXACT_ZERO_DRIFT",
     "steps": 50000,
-    "fnv1a_checksum": "0xa9c7f4723e8cf9e9",
-    "max_action_peak": 2.074
+    "fnv1a_checksum": "0xe7fa11499a5f1c61",
+    "max_action_peak": 5.98967
   },
   "operator_safety_proof": {
     "bounds_check": "ALL_CELLS_BOUNDED",
     "source_of_truth": "ops.yaml-v2.0.0"
   },
-  "certified_at": "Fri Sep 11 14:22:11 2026"
+  "certified_at": "Fri Oct 23 23:59:41 2026"
 }

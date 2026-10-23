@@ -263,7 +263,7 @@ void test_legacy_v2_checkpoint_backward_compatibility() {
         assert(org.synapses.size() == 425 && "doudizhu_cand_scorer 突触数必须为 425！");
     }
 
-    // 3. cartpole_balance_champion.bin 历史形态学普查
+    // 3. cartpole_balance_champion.bin 形态学普查 (W1b Prefer A promote: 49->64 synapses)
     {
         CellularOrganism org = CellularOrganism::load_checkpoint_bin(find_ckpt_path("checkpoints/cartpole_balance_champion.bin"));
         assert(org.cells.size() == 13);
@@ -275,7 +275,7 @@ void test_legacy_v2_checkpoint_backward_compatibility() {
         std::cout << "  ✓ cartpole_balance_champion.bin: cells=13, sense=" << sense << ", act=" << act << std::endl;
         assert(sense == 2 && "cartpole 受体数必须为 2！");
         assert(act == 3 && "cartpole 效应器数必须为 3！");
-        assert(org.synapses.size() == 49 && "cartpole 突触数必须为 49！");
+        assert(org.synapses.size() == 64 && "cartpole 突触数必须为 64！");
     }
 
     std::cout << "[PASS] test_legacy_v2_checkpoint_backward_compatibility 完美通过！" << std::endl;
