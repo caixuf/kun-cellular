@@ -1,0 +1,32 @@
+{
+  "claim_id": "E1-egate-first-light",
+  "tip_hash": "bff1c509169c706eaa74d03640c9566100f54787",
+  "learn_scales": [41, 82, 164],
+  "learn_scale_primary": 82,
+  "exec_scale": 82,
+  "exec_equals_learn_claimed": true,
+  "note_scales": "Prefer-A organism builder fixed at 82 cells; 41/164 registered learn-scale points; live dump 82-only (adapter gap for multi-cell-count).",
+  "dual_metrics": ["coverage_frac", "novelty_knn"],
+  "companion_metrics": ["avalanche_mean_size", "lyapunov_max_loop_gain"],
+  "seeds": [11, 22, 33, 44],
+  "per_seed": [
+    {"seed": 11, "coverage_frac": 1.000000, "novelty_knn": 1.000000, "avalanche_mean_size": 83951.764706, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.176299, "ood_seed": 1011, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+    {"seed": 22, "coverage_frac": 1.000000, "novelty_knn": 0.352941, "avalanche_mean_size": 83964.470588, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.337163, "ood_seed": 1022, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+    {"seed": 33, "coverage_frac": 1.000000, "novelty_knn": 0.470588, "avalanche_mean_size": 83964.882353, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.049667, "ood_seed": 1033, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+    {"seed": 44, "coverage_frac": 1.000000, "novelty_knn": 0.235294, "avalanche_mean_size": 82804.294118, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.149531, "ood_seed": 1044, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1}
+  ],
+  "map_elites_coverage_ratio": 0.062500,
+  "map_elites_occupied": 4,
+  "niche_count": 4,
+  "ood_label": "seed_shift_+1000",
+  "mcnemar": {"n": 4, "b": 0, "c": 0, "chi2": 0.000000, "p": 1.000000e+00},
+  "paired_coverage": {"n": 4, "mean_diff": 0.000000, "p": 1.000000e+00},
+  "anti_artifact": {"pass": true, "dual_ok": true, "seeds_ok": true, "scales_ok": true, "ood_paired_ok": true, "reason": "anti-artifact green"},
+  "e_gate": {"tag": "E2", "pass_e2": true, "stage1_ok": true, "stage2_ok": true, "stage3_ok": true, "stage4_ok": true, "reason": "E-Gate green → E2"},
+  "honesty": {
+    "claimed_tag": "E1",
+    "pipeline_tag_if_green": "E2",
+    "why_not_e2": "Live organism dump fixed at Prefer-A 82 cells; 41/164 learn-scale points registered but not executed as distinct cell-count campaigns. OOD is seed-shift on same ABI. Honest E1.",
+    "forbidden": ["DouZero", "win-rate", "strength", "bare emerged"]
+  }
+}
