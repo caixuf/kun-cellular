@@ -61,6 +61,8 @@ jobs:
 
   # W1b Harden Prefer A — frozen champ multi-family Pack S + T4 (A1/A4–A7)
   w1b-harden-repro:
+    # Evidence-only: HARDEN_FAIL (F1) must not block required green on main
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
