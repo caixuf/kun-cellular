@@ -10,6 +10,9 @@
 //
 // 并行归属: 本类的 evaluate 为串行 (单 deme 视角)。跨 deme 的并行调度由
 // EcologyGrid 统一持有 (系统层单一调度点), 避免嵌套并行区过订。
+//
+// Phase 2: sexual path gated by mates_compatible (compatibility_distance);
+// incompatible mate → reject/skip → asexual clone of parent A (not silent sexual success).
 // ============================================================================
 #include <algorithm>
 #include <cmath>
@@ -32,6 +35,9 @@ struct EvolutionParams {
     size_t tournament_k   = 3;       // 锦标赛选择窗口
     float  crossover_prob = 0.5f;    // 有性重组概率 (否则克隆父 A 后变异)
     float  migration_rate = 0.0625f; // 每代每岛迁移概率 (1/16)
+    // Prefer-A speciation gate (parity with MorphogeneticEcosystem::speciation_threshold).
+    // Sexual attempt only when compatibility_distance(pa,pb) < speciation_threshold.
+    float  speciation_threshold = kDefaultSpeciationThreshold;
 };
 
 template <typename Individual>
@@ -93,7 +99,8 @@ public:
     // 岛内代际推进: 精英保留 + 锦标赛亲本 + (杂交|克隆) + 变异, 种群规模守恒
     // 缓冲常驻复用: offspring_ 保持 pop 个活槽, 逐代按槽位原地写 (copy-assign 复用内部
     // vector 容量) → 稳态零堆分配。无默认构造的个体用 individuals_[0] 拷贝构造补齐。
-    // rng 抽取序列与旧 push_back 版逐位一致 (抽取次数/顺序不变)。
+    // Phase 2: crossover_prob 命中后先 mates_compatible; 不相容或 cross_into 拒绝 →
+    // 无性克隆父 A (reject/skip), 绝不把静默克隆记为有性成功。
     void evolve_generation(const EvolutionParams& params) {
         const size_t pop = individuals_.size();
         if (pop == 0 || fitness_.size() != pop) return;
@@ -108,10 +115,15 @@ public:
             const Individual& pa = tournament(params.tournament_k);
             const Individual& pb = tournament(params.tournament_k);
             std::uniform_real_distribution<float> u(0.0f, 1.0f);
+            bool wrote_sexual = false;
             if (u(rng_) < params.crossover_prob) {
-                crossover_into(pa, pb, offspring_[slot], rng_);  // 原地杂交 (免分配)
-            } else {
-                offspring_[slot] = pa;                           // 克隆父 A (原地)
+                if (mates_compatible(pa, pb, params.speciation_threshold)) {
+                    wrote_sexual = crossover_into(pa, pb, offspring_[slot], rng_);
+                }
+                // else: species reject/skip — fall through to asexual
+            }
+            if (!wrote_sexual) {
+                offspring_[slot] = pa;  // 克隆父 A (无性 / reject 回退)
             }
             MutationTrait<Individual>::mutate(offspring_[slot], params.mut_rate, params.mut_sigma, rng_);
         }
