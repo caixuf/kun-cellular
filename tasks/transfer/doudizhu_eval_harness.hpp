@@ -19,6 +19,7 @@
 // ============================================================================
 
 #include "tasks/transfer/cross_domain_tasks.hpp"
+#include "tasks/transfer/doudizhu_rules_core.hpp"  // CONTRACT v1 deal/play/legal/score
 #include "kun/cellular/statistical_evaluation.hpp"
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/cellular_relaxation.hpp"
@@ -206,7 +207,7 @@ public:
                 auto res = task.step(act);
                 if (res.done) {
                     if (res.success) wins++;
-                    double chips = res.success ? 200.0 : -200.0;
+                    double chips = doudizhu_rules::terminal_score(res.success);  // CONTRACT v1 score
                     total_chips += chips;
                     total_steps += res.steps;
                     target_perf.win_records[i] = res.success ? 1 : 0;
@@ -264,7 +265,7 @@ public:
                 auto res = task.step_continuous(acts);
                 if (res.done) {
                     if (res.success) wins++;
-                    double chips = res.success ? 200.0 : -200.0;
+                    double chips = doudizhu_rules::terminal_score(res.success);  // CONTRACT v1 score
                     total_chips += chips;
                     total_steps += res.steps;
                     target_perf.win_records[i] = res.success ? 1 : 0;
@@ -369,7 +370,7 @@ public:
                 auto res = task.step(act);
                 if (res.done) {
                     if (res.success) wins++;
-                    double chips = res.success ? 200.0 : -200.0;
+                    double chips = doudizhu_rules::terminal_score(res.success);  // CONTRACT v1 score
                     total_chips += chips;
                     total_steps += res.steps;
                     target_perf.win_records[i] = res.success ? 1 : 0;
@@ -442,7 +443,7 @@ public:
                 auto res = task.step_continuous(acts);
                 if (res.done) {
                     if (res.success) wins++;
-                    double chips = res.success ? 200.0 : -200.0;
+                    double chips = doudizhu_rules::terminal_score(res.success);  // CONTRACT v1 score
                     total_chips += chips;
                     total_steps += res.steps;
                     target_perf.win_records[i] = res.success ? 1 : 0;

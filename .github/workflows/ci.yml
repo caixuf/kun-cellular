@@ -16,7 +16,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.12'
+        python-version: "3.12"
 
     - name: Install Python Dependencies
       run: |
@@ -40,6 +40,11 @@ jobs:
     - name: Run CTest
       run: ctest --test-dir build --output-on-failure
 
+    - name: Assert DouDiZhu I1-I3 required gate
+      run: |
+        test -x build/test_doudizhu_invariants
+        ./build/test_doudizhu_invariants
+
     - name: Run Substrate Purity Guard
       run: python3 tools/ci/check_substrate_purity.py
 
@@ -49,7 +54,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '22'
+        node-version: "22"
 
     - name: Run Frontend Syntax & Asset Check
       run: python3 tools/ci/check_frontend.py
@@ -58,6 +63,29 @@ jobs:
       run: |
         pytest tests/ -v
         python3 tests/test_gate5_gate6_replay_shadow.py
+
+  # Phase 1 Correctness — 8k illegal+agree REQUIRED (not continue-on-error)
+  doudizhu-wasm-probe:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+
+    - name: Assert committed WASM artifacts present
+      run: |
+        test -f frontend/wasm/doudizhu_rules.wasm
+        test -f frontend/wasm/doudizhu_rules.js
+        test -f frontend/doudizhu_wasm_glue.js
+
+    - name: 8k illegal + agree probe (fail if illegal_rate > 0.1% or disagree)
+      run: |
+        mkdir -p runs
+        node tools/bench_doudizhu_wasm_probe.mjs 20261024 8000 | tee runs/doudizhu_wasm_probe.json
+        python3 -c "import json,sys; d=json.load(open(\"runs/doudizhu_wasm_probe.json\")); print(d); sys.exit(0 if d.get(\"illegal_rate\",1)<=0.001 and d.get(\"disagree_n\")==0 and d.get(\"sum_mismatch\")==0 and d.get(\"pass_p1\") and d.get(\"pass_p2\") else 1)"
 
   # W1b Harden Prefer A — frozen champ multi-family Pack S + T4 (A1/A4–A7)
   w1b-harden-repro:
