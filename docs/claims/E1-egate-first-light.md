@@ -68,3 +68,8 @@ Forbidden: bare “emerged” / strength / DouZero / win-rate.
 | No new metric beyond Phase3 headers required | N/A |
 
 Phase4 **HOLD**. Win knives **STOP**. No 4th ABI.
+
+
+---
+
+**E2 live multi-scale →** `docs/claims/E2-egate-second-light.md` (this knife closes the 41/164 adapter gap; E1 tag unchanged).
