@@ -7,10 +7,17 @@
 //   - 领域无关: 无任何业务名词
 //   - 确定性: 全部随机源显式传入 (std::mt19937), 同种子位级可复现
 //   - 训练离线使用, 运行时前向链路不感知本层
+//
+// Phase 2 Prefer-A:
+//   - CorticalMacroArray / CellularOrganism sexual cross_into (bool; reject ≠ silent clone)
+//   - compatibility_distance gate lives in deme.hpp (see compatibility_distance.hpp)
 // ============================================================================
 #include "kun/cellular/cortical_column.hpp"
+#include "kun/cellular/cellular_genome.hpp"
+#include "kun/cellular/population/compatibility_distance.hpp"
 
 #include <cmath>
+#include <concepts>
 #include <random>
 #include <vector>
 
@@ -42,23 +49,26 @@ struct CrossoverTrait {
 // ── CorticalMacroArray 列级有性杂交特化 ──────────────────────────────────────
 // 语义: 子代逐列取父 A 或父 B (50/50), 每列保持完整合法的编译微柱 (不打碎列内突触);
 //       长程轴突按子代列拓扑重新布线; 列内寄存器状态归零 (运行时状态不遗传)。
+// Phase 2: 异构亲本 → return false, **不**静默克隆写入 out (reject/skip; deme 负责无性回退)。
 template <>
 struct CrossoverTrait<CorticalMacroArray> {
     // 原地杂交: 结果写入调用方预分配的 out (out 同形时逐元素拷贝赋值 → 复用内部 vector 容量,
-    // 稳态零堆分配)。前置条件: a/b 不得与 out 别名; out 可异形 (内部先 out = a 定形)。
-    // rng 抽取序列与旧值返回版 cross 逐位一致 (n_cols 次 coin + 1 次 rng() 布轴突种子)。
-    static void cross_into(const CorticalMacroArray& a, const CorticalMacroArray& b,
+    // 稳态零堆分配)。前置条件: a/b 不得与 out 别名。
+    // 返回 true = 有性写入成功; false = 形状拒绝 (out 保持调用前内容不变)。
+    // rng 抽取序列与旧值返回版 cross 逐位一致 (成功路径: n_cols 次 coin + 1 次 rng() 布轴突种子)。
+    static bool cross_into(const CorticalMacroArray& a, const CorticalMacroArray& b,
                            CorticalMacroArray& out, std::mt19937& rng) {
         // 架构兼容性校验: 两亲本必须是同构阵列 (列数/每列细胞数一致)
         const auto& ac = a.columns();
         const auto& bc = b.columns();
         if (ac.size() != bc.size() || ac.empty()) {
-            out = a;  // 不同构: 退化为克隆父 A (0 次 rng 抽取, 同旧)
-            return;
+            return false;  // Prefer-A: reject — no silent clone-as-success
         }
         const size_t cells_per_col = ac[0].genome.num_cells;
         for (size_t c = 0; c < ac.size(); ++c) {
-            if (bc[c].genome.num_cells != cells_per_col) { out = a; return; }
+            if (bc[c].genome.num_cells != cells_per_col) {
+                return false;
+            }
         }
 
         out = a;  // 拷贝赋值: out 同形且容量足够时复用内部 buffer
@@ -79,29 +89,87 @@ struct CrossoverTrait<CorticalMacroArray> {
             ? static_cast<uint32_t>(out.macro_axons().size() / n_cols) : 0;
         if (axons_per_col == 0) axons_per_col = 1;
         out.wire_small_world_axons(axons_per_col, static_cast<uint32_t>(rng()));
+        return true;
     }
 
-    // 值返回兼容壳 (tests/bench 依赖); 语义与 rng 序列同旧实现。
+    // 值返回兼容壳 (tests/bench 依赖); 成功路径 rng 序列同旧。
+    // 拒绝时返回父 A 克隆 (值 API 便利; Prefer-A deme 走 bool cross_into + distance 门, 不经此壳宣称有性成功)。
     static CorticalMacroArray cross(const CorticalMacroArray& a, const CorticalMacroArray& b,
                                     std::mt19937& rng) {
         CorticalMacroArray child = a;
-        cross_into(a, b, child, rng);
+        if (!cross_into(a, b, child, rng)) {
+            return a;
+        }
+        return child;
+    }
+};
+
+// ── CellularOrganism 固定形状有性杂交 (Prefer-A 82-cell / A8 冠军路径) ────────
+// Syn contract (documented):
+//   - Parents must share cells.size() and synapses.size() (slot-aligned).
+//   - Offspring conserves both sizes (champion path: cells.size()==82).
+//   - Per-cell / per-synapse 50/50 whole-slot take from A or B (heritable fields).
+//   - Runtime state cleared via reset_state; compile() rebuilds execution buffers.
+//   - Steady-state zero-alloc: out = a then element assign reuses vector capacity when
+//     out already holds the same shape (deme offspring slots).
+//   - Shape mismatch → return false (out unchanged); no silent clone-as-success.
+template <>
+struct CrossoverTrait<CellularOrganism> {
+    static bool cross_into(const CellularOrganism& a, const CellularOrganism& b,
+                           CellularOrganism& out, std::mt19937& rng) {
+        if (a.cells.size() != b.cells.size() || a.cells.empty()) return false;
+        if (a.synapses.size() != b.synapses.size()) return false;
+
+        out = a;  // capacity reuse when out already same shape
+        auto& cells = out.cells;
+        auto& syns = out.synapses;
+        std::uniform_real_distribution<float> coin(0.0f, 1.0f);
+        for (size_t i = 0; i < cells.size(); ++i) {
+            if (coin(rng) < 0.5f) {
+                cells[i] = b.cells[i];
+            }
+        }
+        for (size_t i = 0; i < syns.size(); ++i) {
+            if (coin(rng) < 0.5f) {
+                syns[i] = b.synapses[i];
+            }
+        }
+        out.parent_organism_id = a.organism_id;
+        out.generation = std::max(a.generation, b.generation) + 1;
+        out.fitness_score = 0.0;
+        out.cumulative_reward = 0.0;
+        out.max_drawdown = 0.0;
+        out.trade_count = 0;
+        out.reset_state(/*reset_plasticity=*/false);
+        out.compile();
+        return true;
+    }
+
+    static CellularOrganism cross(const CellularOrganism& a, const CellularOrganism& b,
+                                  std::mt19937& rng) {
+        CellularOrganism child = a;
+        if (!cross_into(a, b, child, rng)) {
+            return a;
+        }
         return child;
     }
 };
 
 // ── 定制点: 有 cross_into 的 trait 走零分配原地路径; 否则回退旧值返回 cross ──────
+// 返回 true = 有性 (或默认克隆写入) 已写入 out; false = Prefer-A 形状拒绝 (out 未改)。
 // 未提供 cross_into 的类型 (默认 trait / 任务自定义值返回特化) 自动走 else 分支, 零改动兼容。
 template <typename Individual>
-inline void crossover_into(const Individual& a, const Individual& b,
+inline bool crossover_into(const Individual& a, const Individual& b,
                            Individual& out, std::mt19937& rng) {
+    // Prefer-A specializations expose bool cross_into (false = shape reject, out unchanged).
     if constexpr (requires(Individual& o, const Individual& x,
                            const Individual& y, std::mt19937& r) {
-                      CrossoverTrait<Individual>::cross_into(x, y, o, r);
+                      { CrossoverTrait<Individual>::cross_into(x, y, o, r) } -> std::convertible_to<bool>;
                   }) {
-        CrossoverTrait<Individual>::cross_into(a, b, out, rng);
+        return static_cast<bool>(CrossoverTrait<Individual>::cross_into(a, b, out, rng));
     } else {
         out = CrossoverTrait<Individual>::cross(a, b, rng);
+        return true;
     }
 }
 
@@ -111,6 +179,25 @@ inline bool genome_equal(const CompactSoAGenome& x, const CompactSoAGenome& y) {
     if (x.op_types != y.op_types) return false;
     if (x.gains != y.gains || x.biases != y.biases) return false;
     if (x.inc_off != y.inc_off || x.inc_from != y.inc_from || x.inc_weight != y.inc_weight) return false;
+    return true;
+}
+
+// Prefer-A organism heritable equality (type/param + synapse endpoints/weights).
+inline bool organism_heritable_equal(const CellularOrganism& x, const CellularOrganism& y) {
+    if (x.cells.size() != y.cells.size() || x.synapses.size() != y.synapses.size()) return false;
+    for (size_t i = 0; i < x.cells.size(); ++i) {
+        if (x.cells[i].id != y.cells[i].id) return false;
+        if (x.cells[i].type != y.cells[i].type) return false;
+        if (x.cells[i].param1 != y.cells[i].param1) return false;
+        if (x.cells[i].param2 != y.cells[i].param2) return false;
+    }
+    for (size_t i = 0; i < x.synapses.size(); ++i) {
+        if (x.synapses[i].from_cell_id != y.synapses[i].from_cell_id) return false;
+        if (x.synapses[i].to_cell_id != y.synapses[i].to_cell_id) return false;
+        if (x.synapses[i].to_port != y.synapses[i].to_port) return false;
+        if (x.synapses[i].weight != y.synapses[i].weight) return false;
+        if (x.synapses[i].is_active != y.synapses[i].is_active) return false;
+    }
     return true;
 }
 
