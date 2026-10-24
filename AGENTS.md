@@ -15,6 +15,7 @@
 2. **C/C++ 是唯一的绝对计算底座 (Single Source of Truth)**
    - 28 类原子动力学原语、私有寄存器、Kahn 拓扑排序编译器、零堆分配连续内存布局，权威定义在 `include/kun/cellular/...`；
    - 严禁在 Python 脚本层手写脱离 C 底座的“伪神经网络算子”；Python 仅作为外围驱动与数据管线。
+   - DouDiZhu FE：规则唯一源为 `tasks/transfer/doudizhu_rules_core.hpp` → WASM（`frontend/wasm/`）；`frontend/doudizhu.html` 仅渲染+遥测，禁止第二套 JS 规则。
 
 3. **通用计算底座与具身业务场景绝对正交解耦**
    - 底座计算图内核绝对禁止出现具体业务名词（车辆模型、曲率限速、方向盘、K线撮合等）；
