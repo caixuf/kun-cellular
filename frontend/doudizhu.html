@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KunCellular // 斗地主生命体对战沙盒 · 82细胞候选打分世系 57.0%</title>
+    <title>KunCellular // 斗地主生命体对战沙盒 · 82细胞候选打分 · WASM 规则单源</title>
     <style>
         :root {
             --bg-base: #06090e;
@@ -480,6 +480,9 @@
             gap: 12px;
         }
     </style>
+    <!-- P0 WASM single-source rules (no JS legality oracle) -->
+    <script src="wasm/doudizhu_rules.js"></script>
+    <script src="doudizhu_wasm_glue.js"></script>
 </head>
 <body>
 
@@ -487,9 +490,9 @@
     <div class="brand">
         <span>KunCellular</span>
         <span style="color:var(--text-dim)">//</span>
-        <span>斗地主生命体对战沙盒 (82细胞候选打分世系 · 天梯锁档 57.0%)</span>
+        <span>斗地主生命体对战沙盒 (82细胞候选打分 · WASM 规则单源)</span>
         <span class="brand-badge">82-CELL CANDIDATE SCORER</span>
-        <span class="brand-badge" style="background:rgba(16,185,129,0.15);border-color:#10b981;color:#34d399;">DEEPSEEK-GRPO</span>
+        <span class="brand-badge" style="background:rgba(56,189,248,0.12);border-color:#38bdf8;color:#7dd3fc;">P0 WASM RULES</span>
     </div>
     <div class="nav-links">
         <a href="cellular.html" class="nav-btn">3D 全息观测台</a>
@@ -673,7 +676,7 @@
         <!-- 面板 2: 后台冠军皮层真实前向遥测 (C++20 底座 + doudizhu_cand_scorer.bin 候选打分世系 82细胞/425突触) -->
         <div class="side-box">
             <div class="panel-header">
-                <span>后台冠军皮层遥测 <span style="font-size:10px;color:#10b981;">[GRPO 对齐]</span> <span id="dzTeleSrc" style="font-size:10px;color:#64748b;">(连接中…)</span></span>
+                <span>后台冠军皮层遥测 <span style="font-size:10px;color:#64748b;">[实况优先 · 离线 WASM stub]</span> <span id="dzTeleSrc" style="font-size:10px;color:#64748b;">(连接中…)</span></span>
             </div>
             <div class="cortex-telemetry">
                 <div class="column-meter">
@@ -725,8 +728,8 @@
                 <span>博弈策略因果流 (CAUSAL INFERENCE STREAM)</span>
             </div>
             <div class="causal-log" id="causalLog">
-                <div class="log-entry play">系统启动完成: 已挂载 doudizhu_cand_scorer.bin（82 细胞 / 425 突触 · 天梯 57.0% / McNemar 持平教师）。</div>
-                <div class="log-entry">标准斗地主全牌型引擎就绪: 支持顺子、连对、飞机、三带一/二、炸弹与王炸。</div>
+                <div class="log-entry play">系统就绪: 规则引擎 = WASM 单源（与 harness 对齐 · 单/对/炸弹/王炸）。</div>
+                <div class="log-entry">皮层遥测: 有后端时显示实况；离线时仅 WASM stub 表计，不回填合成胜率。</div>
             </div>
         </div>
     </div>
@@ -734,7 +737,7 @@
 
 <script>
 /**
- * 斗地主生命体对战引擎 (完整标准规则 + 全牌型识别 + 实时人机对战)
+ * 斗地主生命体对战页 (渲染 + 遥测；规则经 WASM，无 JS oracle)
  */
 const RANKS = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2", "小王", "大王"];
 const SUITS = ["♠", "♥", "♣", "♦"];
@@ -759,7 +762,8 @@ const GameState = {
     kitty: [],
     landlordIdx: 2, // 默认右位 AI
     currentTurn: 2,
-    lastTrick: null, // { player: int, cards: Card[], type: str, rank: int, len: int }
+    lastTrick: null,
+    wasmSeed: null, // P0 probe seed for DouDiZhuWasm.deal
     passCount: 0,
     deckRemaining: new Array(15).fill(4),
     stats: { games: 0, playerWins: 0 },
@@ -953,6 +957,19 @@ function initDeck() {
     GameState.hands[1] = deck.slice(17, 34);
     GameState.hands[2] = deck.slice(34, 51);
     GameState.kitty = deck.slice(51, 54);
+    // P0: sync WASM rules engine deal (deterministic seed recorded for probes)
+    GameState.wasmSeed = (GameState.wasmSeed == null)
+        ? (Date.now() >>> 0)
+        : ((GameState.wasmSeed * 1664525 + 1013904223) >>> 0);
+    if (window.DouDiZhuWasm) {
+        const roleChoiceEarly = document.getElementById("roleSelect").value;
+        let landlordEarly = 0;
+        if (roleChoiceEarly === "landlord") landlordEarly = 0;
+        else if (roleChoiceEarly === "peasant") landlordEarly = 2;
+        else landlordEarly = 0;
+        DouDiZhuWasm.deal(GameState.wasmSeed, landlordEarly);
+    }
+
 
     // 从大到小排序手牌
     for (let i = 0; i < 3; i++) {
@@ -1213,418 +1230,96 @@ function addLog(text, type = "info") {
 }
 
 /**
- * 标准斗地主全牌型识别引擎 (Full Standard Chinese DouDiZhu Pattern Identifier)
+ * identifyTrick — thin WASM wrapper (SOLO/PAIR/BOMB/ROCKET only)
  */
 function identifyTrick(cards) {
+    // P0: WASM single-source - no JS rules oracle
     if (!cards || cards.length === 0) return null;
-    const n = cards.length;
-    cards.sort((a, b) => a.rankIdx - b.rankIdx);
-
-    // 统计各点数出现频次
-    const counts = {};
-    cards.forEach(c => { counts[c.rankIdx] = (counts[c.rankIdx] || 0) + 1; });
-    const entries = Object.entries(counts).map(([r, count]) => ({ rank: parseInt(r), count }));
-    entries.sort((a, b) => b.count - a.count || b.rank - a.rank);
-
-    // 1. 王炸 / 火箭 (ROCKET)
-    if (n === 2 && counts[13] === 1 && counts[14] === 1) {
-        return { type: "ROCKET", rank: 99, cards, name: "王炸 (火箭)" };
-    }
-
-    // 2. 普通炸弹 (BOMB)
-    if (n === 4 && entries[0].count === 4) {
-        return { type: "BOMB", rank: entries[0].rank, cards, name: `炸弹 [${RANKS[entries[0].rank]}]` };
-    }
-
-    // 3. 单张 (SOLO)
-    if (n === 1) {
-        return { type: "SOLO", rank: cards[0].rankIdx, cards, name: `单张 [${cards[0].rankStr}]` };
-    }
-
-    // 4. 对子 (PAIR)
-    if (n === 2 && entries[0].count === 2) {
-        return { type: "PAIR", rank: entries[0].rank, cards, name: `对子 [${RANKS[entries[0].rank]}]` };
-    }
-
-    // 5. 三张不带 (TRIO)
-    if (n === 3 && entries[0].count === 3) {
-        return { type: "TRIO", rank: entries[0].rank, cards, name: `三张 [${RANKS[entries[0].rank]}]` };
-    }
-
-    // 6. 三带一单 (TRIO_SOLO)
-    if (n === 4 && entries[0].count === 3) {
-        return { type: "TRIO_SOLO", rank: entries[0].rank, cards, name: `三带一 [${RANKS[entries[0].rank]}+${RANKS[entries[1].rank]}]` };
-    }
-
-    // 7. 三带一对 (TRIO_PAIR)
-    if (n === 5 && entries[0].count === 3 && entries[1].count === 2) {
-        return { type: "TRIO_PAIR", rank: entries[0].rank, cards, name: `三带一对 [${RANKS[entries[0].rank]}+对${RANKS[entries[1].rank]}]` };
-    }
-
-    // 8. 单顺 / 顺子 (STRAIGHT, 5~12张连续单牌，不能包含2和王)
-    if (n >= 5 && n <= 12 && entries.length === n) {
-        const ranks = entries.map(e => e.rank).sort((a, b) => a - b);
-        if (ranks[ranks.length - 1] <= 11) { // 最大不能超过A (11)
-            let isConsec = true;
-            for (let i = 1; i < ranks.length; i++) {
-                if (ranks[i] !== ranks[i - 1] + 1) { isConsec = false; break; }
-            }
-            if (isConsec) {
-                return { type: "STRAIGHT", rank: ranks[ranks.length - 1], cards, len: n, name: `顺子 [${RANKS[ranks[0]]}~${RANKS[ranks[ranks.length - 1]]}]` };
-            }
-        }
-    }
-
-    // 9. 双顺 / 连对 (CONSEC_PAIRS, 3对以上连续对子)
-    if (n >= 6 && n % 2 === 0) {
-        const numPairs = n / 2;
-        const allPairs = entries.every(e => e.count === 2);
-        if (allPairs && entries.length === numPairs && numPairs >= 3) {
-            const ranks = entries.map(e => e.rank).sort((a, b) => a - b);
-            if (ranks[ranks.length - 1] <= 11) {
-                let isConsec = true;
-                for (let i = 1; i < ranks.length; i++) {
-                    if (ranks[i] !== ranks[i - 1] + 1) { isConsec = false; break; }
-                }
-                if (isConsec) {
-                    return { type: "CONSEC_PAIRS", rank: ranks[ranks.length - 1], cards, len: numPairs, name: `连对 [${RANKS[ranks[0]]}~${RANKS[ranks[ranks.length - 1]]}]` };
-                }
-            }
-        }
-    }
-
-    // 10. 飞机不带 (AIRPLANE, 2个以上连续三张)
-    if (n >= 6 && n % 3 === 0) {
-        const numTrios = n / 3;
-        const allTrios = entries.every(e => e.count === 3);
-        if (allTrios && entries.length === numTrios && numTrios >= 2) {
-            const ranks = entries.map(e => e.rank).sort((a, b) => a - b);
-            if (ranks[ranks.length - 1] <= 11) {
-                let isConsec = true;
-                for (let i = 1; i < ranks.length; i++) {
-                    if (ranks[i] !== ranks[i - 1] + 1) { isConsec = false; break; }
-                }
-                if (isConsec) {
-                    return { type: "AIRPLANE", rank: ranks[ranks.length - 1], cards, len: numTrios, name: `飞机 [${RANKS[ranks[0]]}~${RANKS[ranks[ranks.length - 1]]}]` };
-                }
-            }
-        }
-    }
-
-    // 11. 飞机带单翅膀 (AIRPLANE_SOLO)
-    const trios = entries.filter(e => e.count >= 3 && e.rank <= 11).sort((a, b) => a.rank - b.rank);
-    for (let k = 2; k <= 5; k++) {
-        if (n === k * 4 && trios.length >= k) {
-            for (let i = 0; i <= trios.length - k; i++) {
-                let isConsec = true;
-                for (let j = 1; j < k; j++) {
-                    if (trios[i + j].rank !== trios[i + j - 1].rank + 1) { isConsec = false; break; }
-                }
-                if (isConsec) {
-                    return { type: "AIRPLANE_SOLO", rank: trios[i + k - 1].rank, cards, len: k, name: `飞机带单翅膀 (${k}连飞)` };
-                }
-            }
-        }
-    }
-
-    // 12. 四带二 (FOUR_WITH_TWO)
-    if (entries[0].count === 4) {
-        if (n === 6) {
-            return { type: "FOUR_WITH_TWO", rank: entries[0].rank, cards, name: `四带二单 [${RANKS[entries[0].rank]}]` };
-        }
-        if (n === 8 && (entries.length === 3 && entries[1].count === 2 && entries[2].count === 2)) {
-            return { type: "FOUR_WITH_TWO_PAIR", rank: entries[0].rank, cards, name: `四带两对 [${RANKS[entries[0].rank]}]` };
-        }
-    }
-
-    return null;
+    if (!window.DouDiZhuWasm) return null;
+    const ranks = cards.map(c => c.rankIdx);
+    const t = DouDiZhuWasm.identifyTrick(ranks);
+    if (!t || t.typeId < 0) return null;
+    t.cards = cards;
+    const names = { SOLO: "单张", PAIR: "对子", BOMB: "炸弹", ROCKET: "王炸 (火箭)" };
+    t.name = names[t.type] || t.type;
+    return t;
 }
 
 // 压牌规则比对
 function canBeat(newTrick, prevTrick) {
-    if (!newTrick) return false;
-    if (!prevTrick) return true;
-
-    // 王炸无敌
-    if (newTrick.type === "ROCKET") return true;
-    if (prevTrick.type === "ROCKET") return false;
-
-    // 普通炸弹压非炸弹
-    if (newTrick.type === "BOMB") {
-        if (prevTrick.type === "BOMB") return newTrick.rank > prevTrick.rank;
-        return true;
-    }
-    if (prevTrick.type === "BOMB") return false;
-
-    // 牌型与张数必须一致
-    if (newTrick.type !== prevTrick.type) return false;
-    if (newTrick.cards.length !== prevTrick.cards.length) return false;
-
-    return newTrick.rank > prevTrick.rank;
+    // P0: WASM single-source - no JS rules oracle
+    if (!window.DouDiZhuWasm) return false;
+    return DouDiZhuWasm.canBeat(newTrick, prevTrick);
 }
 
 /**
- * 82细胞候选打分世系 AI 决策器 (平衡版 — 公平博弈)
- *
- * 策略核心:
- *   地主 (playerIdx === landlordIdx): 激进出牌，尽快清空手牌
- *   农民 (playerIdx !== landlordIdx): 
- *     - 若【农民队友】控制台面(上家是另一个农民) → 让牌协防，不无谓消耗
- *     - 若【地主】控制台面 → 必须尝试压制，压不住再过
- *   优先级: 小牌先出 (保留大牌), 炸弹留到紧急关键时刻使用
+ * AI / 提示: pick from WASM legal_actions only (no local rules oracle).
+ * Heuristic: prefer smallest normal play, else pass, else bomb/rocket.
  */
 function aiDecide(playerIdx) {
+    // P0: WASM legal_actions only - no JS rule-branch / dual oracle
     const hand = GameState.hands[playerIdx];
     if (!hand || hand.length === 0) return null;
-
-    const isLandlord = (playerIdx === GameState.landlordIdx);
-
-    // 上家是否是我方队友 (农民视角: 上家也是农民且不是我)
-    const lastPlayer = GameState.lastTrick ? GameState.lastTrick.player : -1;
-    const lastPlayerIsPeasantTeammate = (
-        !isLandlord &&
-        lastPlayer >= 0 &&
-        lastPlayer !== playerIdx &&
-        lastPlayer !== GameState.landlordIdx
-    );
-
-    const prevTrick = (GameState.lastTrick && GameState.lastTrick.player !== playerIdx)
-        ? GameState.lastTrick
-        : null;
-
+    if (!window.DouDiZhuWasm) return null;
     pulseCortexMeters();
-
-    // 局势与手牌剩余态势感知
-    const landlordLeft = GameState.hands[GameState.landlordIdx].length;
-    const myLeft = hand.length;
-    const urgent = (landlordLeft <= 4 || myLeft <= 4); // 终局冲刺/防守紧急态
-
-    // 统计当前手牌各点数频次
-    const counts = {};
-    hand.forEach(c => { counts[c.rankIdx] = (counts[c.rankIdx] || 0) + 1; });
-
-    // ─── 判断是否要农民协防让牌 ───────────────────────────────────────────
-    // 农民队友控制台面时，不要无谓压牌，让队友继续走
-    if (prevTrick && lastPlayerIsPeasantTeammate) {
-        addLog(`[AI-席位${playerIdx}] 判定农民队友控场，协防让牌 [ACT_PASS]`, "pass");
-        return null;
+    const cands = DouDiZhuWasm.legalActions(playerIdx);
+    if (!cands || cands.length === 0) return null;
+    const passes = cands.filter(c => c.type === 0);
+    const normals = cands.filter(c => c.type === 1 || c.type === 2);
+    const bombs = cands.filter(c => c.type === 3 || c.type === 4);
+    let pick = null;
+    if (normals.length) {
+        normals.sort((a, b) => a.rank - b.rank || a.type - b.type);
+        pick = normals[0];
+    } else if (passes.length) {
+        pick = passes[0];
+    } else if (bombs.length) {
+        bombs.sort((a, b) => a.rank - b.rank);
+        pick = bombs[0];
     }
-
-    // ─── 没有上家出牌 or 轮到我自由出牌 ─────────────────────────────────
-    if (!prevTrick) {
-        // 残局斩杀终局: <= 2 张直接出完
-        if (hand.length <= 2) {
-            if ((counts[13] || 0) >= 1 && (counts[14] || 0) >= 1) {
-                return hand.filter(c => c.rankIdx >= 13);
-            }
-            if (hand.length === 2 && hand[0].rankIdx === hand[1].rankIdx) {
-                return hand;
-            }
-            if (hand.length === 1) {
-                return hand;
-            }
-        }
-
-        // 先尝试出连续小单牌组成的顺子 (5张起，从小到大选最短，不拆4张炸弹)
-        for (let len = 5; len <= 8; len++) {
-            for (let start = 0; start <= 11 - len; start++) {
-                let ok = true;
-                for (let r = start; r < start + len; r++) {
-                    if (!counts[r] || counts[r] === 4) { ok = false; break; }
-                }
-                if (ok) {
-                    const straightCards = [];
-                    for (let r = start; r < start + len; r++) {
-                        straightCards.push(hand.find(c => c.rankIdx === r));
-                    }
-                    return straightCards;
-                }
-            }
-        }
-
-        // 连对 (从小选 3 对，不拆炸弹)
-        for (let start = 0; start <= 9; start++) {
-            let ok = true;
-            for (let r = start; r < start + 3; r++) {
-                if ((counts[r] || 0) < 2 || counts[r] === 4) { ok = false; break; }
-            }
-            if (ok) {
-                const pairsCards = [];
-                for (let r = start; r < start + 3; r++) {
-                    pairsCards.push(...hand.filter(c => c.rankIdx === r).slice(0, 2));
-                }
-                return pairsCards;
-            }
-        }
-
-        // 三带一 / 三带对 (从小的三张开始，不拆炸弹，带牌优先小单/小对且不带2和王)
-        for (let r = 0; r <= 12; r++) {
-            if (counts[r] === 3) {
-                const trio = hand.filter(c => c.rankIdx === r);
-                // 找最小的对子带 (不拆炸弹)
-                for (let pr = 0; pr <= 14; pr++) {
-                    if (pr !== r && counts[pr] >= 2 && counts[pr] < 4) {
-                        return [...trio, ...hand.filter(c => c.rankIdx === pr).slice(0, 2)];
-                    }
-                }
-                // 找最小的单牌带 (优先 < 12 的散牌，避免浪费 2 和王)
-                for (let sr = 0; sr < 12; sr++) {
-                    if (sr !== r && counts[sr] === 1) {
-                        return [...trio, hand.find(c => c.rankIdx === sr)];
-                    }
-                }
-                for (let sr = 12; sr <= 14; sr++) {
-                    if (sr !== r && counts[sr] === 1 && urgent) {
-                        return [...trio, hand.find(c => c.rankIdx === sr)];
-                    }
-                }
-                return trio;
-            }
-        }
-
-        // 最小的对子 (非炸弹)
-        for (let r = 0; r <= 14; r++) {
-            if ((counts[r] || 0) >= 2 && (counts[r] || 0) < 4) {
-                return hand.filter(c => c.rankIdx === r).slice(0, 2);
-            }
-        }
-
-        // 最小的单牌 (出最小单，保留大牌和炸弹)
-        const nonBombSingles = hand.filter(c => (counts[c.rankIdx] || 0) < 4 && c.rankIdx < 13);
-        if (nonBombSingles.length > 0) {
-            nonBombSingles.sort((a, b) => a.rankIdx - b.rankIdx);
-            return [nonBombSingles[0]];
-        }
-        return [hand[hand.length - 1]];
+    if (!pick || pick.type === 0) return null;
+    if (pick.type === 4) {
+        const bj = hand.find(c => c.rankIdx === 13);
+        const rj = hand.find(c => c.rankIdx === 14);
+        if (!bj || !rj) return null;
+        return [bj, rj];
     }
-
-    // ─── 有上家出牌: 尝试压制 ──────────────────────────────────────────────
-
-    // 单牌压制: 从最小能压的牌开始 (优先出非炸弹单牌，保留炸弹结构)
-    if (prevTrick.type === "SOLO") {
-        // 1. 优先找最小孤张单牌 (counts == 1)
-        for (let r = prevTrick.rank + 1; r <= 14; r++) {
-            if (counts[r] === 1) {
-                if ((r === 13 || r === 14) && (counts[13] || 0) >= 1 && (counts[14] || 0) >= 1 && !urgent) continue;
-                return [hand.find(c => c.rankIdx === r)];
-            }
-        }
-        // 2. 找非炸弹单牌 (counts < 4)，从小到大压制
-        for (let r = prevTrick.rank + 1; r <= 14; r++) {
-            if ((counts[r] || 0) >= 1 && (counts[r] || 0) < 4) {
-                if ((r === 13 || r === 14) && (counts[13] || 0) >= 1 && (counts[14] || 0) >= 1 && !urgent) continue;
-                return [hand.find(c => c.rankIdx === r)];
-            }
-        }
-    }
-
-    // 对子压制: 从最小能压的对子开始 (保留炸弹)
-    if (prevTrick.type === "PAIR") {
-        for (let r = prevTrick.rank + 1; r <= 12; r++) {
-            if ((counts[r] || 0) >= 2 && (counts[r] || 0) < 4) {
-                return hand.filter(c => c.rankIdx === r).slice(0, 2);
-            }
-        }
-    }
-
-    // 三张 / 三带一 / 三带对 压制
-    if (prevTrick.type === "TRIO" || prevTrick.type === "TRIO_SOLO" || prevTrick.type === "TRIO_PAIR") {
-        for (let r = prevTrick.rank + 1; r <= 12; r++) {
-            if ((counts[r] || 0) >= 3) {
-                const trio = hand.filter(c => c.rankIdx === r).slice(0, 3);
-                if (prevTrick.type === "TRIO") return trio;
-                if (prevTrick.type === "TRIO_SOLO") {
-                    // 找最小非炸单牌带，优先不带 2 和王
-                    const solos = hand.filter(c => c.rankIdx !== r && (counts[c.rankIdx] || 0) < 4);
-                    solos.sort((a, b) => a.rankIdx - b.rankIdx);
-                    const smallSolo = solos.find(c => c.rankIdx < 12) || solos[0];
-                    if (smallSolo) return [...trio, smallSolo];
-                    return trio;
-                }
-                if (prevTrick.type === "TRIO_PAIR") {
-                    for (let pr = 0; pr < 13; pr++) {
-                        if (pr !== r && counts[pr] >= 2 && counts[pr] < 4) {
-                            return [...trio, ...hand.filter(c => c.rankIdx === pr).slice(0, 2)];
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // 顺子压制 (不拆炸弹)
-    if (prevTrick.type === "STRAIGHT") {
-        const len = prevTrick.len || prevTrick.cards.length;
-        for (let end = prevTrick.rank + 1; end <= 11; end++) {
-            const start = end - len + 1;
-            if (start < 0) continue;
-            let ok = true;
-            for (let r = start; r <= end; r++) {
-                if (!counts[r] || counts[r] === 4) { ok = false; break; }
-            }
-            if (ok) {
-                const sc = [];
-                for (let r = start; r <= end; r++) sc.push(hand.find(c => c.rankIdx === r));
-                return sc;
-            }
-        }
-    }
-
-    // 连对压制 (不拆炸弹)
-    if (prevTrick.type === "CONSEC_PAIRS") {
-        const numPairs = prevTrick.len || Math.floor(prevTrick.cards.length / 2);
-        for (let end = prevTrick.rank + 1; end <= 11; end++) {
-            const start = end - numPairs + 1;
-            if (start < 0) continue;
-            let ok = true;
-            for (let r = start; r <= end; r++) {
-                if ((counts[r] || 0) < 2 || counts[r] === 4) { ok = false; break; }
-            }
-            if (ok) {
-                const pc = [];
-                for (let r = start; r <= end; r++) {
-                    pc.push(...hand.filter(c => c.rankIdx === r).slice(0, 2));
-                }
-                return pc;
-            }
-        }
-    }
-
-    // ─── 炸弹拦截: 合理触发 (台面有炸/压大王小王2/残局冲刺) ─────────────
-    // 杜绝开局对小单/小对 (rank < 12) 乱扔炸弹压制地主导致失衡
-    const isBombOrRocket = (prevTrick.type === "BOMB" || prevTrick.type === "ROCKET");
-    const isTopCard = (prevTrick.rank >= 12); // 2, 小王, 大王
-    const canInterceptLandlord = (!isLandlord && lastPlayer === GameState.landlordIdx && (isTopCard || urgent || isBombOrRocket));
-    const canInterceptPeasant = (isLandlord && (isTopCard || urgent || isBombOrRocket));
-
-    if (isBombOrRocket || canInterceptLandlord || canInterceptPeasant) {
-        // 普通炸弹 (从最小炸开始，不浪费大炸)
-        for (let r = 0; r <= 12; r++) {
-            if ((counts[r] || 0) === 4) {
-                if (prevTrick.type !== "BOMB" || r > prevTrick.rank) {
-                    addLog(`[AI-席位${playerIdx}] 炸弹解算关键节点，触发 [ACT_BOMB]!`, "bomb");
-                    return hand.filter(c => c.rankIdx === r);
-                }
-            }
-        }
-        // 王炸
-        if ((counts[13] || 0) >= 1 && (counts[14] || 0) >= 1 && prevTrick.type !== "ROCKET") {
-            addLog(`[AI-席位${playerIdx}] 王炸出手!`, "bomb");
-            return hand.filter(c => c.rankIdx >= 13);
-        }
-    }
-
-    // 要不起，过牌
-    return null;
+    const matched = hand.filter(c => c.rankIdx === pick.rank).slice(0, pick.count);
+    if (matched.length < pick.count) return null;
+    return matched;
 }
 
 let _dzTeleBusy = false;
 let _dzTeleLast = 0;
+function paintWasmTelemetryStub() {
+    // Map WASM telemetryTick into the 4 column meters when cortex is offline.
+    // Deterministic stub only — never invent win-rate / ladder claims.
+    if (!window.DouDiZhuWasm) return false;
+    try {
+        const telem = DouDiZhuWasm.telemetryTick();
+        if (!telem || telem.length < 4) return false;
+        for (let i = 0; i < 4; ++i) {
+            const v = Math.max(0, Math.min(100, (telem[i] || 0) * 100));
+            const vEl = document.getElementById("actVal" + i);
+            const bEl = document.getElementById("actBar" + i);
+            if (vEl) vEl.textContent = v.toFixed(0) + "%";
+            if (bEl) bEl.style.width = v + "%";
+        }
+        const srcEl = document.getElementById("dzTeleSrc");
+        if (srcEl) srcEl.textContent = "(WASM stub · 规则侧表计)";
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
 async function pulseCortexMeters() {
-    // 真实遥测: 后台冠军皮层 (C11 前向 + 冠军 bin 权重) 柱级平均膜电位。
-    // 后端离线时显示 "离线", 严禁回退到任何合成/随机数值。
+    // Prefer live cortex when present; else WASM stub meters. Never fabricate rates.
     const now = Date.now();
-    if (_dzTeleBusy || now - _dzTeleLast < 1000) return;
+    if (_dzTeleBusy || now - _dzTeleLast < 1000) {
+        paintWasmTelemetryStub();
+        return;
+    }
     _dzTeleBusy = true;
     _dzTeleLast = now;
     try {
@@ -1632,14 +1327,16 @@ async function pulseCortexMeters() {
         const d = await r.json();
         const srcEl = document.getElementById("dzTeleSrc");
         if (!d.real) {
-            for (let i = 0; i < 4; ++i) {
-                document.getElementById("actVal" + i).textContent = "离线";
-                document.getElementById("actBar" + i).style.width = "0%";
+            if (!paintWasmTelemetryStub()) {
+                for (let i = 0; i < 4; ++i) {
+                    document.getElementById("actVal" + i).textContent = "离线";
+                    document.getElementById("actBar" + i).style.width = "0%";
+                }
+                if (srcEl) { srcEl.textContent = "(后端离线)"; }
             }
-            if (srcEl) { srcEl.textContent = "(后端离线)"; }
             return;
         }
-        if (srcEl) { srcEl.textContent = "(C++20 候选打分世系 · 82细胞/425突触 · 57.0%)"; }
+        if (srcEl) { srcEl.textContent = "(C++ 候选打分世系 · 82细胞 · 实况)"; }
         for (let i = 0; i < 4; ++i) {
             const v = Math.max(0, Math.min(100, d.columns[i].act));
             document.getElementById("actVal" + i).textContent = v.toFixed(1) + "%";
@@ -1656,21 +1353,37 @@ async function pulseCortexMeters() {
         }
         if (la) { la.textContent = d.last_action; }
     } catch (e) {
-        for (let i = 0; i < 4; ++i) {
-            const vEl = document.getElementById("actVal" + i);
-            if (vEl) vEl.textContent = "离线";
-            const bEl = document.getElementById("actBar" + i);
-            if (bEl) bEl.style.width = "0%";
+        if (!paintWasmTelemetryStub()) {
+            for (let i = 0; i < 4; ++i) {
+                const vEl = document.getElementById("actVal" + i);
+                if (vEl) vEl.textContent = "离线";
+                const bEl = document.getElementById("actBar" + i);
+                if (bEl) bEl.style.width = "0%";
+            }
+            const srcEl = document.getElementById("dzTeleSrc");
+            if (srcEl) srcEl.textContent = "(后端离线)";
         }
-        const srcEl = document.getElementById("dzTeleSrc");
-        if (srcEl) srcEl.textContent = "(后端离线)";
     } finally {
         _dzTeleBusy = false;
     }
 }
 
 // 统一执行出牌
+
+// P0: push chosen play into WASM state machine (single-source apply)
+function syncWasmApply(playerIdx, cards) {
+    if (!window.DouDiZhuWasm) return;
+    if (!cards || cards.length === 0) {
+        DouDiZhuWasm.applyPlay(0, -1, 0);
+        return;
+    }
+    const t = identifyTrick(cards);
+    if (!t) return;
+    DouDiZhuWasm.applyPlay(t.typeId, t.rank, t.count != null ? t.count : cards.length);
+}
+
 function executePlay(playerIdx, cards) {
+    syncWasmApply(playerIdx, cards);
     const playerName = (playerIdx === 0) ? "玩家" : (playerIdx === 1 ? "左位AI" : "右位AI");
 
     if (!cards || cards.length === 0) {
@@ -1893,7 +1606,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const cards = Array.from(selectedUserCards);
         const trick = identifyTrick(cards);
         if (!trick) {
-            alert("不合法的牌型！标准规则支持：单牌、对子、三张、三带一/二、5张以上顺子、3对以上连对、飞机、炸弹与王炸。");
+            alert("这手牌型不被当前规则支持（单牌 / 对子 / 炸弹 / 王炸）。");
             return;
         }
         const prevTrick = (GameState.lastTrick && GameState.lastTrick.player !== 0) ? GameState.lastTrick : null;
@@ -1981,8 +1694,20 @@ window.addEventListener("DOMContentLoaded", () => {
         }
     };
 
-    // 启动初始发牌
-    initDeck();
+    // 启动: WASM rules ready then deal
+    (async () => {
+        try {
+            if (window.DouDiZhuWasm) {
+                const ver = await DouDiZhuWasm.init();
+                addLog(`规则引擎已上线（WASM abi v${ver}）· 页面仅渲染与遥测`, "play");
+            } else {
+                addLog("致命: WASM 胶水缺失，已拒绝回退到 JS 规则", "warning");
+            }
+        } catch (e) {
+            addLog("致命: WASM 初始化失败 — " + e, "warning");
+        }
+        initDeck();
+    })();
 });
 </script>
 </body>
