@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KunCellular // 斗地主生命体对战沙盒 · 82细胞候选打分世系 57.0%</title>
+    <title>KunCellular // 斗地主生命体对战沙盒 · 82细胞候选打分 · WASM 规则单源</title>
     <style>
         :root {
             --bg-base: #06090e;
@@ -490,9 +490,9 @@
     <div class="brand">
         <span>KunCellular</span>
         <span style="color:var(--text-dim)">//</span>
-        <span>斗地主生命体对战沙盒 (82细胞候选打分世系 · 天梯锁档 57.0%)</span>
+        <span>斗地主生命体对战沙盒 (82细胞候选打分 · WASM 规则单源)</span>
         <span class="brand-badge">82-CELL CANDIDATE SCORER</span>
-        <span class="brand-badge" style="background:rgba(16,185,129,0.15);border-color:#10b981;color:#34d399;">DEEPSEEK-GRPO</span>
+        <span class="brand-badge" style="background:rgba(56,189,248,0.12);border-color:#38bdf8;color:#7dd3fc;">P0 WASM RULES</span>
     </div>
     <div class="nav-links">
         <a href="cellular.html" class="nav-btn">3D 全息观测台</a>
@@ -676,7 +676,7 @@
         <!-- 面板 2: 后台冠军皮层真实前向遥测 (C++20 底座 + doudizhu_cand_scorer.bin 候选打分世系 82细胞/425突触) -->
         <div class="side-box">
             <div class="panel-header">
-                <span>后台冠军皮层遥测 <span style="font-size:10px;color:#10b981;">[GRPO 对齐]</span> <span id="dzTeleSrc" style="font-size:10px;color:#64748b;">(连接中…)</span></span>
+                <span>后台冠军皮层遥测 <span style="font-size:10px;color:#64748b;">[实况优先 · 离线 WASM stub]</span> <span id="dzTeleSrc" style="font-size:10px;color:#64748b;">(连接中…)</span></span>
             </div>
             <div class="cortex-telemetry">
                 <div class="column-meter">
@@ -728,8 +728,8 @@
                 <span>博弈策略因果流 (CAUSAL INFERENCE STREAM)</span>
             </div>
             <div class="causal-log" id="causalLog">
-                <div class="log-entry play">系统启动完成: 已挂载 doudizhu_cand_scorer.bin（82 细胞 / 425 突触 · 天梯 57.0% / McNemar 持平教师）。</div>
-                <div class="log-entry">标准斗地主全牌型引擎就绪: 支持顺子、连对、飞机、三带一/二、炸弹与王炸。</div>
+                <div class="log-entry play">系统就绪: 规则引擎 = WASM 单源（与 harness 对齐 · 单/对/炸弹/王炸）。</div>
+                <div class="log-entry">皮层遥测: 有后端时显示实况；离线时仅 WASM stub 表计，不回填合成胜率。</div>
             </div>
         </div>
     </div>
@@ -737,7 +737,7 @@
 
 <script>
 /**
- * 斗地主生命体对战引擎 (完整标准规则 + 全牌型识别 + 实时人机对战)
+ * 斗地主生命体对战页 (渲染 + 遥测；规则经 WASM，无 JS oracle)
  */
 const RANKS = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2", "小王", "大王"];
 const SUITS = ["♠", "♥", "♣", "♦"];
@@ -763,7 +763,7 @@ const GameState = {
     landlordIdx: 2, // 默认右位 AI
     currentTurn: 2,
     lastTrick: null,
-    wasmSeed: null, // P0 probe seed // { player: int, cards: Card[], type: str, rank: int, len: int }
+    wasmSeed: null, // P0 probe seed for DouDiZhuWasm.deal
     passCount: 0,
     deckRemaining: new Array(15).fill(4),
     stats: { games: 0, playerWins: 0 },
@@ -1230,7 +1230,7 @@ function addLog(text, type = "info") {
 }
 
 /**
- * 标准斗地主全牌型识别引擎 (Full Standard Chinese DouDiZhu Pattern Identifier)
+ * identifyTrick — thin WASM wrapper (SOLO/PAIR/BOMB/ROCKET only)
  */
 function identifyTrick(cards) {
     // P0: WASM single-source - no JS rules oracle
@@ -1253,14 +1253,8 @@ function canBeat(newTrick, prevTrick) {
 }
 
 /**
- * 82细胞候选打分世系 AI 决策器 (平衡版 — 公平博弈)
- *
- * 策略核心:
- *   地主 (playerIdx === landlordIdx): 激进出牌，尽快清空手牌
- *   农民 (playerIdx !== landlordIdx): 
- *     - 若【农民队友】控制台面(上家是另一个农民) → 让牌协防，不无谓消耗
- *     - 若【地主】控制台面 → 必须尝试压制，压不住再过
- *   优先级: 小牌先出 (保留大牌), 炸弹留到紧急关键时刻使用
+ * AI / 提示: pick from WASM legal_actions only (no local rules oracle).
+ * Heuristic: prefer smallest normal play, else pass, else bomb/rocket.
  */
 function aiDecide(playerIdx) {
     // P0: WASM legal_actions only - no JS rule-branch / dual oracle
@@ -1297,24 +1291,35 @@ function aiDecide(playerIdx) {
 
 let _dzTeleBusy = false;
 let _dzTeleLast = 0;
-async function pulseCortexMeters() {
-    if (window.DouDiZhuWasm) {
-        try {
-            const telem = DouDiZhuWasm.telemetryTick();
-            // TODO(yanliao): map telem[0..11] into HUD meters if RESHIP polish
-            if (telem && telem.length >= 12) {
-                for (let i = 0; i < 12; i++) {
-                    const el = document.getElementById("cellMeter" + i);
-                    if (el) el.style.opacity = String(0.3 + 0.7 * Math.min(1, telem[i] || 0));
-                }
-            }
-        } catch (_) {}
+function paintWasmTelemetryStub() {
+    // Map WASM telemetryTick into the 4 column meters when cortex is offline.
+    // Deterministic stub only — never invent win-rate / ladder claims.
+    if (!window.DouDiZhuWasm) return false;
+    try {
+        const telem = DouDiZhuWasm.telemetryTick();
+        if (!telem || telem.length < 4) return false;
+        for (let i = 0; i < 4; ++i) {
+            const v = Math.max(0, Math.min(100, (telem[i] || 0) * 100));
+            const vEl = document.getElementById("actVal" + i);
+            const bEl = document.getElementById("actBar" + i);
+            if (vEl) vEl.textContent = v.toFixed(0) + "%";
+            if (bEl) bEl.style.width = v + "%";
+        }
+        const srcEl = document.getElementById("dzTeleSrc");
+        if (srcEl) srcEl.textContent = "(WASM stub · 规则侧表计)";
+        return true;
+    } catch (_) {
+        return false;
     }
+}
 
-    // 真实遥测: 后台冠军皮层 (C11 前向 + 冠军 bin 权重) 柱级平均膜电位。
-    // 后端离线时显示 "离线", 严禁回退到任何合成/随机数值。
+async function pulseCortexMeters() {
+    // Prefer live cortex when present; else WASM stub meters. Never fabricate rates.
     const now = Date.now();
-    if (_dzTeleBusy || now - _dzTeleLast < 1000) return;
+    if (_dzTeleBusy || now - _dzTeleLast < 1000) {
+        paintWasmTelemetryStub();
+        return;
+    }
     _dzTeleBusy = true;
     _dzTeleLast = now;
     try {
@@ -1322,14 +1327,16 @@ async function pulseCortexMeters() {
         const d = await r.json();
         const srcEl = document.getElementById("dzTeleSrc");
         if (!d.real) {
-            for (let i = 0; i < 4; ++i) {
-                document.getElementById("actVal" + i).textContent = "离线";
-                document.getElementById("actBar" + i).style.width = "0%";
+            if (!paintWasmTelemetryStub()) {
+                for (let i = 0; i < 4; ++i) {
+                    document.getElementById("actVal" + i).textContent = "离线";
+                    document.getElementById("actBar" + i).style.width = "0%";
+                }
+                if (srcEl) { srcEl.textContent = "(后端离线)"; }
             }
-            if (srcEl) { srcEl.textContent = "(后端离线)"; }
             return;
         }
-        if (srcEl) { srcEl.textContent = "(C++20 候选打分世系 · 82细胞/425突触 · 57.0%)"; }
+        if (srcEl) { srcEl.textContent = "(C++ 候选打分世系 · 82细胞 · 实况)"; }
         for (let i = 0; i < 4; ++i) {
             const v = Math.max(0, Math.min(100, d.columns[i].act));
             document.getElementById("actVal" + i).textContent = v.toFixed(1) + "%";
@@ -1346,14 +1353,16 @@ async function pulseCortexMeters() {
         }
         if (la) { la.textContent = d.last_action; }
     } catch (e) {
-        for (let i = 0; i < 4; ++i) {
-            const vEl = document.getElementById("actVal" + i);
-            if (vEl) vEl.textContent = "离线";
-            const bEl = document.getElementById("actBar" + i);
-            if (bEl) bEl.style.width = "0%";
+        if (!paintWasmTelemetryStub()) {
+            for (let i = 0; i < 4; ++i) {
+                const vEl = document.getElementById("actVal" + i);
+                if (vEl) vEl.textContent = "离线";
+                const bEl = document.getElementById("actBar" + i);
+                if (bEl) bEl.style.width = "0%";
+            }
+            const srcEl = document.getElementById("dzTeleSrc");
+            if (srcEl) srcEl.textContent = "(后端离线)";
         }
-        const srcEl = document.getElementById("dzTeleSrc");
-        if (srcEl) srcEl.textContent = "(后端离线)";
     } finally {
         _dzTeleBusy = false;
     }
@@ -1597,7 +1606,7 @@ window.addEventListener("DOMContentLoaded", () => {
         const cards = Array.from(selectedUserCards);
         const trick = identifyTrick(cards);
         if (!trick) {
-            alert("不合法的牌型！P0 WASM 单源（与 harness 对齐）支持：单牌、对子、炸弹、王炸。");
+            alert("这手牌型不被当前规则支持（单牌 / 对子 / 炸弹 / 王炸）。");
             return;
         }
         const prevTrick = (GameState.lastTrick && GameState.lastTrick.player !== 0) ? GameState.lastTrick : null;
@@ -1690,12 +1699,12 @@ window.addEventListener("DOMContentLoaded", () => {
         try {
             if (window.DouDiZhuWasm) {
                 const ver = await DouDiZhuWasm.init();
-                addLog(`P0 WASM rules online (abi v${ver}) - JS identifyTrick/canBeat/AI oracle stripped`, "play");
+                addLog(`规则引擎已上线（WASM abi v${ver}）· 页面仅渲染与遥测`, "play");
             } else {
-                addLog("FATAL: DouDiZhuWasm glue missing - refuse JS rules fallback", "warning");
+                addLog("致命: WASM 胶水缺失，已拒绝回退到 JS 规则", "warning");
             }
         } catch (e) {
-            addLog("FATAL: WASM init failed: " + e, "warning");
+            addLog("致命: WASM 初始化失败 — " + e, "warning");
         }
         initDeck();
     })();

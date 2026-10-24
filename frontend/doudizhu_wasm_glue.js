@@ -1,7 +1,7 @@
 /**
  * DouDiZhu WASM glue — calls emscripten exports ONLY. No local legality oracle.
  * Loads frontend/wasm/doudizhu_rules.js (createDouDiZhuModule).
- * TODO(颜料盒): polish HUD strings if RESHIP needed after functional cutover.
+ * Design polish 2026-10-24: HUD/copy owned in doudizhu.html; this file stays thin WASM calls only.
  */
 (function (global) {
   "use strict";
