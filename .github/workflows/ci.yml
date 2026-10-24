@@ -59,3 +59,30 @@ jobs:
         pytest tests/ -v
         python3 tests/test_gate5_gate6_replay_shadow.py
 
+  # W1b Harden Prefer A — frozen champ multi-family Pack S + T4 (A1/A4–A7)
+  w1b-harden-repro:
+    # Evidence-only: HARDEN_FAIL (F1) must not block required green on main
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: A1 assert frozen champ md5
+      run: |
+        expected=ea8e68269b24ed578070738a99441d83
+        got=$(md5sum checkpoints/cartpole_balance_champion.bin | awk '{print $1}')
+        echo "champ md5=$got"
+        test "$got" = "$expected"
+
+    - name: Build harden bench
+      run: |
+        mkdir -p build runs
+        g++ -O3 -march=native -std=c++20 -I include -I . \
+          tools/bench_cartpole_vs_pd_harden.cpp \
+          -o build/bench_cartpole_vs_pd_harden -pthread -lm
+
+    - name: Run harden bench (fail on A1/A4–A7 miss)
+      run: |
+        ./build/bench_cartpole_vs_pd_harden \
+          --bin checkpoints/cartpole_balance_champion.bin \
+          --out runs/cartpole_vs_pd_harden.json
