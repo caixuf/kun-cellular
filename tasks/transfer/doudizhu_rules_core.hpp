@@ -2,6 +2,24 @@
 // DouDiZhu rules core — single source aligned with DouDiZhuCardGameTask CandPlay / trick semantics.
 // Trick surface (harness / task): NONE(pass), SOLO, PAIR, BOMB, ROCKET.
 // Used by: native I1–I3 tests, emscripten WASM exports, FE glue (no JS rules oracle).
+//
+// =============================================================================
+// CONTRACT v1 — eval harness frozen ops (Phase 1 Correctness lock)
+// =============================================================================
+// Breaking change to any op below requires Prefer bounce + rails amend — no silent reshape.
+// Tests: tests/test_doudizhu_invariants.cpp (I1–I3 + contract freeze). CI red on drift.
+//
+// | Op      | Symbol(s)                                              | Meaning / freeze                                      |
+// |---------|--------------------------------------------------------|-------------------------------------------------------|
+// | deal    | deal_counts(seed, hands, kitty); assign_landlord(...)  | Seed → 3×17 + kitty3; card-sum == 54 conserved        |
+// | play    | apply_play(hand, table, cand, cards_left*)             | Apply cand; reject illegal; update table / counts     |
+// | legal   | enumerate_candidates / enumerate_candidates_n          | Legal CandPlay set for seat hand + table trick        |
+// | score   | terminal_score(agent_won)                              | Episode chips: +200 win / −200 loss (eval harness)    |
+//
+// TrickType numeric values are part of CONTRACT v1 (WASM / FE bit-agree):
+//   NONE=0, SOLO=1, PAIR=2, BOMB=3, ROCKET=4, INVALID=-1
+// Subset SOLO–PAIR–BOMB–ROCKET vs fuller Chinese DDZ is NON-BLOCK (Prefer #1).
+// =============================================================================
 #include <cstdint>
 #include <cstring>
 #include <algorithm>
@@ -11,6 +29,11 @@
 
 namespace kun {
 namespace doudizhu_rules {
+
+// CONTRACT v1 semver marker — bump only with Prefer bounce.
+inline constexpr int kContractMajor = 1;
+inline constexpr int kContractMinor = 0;
+inline constexpr const char* kContractId = "doudizhu-rules-CONTRACT-v1";
 
 enum TrickType : int32_t {
     TRICK_NONE = 0,
@@ -90,6 +113,7 @@ inline bool can_beat(const Trick& neu, const Trick& prev) {
     return neu.rank > prev.rank;
 }
 
+// CONTRACT v1 · deal
 inline int deal_counts(uint32_t seed, int hands[3][15], int kitty[15]) {
     std::memset(hands, 0, sizeof(int) * 3 * 15);
     std::memset(kitty, 0, sizeof(int) * 15);
@@ -112,6 +136,7 @@ inline void assign_landlord(int hands[3][15], const int kitty[15], int landlord)
     for (int r = 0; r < 15; ++r) hands[landlord][r] += kitty[r];
 }
 
+// CONTRACT v1 · legal
 inline void enumerate_candidates(const int hand[15], const Trick& table, std::vector<CandPlay>& out) {
     out.clear();
     if (table.type == TRICK_NONE) {
@@ -152,6 +177,7 @@ inline int enumerate_candidates_n(const int hand[15], const Trick& table, CandPl
     return n;
 }
 
+// CONTRACT v1 · play
 inline bool apply_play(int hand[15], Trick& table, const CandPlay& c, int* cards_left) {
     std::vector<CandPlay> legal;
     enumerate_candidates(hand, table, legal);
@@ -171,6 +197,12 @@ inline bool apply_play(int hand[15], Trick& table, const CandPlay& c, int* cards
     if (cards_left) *cards_left -= c.count;
     table = Trick{static_cast<TrickType>(c.type), c.rank, c.count};
     return true;
+}
+
+// CONTRACT v1 · score — episode/terminal chips used by doudizhu_eval_harness.
+// Frozen: win = +200, loss = −200. Prefer bounce required to reshape.
+inline double terminal_score(bool agent_won) {
+    return agent_won ? 200.0 : -200.0;
 }
 
 }  // namespace doudizhu_rules

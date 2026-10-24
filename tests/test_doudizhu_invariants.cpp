@@ -10,6 +10,7 @@
 #include <random>
 #include <set>
 #include <tuple>
+#include <string>
 
 using namespace kun;
 using namespace kun::doudizhu_rules;
@@ -183,11 +184,38 @@ static void test_agree_deal_legal() {
     std::cout << "[PASS] agree deal/legal smoke\n";
 }
 
+
+// CONTRACT v1 freeze: enum ints + score + deal/play/legal symbols must not silently drift.
+static void test_contract_v1_frozen() {
+    assert(kContractMajor == 1);
+    assert(kContractMinor == 0);
+    assert(std::string(kContractId) == "doudizhu-rules-CONTRACT-v1");
+    assert(TRICK_NONE == 0);
+    assert(TRICK_SOLO == 1);
+    assert(TRICK_PAIR == 2);
+    assert(TRICK_BOMB == 3);
+    assert(TRICK_ROCKET == 4);
+    assert(TRICK_INVALID == -1);
+    assert(terminal_score(true) == 200.0);
+    assert(terminal_score(false) == -200.0);
+    // deal / legal / play smoke locked to CONTRACT table
+    int hands[3][15], kitty[15];
+    assert(deal_counts(20261024u, hands, kitty) == 54);
+    assign_landlord(hands, kitty, 0);
+    Trick table{TRICK_NONE, -1, 0};
+    std::vector<CandPlay> cands;
+    enumerate_candidates(hands[0], table, cands);
+    assert(!cands.empty());
+    assert(apply_play(hands[0], table, cands[0], nullptr));
+    std::cout << "[PASS] CONTRACT v1 frozen (deal/play/legal/score)\n";
+}
+
 int main() {
     test_I1_card_sum();
     test_I2_identify_gold();
     test_I3_canbeat_antisym();
     test_agree_deal_legal();
-    std::cout << "[PASS] test_doudizhu_invariants I1–I3 all green\n";
+    test_contract_v1_frozen();
+    std::cout << "[PASS] test_doudizhu_invariants I1–I3 + CONTRACT v1 all green\n";
     return 0;
 }
