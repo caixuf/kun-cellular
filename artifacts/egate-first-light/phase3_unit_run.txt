@@ -1,0 +1,11 @@
+==================================================================
+  Prefer-A Phase 3: MAP-Elites / novelty / protect / E-Gate
+==================================================================
+  ✓ A1 MAP-Elites grid insert/replace/capacity
+  ✓ A2 novelty stepping-stones + driver modes
+  ✓ A3 PopulationSpeciesNiche protect_window
+  ✓ A4 Coverage · L1 distance · avalanche · Lyapunov companion
+  ✓ A5 anti-artifact dual · 4×3 · OOD+McNemar
+  ✓ A6 E-Gate pipeline + exec≠learn ban + E3 path
+  ✓ A9 82-cell / deterministic Prefer-A held
+[PASS] test_population_phase3_map_elites all assertions passed!

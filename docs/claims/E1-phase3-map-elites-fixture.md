@@ -45,3 +45,17 @@ Forbidden: bare “emerged / life / AGI” without E-tag.
 
 Evaluation/demo size must not be marketed as the scale the agent **learned** at.  
 200-cell openness probe (NON-BLOCK) may **execute** at 200 only if labeled `exec_scale=200` with Prefer-A `learn_scale=82` when different.
+
+---
+
+## Supersede note (E-Gate first-light · 2026-10-25)
+
+**Status:** Fixture **superseded for tip_hash** by `docs/claims/E1-egate-first-light.md`.
+
+| Field | Old (stale) | Current |
+|---|---|---|
+| tip_hash | `2817e2f0851c466b5204dd384f5e6e14600095a0` (Phase2 `#11`) | **`bff1c509169c706eaa74d03640c9566100f54787`** (main `#13`, contains Phase3 `#12`) |
+| first-light claim | this dry-run fixture | `E1-egate-first-light` |
+| role of this file | retained as Phase3 dry-run historical fixture | do **not** use `2817e2f0` as current E-Gate tip |
+
+This file remains an **E1 dry-run** record of Phase3 landing. Current tip / Prefer-A first-light pack lives in `E1-egate-first-light.md` + `docs/handoff/2026-10-25-egate-first-light.md`.
