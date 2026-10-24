@@ -188,6 +188,9 @@ target_link_libraries(train_household_coverage_tripartite PRIVATE kun_cellular T
 add_executable(bench_doudizhu_moe "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_doudizhu_moe.cpp")
 target_link_libraries(bench_doudizhu_moe PRIVATE kun_cellular Threads::Threads m)
 
+add_executable(bench_doudizhu_phase4_vs_1ply "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_doudizhu_phase4_vs_1ply.cpp")
+target_link_libraries(bench_doudizhu_phase4_vs_1ply PRIVATE kun_cellular Threads::Threads m)
+
 add_executable(train_doudizhu_bc_distill "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_doudizhu_bc_distill.cpp")
 target_link_libraries(train_doudizhu_bc_distill PRIVATE kun_cellular Threads::Threads m)
 

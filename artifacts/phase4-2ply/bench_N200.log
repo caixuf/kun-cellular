@@ -1,0 +1,21 @@
+=== Phase4 Prefer-A bench: 1-ply vs 2-ply maximin ===
+N=200 seed_base=20261025 ckpt=checkpoints/doudizhu_cand_scorer.bin budget_ms=10
+scorer cells=82 score_head=80
+  progress 25/200  A_wins=19 B_wins=17 illegal_B=0 timeouts_B=0
+  progress 50/200  A_wins=33 B_wins=35 illegal_B=0 timeouts_B=0
+  progress 75/200  A_wins=50 B_wins=50 illegal_B=0 timeouts_B=0
+  progress 100/200  A_wins=61 B_wins=63 illegal_B=0 timeouts_B=0
+  progress 125/200  A_wins=78 B_wins=76 illegal_B=0 timeouts_B=0
+  progress 150/200  A_wins=94 B_wins=90 illegal_B=0 timeouts_B=0
+  progress 175/200  A_wins=111 B_wins=104 illegal_B=0 timeouts_B=0
+  progress 200/200  A_wins=125 B_wins=118 illegal_B=0 timeouts_B=0
+
+--- Results ---
+Policy A (1-ply): wins=125/200 (62.50%) illegal_games=0
+Policy B (2-ply): wins=118/200 (59.00%) illegal_games=0 illegal_decisions=0/3755 (0.0000%)
+McNemar B-vs-A: b=Bwin_Aloss=23 c=Awin_Bloss=30 both=95 neither=52  b=30, c=23, chi2=0.6792, p=4.0985e-01 (不显著)
+Wall-clock ms: A p50=0.005 p95=0.027 | B p50=0.029 p95=0.171
+Timeouts (B fallback decisions): 0 / 3755 (0.00%)
+DELIVER_OR_REASON: 2-ply behind 1-ply on this ladder — search not a win.
+Wrote artifacts/phase4-2ply/bench_result.json
+PASS illegal gate (A4)
