@@ -41,6 +41,7 @@ jobs:
       run: ctest --test-dir build --output-on-failure
 
     - name: Assert DouDiZhu I1-I3 required gate
+      if: success() || failure()
       run: |
         test -x build/test_doudizhu_invariants
         ./build/test_doudizhu_invariants

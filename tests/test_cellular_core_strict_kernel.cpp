@@ -2,10 +2,12 @@
 #include "kun/cellular/cellular_genome.hpp"
 
 #include <array>
+#include <bit>
 #include <cassert>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
+#include <cstdio>
 #include <limits>
 #include <span>
 
@@ -56,19 +58,62 @@ void assert_same_fixture(const Fixture& expected, const Fixture& actual) {
     assert(expected.activity_count == actual.activity_count);
 }
 
-void assert_same_fixture_as_legacy(const Fixture& expected, const kun::Cell& actual) {
-    assert(std::memcmp(&expected.state, &actual.state_val, sizeof(expected.state)) == 0);
-    assert(std::memcmp(&expected.aux, &actual.aux_state, sizeof(expected.aux)) == 0);
-    assert(std::memcmp(&expected.previous, &actual.prev_input,
-                       sizeof(expected.previous)) == 0);
-    assert(std::memcmp(&expected.output, &actual.output_val,
-                       sizeof(expected.output)) == 0);
-    assert(std::memcmp(expected.delay.data(), actual.delay_buffer,
-                       sizeof(expected.delay)) == 0);
-    assert(std::memcmp(&expected.latch, &actual.latch_state,
-                       sizeof(expected.latch)) == 0);
-    assert(expected.delay_index == actual.delay_idx);
-    assert(expected.activity_count == actual.activation_count);
+void assert_same_fixture_as_legacy(const Fixture& expected, const kun::Cell& actual,
+                                     uint8_t cell_type = 255, size_t step = 0) {
+    auto dump = [&](const char* field) {
+        std::fprintf(stderr,
+            "LEGACY_MISMATCH field=%s cell_type=%u step=%zu\n"
+            "  state e=%.17g (0x%016llx) a=%.17g (0x%016llx)\n"
+            "  aux   e=%.17g a=%.17g\n"
+            "  prev  e=%.17g a=%.17g\n"
+            "  out   e=%.17g a=%.17g\n"
+            "  latch e=%d a=%d delay_idx e=%u a=%u act e=%u a=%u\n",
+            field, static_cast<unsigned>(cell_type), step,
+            expected.state,
+            static_cast<unsigned long long>(std::bit_cast<std::uint64_t>(expected.state)),
+            actual.state_val,
+            static_cast<unsigned long long>(std::bit_cast<std::uint64_t>(actual.state_val)),
+            expected.aux, actual.aux_state,
+            expected.previous, actual.prev_input,
+            expected.output, actual.output_val,
+            expected.latch ? 1 : 0, actual.latch_state ? 1 : 0,
+            static_cast<unsigned>(expected.delay_index),
+            static_cast<unsigned>(actual.delay_idx),
+            expected.activity_count, actual.activation_count);
+        std::fflush(stderr);
+    };
+    if (std::memcmp(&expected.state, &actual.state_val, sizeof(expected.state)) != 0) {
+        dump("state");
+        assert(false);
+    }
+    if (std::memcmp(&expected.aux, &actual.aux_state, sizeof(expected.aux)) != 0) {
+        dump("aux");
+        assert(false);
+    }
+    if (std::memcmp(&expected.previous, &actual.prev_input, sizeof(expected.previous)) != 0) {
+        dump("previous");
+        assert(false);
+    }
+    if (std::memcmp(&expected.output, &actual.output_val, sizeof(expected.output)) != 0) {
+        dump("output");
+        assert(false);
+    }
+    if (std::memcmp(expected.delay.data(), actual.delay_buffer, sizeof(expected.delay)) != 0) {
+        dump("delay");
+        assert(false);
+    }
+    if (std::memcmp(&expected.latch, &actual.latch_state, sizeof(expected.latch)) != 0) {
+        dump("latch");
+        assert(false);
+    }
+    if (expected.delay_index != actual.delay_idx) {
+        dump("delay_index");
+        assert(false);
+    }
+    if (expected.activity_count != actual.activation_count) {
+        dump("activity_count");
+        assert(false);
+    }
 }
 
 SdscCellKernelStrictParameters continuous(double p1, double p2 = 0.0) {
@@ -669,7 +714,7 @@ void test_all_cell_types_have_strict_native_execution() {
                            in0, in1, input_dim, input_ptr, &cpp_state) ==
                        SDSC_CELL_KERNEL_OK);
                 assert_same_fixture(c_fixture, cpp_fixture);
-                assert_same_fixture_as_legacy(c_fixture, legacy);
+                assert_same_fixture_as_legacy(c_fixture, legacy, cell_type, step);
             }
         }
     }
