@@ -94,6 +94,34 @@ inline AntiArtifactVerdict evaluate_anti_artifact(const AntiArtifactEvidence& ev
     return v;
 }
 
+// Prefer-A openness scale-sweep: max/min learning-scale value span >=4x (A2).
+// Cheap optional helper — does NOT change evaluate_anti_artifact defaults, so
+// existing E1-E3 evidence packs stay green without a span field.
+inline constexpr double kAntiArtifactMinSpanRatio = 4.0;
+
+inline double learning_scale_span_ratio(const std::vector<LearningScalePoint>& scales) {
+    if (scales.empty()) return 0.0;
+    std::uint32_t lo = scales.front().value;
+    std::uint32_t hi = scales.front().value;
+    for (const auto& s : scales) {
+        if (s.value < lo) lo = s.value;
+        if (s.value > hi) hi = s.value;
+    }
+    if (lo == 0u) return 0.0;
+    return static_cast<double>(hi) / static_cast<double>(lo);
+}
+
+inline bool learning_scale_span_ok(const std::vector<LearningScalePoint>& scales,
+                                   double min_ratio = kAntiArtifactMinSpanRatio) {
+    std::vector<std::uint32_t> vals;
+    vals.reserve(scales.size());
+    for (const auto& s : scales) vals.push_back(s.value);
+    std::sort(vals.begin(), vals.end());
+    vals.erase(std::unique(vals.begin(), vals.end()), vals.end());
+    if (vals.size() < kAntiArtifactMinScales) return false;
+    return learning_scale_span_ratio(scales) + 1e-12 >= min_ratio;
+}
+
 // Helper: Prefer-A default 3 learning scales on cells axis (82 held as primary).
 inline std::array<LearningScalePoint, 3> default_prefer_a_learning_scales() {
     return {{
