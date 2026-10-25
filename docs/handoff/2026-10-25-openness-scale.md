@@ -2,8 +2,9 @@
 
 **Date:** 2026-10-25 Asia/Shanghai  
 **Base tip:** `741c214c` / `741c214c8b6026616bbc8e92696034047348f9e3` (Flagship STATUS / Prefer A+B rails)  
+**Branch tip:** `9a6a7c5d` / `9a6a7c5d42c4ef2cf541f9421fc28e763a2abfe5` (A1 protect on measure `862dfa96`) · PR #20  
 **Branch:** `feat/cellular-openness-scale`  
-**Owners:** **手术刀** (this pack — E-Gate multi-scale measure / span / handoff) · **焊枪** (A1 protect_window live deme wire — separate)  
+**Owners:** **手术刀** (E-Gate multi-scale measure / span / handoff) · **焊枪** (A1 protect_window live deme/ecology wire)  
 **Gate:** 找茬喵 · **Merge:** 扳手  
 **Pack id:** `openness-scale-sweep` — **NOT** a new E4 ABI; E1/E2/E3 **closed** (do not retag)
 
@@ -30,12 +31,12 @@ Success = Prefer-A **scale-sweep** evidence: ≥3 learning-scale points · max/m
 | Exec cells | **`kPreferAOrganismCells=82`** — **held** |
 | Learn ≠ exec lift | YES — 41/164 are measure campaigns; runtime ABI stays 82 |
 
-## Prefer checks A0 / A2–A6 (手术刀) · A1 = 焊枪
+## Prefer checks A0–A6 (co-land tip `9a6a7c5d`)
 
 | ID | Check | Verdict |
 |---|---|---|
 | A0 | Branch off `741c214c` | **PASS** (this branch tip ancestry) |
-| A1 | New-species protect_window live deme wire | **焊枪 landing** — do not steal; see `test_population_openness_protect_live.cpp` / deme·ecology·niche |
+| A1 | New-species protect_window live deme wire | **PASS** — tip `9a6a7c5d` · deme + ecology_grid NicheRegistry wire · purge_all_unprotected · test_population_openness_protect_live PASS |
 | A2 | Scale sweep ≥3 · span ≥4× | **PASS** — 41/82/164 · span=4.0 · `learning_scale_span_ok` |
 | A3 | Dual + OOD+paired seeds | **PASS** — evidence JSON |
 | A4 | Exec 82 / zero-alloc / det; learn ≠ exec lift | **PASS** — assert in measure + unit |
@@ -78,6 +79,13 @@ echo exit:$?
 **Learn scales (live):** 41 / 82 / 164 cells · primary learn=82 · **exec=82**  
 **Span helper:** `learning_scale_span_ratio` / `learning_scale_span_ok` in `anti_artifact.hpp`
 
+### A1 protect_window (焊枪)
+
+```bash
+cmake --build build --target test_population_openness_protect_live -j4
+./build/test_population_openness_protect_live
+```
+
 ## Evidence paths
 
 | Path | Role |
@@ -87,6 +95,8 @@ echo exit:$?
 | `tests/test_population_openness_scale_sweep.cpp` | unit: ≥3 · ≥4× · exec 82 |
 | `include/kun/cellular/population/anti_artifact.hpp` | `learning_scale_span_*` (E1–E3 compat) |
 | `docs/claims/openness-scale-sweep.md` | thin pack claim (non-E-tag) |
+| `tests/test_population_openness_protect_live.cpp` | A1 live deme/ecology protect (焊枪) |
+| `include/kun/cellular/population/deme.hpp` · `ecology_grid.hpp` | A1 NicheRegistry wire (焊枪) |
 
 ## E1 / E2 / E3 / this pack
 
@@ -99,8 +109,8 @@ echo exit:$?
 
 ## Stream A readiness
 
-**Measure slice ready for 找茬喵 once A1 lands** (or if A1 already present on branch tip).  
-Do **not** claim full Stream A DONE until 焊枪 protect_window live wire + this pack both tip.
+**A0–A6 green on tip `9a6a7c5d`** — measure (`862dfa96`) + A1 protect (`9a6a7c5d`) co-land.  
+**Hand 找茬喵** for Stream A gate. **Not** DONE until 找茬喵 PASS → 扳手 squash.
 
 ## Park / bans held
 
