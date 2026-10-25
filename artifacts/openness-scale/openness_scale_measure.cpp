@@ -5,7 +5,6 @@
 #include "kun/cellular/population/anti_artifact.hpp"
 #include "kun/cellular/population/avalanche_metric.hpp"
 #include "kun/cellular/population/compatibility_distance.hpp"
-#include "kun/cellular/population/e_gate.hpp"
 #include "kun/cellular/population/map_elites_grid.hpp"
 #include "kun/cellular/population/novelty_stepping_stone.hpp"
 #include "kun/cellular/population/phase3_metrics.hpp"
@@ -205,8 +204,10 @@ int main() {
 
     std::printf("{\n");
     std::printf("  \"pack_id\": \"%s\",\n", kPackId);
+    std::printf("  \"tip_hash\": \"687cadf5bca20106086a73ae6f9a4a14b41d8cb2\",\n");
     std::printf("  \"claim_language\": \"openness / coverage / novelty scale-sweep — NOT E4 ABI\",\n");
     std::printf("  \"e_tags_closed\": [\"E1\", \"E2\", \"E3\"],\n");
+    std::printf("  \"e_gate_echo\": \"none\",\n");
     std::printf("  \"learn_scales\": [41, 82, 164],\n");
     std::printf("  \"learn_scales_live\": [41, 82, 164],\n");
     std::printf("  \"learn_scale_primary\": 82,\n");
@@ -246,30 +247,6 @@ int main() {
     ev.paired_used = true;
     auto aa = evaluate_anti_artifact(ev);
 
-    EGatePreRegister pr;
-    pr.claim_id = kPackId;
-    pr.behavioral_descriptor = "coverage_frac x novelty_knn";
-    pr.metrics = {"coverage_frac", "novelty_knn", "avalanche_mean_size"};
-    pr.seeds = seeds;
-    pr.learn_scales = ev.scales;
-    pr.exec_scale = 82;
-    pr.learn_scale = 82;
-    pr.exec_equals_learn_claimed = true;  // primary path: exec==learn==82
-    pr.stop_rule =
-        "max_gens=0 openness scale-sweep; live 41/82/164; span>=4; exec=82 held; "
-        "E1/E2/E3 closed; A1=焊枪";
-    pr.tip_hash = "3d61327e97dc07476143d15719bd828e122c3a60";
-    pr.cmd =
-        "g++ -std=c++20 -O2 -Iinclude "
-        "artifacts/openness-scale/openness_scale_measure.cpp "
-        "-o artifacts/openness-scale/openness_scale_measure && "
-        "./artifacts/openness-scale/openness_scale_measure";
-    pr.mechanism_sketch =
-        "MapElitesGrid + NoveltySteppingStoneArchive + AvalancheMetric sized per "
-        "campaign; learning_scale_span_ok(41/82/164)=4x; kPreferAOrganismCells=82 "
-        "exec lock; protect_window live deme wire owned by 焊枪 (not this pack)";
-    auto eg = run_e_gate(pr, ev);
-
     bool live_41 = false, live_82 = false, live_164 = false;
     for (const auto& c : campaigns) {
         if (c.cells == 41) live_41 = true;
@@ -290,21 +267,18 @@ int main() {
         aa.seeds_ok ? "true" : "false", aa.scales_ok ? "true" : "false",
         aa.ood_paired_ok ? "true" : "false", span_ok ? "true" : "false", span,
         aa.reason.c_str());
-    std::printf(
-        "  \"e_gate\": {\"tag\": \"%s\", \"pass_e2\": %s, \"stage1_ok\": %s, "
-        "\"stage2_ok\": %s, \"stage3_ok\": %s, \"stage4_ok\": %s, \"reason\": \"%s\"},\n",
-        emergence_tag_name(eg.tag), eg.pass_e2 ? "true" : "false",
-        eg.stage1_ok ? "true" : "false", eg.stage2_ok ? "true" : "false",
-        eg.stage3_ok ? "true" : "false", eg.stage4_ok ? "true" : "false", eg.reason.c_str());
+    // Knife e_gate_tag_honesty_v1: do NOT stamp e_gate.tag as pack stage.
+    // Pack is openness-scale-sweep; E1/E2/E3 closed; not E4. Echo already
+    // printed as top-level e_gate_echo="none".
     std::printf("  \"prefer_checks\": {\n");
-    std::printf("    \"A0_branch\": \"feat/cellular-openness-first-light off 3d61327e\",\n");
+    std::printf("    \"A0_branch\": \"feat/cellular-openness-deepen-egate-tag off 687cadf5\",\n");
     std::printf("    \"A1_protect_window\": \"焊枪 landing\",\n");
     std::printf("    \"A2_scale_sweep\": %s,\n",
                 (live_41 && live_82 && live_164 && span_ok) ? "\"PASS\"" : "\"FAIL\"");
     std::printf("    \"A3_dual_ood_paired\": %s,\n", aa.pass ? "\"PASS\"" : "\"FAIL\"");
     std::printf("    \"A4_exec_82\": %s,\n",
                 (kPreferAOrganismCells == 82) ? "\"PASS\"" : "\"FAIL\"");
-    std::printf("    \"A5_handoff\": \"docs/handoff/2026-10-25-openness-first-light.md\",\n");
+    std::printf("    \"A5_handoff\": \"docs/handoff/2026-10-25-openness-deepen-egate-tag.md\",\n");
     std::printf("    \"A6_bans\": \"PASS — no DouZero/strength/win-rate/ADAS/4th ABI/zoo\"\n");
     std::printf("  },\n");
     std::printf("  \"honesty\": {\n");
