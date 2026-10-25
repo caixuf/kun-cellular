@@ -204,7 +204,7 @@ int main() {
 
     std::printf("{\n");
     std::printf("  \"pack_id\": \"%s\",\n", kPackId);
-    std::printf("  \"tip_hash\": \"687cadf5bca20106086a73ae6f9a4a14b41d8cb2\",\n");
+    std::printf("  \"tip_hash\": \"bbcee73fa2f3e057d6e54787ae88be8bc151c330\",\n");
     std::printf("  \"claim_language\": \"openness / coverage / novelty scale-sweep — NOT E4 ABI\",\n");
     std::printf("  \"e_tags_closed\": [\"E1\", \"E2\", \"E3\"],\n");
     std::printf("  \"e_gate_echo\": \"none\",\n");
@@ -254,6 +254,30 @@ int main() {
         if (c.cells == 164) live_164 = true;
     }
 
+    // Knife avalanche_164_cap_honesty_v1: assert scale-164 avalanche cap@128.
+    // Companion metric honesty ONLY — do NOT uncap / invent sites / raise kAvalancheMaxSites.
+    bool avalanche_164_found = false;
+    bool avalanche_164_capped = false;
+    std::size_t avalanche_164_sites = 0;
+    for (const auto& c : campaigns) {
+        if (c.cells == 164) {
+            avalanche_164_found = true;
+            avalanche_164_capped = c.avalanche_capped;
+            avalanche_164_sites = c.avalanche_sites;
+            break;
+        }
+    }
+    const bool avalanche_164_cap_ok =
+        avalanche_164_found && avalanche_164_capped &&
+        (avalanche_164_sites == kAvalancheMaxSites);
+    // Fold into anti_artifact.pass — fail (do not greenwash) if cap honesty missing/false.
+    if (!avalanche_164_cap_ok) {
+        aa.pass = false;
+        aa.reason =
+            "avalanche@164 cap@128 honesty missing/false "
+            "(require sites==kAvalancheMaxSites=128 and capped_at_128=true)";
+    }
+
     std::printf("  ],\n");
     std::printf("  \"live_adapters_executed\": {\"cells_41\": %s, \"cells_82\": %s, "
                 "\"cells_164\": %s},\n",
@@ -262,23 +286,26 @@ int main() {
     std::printf(
         "  \"anti_artifact\": {\"pass\": %s, \"dual_ok\": %s, \"seeds_ok\": %s, "
         "\"scales_ok\": %s, \"ood_paired_ok\": %s, \"span_ok\": %s, "
-        "\"span_ratio\": %.6f, \"reason\": \"%s\"},\n",
+        "\"span_ratio\": %.6f, \"avalanche_164_cap_ok\": %s, "
+        "\"avalanche_164_sites\": %zu, \"avalanche_164_capped_at_128\": %s, "
+        "\"reason\": \"%s\"},\n",
         aa.pass ? "true" : "false", aa.dual_ok ? "true" : "false",
         aa.seeds_ok ? "true" : "false", aa.scales_ok ? "true" : "false",
         aa.ood_paired_ok ? "true" : "false", span_ok ? "true" : "false", span,
-        aa.reason.c_str());
+        avalanche_164_cap_ok ? "true" : "false", avalanche_164_sites,
+        avalanche_164_capped ? "true" : "false", aa.reason.c_str());
     // Knife e_gate_tag_honesty_v1: do NOT stamp e_gate.tag as pack stage.
     // Pack is openness-scale-sweep; E1/E2/E3 closed; not E4. Echo already
     // printed as top-level e_gate_echo="none".
     std::printf("  \"prefer_checks\": {\n");
-    std::printf("    \"A0_branch\": \"feat/cellular-openness-deepen-egate-tag off 687cadf5\",\n");
+    std::printf("    \"A0_branch\": \"feat/cellular-openness-deepen2 off bbcee73f\",\n");
     std::printf("    \"A1_protect_window\": \"焊枪 landing\",\n");
     std::printf("    \"A2_scale_sweep\": %s,\n",
                 (live_41 && live_82 && live_164 && span_ok) ? "\"PASS\"" : "\"FAIL\"");
     std::printf("    \"A3_dual_ood_paired\": %s,\n", aa.pass ? "\"PASS\"" : "\"FAIL\"");
     std::printf("    \"A4_exec_82\": %s,\n",
                 (kPreferAOrganismCells == 82) ? "\"PASS\"" : "\"FAIL\"");
-    std::printf("    \"A5_handoff\": \"docs/handoff/2026-10-25-openness-deepen-egate-tag.md\",\n");
+    std::printf("    \"A5_handoff\": \"docs/handoff/2026-10-25-openness-deepen2-avalanche-cap.md\",\n");
     std::printf("    \"A6_bans\": \"PASS — no DouZero/strength/win-rate/ADAS/4th ABI/zoo\"\n");
     std::printf("  },\n");
     std::printf("  \"honesty\": {\n");
@@ -291,6 +318,6 @@ int main() {
     std::printf("}\n");
 
     const bool ok = aa.pass && span_ok && live_41 && live_82 && live_164 &&
-                    (kPreferAOrganismCells == 82);
+                    avalanche_164_cap_ok && (kPreferAOrganismCells == 82);
     return ok ? 0 : 1;
 }

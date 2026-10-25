@@ -5,6 +5,7 @@
 // test_population_openness_protect_live.cpp).
 // ============================================================================
 #include "kun/cellular/population/anti_artifact.hpp"
+#include "kun/cellular/population/avalanche_metric.hpp"
 #include "kun/cellular/population/compatibility_distance.hpp"
 
 #include <cassert>
@@ -18,6 +19,7 @@ using kun::population::default_prefer_a_learning_scales;
 using kun::population::evaluate_anti_artifact;
 using kun::population::kAntiArtifactMinScales;
 using kun::population::kAntiArtifactMinSpanRatio;
+using kun::population::kAvalancheMaxSites;
 using kun::population::kPreferAOrganismCells;
 using kun::population::learning_scale_span_ok;
 using kun::population::learning_scale_span_ratio;
@@ -85,6 +87,23 @@ void test_anti_artifact_still_green_without_span_field() {
     std::cout << "  ✓ evaluate_anti_artifact green + span_ok (compat held)\n";
 }
 
+void test_avalanche_164_cap_honesty_contract() {
+    // Knife avalanche_164_cap_honesty_v1 (cheap): measure MUST assert
+    // cells==164 → avalanche_sites==kAvalancheMaxSites(128) AND capped=true.
+    // This unit locks the constant + expected math; measure folds into
+    // anti_artifact.pass (fail if omitted/false — no greenwash).
+    assert(kAvalancheMaxSites == 128);
+    const std::size_t cells_164 = 164;
+    const std::size_t sites = std::min(cells_164, kAvalancheMaxSites);
+    const bool capped = (cells_164 > kAvalancheMaxSites);
+    assert(sites == 128);
+    assert(capped == true);
+    // Simulated anti_artifact fold: missing/false must fail pass path.
+    const bool avalanche_164_cap_ok = capped && (sites == kAvalancheMaxSites);
+    assert(avalanche_164_cap_ok);
+    std::cout << "  ✓ avalanche_164_cap_honesty: sites=128 capped=true (no uncap)\n";
+}
+
 }  // namespace
 
 int main() {
@@ -95,6 +114,7 @@ int main() {
     test_default_scales_span_ge_4();
     test_span_rejects_narrow();
     test_anti_artifact_still_green_without_span_field();
+    test_avalanche_164_cap_honesty_contract();
     std::cout << "[PASS] test_population_openness_scale_sweep\n";
     return 0;
 }
