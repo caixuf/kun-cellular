@@ -109,6 +109,8 @@ cmake --build build --target test_population_openness_protect_live -j4
 
 ## Stream A readiness
 
+**Next:** first-light measured — see `docs/handoff/2026-10-25-openness-first-light.md` @ tip `3d61327e`.
+
 **A0–A6 green on tip `9a6a7c5d`** — measure (`862dfa96`) + A1 protect (`9a6a7c5d`) co-land.  
 **Hand 找茬喵** for Stream A gate. **Not** DONE until 找茬喵 PASS → 扳手 squash.
 

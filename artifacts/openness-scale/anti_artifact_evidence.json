@@ -91,12 +91,12 @@
   "anti_artifact": {"pass": true, "dual_ok": true, "seeds_ok": true, "scales_ok": true, "ood_paired_ok": true, "span_ok": true, "span_ratio": 4.000000, "reason": "anti-artifact green"},
   "e_gate": {"tag": "E2", "pass_e2": true, "stage1_ok": true, "stage2_ok": true, "stage3_ok": true, "stage4_ok": true, "reason": "E-Gate green → E2"},
   "prefer_checks": {
-    "A0_branch": "feat/cellular-openness-scale off 741c214c",
+    "A0_branch": "feat/cellular-openness-first-light off 3d61327e",
     "A1_protect_window": "焊枪 landing",
     "A2_scale_sweep": "PASS",
     "A3_dual_ood_paired": "PASS",
     "A4_exec_82": "PASS",
-    "A5_handoff": "docs/handoff/2026-10-25-openness-scale.md",
+    "A5_handoff": "docs/handoff/2026-10-25-openness-first-light.md",
     "A6_bans": "PASS — no DouZero/strength/win-rate/ADAS/4th ABI/zoo"
   },
   "honesty": {
