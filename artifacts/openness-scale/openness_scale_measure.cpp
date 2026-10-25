@@ -204,7 +204,7 @@ int main() {
 
     std::printf("{\n");
     std::printf("  \"pack_id\": \"%s\",\n", kPackId);
-    std::printf("  \"tip_hash\": \"bbcee73fa2f3e057d6e54787ae88be8bc151c330\",\n");
+    std::printf("  \"tip_hash\": \"02ee87c54a2273835425912da058bacfcd241051\",\n");
     std::printf("  \"claim_language\": \"openness / coverage / novelty scale-sweep — NOT E4 ABI\",\n");
     std::printf("  \"e_tags_closed\": [\"E1\", \"E2\", \"E3\"],\n");
     std::printf("  \"e_gate_echo\": \"none\",\n");
@@ -298,14 +298,14 @@ int main() {
     // Pack is openness-scale-sweep; E1/E2/E3 closed; not E4. Echo already
     // printed as top-level e_gate_echo="none".
     std::printf("  \"prefer_checks\": {\n");
-    std::printf("    \"A0_branch\": \"feat/cellular-openness-deepen2 off bbcee73f\",\n");
+    std::printf("    \"A0_branch\": \"feat/cellular-openness-thesis-protect-egate off 02ee87c\",\n");
     std::printf("    \"A1_protect_window\": \"焊枪 landing\",\n");
     std::printf("    \"A2_scale_sweep\": %s,\n",
                 (live_41 && live_82 && live_164 && span_ok) ? "\"PASS\"" : "\"FAIL\"");
     std::printf("    \"A3_dual_ood_paired\": %s,\n", aa.pass ? "\"PASS\"" : "\"FAIL\"");
     std::printf("    \"A4_exec_82\": %s,\n",
                 (kPreferAOrganismCells == 82) ? "\"PASS\"" : "\"FAIL\"");
-    std::printf("    \"A5_handoff\": \"docs/handoff/2026-10-25-openness-deepen2-avalanche-cap.md\",\n");
+    std::printf("    \"A5_handoff\": \"docs/handoff/2026-10-25-openness-thesis-protect-egate.md\",\n");
     std::printf("    \"A6_bans\": \"PASS — no DouZero/strength/win-rate/ADAS/4th ABI/zoo\"\n");
     std::printf("  },\n");
     std::printf("  \"honesty\": {\n");
