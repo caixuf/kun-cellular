@@ -7,6 +7,8 @@
 **Canonical STATUS path:** `docs/handoff/2026-10-25-flagship-status3.md` (this file) — supersedes prior Flagship STATUS lineage for cite tables / dual-ceiling / PARK  
 **Owners:** 焊枪 (thin docs) · Gate: 找茬喵 · Merge: 扳手  
 
+> **Superseded for cite/PARK surface** by [`docs/handoff/2026-10-25-flagship-status4.md`](./2026-10-25-flagship-status4.md) (STATUS⁴ · cellular `#20`–`#26` + KAD `#109`–`#117`). This STATUS³ file remains as prior campaign history — no claim inflation.
+
 > Status pack — honest inventory only; **no** new capability · **no** win-rate inflation · **no** ADAS reopen · **no** invent-scenario · **no** uncap · **no** invent 328 · **no** greenwash · **no** control retune.
 
 ---
