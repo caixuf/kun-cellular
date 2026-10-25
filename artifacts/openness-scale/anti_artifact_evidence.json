@@ -1,6 +1,6 @@
 {
   "pack_id": "openness-scale-sweep",
-  "tip_hash": "687cadf5bca20106086a73ae6f9a4a14b41d8cb2",
+  "tip_hash": "bbcee73fa2f3e057d6e54787ae88be8bc151c330",
   "claim_language": "openness / coverage / novelty scale-sweep — NOT E4 ABI",
   "e_tags_closed": ["E1", "E2", "E3"],
   "e_gate_echo": "none",
@@ -90,14 +90,14 @@
     }
   ],
   "live_adapters_executed": {"cells_41": true, "cells_82": true, "cells_164": true},
-  "anti_artifact": {"pass": true, "dual_ok": true, "seeds_ok": true, "scales_ok": true, "ood_paired_ok": true, "span_ok": true, "span_ratio": 4.000000, "reason": "anti-artifact green"},
+  "anti_artifact": {"pass": true, "dual_ok": true, "seeds_ok": true, "scales_ok": true, "ood_paired_ok": true, "span_ok": true, "span_ratio": 4.000000, "avalanche_164_cap_ok": true, "avalanche_164_sites": 128, "avalanche_164_capped_at_128": true, "reason": "anti-artifact green"},
   "prefer_checks": {
-    "A0_branch": "feat/cellular-openness-deepen-egate-tag off 687cadf5",
+    "A0_branch": "feat/cellular-openness-deepen2 off bbcee73f",
     "A1_protect_window": "焊枪 landing",
     "A2_scale_sweep": "PASS",
     "A3_dual_ood_paired": "PASS",
     "A4_exec_82": "PASS",
-    "A5_handoff": "docs/handoff/2026-10-25-openness-deepen-egate-tag.md",
+    "A5_handoff": "docs/handoff/2026-10-25-openness-deepen2-avalanche-cap.md",
     "A6_bans": "PASS — no DouZero/strength/win-rate/ADAS/4th ABI/zoo"
   },
   "honesty": {
