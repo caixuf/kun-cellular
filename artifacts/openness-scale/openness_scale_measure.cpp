@@ -258,7 +258,7 @@ int main() {
     pr.stop_rule =
         "max_gens=0 openness scale-sweep; live 41/82/164; span>=4; exec=82 held; "
         "E1/E2/E3 closed; A1=焊枪";
-    pr.tip_hash = "741c214c8b6026616bbc8e92696034047348f9e3";
+    pr.tip_hash = "3d61327e97dc07476143d15719bd828e122c3a60";
     pr.cmd =
         "g++ -std=c++20 -O2 -Iinclude "
         "artifacts/openness-scale/openness_scale_measure.cpp "
@@ -297,14 +297,14 @@ int main() {
         eg.stage1_ok ? "true" : "false", eg.stage2_ok ? "true" : "false",
         eg.stage3_ok ? "true" : "false", eg.stage4_ok ? "true" : "false", eg.reason.c_str());
     std::printf("  \"prefer_checks\": {\n");
-    std::printf("    \"A0_branch\": \"feat/cellular-openness-scale off 741c214c\",\n");
+    std::printf("    \"A0_branch\": \"feat/cellular-openness-first-light off 3d61327e\",\n");
     std::printf("    \"A1_protect_window\": \"焊枪 landing\",\n");
     std::printf("    \"A2_scale_sweep\": %s,\n",
                 (live_41 && live_82 && live_164 && span_ok) ? "\"PASS\"" : "\"FAIL\"");
     std::printf("    \"A3_dual_ood_paired\": %s,\n", aa.pass ? "\"PASS\"" : "\"FAIL\"");
     std::printf("    \"A4_exec_82\": %s,\n",
                 (kPreferAOrganismCells == 82) ? "\"PASS\"" : "\"FAIL\"");
-    std::printf("    \"A5_handoff\": \"docs/handoff/2026-10-25-openness-scale.md\",\n");
+    std::printf("    \"A5_handoff\": \"docs/handoff/2026-10-25-openness-first-light.md\",\n");
     std::printf("    \"A6_bans\": \"PASS — no DouZero/strength/win-rate/ADAS/4th ABI/zoo\"\n");
     std::printf("  },\n");
     std::printf("  \"honesty\": {\n");
