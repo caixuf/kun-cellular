@@ -1,3 +1,5 @@
+> **STATUS³ canonical:** `docs/handoff/2026-10-25-flagship-status3.md` (Flagship STATUS³ · tip `82999b87`/#24 + KAD `b0103bf5`/#116) — this file remains prior-campaign lineage only; do not invent parallel claim surface.
+
 # Handoff — Flagship consolidation STATUS (Prefer A · Prefer A+B incremental)
 
 **Date:** 2026-10-25 Asia/Shanghai  
