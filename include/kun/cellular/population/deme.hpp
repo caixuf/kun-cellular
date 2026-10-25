@@ -23,6 +23,7 @@
 
 #include "kun/cellular/population/individual_traits.hpp"
 #include "kun/cellular/population/population_eval.hpp"
+#include "kun/cellular/population/population_species_niche.hpp"
 
 namespace kun {
 namespace population {
@@ -56,6 +57,54 @@ public:
     const std::vector<Individual>& individuals() const { return individuals_; }
     const std::vector<double>& fitness() const { return fitness_; }
     std::mt19937& rng() { return rng_; }
+
+    // Prefer-A SpeciesNiche protect_window live wire (Phase3 #12 -> deme path).
+    PopulationNicheRegistry& niche_registry() { return niche_registry_; }
+    const PopulationNicheRegistry& niche_registry() const { return niche_registry_; }
+    void enable_niche_protect_live(bool on = true) { niche_protect_live_ = on; }
+    bool niche_protect_live() const { return niche_protect_live_; }
+
+    // Refresh member fitness from deme slots (individual_id == slot index).
+    void refresh_niche_member_fitness() {
+        for (auto& n : niche_registry_.niches()) {
+            for (auto& m : n.members) {
+                const size_t slot = static_cast<size_t>(m.individual_id);
+                if (slot < fitness_.size()) m.fitness = fitness_[slot];
+            }
+            n.calculate_shared_fitness();
+        }
+    }
+
+    // After fitness known: age niches, purge unprotected, apply deme consequence.
+    // Purged slots <- elite clone + pending-eval sentinel (pop size conserved).
+    // Returns number of deme slots rewritten.
+    std::size_t niche_protect_step(double fitness_floor, size_t elite_keep = 3) {
+        if (!niche_protect_live_ || niche_registry_.niches().empty()) return 0;
+        if (individuals_.empty() || fitness_.size() != individuals_.size()) return 0;
+        refresh_niche_member_fitness();
+        niche_registry_.note_generation_all();
+        niche_purge_scratch_.clear();
+        niche_registry_.purge_unprotected_all(fitness_floor, &niche_purge_scratch_);
+        if (niche_purge_scratch_.empty()) return 0;
+        const size_t elite_n = std::min(elite_keep, individuals_.size());
+        ensure_topk(std::max(elite_n, size_t{1}));
+        const size_t donor = ranking_.empty() ? 0 : ranking_[0];
+        std::size_t applied = 0;
+        for (std::uint32_t id : niche_purge_scratch_) {
+            const size_t slot = static_cast<size_t>(id);
+            if (slot >= individuals_.size() || slot == donor) continue;
+            bool is_elite = false;
+            for (size_t e = 0; e < elite_n && e < ranking_.size(); ++e) {
+                if (ranking_[e] == slot) { is_elite = true; break; }
+            }
+            if (is_elite) continue;
+            individuals_[slot] = individuals_[donor];
+            fitness_[slot] = -1e18;  // pending-eval
+            ++applied;
+        }
+        if (applied) ranking_valid_ = false;
+        return applied;
+    }
 
     // 适应度降序排名 (仅前 keep_n 有序; 全范围仍是索引的一个排列)
     const std::vector<size_t>& ranking() const { return ranking_; }
@@ -225,6 +274,10 @@ private:
     // 双缓冲 (容量复用)
     std::vector<Individual> offspring_;
     std::vector<double> fitness_next_;
+    // Prefer-A niche protect live wire (optional; off until enable_niche_protect_live)
+    PopulationNicheRegistry niche_registry_;
+    bool niche_protect_live_{false};
+    std::vector<std::uint32_t> niche_purge_scratch_;
 };
 
 }  // namespace population
