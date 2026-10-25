@@ -1,0 +1,107 @@
+{
+  "pack_id": "openness-scale-sweep",
+  "claim_language": "openness / coverage / novelty scale-sweep — NOT E4 ABI",
+  "e_tags_closed": ["E1", "E2", "E3"],
+  "learn_scales": [41, 82, 164],
+  "learn_scales_live": [41, 82, 164],
+  "learn_scale_primary": 82,
+  "exec_cells": 82,
+  "span_ratio": 4.000000,
+  "span_ratio_min": 4.0,
+  "span_ok": true,
+  "learn_neq_exec_noted": true,
+  "note_scales": "LIVE measure campaigns at 41/82/164. Prefer-A exec kPreferAOrganismCells=82 held — learn span != exec lift. Adapters may measure at 41/164; runtime ABI stays 82. OOD seed_shift_+1000 per scale.",
+  "dual_metrics": ["coverage_frac", "novelty_knn"],
+  "companion_metrics": ["avalanche_mean_size", "lyapunov_max_loop_gain"],
+  "seeds": [11, 22, 33, 44],
+  "ood_label": "seed_shift_+1000",
+  "a1_protect_window": "焊枪 landing — measure slice does not wire deme path",
+  "per_scale": [
+    {
+      "cells": 41,
+      "learn_scale_campaign": 41,
+      "exec_cells_prefer_a": 82,
+      "learn_equals_exec_lift": false,
+      "campaign_is_measure_only": true,
+      "exec_equals_primary_learn": false,
+      "live_organism_cells": 41,
+      "synapse_count": 82,
+      "avalanche_sites": 41,
+      "avalanche_sites_capped_at_128": false,
+      "per_seed": [
+        {"seed": 11, "cells": 41, "coverage_frac": 1.000000, "novelty_knn": 1.000000, "avalanche_mean_size": 41977.058824, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.670667, "ood_seed": 1011, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+        {"seed": 22, "cells": 41, "coverage_frac": 1.000000, "novelty_knn": 0.352941, "avalanche_mean_size": 41983.058824, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.630150, "ood_seed": 1022, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+        {"seed": 33, "cells": 41, "coverage_frac": 1.000000, "novelty_knn": 0.470588, "avalanche_mean_size": 41981.176471, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.689510, "ood_seed": 1033, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+        {"seed": 44, "cells": 41, "coverage_frac": 1.000000, "novelty_knn": 0.235294, "avalanche_mean_size": 41981.705882, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.447571, "ood_seed": 1044, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1}
+      ],
+      "map_elites_coverage_ratio": 0.062500,
+      "map_elites_occupied": 4,
+      "niche_count": 4,
+      "mcnemar": {"n": 4, "b": 0, "c": 0, "chi2": 0.000000, "p": 1.000000e+00},
+      "paired_coverage": {"n": 4, "mean_diff": 0.000000, "p": 1.000000e+00}
+    },
+    {
+      "cells": 82,
+      "learn_scale_campaign": 82,
+      "exec_cells_prefer_a": 82,
+      "learn_equals_exec_lift": false,
+      "campaign_is_measure_only": true,
+      "exec_equals_primary_learn": true,
+      "live_organism_cells": 82,
+      "synapse_count": 164,
+      "avalanche_sites": 82,
+      "avalanche_sites_capped_at_128": false,
+      "per_seed": [
+        {"seed": 11, "cells": 82, "coverage_frac": 1.000000, "novelty_knn": 1.000000, "avalanche_mean_size": 83951.764706, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.176299, "ood_seed": 1011, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+        {"seed": 22, "cells": 82, "coverage_frac": 1.000000, "novelty_knn": 0.352941, "avalanche_mean_size": 83964.470588, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.337163, "ood_seed": 1022, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+        {"seed": 33, "cells": 82, "coverage_frac": 1.000000, "novelty_knn": 0.470588, "avalanche_mean_size": 83964.882353, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.049667, "ood_seed": 1033, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+        {"seed": 44, "cells": 82, "coverage_frac": 1.000000, "novelty_knn": 0.235294, "avalanche_mean_size": 82804.294118, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.149531, "ood_seed": 1044, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1}
+      ],
+      "map_elites_coverage_ratio": 0.062500,
+      "map_elites_occupied": 4,
+      "niche_count": 4,
+      "mcnemar": {"n": 4, "b": 0, "c": 0, "chi2": 0.000000, "p": 1.000000e+00},
+      "paired_coverage": {"n": 4, "mean_diff": 0.000000, "p": 1.000000e+00}
+    },
+    {
+      "cells": 164,
+      "learn_scale_campaign": 164,
+      "exec_cells_prefer_a": 82,
+      "learn_equals_exec_lift": false,
+      "campaign_is_measure_only": true,
+      "exec_equals_primary_learn": false,
+      "live_organism_cells": 164,
+      "synapse_count": 328,
+      "avalanche_sites": 128,
+      "avalanche_sites_capped_at_128": true,
+      "per_seed": [
+        {"seed": 11, "cells": 164, "coverage_frac": 1.000000, "novelty_knn": 1.000000, "avalanche_mean_size": 131059.705882, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.111689, "ood_seed": 1011, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+        {"seed": 22, "cells": 164, "coverage_frac": 1.000000, "novelty_knn": 0.352941, "avalanche_mean_size": 131067.411765, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.470643, "ood_seed": 1022, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+        {"seed": 33, "cells": 164, "coverage_frac": 1.000000, "novelty_knn": 0.470588, "avalanche_mean_size": 131068.764706, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.259492, "ood_seed": 1033, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1},
+        {"seed": 44, "cells": 164, "coverage_frac": 1.000000, "novelty_knn": 0.235294, "avalanche_mean_size": 131032.941176, "avalanche_branching": 2.000000, "lyapunov_max_loop_gain": 0.340336, "ood_seed": 1044, "ood_coverage_frac": 1.000000, "pass_pri": 1, "pass_ood": 1}
+      ],
+      "map_elites_coverage_ratio": 0.062500,
+      "map_elites_occupied": 4,
+      "niche_count": 4,
+      "mcnemar": {"n": 4, "b": 0, "c": 0, "chi2": 0.000000, "p": 1.000000e+00},
+      "paired_coverage": {"n": 4, "mean_diff": 0.000000, "p": 1.000000e+00}
+    }
+  ],
+  "live_adapters_executed": {"cells_41": true, "cells_82": true, "cells_164": true},
+  "anti_artifact": {"pass": true, "dual_ok": true, "seeds_ok": true, "scales_ok": true, "ood_paired_ok": true, "span_ok": true, "span_ratio": 4.000000, "reason": "anti-artifact green"},
+  "e_gate": {"tag": "E2", "pass_e2": true, "stage1_ok": true, "stage2_ok": true, "stage3_ok": true, "stage4_ok": true, "reason": "E-Gate green → E2"},
+  "prefer_checks": {
+    "A0_branch": "feat/cellular-openness-scale off 741c214c",
+    "A1_protect_window": "焊枪 landing",
+    "A2_scale_sweep": "PASS",
+    "A3_dual_ood_paired": "PASS",
+    "A4_exec_82": "PASS",
+    "A5_handoff": "docs/handoff/2026-10-25-openness-scale.md",
+    "A6_bans": "PASS — no DouZero/strength/win-rate/ADAS/4th ABI/zoo"
+  },
+  "honesty": {
+    "not_e4": true,
+    "e1_e2_e3_closed": true,
+    "forbidden": ["DouZero", "win-rate", "strength", "bare emerged", "Phase4 reopen", "ADAS reopen", "4th ABI", "exec cell lift", "silent P1", "zoo/mutate"]
+  }
+}

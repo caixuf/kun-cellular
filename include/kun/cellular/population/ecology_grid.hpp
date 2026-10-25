@@ -48,6 +48,21 @@ public:
 
     uint64_t total_migrations() const { return total_migrations_; }
 
+    // Prefer-A SpeciesNiche protect_window live path (wired through deme).
+    // fitness_floor <= -1e17 disables. When enabled, each step_generation after
+    // fitness is known runs deme.niche_protect_step (age + purge + deme consequence).
+    void enable_niche_protect(double fitness_floor, size_t elite_keep = 3) {
+        niche_fitness_floor_ = fitness_floor;
+        niche_elite_keep_ = elite_keep;
+        for (auto& d : demes_) d.enable_niche_protect_live(true);
+    }
+    void disable_niche_protect() {
+        niche_fitness_floor_ = -1e18;
+        for (auto& d : demes_) d.enable_niche_protect_live(false);
+    }
+    bool niche_protect_enabled() const { return niche_fitness_floor_ > -1e17; }
+
+
     template <typename Factory>
     void seed_all(Factory&& factory) {
         for (auto& d : demes_) d.seed_population(demes_[0].size() ? d.size() : 0, factory);
@@ -61,6 +76,9 @@ public:
     template <typename Eval>
     void step_generation(Eval&& eval, const EvolutionParams& params) {
         evaluate_pending(eval);
+        if (niche_protect_enabled()) {
+            for (auto& d : demes_) d.niche_protect_step(niche_fitness_floor_, niche_elite_keep_);
+        }
         for (auto& d : demes_) d.evolve_generation(params);
         migrate(params);
         evaluate_pending(eval);
@@ -138,6 +156,8 @@ private:
     std::vector<Individual*> flat_ptr_;
     std::vector<double> flat_fitness_;
     uint64_t batch_seq_{0};
+    double niche_fitness_floor_{-1e18};  // <= -1e17 => niche protect off
+    size_t niche_elite_keep_{3};
 };
 
 }  // namespace population

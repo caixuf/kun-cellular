@@ -102,6 +102,42 @@ public:
     float speciation_threshold() const { return speciation_threshold_; }
     std::uint32_t default_protect_window() const { return default_protect_window_; }
 
+    // Clear members only - niches (and age_generations / protect_window) persist.
+    void clear_membership() {
+        for (auto& n : niches_) n.members.clear();
+    }
+
+    // Age every niche by one generation using current member best fitness.
+    void note_generation_all() {
+        for (auto& n : niches_) {
+            double best = n.max_fitness;
+            for (const auto& m : n.members) {
+                if (m.fitness > best) best = m.fitness;
+            }
+            n.note_generation(best);
+        }
+    }
+
+    // Purge below-floor members across niches; append removed ids when out_ids != nullptr.
+    std::size_t purge_unprotected_all(double fitness_floor,
+                                      std::vector<std::uint32_t>* out_ids = nullptr) {
+        std::size_t total = 0;
+        for (auto& n : niches_) {
+            if (n.in_protect_window()) {
+                total += n.purge_unprotected(fitness_floor);  // marks protected, removes 0
+                continue;
+            }
+            if (out_ids) {
+                for (const auto& m : n.members) {
+                    if (m.protected_from_purge) continue;
+                    if (m.fitness < fitness_floor) out_ids->push_back(m.individual_id);
+                }
+            }
+            total += n.purge_unprotected(fitness_floor);
+        }
+        return total;
+    }
+
     // Place individual into first niche whose representative distance < threshold,
     // else spawn. Distance is caller-supplied (Prefer-A adapters via compatibility_distance).
     void place_or_speciate(std::uint32_t individual_id, double fitness,
