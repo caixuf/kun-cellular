@@ -38,6 +38,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <memory>
 #include <numeric>
 #include <random>
 #include <string>
@@ -47,11 +48,8 @@ using namespace kun;
 
 namespace {
 
-constexpr size_t kInDim = 64;
-constexpr size_t kFeat = 16;
 constexpr size_t kRank = 8;
 constexpr size_t kAct = 2;
-constexpr size_t kAdapterParams = kFeat * kRank + kRank * kAct + kRank + kAct;
 
 struct Options {
     std::string trunk = "checkpoints/sdsc_mega_1million.bin";
@@ -62,6 +60,7 @@ struct Options {
     int episodes_eval = 100;
     int seeds = 3;
     bool quick = false;
+    bool cpu = false;
 };
 
 struct EvalResult {
@@ -134,11 +133,16 @@ static CompactSoAGenome from_binary(const SDSCBinaryGraph* bg) {
 }
 
 struct Adapter {
-    std::vector<double> genes;  // U(16x8), V(8x2), b1(8), b2(2)
+    size_t feat_dim{16};
+    std::vector<double> genes;  // U(feat x rank), V(rank x act), b1(rank), b2(act)
     std::vector<double> feat_mean;
     std::vector<double> feat_std;
 
-    Adapter() : genes(kAdapterParams, 0.0) {}
+    explicit Adapter(size_t f = 16)
+        : feat_dim(f),
+          genes(f * kRank + kRank * kAct + kRank + kAct, 0.0) {}
+
+    size_t param_count() const { return genes.size(); }
 
     void randomize(std::mt19937& rng) {
         std::normal_distribution<double> n(0.0, 0.3);
@@ -146,72 +150,107 @@ struct Adapter {
     }
 
     void forward(const float* feat, double out[kAct]) const {
-        double x[kFeat];
-        for (size_t i = 0; i < kFeat; ++i) {
-            const double v = (feat_mean.empty() ? feat[i] : (feat[i] - feat_mean[i]) /
-                                                       (feat_std[i] + 1e-6));
-            x[i] = v;
+        std::vector<double> x(feat_dim);
+        for (size_t i = 0; i < feat_dim; ++i) {
+            x[i] = feat_mean.empty() ? feat[i]
+                                     : (feat[i] - feat_mean[i]) / (feat_std[i] + 1e-6);
         }
+        const size_t off_b1 = feat_dim * kRank + kRank * kAct;
+        const size_t off_b2 = off_b1 + kRank;
         double h[kRank];
-        size_t off = 0;
         for (size_t r = 0; r < kRank; ++r) {
-            double s = genes[kFeat * kRank + kRank * kAct + r];  // b1
-            for (size_t i = 0; i < kFeat; ++i) s += genes[i * kRank + r] * x[i];
+            double s = genes[off_b1 + r];
+            for (size_t i = 0; i < feat_dim; ++i) s += genes[i * kRank + r] * x[i];
             h[r] = std::tanh(s);
         }
         for (size_t a = 0; a < kAct; ++a) {
-            double s = genes[kFeat * kRank + kRank * kAct + kRank + a];  // b2
+            double s = genes[off_b2 + a];
             for (size_t r = 0; r < kRank; ++r) {
-                s += genes[kFeat * kRank + r * kAct + a] * h[r];
+                s += genes[feat_dim * kRank + r * kAct + a] * h[r];
             }
             out[a] = std::tanh(s);
         }
-        (void)off;
     }
 };
 
 struct Trunk {
     SDSCBinaryGraph* bg{nullptr};
-    SdscCUDAGraph gpu;
+    std::unique_ptr<SdscCUDAGraph> gpu;
+    CellularOrganism cpu_org;
+    bool cpu{false};
     bool ready{false};
+    size_t in_dim{0};
+    size_t out_dim{0};
     std::vector<float> in;
     std::vector<float> out;
+    std::vector<double> cpu_in;
 
-    bool load(const std::string& path) {
+    bool load(const std::string& path, bool use_cpu = false) {
+        cpu = use_cpu;
+        if (cpu) {
+            cpu_org = CellularOrganism::load_checkpoint_bin(path);
+            if (cpu_org.cells.empty()) { std::cerr << "[trunk] cpu load failed\n"; return false; }
+            cpu_org.compile();
+            bg = sdsc_binary_load(path.c_str());
+            if (!bg) { std::cerr << "[trunk] header load failed\n"; return false; }
+            in_dim = bg->header.input_dim;
+            out_dim = bg->header.output_dim;
+            in.assign(in_dim, 0.0f);
+            cpu_in.assign(in_dim, 0.0);
+            out.assign(out_dim, 0.0f);
+            ready = true;
+            return true;
+        }
         bg = sdsc_binary_load(path.c_str());
-        if (!bg) return false;
+        if (!bg) { std::cerr << "[trunk] sdsc_binary_load failed\n"; return false; }
+        in_dim = bg->header.input_dim;
+        out_dim = bg->header.output_dim;
+        if (in_dim == 0 || out_dim == 0) { std::cerr << "[trunk] zero in/out dim\n"; return false; }
         CompactSoAGenome g = from_binary(bg);
-        if (!gpu.upload(g)) return false;
-        in.assign(kInDim, 0.0f);
-        out.assign(kFeat, 0.0f);
+        gpu = std::make_unique<SdscCUDAGraph>();
+        if (!gpu->upload(g)) { std::cerr << "[trunk] gpu.upload failed\n"; return false; }
+        in.assign(in_dim, 0.0f);
+        out.assign(out_dim, 0.0f);
         ready = true;
         return true;
     }
 
     void step(const std::vector<float>& obs4) {
         std::fill(in.begin(), in.end(), 0.0f);
-        for (size_t i = 0; i < obs4.size() && i < 4; ++i) in[i] = obs4[i];
-        gpu.forward(in.data(), out.data());
+        for (size_t i = 0; i < obs4.size() && i < 4 && i < in_dim; ++i) in[i] = obs4[i];
+        if (cpu) {
+            for (size_t i = 0; i < in.size(); ++i) cpu_in[i] = in[i];
+            auto a = cpu_org.forward_nd(cpu_in.data(), cpu_in.size(), false);
+            if (out.size() >= 4) {
+                out[0] = static_cast<float>(a.positive_action);
+                out[1] = static_cast<float>(a.negative_action);
+                out[2] = static_cast<float>(a.defensive_reset);
+                out[3] = a.immune_lock ? 1.0f : 0.0f;
+            }
+        } else {
+            gpu->forward(in.data(), out.data());
+        }
     }
 };
 
 static void calibrate(Trunk& trunk, Adapter& ad, uint32_t seed) {
     std::mt19937 rng(seed);
     std::uniform_real_distribution<float> u(-1.0f, 1.0f);
-    std::vector<double> sum(kFeat, 0.0), sq(kFeat, 0.0);
+    const size_t nf = trunk.out_dim;
+    std::vector<double> sum(nf, 0.0), sq(nf, 0.0);
     const int N = 64;
     for (int i = 0; i < N; ++i) {
         std::vector<float> obs(4);
         for (auto& v : obs) v = u(rng);
         trunk.step(obs);
-        for (size_t f = 0; f < kFeat; ++f) {
+        for (size_t f = 0; f < nf; ++f) {
             sum[f] += trunk.out[f];
             sq[f] += static_cast<double>(trunk.out[f]) * trunk.out[f];
         }
     }
-    ad.feat_mean.resize(kFeat);
-    ad.feat_std.resize(kFeat);
-    for (size_t f = 0; f < kFeat; ++f) {
+    ad.feat_mean.resize(nf);
+    ad.feat_std.resize(nf);
+    for (size_t f = 0; f < nf; ++f) {
         ad.feat_mean[f] = sum[f] / N;
         const double var = std::max(0.0, sq[f] / N - ad.feat_mean[f] * ad.feat_mean[f]);
         ad.feat_std[f] = std::sqrt(var);
@@ -352,7 +391,7 @@ static ESResult train_adapter(Trunk& trunk, TaskId task, const Options& opt, uin
         return evaluate_adapter(trunk, ad, task, opt.episodes_train, eval_seed).sr;
     };
 
-    std::vector<Adapter> pop(static_cast<size_t>(opt.pop));
+    std::vector<Adapter> pop(static_cast<size_t>(opt.pop), Adapter(trunk.out_dim));
     for (auto& a : pop) {
         a.randomize(rng);
         calibrate(trunk, a, seed);
@@ -402,6 +441,7 @@ int main(int argc, char** argv) {
         else if (a == "--gens") opt.gens = std::stoi(next());
         else if (a == "--episodes") opt.episodes_eval = std::stoi(next());
         else if (a == "--seeds") opt.seeds = std::stoi(next());
+        else if (a == "--cpu") opt.cpu = true;
         else if (a == "--quick") opt.quick = true;
         else if (a == "--help") {
             std::cout << "usage: bench_adapter_transfer [--quick] [--pop N] [--gens N] "
@@ -421,22 +461,25 @@ int main(int argc, char** argv) {
     const std::string commit = std::getenv("KUN_COMMIT") ? std::getenv("KUN_COMMIT") : "unknown";
 
     Trunk trunk;
-    if (!trunk.load(opt.trunk)) {
+    if (!trunk.load(opt.trunk, opt.cpu)) {
         std::cerr << "cannot load/upload trunk: " << opt.trunk << "\n";
         std::cerr << "hint: set LD_LIBRARY_PATH to NVRTC builtins (see ctest env)\n";
         return 77;  // SKIP
     }
+    const size_t adapter_params = trunk.out_dim * kRank + kRank * kAct + kRank + kAct;
     std::cout << "S1 adapter transfer | trunk=" << opt.trunk
+              << " backend=" << (opt.cpu ? "cpu" : "cuda")
               << " cells=" << trunk.bg->header.num_cells
               << " syns=" << trunk.bg->header.num_synapses
-              << " adapter_params=" << kAdapterParams << "\n";
+              << " in=" << trunk.in_dim << " out=" << trunk.out_dim
+              << " adapter_params=" << adapter_params << "\n";
 
-    // 诊断：主干 16 维输出是否全零/饱和
+    // 诊断：主干输出是否全零/饱和
     {
         std::vector<float> probe = {0.1f, -0.2f, 0.3f, -0.4f};
         trunk.step(probe);
         std::cout << "  trunk probe out:";
-        for (size_t i = 0; i < kFeat; ++i) std::cout << " " << trunk.out[i];
+        for (size_t i = 0; i < trunk.out_dim; ++i) std::cout << " " << trunk.out[i];
         std::cout << "\n";
     }
 
@@ -501,7 +544,7 @@ int main(int argc, char** argv) {
     os << "  \"config\":{\"pop\":" << opt.pop << ",\"gens\":" << opt.gens
        << ",\"seeds\":" << opt.seeds << ",\"episodes_train\":" << opt.episodes_train
        << ",\"episodes_eval\":" << opt.episodes_eval
-       << ",\"adapter_params\":" << kAdapterParams
+       << ",\"adapter_params\":" << adapter_params
        << ",\"rank\":" << kRank << "},\n";
     os << "  \"results\":[";
     for (size_t i = 0; i < results.size(); ++i) {
@@ -533,7 +576,7 @@ int main(int argc, char** argv) {
            << ",\"" << t << "_champion\":" << mean(t, false);
     }
     os << "},\n  \"gate\":{\"S1\":\"" << (gate ? "PASS" : "FAIL")
-       << "\",\"adapter_params\":" << kAdapterParams << "}\n}\n";
+       << "\",\"adapter_params\":" << adapter_params << "}\n}\n";
     os.close();
 
     std::cout << "\n== aggregate ==\n";
@@ -544,7 +587,7 @@ int main(int argc, char** argv) {
                   << " delta=" << (mean(t, true) - mean(t, false)) << "\n";
     }
     std::cout << "GATE: S1 " << (gate ? "PASS" : "FAIL")
-              << " (adapter_params=" << kAdapterParams << ")\n";
+              << " (adapter_params=" << adapter_params << ")\n";
     std::cout << "ARTIFACT: " << opt.out << "\n";
     return 0;
 }

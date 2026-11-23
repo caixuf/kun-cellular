@@ -42,6 +42,7 @@ extern "C" {
 #define SDSC_BINARY_MAGIC 0x53445343 /* "SDSC" */
 #define SDSC_BINARY_VERSION 2
 #define SDSC_BINARY_VERSION_V3 3
+#define SDSC_BINARY_VERSION_V4 4
 #define SDSC_BINARY_VERSION_V5 5 /* v5: 受体映射表 (逐列异列注入, GPU 生态世系位级对账) */
 
 #pragma pack(push, 1)
@@ -123,6 +124,7 @@ static inline SDSCBinaryGraph* sdsc_binary_load(const char* filepath) {
     const SDSCBinaryHeader* hdr = (const SDSCBinaryHeader*)raw_data;
     if (hdr->magic != SDSC_BINARY_MAGIC ||
         (hdr->version != SDSC_BINARY_VERSION && hdr->version != SDSC_BINARY_VERSION_V3 &&
+         hdr->version != SDSC_BINARY_VERSION_V4 &&
          hdr->version != SDSC_BINARY_VERSION_V5)) {
 #if defined(_WIN32) || defined(_WIN64)
         free(raw_data);

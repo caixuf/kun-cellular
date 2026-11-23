@@ -15,10 +15,10 @@ COMMIT: <S1 代码 commit>
 COMMAND: LD_LIBRARY_PATH=<nvidia/cu13/lib> ./build/bench_adapter_transfer --quick
 ARTIFACT: runs/adapter_transfer_quick.json（正式 JSON 未生成：零特征下恒为 0）
 GATE: S1 BLOCKED/FAIL
-KEY NUMBERS: trunk probe out[0..15] = 0（全部）；adapter 0% vs champion maze 80% / cartpole 100% / maglev 100%
+KEY NUMBERS: 1M probe out[0..15] = 0；8k probe 4 维稀疏输入 = 0，全 1 输入 ≈ 1.03；adapter 0% vs champion maze 80% / cartpole 100% / maglev 100%
 CONTROLS: 同 seed 的 from-scratch 冠军正常（cartpole/maglev 100%），排除评测代码整体坏掉
-CONCLUSION: 1M bin 是压测拓扑，无可用特征；S1 需先有训练过的 1M 主干
-NEXT: 预训练 1M 主干 / 或用 8k flagship 主干做 S1-preview / 或停规模线
+CONCLUSION: 1M 是压测拓扑，8k 是 IO 混合实验；两者都不是训练过的特征主干，S1 需先有训练主干
+NEXT: 预训练主干 / 或用 210 细胞 ADAS 冠军做“trained trunk preview” / 或停规模线
 ```
 
 ---
@@ -47,7 +47,32 @@ trunk probe out: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 - 这不是本次转换的 bug：官方 `test_binary_runtime_scale` 也只打印 `out[0]=0.0000`，
   它验证的是“无 NaN + 零分配 + 吞吐”，**不验证输出非零**。
 
-### 3.2 Quick 评测（1 seed，10 episodes）
+### 3.2 8k flagship S1-preview
+
+为排除“只是 1M 太大/转换错”，又用 8k flagship 做了 preview：
+
+| 项 | 值 |
+|---|---|
+| 主干 | `checkpoints/flagship_io_mix_n64_s20260910.bin` |
+| 规模 | 8,196 cells / 35,848 syns；4096 in / 4 out |
+| 后端 | CPU（GPU 输入注入忽略 receptor 标志，另行记录） |
+| 适配器 | 4 维特征 → rank-8 → 2 动作，58 参数 |
+
+探针结果：
+
+```text
+4 维稀疏输入 (0.1,-0.2,0.3,-0.4)，其余 0  ->  acts (0, 0, 0, 0)
+4096 维全 1                             ->  acts (1.033, 0, -0.047, 0)
+4096 维其余 0.1                         ->  acts (0.103, 0, -0.0047, 0)
+```
+
+结论：这个 8k 主干基本是 **输入均值/IO 混合**，不是任务特征提取器。
+把 4 维观测塞进前 4 个通道，输出就是 0；适配器拿不到任何信息。
+
+顺带修了一个底座 bug：`sdsc_binary_load` 的版本检查漏了 **v4**，而所有 flagship 都是 v4。
+（`include/kun/cellular/sdsc_binary_runtime.h`）
+
+### 3.3 Quick 评测（1M，1 seed，10 episodes）
 
 | 任务 | Adapter | From-scratch 冠军 | 结论 |
 |---|---:|---:|---|
@@ -79,10 +104,16 @@ trunk probe out: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 - 前 64 个细胞不是 sense 受体，输入注入语义不成立；
 - 输出恒 0，官方测试也接受这个结果（只查 NaN）。
 
+`flagship_io_mix_n64_s20260910.bin` 的定位是 **IO 混合实验**：
+
+- 4096 输入 / 4 输出，输出近似“所有输入的均值”；
+- 4 维稀疏输入 → 0；全 1 → 1.03；其余 0.1 → 0.103；
+- 它不是任务特征提取器，适配器同样拿不到信息。
+
 所以：
 
 - **不能**把 S1 的失败解释成“冻结主干 + 适配器没用”；
-- 正确结论是：**S1 的前提（存在一个可用的 1M 特征主干）不成立**；
+- 正确结论是：**S1 的前提（存在一个可用的训练主干）不成立**；
 - 这也解释了为什么 Phase 0 的资产核验必须放在规模线之前。
 
 ---
@@ -101,17 +132,24 @@ trunk probe out: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 
 ## 6. 下一步选择
 
+### 选项 B：S1-preview on 8k flagship（已做，也失败）
+
+- 用 `flagship_io_mix_n64_s20260910.bin`（8,196 cells）等已有旗舰主干；
+- 先验证“冻结主干 + rank-8 适配器”的 recipe 是否成立；
+- 结果：8k 是 IO 混合实验，4 维稀疏输入输出 0；recipe 仍无法验证。
+
+### 选项 D：用真正的训练主干做 preview
+
+- `checkpoints/adas_cortex_champion.bin`（210 cells / 659 syns，6 in / 2 out）是**真训练过的**车道保持皮层；
+- 用它做冻结主干，适配 maze/cartpole/maglev，至少能验证“跨任务冻结特征 + rank-8 adapter”的 recipe；
+- 规模比 1M 小，但这是仓库里唯一“真训练过 + 非任务同一域”的主干；
+- 如果 D 成立，再投入 1M 预训练；如果 D 也不成立，说明 recipe 本身有问题。
+
 ### 选项 A：先预训练 1M 主干
 
 - 用任务分布预训练 1M 细胞主干（自监督下一状态 / 多任务控制）；
 - 这是数天~数周的工程，不是一次 benchmark；
 - 训练完成后，S1 才真正可测。
-
-### 选项 B：S1-preview on 8k flagship
-
-- 用 `flagship_io_mix_n64_s20260910.bin`（8,196 cells）等已有旗舰主干；
-- 先验证“冻结主干 + rank-8 适配器”的 recipe 是否成立；
-- 如果 8k 都不成立，1M 不用谈；如果 8k 成立，再投入 1M 预训练。
 
 ### 选项 C：停规模线
 
