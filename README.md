@@ -54,6 +54,7 @@
 | S1 1M 主干 | BLOCKED | 1M/8k 不是训练主干；ADAS 仅 maglev −4pp |
 | **S1-A0** 1M/10M 储层 agent | **PASS（Maze）** | 1M/10M 细胞 + 138 参数读出，Maze 95% = 冠军；100M 不稳定 |
 | **S2** 条件计算 MoE | **PASS** | 10M 总参数，top-1 1% active，Maze 95% = 全量 |
+| **S3** 100M 条件探针 | **PASS** | 500×200k，top-5 1M active，Maze 95% |
 
 - **规模线 PAUSED**：S2/S3/S4 不启动，等 S1 reopen 硬门；
 - **机制线继续**：E-B 延迟泛化 / E-C 时序组合 / E-D v2 多步 verifier；
