@@ -51,8 +51,25 @@
 - [x] 重命名 6 个命名膨胀 checkpoint；更新测试引用；
 - [x] 删除 `bench_adas_scales` 的 0.88 硬编码与自指地平线/能力字段；
 - [x] 补一个**可信的 100M 推理 bench**：`test_adas_scales` / `bench_adas_scales` 在 ctest 环境实测 **12.18 ms/step、8.21 GCells/s**（合成拓扑，仅硬件）；
-- [ ] 审计 `enable_mla/moe/rope` / `OrganFrozenBank` / GRPO 的真实调用路径；
+- [x] 审计 `enable_mla/moe/rope` / `OrganFrozenBank` / GRPO 的真实调用路径；
 - [ ] 把以上结果回填本表，未过的资产不得进入 §3 阶梯。
+
+**Phase 0 审计结果（2026-11-23）**：
+
+| 机制 | 任务/工具层调用 | 结论 |
+|---|---|---|
+| `enable_mla` / `enable_moe` / `enable_rope` | **0 处**（仅 `tests/test_cellular_endogenous_organs.cpp`） | 库 API，未验证 |
+| `OrganFrozenBank` | **0 处**（仅 `tests/test_cellular_core_import.cpp` 等） | 库 API，未验证 |
+| `CellularGRPOTrainer` | **0 处**（仅 `tests/test_cellular_grpo.cpp`） | 半成品，需任务级接线 |
+| `set_relaxation_steps` | **0 处**（仅 tests） | 未使用 |
+| `forward_with_relaxation` | **1 处**：`tasks/transfer/doudizhu_eval_harness.hpp` | 唯一任务级使用；E-A 可直接复用 |
+| `CellularBPTTEngine` | **多处**：`tools/train_doudizhu_bc_distill.cpp`、`tools/timing_discovery.cpp`、`tools/u4_task_level.cpp` | 真实在用，可支撑 E-B |
+
+**对 E-A/B/C 的直接影响**：
+
+- **E-A**：`forward_with_relaxation` 已有任务级先例（斗地主评估），迷宫/CartPole 只需加 K sweep，不需要新底座。
+- **E-B**：GRPO 目前只有单测；要么先补任务级接线（`in_dim` 扩展），要么用已验证的 BPTT 做第一版。
+- **E-C**：`OrganFrozenBank` 只有库代码，必须先写一个最小 deposit/splice 的任务级用例，否则 H3 无从谈起。
 
 ---
 
