@@ -184,6 +184,7 @@ struct Trunk {
     std::vector<float> in;
     std::vector<float> out;
     std::vector<double> cpu_in;
+    std::vector<size_t> feat_cells;
 
     bool load(const std::string& path, bool use_cpu = false) {
         cpu = use_cpu;
@@ -195,6 +196,15 @@ struct Trunk {
             if (!bg) { std::cerr << "[trunk] header load failed\n"; return false; }
             in_dim = bg->header.input_dim;
             out_dim = bg->header.output_dim;
+            for (size_t i = 0; i < cpu_org.cells.size(); ++i) {
+                const int t = static_cast<int>(cpu_org.cells[i].type);
+                if (t >= 30 && t <= 34) feat_cells.push_back(i);
+            }
+            if (feat_cells.size() < out_dim) {
+                feat_cells.clear();
+                const size_t start = cpu_org.cells.size() > out_dim ? cpu_org.cells.size() - out_dim : 0;
+                for (size_t i = start; i < cpu_org.cells.size(); ++i) feat_cells.push_back(i);
+            }
             in.assign(in_dim, 0.0f);
             cpu_in.assign(in_dim, 0.0);
             out.assign(out_dim, 0.0f);
@@ -220,12 +230,9 @@ struct Trunk {
         for (size_t i = 0; i < obs4.size() && i < 4 && i < in_dim; ++i) in[i] = obs4[i];
         if (cpu) {
             for (size_t i = 0; i < in.size(); ++i) cpu_in[i] = in[i];
-            auto a = cpu_org.forward_nd(cpu_in.data(), cpu_in.size(), false);
-            if (out.size() >= 4) {
-                out[0] = static_cast<float>(a.positive_action);
-                out[1] = static_cast<float>(a.negative_action);
-                out[2] = static_cast<float>(a.defensive_reset);
-                out[3] = a.immune_lock ? 1.0f : 0.0f;
+            cpu_org.forward_nd(cpu_in.data(), cpu_in.size(), false);
+            for (size_t i = 0; i < out_dim && i < feat_cells.size(); ++i) {
+                out[i] = static_cast<float>(cpu_org.cells[feat_cells[i]].output_val);
             }
         } else {
             gpu->forward(in.data(), out.data());

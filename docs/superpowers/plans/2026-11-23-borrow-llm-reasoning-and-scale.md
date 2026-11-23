@@ -248,13 +248,13 @@ monolith 59.9%（掉 40.1pp）；pulse 子集 full 100% vs 26.8%（p=4.16e-112�
 - **失败含义**：连 1M 的适配器都不 work，10M/100M 不用谈。
 
 **结果（2026-11-23）**：见 `docs/handoff/2026-11-23-s1-adapter-transfer.md`。
-**S1 BLOCKED / FAIL（资产不成立）**：
+**S1 BLOCKED / FAIL（无通用训练主干）**：
 - `sdsc_mega_1million.bin` 的 16 维输出全 0；它是压测拓扑，不是训练主干。
-- 8k flagship `flagship_io_mix_n64_s20260910.bin` 也试了：4 维稀疏输入输出 0，
-  4096 维全 1 输出 1.03，基本是输入均值/IO 混合，不是特征提取器。
-- adapter 三任务全 0；from-scratch 冠军 maze 80%（10 eps 小样本）/ cartpole 100% / maglev 100%。
-不是适配器 recipe 失败，是前提不成立。下一步：用 210 细胞 ADAS 冠军做 trained-trunk preview（选项 D），
-再决定是否预训练 1M（选项 A）。
+- 8k flagship 是 IO 混合实验：4 维稀疏输入输出 0，全 1 输出 1.03，基本是输入均值。
+- 210 细胞 ADAS 冠军（真训练主干）preview：**maglev 96% vs 100%（−4pp，在 −5pp 内）**；
+  maze 8%、cartpole 0%。recipe 在“主干域接近任务域”时成立，但单任务主干不通用。
+- 三任务判据仍 FAIL。E3（资产/前提失败），不是适配器全面失败。
+下一步：A（预训练多任务主干）是唯一能解锁 S1 的路径；否则 C（停规模线，回机制线）。
 
 ### 3.4 S2（10M）：条件计算是分水岭
 

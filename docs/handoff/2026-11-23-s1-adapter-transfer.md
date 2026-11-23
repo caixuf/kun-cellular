@@ -15,10 +15,10 @@ COMMIT: <S1 代码 commit>
 COMMAND: LD_LIBRARY_PATH=<nvidia/cu13/lib> ./build/bench_adapter_transfer --quick
 ARTIFACT: runs/adapter_transfer_quick.json（正式 JSON 未生成：零特征下恒为 0）
 GATE: S1 BLOCKED/FAIL
-KEY NUMBERS: 1M probe out[0..15] = 0；8k probe 4 维稀疏输入 = 0，全 1 输入 ≈ 1.03；adapter 0% vs champion maze 80% / cartpole 100% / maglev 100%
-CONTROLS: 同 seed 的 from-scratch 冠军正常（cartpole/maglev 100%），排除评测代码整体坏掉
-CONCLUSION: 1M 是压测拓扑，8k 是 IO 混合实验；两者都不是训练过的特征主干，S1 需先有训练主干
-NEXT: 预训练主干 / 或用 210 细胞 ADAS 冠军做“trained trunk preview” / 或停规模线
+KEY NUMBERS: 1M probe 0；8k 稀疏输入 0；ADAS 210c preview: maze 8% / cartpole 0% / maglev 96%（冠军 96/100/100）
+CONTROLS: 同 seed 冠军正常；ADAS 主干在 maglev 上 −4pp（在 −5pp 内），maze/cartpole 大幅失败
+CONCLUSION: 1M/8k 不是训练主干；ADAS 单任务主干只在 maglev 上验证了 recipe，不通用
+NEXT: 多任务预训练主干 / 或停规模线，回到机制线
 ```
 
 ---
@@ -83,6 +83,27 @@ trunk probe out: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 - 冠军正常，说明评测循环没有整体坏掉；
 - adapter 在三个任务上全 0，与“特征恒为 0”一致。
 
+### 3.4 210-cell ADAS trained trunk preview（选项 D）
+
+用真正训练过的 `checkpoints/adas_cortex_champion.bin`（210 cells / 659 syns，6 in / 2 out）
+做冻结主干；直接读 6 个执行器细胞的 `output_val` 作为特征（`ActionOutputs` 只暴露 4 个字段，
+读不到 `ACT_CHANNEL`）。适配器：6 维 → rank-8 → 2 动作，42 参数。
+
+正式：2 seeds × 120 代 × 24 pop × 4 train episodes × 100 eval episodes。
+
+| 任务 | Adapter | 冠军 | Δ | 判定 |
+|---|---:|---:|---:|---|
+| maze | 8% | 96% | −88pp | ❌ |
+| cartpole | 0% | 100% | −100pp | ❌ |
+| **maglev** | **96%** | **100%** | **−4pp** | ✅ 在 −5pp 内 |
+
+- **Maglev 上 recipe 成立**：冻结 ADAS 主干 + 42 参数适配器，达到冠军的 96%；
+- Maze / cartpole 不成立：ADAS 特征不含这两个任务需要的信息；
+- 这是“**单任务主干不通用**”，不是“adapter 完全无效”。
+
+训练墙钟：maze ~12.6s/seed，cartpole ~0.6s/seed，maglev ~4.0s/seed。
+（maze 慢是因为 250 步 × 更多 episode；不是主干慢。）
+
 ### 3.3 训练成本（quick）
 
 | 任务 | 墙钟 |
@@ -122,11 +143,12 @@ trunk probe out: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 
 | 判据 | 结果 |
 |---|---|
-| adapter ≥ champion − 5pp（三任务） | ❌ 全 0 vs 80/100/100 |
-| 适配器参数 <1% 主干 | ✅ 154 / 1,000,000 |
-| **S1** | ❌ **BLOCKED/FAIL（资产不成立）** |
+| adapter ≥ champion − 5pp（三任务） | ❌ maze 8% / cartpole 0% / maglev 96% |
+| 适配器参数 <1% 主干 | ✅ 42 / 210（20%，但绝对量小；仍不是 1M 规模） |
+| **S1** | ❌ **BLOCKED/FAIL（无通用训练主干）** |
 
-**E 标签**：E3（资产/前提失败，不是能力结论）。
+**E 标签**：E3（资产/前提失败），不是“适配器 recipe 全面失败”。
+Maglev 的单任务证据是 E1：recipe 在“主干域接近任务域”时成立。
 
 ---
 
@@ -135,28 +157,28 @@ trunk probe out: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
 ### 选项 B：S1-preview on 8k flagship（已做，也失败）
 
 - 用 `flagship_io_mix_n64_s20260910.bin`（8,196 cells）等已有旗舰主干；
-- 先验证“冻结主干 + rank-8 适配器”的 recipe 是否成立；
 - 结果：8k 是 IO 混合实验，4 维稀疏输入输出 0；recipe 仍无法验证。
 
-### 选项 D：用真正的训练主干做 preview
+### 选项 D：用真正的训练主干做 preview（已做）
 
 - `checkpoints/adas_cortex_champion.bin`（210 cells / 659 syns，6 in / 2 out）是**真训练过的**车道保持皮层；
-- 用它做冻结主干，适配 maze/cartpole/maglev，至少能验证“跨任务冻结特征 + rank-8 adapter”的 recipe；
-- 规模比 1M 小，但这是仓库里唯一“真训练过 + 非任务同一域”的主干；
-- 如果 D 成立，再投入 1M 预训练；如果 D 也不成立，说明 recipe 本身有问题。
+- 结果：**maglev 96% vs 100%（−4pp，在 −5pp 内）**；maze 8%、cartpole 0%；
+- 结论：recipe 在“主干域接近任务域”时成立，但单任务主干**不通用**；
+- 这排除了“adapter 完全无效”，但没有解锁 S1 的 3 任务判据。
 
-### 选项 A：先预训练 1M 主干
+### 选项 A：先预训练多任务主干
 
-- 用任务分布预训练 1M 细胞主干（自监督下一状态 / 多任务控制）；
+- 用任务分布预训练主干（自监督下一状态 / 多任务控制）；
 - 这是数天~数周的工程，不是一次 benchmark；
-- 训练完成后，S1 才真正可测。
+- 这是唯一能让 S1 真正可测的路径；单任务主干已经被 D 证伪为“不通用”。
 
 ### 选项 C：停规模线
 
 - 回到 E-A/B/C 的机制线，先把“串行草稿纸 + 组合”做深；
-- 规模线等有训练主干再开。
+- 规模线等有多任务训练主干再开。
 
-**建议顺序**：B → A → C。先用 8k 验证 recipe，成本最低；不要直接投入 1M 预训练。
+**建议**：B/D 已做，A 是唯一能解锁 S1 的路径但成本高；若不想投入，选 C。
+不要再用 1M/8k 压测拓扑冒充训练主干，也不要拿单任务 ADAS 主干硬凑三任务。
 
 ---
 
