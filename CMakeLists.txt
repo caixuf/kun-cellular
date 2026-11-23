@@ -378,6 +378,11 @@ if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
         set_tests_properties(test_adapter_transfer PROPERTIES
             ENVIRONMENT "LD_LIBRARY_PATH=$ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib:$ENV{LD_LIBRARY_PATH}")
     endif()
+
+    # 1M 规模智能体：结构化稀疏储层 + 蒸馏读出
+    add_executable(train_scaled_agent "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_scaled_agent.cpp")
+    target_include_directories(train_scaled_agent PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_HEADER_PATH})
+    target_link_libraries(train_scaled_agent PRIVATE kun_cellular ${CUDA_DRIVER_LIB} ${NVRTC_LIB} Threads::Threads m)
 endif()
 
 # 4. 构建纯 C11 硬件级通用运行时动态共享库 (C-ABI Shared Library for ctypes / Python Binding)

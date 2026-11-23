@@ -17,6 +17,7 @@
 | **E-C v2** 器官组合（4-way） | **PASS** | full 100% vs best single 62.9%，LOO/单体掉到 chance | E2 窄 |
 | **E-D** Best-of-N | FAIL | 1 步 oracle verifier 只 +2pp；短视搜索不够 | E1 |
 | **S1** 1M 主干 + adapter | BLOCKED | 1M 输出全 0；8k 是 IO 混合；ADAS 只在 maglev 上 −4pp | E3 / E1 |
+| **S1-A0** 1M 储层 agent | **PASS（Maze）** | 1M 细胞储层 + 138 参数读出，Maze 95% = 冠军 | E2 窄 |
 
 **一句话**：
 
@@ -108,6 +109,27 @@ compute 会超过 20× 预算。E1 负结果。
 - 三任务判据 **FAIL**；
 - 失败原因是**没有多任务训练主干**，不是 adapter 完全无效；
 - E 标签：E3（资产/前提失败）+ E1（maglev 单任务正例）。
+
+### 3.5 S1-A0：新建 1M 储层 + 蒸馏读出（规模里程碑）
+
+既然现有 1M/8k 都不是训练主干，就**新建**一个有功能的 1M 稀疏 DAG 储层：
+
+- 1,000,000 cells / 3,000,000 syns；64 in / 64 features；31 MB checkpoint；
+- 用冠军蒸馏：每任务 20 episodes 采集 `(obs, action)`；ridge 读出 138 参数；
+- 特征探针非零；储层冻结。
+
+| 任务 | 冠军 | 1M agent（reservoir-only） | 1M agent（hybrid） |
+|---|---:|---:|---:|
+| **Maze** | **95%** | **95%** | **95%** |
+| CartPole | 100% | 70% | 70% |
+| Maglev | 100% | 0% | 0% |
+
+- reservoir-only 与 hybrid 的 Maze 都是 95% → **不是靠 4 维原始观测**；
+- 这是仓库里第一个**真正有功能**的 1M 细胞 agent；
+- 产物：`checkpoints/scaled_reservoir_1m.bin` + `checkpoints/scaled_agent_maze_readout.json`。
+
+**标签**：E2 窄口径（Maze 达到冠军水平）；CartPole E1；Maglev E3。
+**仍是 S1-A0 里程碑，不是 S1 三任务全通，也不是 S2/S3。**
 
 ---
 

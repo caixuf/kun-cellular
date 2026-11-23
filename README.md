@@ -52,6 +52,7 @@
 | E-C v2 组合（4-way） | **PASS** | full 100% vs best single 62.9% |
 | E-D Best-of-N | FAIL | 1 步 oracle 只 +2pp |
 | S1 1M 主干 | BLOCKED | 1M/8k 不是训练主干；ADAS 仅 maglev −4pp |
+| **S1-A0** 1M 储层 agent | **PASS（Maze）** | 1M 细胞 + 138 参数读出，Maze 95% = 冠军 |
 
 - **规模线 PAUSED**：S2/S3/S4 不启动，等 S1 reopen 硬门；
 - **机制线继续**：E-B 延迟泛化 / E-C 时序组合 / E-D v2 多步 verifier；
@@ -174,7 +175,7 @@ kun-cellular/
 │   ├── adas_cortex_champion_stadium.bin   # 观测台默认学生档 10W/6L
 │   └── domain_zoo_report.json             # 12 任务控制动物园报告
 ├── tools/                         # 演化工具链与后端网关
-├── tests/                         # 当前注册 112 个 CTest（以 `ctest -N` 为准；GPU 用例缺依赖时返回 77 SKIP）
+├── tests/                         # 当前注册 113 个 CTest（以 `ctest -N` 为准；GPU 用例缺依赖时返回 77 SKIP）
 └── runs/                          # 基准数据（含完整 ADAS 10-seed 结果）
     └── adas_champion_vs_stanley_seeds1-10_tuned_20260911.json  # L3 当前 9W/7L
 ```
