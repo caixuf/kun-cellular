@@ -56,8 +56,7 @@
 | **S2** 条件计算 MoE | **PASS** | 10M 总参数，top-1 1% active，Maze 95% = 全量 |
 | **S3** 100M 条件探针 | **PASS** | 500×200k，top-5 1M active（1%），Maze 95% |
 
-- **规模线**：1M/10M agent PASS；S2 10M/1% PASS；S3 100M/1% PASS；  
-  **S4 1B BLOCKED（本机 23 GB RAM / 8 GB VRAM 不足，需更大机器）**；
+- **规模线**：1M/10M agent PASS；S2 10M/1% PASS；S3 100M/1% PASS；S4 1B/1% 流式 PASS；
 - **机制线**：E-B v2 延迟泛化 PASS；E-C v2 组合 PASS；E-D FAIL（短视 verifier）；
 - CTest：**113/113 PASS**（GPU 缺依赖返回 77 SKIP）。
 

@@ -15,7 +15,7 @@
 - S1-A0/B：**PASS（Maze）**（1M/10M 储层 + 138 参数读出，95% = 冠军）；
 - S2：**PASS**（10M 总参 / top-1 1% active / Maze 95%）；
 - S3：**PASS**（100M 总参 / top-5 1M active / Maze 95%）；
-- S4：**BLOCKED（硬件）**（1B/3B 约 33 GB，本机 23 GB RAM / 8 GB VRAM 不足）。
+- S4：**PASS**（500×2M，流式 30 GB，top-5 1% active，Maze 95%）。
 
 ---
 
@@ -340,8 +340,10 @@ top-5（1M active = 1%）Maze 95%；top-25（5M = 5%）Maze 95%；
 - **不做**全图训练、不做 1B 演化。
 - 判据：能装载、能重放、active 扩展曲线不断裂。
 
-**状态（2026-11-23）**：**BLOCKED（硬件）**。1B cells / 3B syns 的 block bin 约 33 GB，
-本机 23 GB RAM / 8 GB VRAM 不足；S1–S3 已完成，S4 需更大机器。
+**结果（2026-11-23）**：见 `docs/handoff/2026-11-23-s4-1b-streaming.md`。
+**S4 PASS**：500 blocks × 2M = 1B cells / 3B syns；block bin 约 30 GB 落盘；
+流式加载；top-5（10M active = 1%）Maze 95%；64/500 blocks ready；
+第一次 5000×200k 尝试只有 75%（网格覆盖不足），已记录为负结果。
 
 ### 3.7 规模化真正的瓶颈：数据与验证器，不是算力
 
