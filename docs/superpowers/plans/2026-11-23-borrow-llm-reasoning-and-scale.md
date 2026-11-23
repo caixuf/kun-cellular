@@ -247,6 +247,13 @@ monolith 59.9%（掉 40.1pp）；pulse 子集 full 100% vs 26.8%（p=4.16e-112�
 - **判据（H4 首验）**：适配器 ≥ from-scratch −5pp，训练成本 ≤1/10。
 - **失败含义**：连 1M 的适配器都不 work，10M/100M 不用谈。
 
+**结果（2026-11-23）**：见 `docs/handoff/2026-11-23-s1-adapter-transfer.md`。
+**S1 BLOCKED / FAIL（资产不成立）**：`sdsc_mega_1million.bin` 的 16 维输出**恒为 0**；
+它是压测拓扑，不是训练过的特征主干。adapter 三任务全 0，from-scratch 冠军
+maze 80%（10 eps 小样本）/ cartpole 100% / maglev 100%。
+不是适配器 recipe 失败，是前提不成立。下一步建议：先用 8k flagship 做 S1-preview，
+验证 recipe；不要直接投入 1M 预训练。
+
 ### 3.4 S2（10M）：条件计算是分水岭
 
 - **S2-a**：10M 推理/变异/深拷贝复测（`test_compact_10m_scale.cpp` + `test_cuda_scale.cpp`）。

@@ -356,6 +356,19 @@ if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
     add_executable(bench_adas_scales "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_adas_scales.cpp")
     target_include_directories(bench_adas_scales PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_HEADER_PATH})
     target_link_libraries(bench_adas_scales PRIVATE kun_cellular ${CUDA_DRIVER_LIB} ${NVRTC_LIB})
+
+    # S1: frozen 1M trunk + rank-8 adapter (GPU)
+    add_executable(bench_adapter_transfer "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_adapter_transfer.cpp")
+    target_include_directories(bench_adapter_transfer PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_HEADER_PATH})
+    target_link_libraries(bench_adapter_transfer PRIVATE kun_cellular ${CUDA_DRIVER_LIB} ${NVRTC_LIB} Threads::Threads m)
+    add_test(NAME test_adapter_transfer
+             COMMAND bench_adapter_transfer --quick
+                     --out ${CMAKE_CURRENT_BINARY_DIR}/adapter_transfer_quick.json)
+    set_tests_properties(test_adapter_transfer PROPERTIES RUN_SERIAL TRUE TIMEOUT 300 SKIP_RETURN_CODE 77)
+    if(EXISTS "$ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib")
+        set_tests_properties(test_adapter_transfer PROPERTIES
+            ENVIRONMENT "LD_LIBRARY_PATH=$ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib:$ENV{LD_LIBRARY_PATH}")
+    endif()
 endif()
 
 # 4. 构建纯 C11 硬件级通用运行时动态共享库 (C-ABI Shared Library for ctypes / Python Binding)
