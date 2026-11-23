@@ -40,6 +40,25 @@
 
 ---
 
+## 机制战役结果（2026-11-23）
+
+总报告：[`docs/handoff/2026-11-23-mechanism-campaign-report.md`](docs/handoff/2026-11-23-mechanism-campaign-report.md)
+
+| 实验 | 结果 | 一句话 |
+|---|---|---|
+| E-A 推理时松弛 | 机械 PASS / 能力 FAIL | 多想几步只补收敛 |
+| E-B 串行 scratchpad | **PASS** | 外部草稿纸因果必要（D=16 55%→100%） |
+| E-C v1 组合（2-way） | FAIL | 阈值天花板（差 0.6pp） |
+| E-C v2 组合（4-way） | **PASS** | full 100% vs best single 62.9% |
+| E-D Best-of-N | FAIL | 1 步 oracle 只 +2pp |
+| S1 1M 主干 | BLOCKED | 1M/8k 不是训练主干；ADAS 仅 maglev −4pp |
+
+- **规模线 PAUSED**：S2/S3/S4 不启动，等 S1 reopen 硬门；
+- **机制线继续**：E-B 延迟泛化 / E-C 时序组合 / E-D v2 多步 verifier；
+- CTest：**111/111 PASS**（GPU 缺依赖返回 77 SKIP）。
+
+---
+
 ## 一、真实工程资产
 
 ### 1. C/C++ 核心底座（~11,000 行，可复现）
