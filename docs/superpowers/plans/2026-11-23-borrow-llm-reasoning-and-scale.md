@@ -1,6 +1,6 @@
 # 预注册：借 LLM 推理机制 + 逐量级规模化试探 — 2026-11-23
 
-> 状态：**机制线阶段性收口；规模线 PAUSED（无多任务训练主干）**。
+> 状态：**机制线收口；规模线 S1-A0/B、S2、S3 已 PASS；S4 1B 受本机内存限制 BLOCKED**。
 > 本文件先定协议，后跑实验；结果回填本文件，不另起叙事。
 > 两条主线：**A. 机制**（E-A/B/C/D）→ **B. 规模**（S0→S4，一级一级上）。
 > 铁律：**先机制，后规模；每一级先跑通，再训练，再谈能力；不跳级。**
@@ -8,11 +8,14 @@
 
 **2026-11-23 收口状态**：
 - E-A：机械 PASS / 能力 FAIL（松弛只补收敛）；
-- E-B：**PASS**（外部 scratchpad 因果必要，E2 窄）；
+- E-B：**PASS**（外部 scratchpad 因果必要，E2 窄）；E-B v2 延迟泛化：**PASS**；
 - E-C v1：FAIL（阈值天花板）；E-C v2：**PASS**（4-way 组合，E2 窄）；
 - E-D：FAIL（1 步 oracle best-of-N 只 +2pp）；
 - S1：**BLOCKED**（1M/8k 不是训练主干；ADAS 只在 maglev 上 −4pp）；
-- S2/S3/S4：**PAUSED**，等 S1 reopen 硬门（见 §3.3 与总报告 §6.3）。
+- S1-A0/B：**PASS（Maze）**（1M/10M 储层 + 138 参数读出，95% = 冠军）；
+- S2：**PASS**（10M 总参 / top-1 1% active / Maze 95%）；
+- S3：**PASS**（100M 总参 / top-5 1M active / Maze 95%）；
+- S4：**BLOCKED（硬件）**（1B/3B 约 33 GB，本机 23 GB RAM / 8 GB VRAM 不足）。
 
 ---
 

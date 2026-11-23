@@ -52,13 +52,14 @@
 | E-C v2 组合（4-way） | **PASS** | full 100% vs best single 62.9% |
 | E-D Best-of-N | FAIL | 1 步 oracle 只 +2pp |
 | S1 1M 主干 | BLOCKED | 1M/8k 不是训练主干；ADAS 仅 maglev −4pp |
-| **S1-A0** 1M/10M 储层 agent | **PASS（Maze）** | 1M/10M 细胞 + 138 参数读出，Maze 95% = 冠军；100M 不稳定 |
+| **S1-A0** 1M/10M 储层 agent | **PASS（Maze）** | 1M/10M 细胞 + 138 参数读出，Maze 95% = 冠军；随机 100M 不稳定 |
 | **S2** 条件计算 MoE | **PASS** | 10M 总参数，top-1 1% active，Maze 95% = 全量 |
-| **S3** 100M 条件探针 | **PASS** | 500×200k，top-5 1M active，Maze 95% |
+| **S3** 100M 条件探针 | **PASS** | 500×200k，top-5 1M active（1%），Maze 95% |
 
-- **规模线 PAUSED**：S2/S3/S4 不启动，等 S1 reopen 硬门；
-- **机制线继续**：E-B 延迟泛化 / E-C 时序组合 / E-D v2 多步 verifier；
-- CTest：**111/111 PASS**（GPU 缺依赖返回 77 SKIP）。
+- **规模线**：1M/10M agent PASS；S2 10M/1% PASS；S3 100M/1% PASS；  
+  **S4 1B BLOCKED（本机 23 GB RAM / 8 GB VRAM 不足，需更大机器）**；
+- **机制线**：E-B v2 延迟泛化 PASS；E-C v2 组合 PASS；E-D FAIL（短视 verifier）；
+- CTest：**113/113 PASS**（GPU 缺依赖返回 77 SKIP）。
 
 ---
 
