@@ -173,6 +173,27 @@ H3 **FAIL**：full 100%，最佳单器官 75.6%（single_event），Δ=24.4pp < 
 LOO 49.3%，monolith 50.7%。结论：组合效应真实且大，但预注册总 SR 阈值设计错误；
 按纪律标 E1，不写 E2。v2 建议：4-way cue（chance 25%）重新预注册。
 
+#### E-C v2 预注册（2026-11-23，先于正式 5-seed 运行）
+
+**动机**：v1 的二选一结构让 best single 天然有 50% 猜边，overall +25pp 不可达；v2 用 4-way cue 把 chance 降到 25%。
+
+**任务**：`bench_organ_composition_v2`
+- t=0：cue ∈ {0,1,2,3} one-hot，只出现一拍；
+- t=2..6：随机一拍 pulse（50% 概率完全没有 pulse）；
+- t=10：有 pulse 选同 index 动作且 max action ≥0.2；无 pulse 要求 max action <1e-6。
+
+**器官**（内部参数冻结）：delay（4×EMA）、event（1×积分）、gate（4×乘法）。
+**训练**：只调器官间/读出权重；ES pop=24 / gens=120 / train episodes=24。
+**评估**：5 seeds × 200 held-out episodes；响应幅度门禁不变。
+
+**判据（先于正式运行）**：
+1. full − best_single ≥ 25pp；
+2. full − min_loo ≥ 20pp；
+3. full − monolith ≥ 10pp；
+4. 5 seeds 全部落盘，随机/单体对照不出现同类提升。
+
+**说明**：quick pilot（1 seed × 40 episodes）仅用于烟测，不作为门禁证据；正式运行必须用 5 seeds × 200 episodes，结果以 `runs/organ_composition_v2_<date>.json` 为准。
+
 ---
 
 ### E-D Best-of-N + verifier（stretch，1 周，可与 E-B 并行）
