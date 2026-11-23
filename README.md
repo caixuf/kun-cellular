@@ -174,7 +174,7 @@ kun-cellular/
 │   ├── adas_cortex_champion_stadium.bin   # 观测台默认学生档 10W/6L
 │   └── domain_zoo_report.json             # 12 任务控制动物园报告
 ├── tools/                         # 演化工具链与后端网关
-├── tests/                         # 当前注册 111 个 CTest（以 `ctest -N` 为准；GPU 用例缺依赖时返回 77 SKIP）
+├── tests/                         # 当前注册 112 个 CTest（以 `ctest -N` 为准；GPU 用例缺依赖时返回 77 SKIP）
 └── runs/                          # 基准数据（含完整 ADAS 10-seed 结果）
     └── adas_champion_vs_stanley_seeds1-10_tuned_20260911.json  # L3 当前 9W/7L
 ```
