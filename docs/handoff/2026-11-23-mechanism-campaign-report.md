@@ -38,6 +38,7 @@
 | S1（三任务 frozen trunk + adapter） | ✅ PASS（1B 共享储层 MoE，三任务 −5pp 内） |
 | S1-A0/B（1M/10M 储层 agent） | ✅ Maze 95%，CartPole/Maglev 未通 |
 | S2（条件计算 top-k） | ✅ PASS（10M 总参 / 1% active / Maze 95%） |
+| S2-c（conditional BPTT） | ⚠️ 机制冒烟 PASS；1B 全尺度未做 |
 | S3（100M 条件探针） | ✅ PASS（100M 总参 / 1% active / Maze 95%） |
 | S4（1B 流式条件探针） | ✅ PASS（1B 总参 / 1% active / Maze 95%） |
 

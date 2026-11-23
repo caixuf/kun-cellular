@@ -55,6 +55,7 @@
 | **S1 三任务** | **PASS** | 1B 共享储层，top-5 1% active，三任务 ≥ champion −5pp |
 | **S1-A0** 1M/10M 储层 agent | **PASS（Maze）** | 1M/10M 细胞 + 138 参数读出，Maze 95% = 冠军；随机 100M 不稳定 |
 | **S2** 条件计算 MoE | **PASS** | 10M 总参数，top-1 1% active，Maze 95% = 全量 |
+| **S2-c** conditional BPTT | ⚠️ 机制冒烟 PASS | 梯度掩码 + 有界 tape；1B 全尺度未做 |
 | **S3** 100M 条件探针 | **PASS** | 500×200k，top-5 1M active（1%），Maze 95% |
 
 - **规模线**：1M/10M agent PASS；S2 10M/1% PASS；S3 100M/1% PASS；S4 1B/1% 流式 PASS；
@@ -178,7 +179,7 @@ kun-cellular/
 │   ├── adas_cortex_champion_stadium.bin   # 观测台默认学生档 10W/6L
 │   └── domain_zoo_report.json             # 12 任务控制动物园报告
 ├── tools/                         # 演化工具链与后端网关
-├── tests/                         # 当前注册 113 个 CTest（以 `ctest -N` 为准；GPU 用例缺依赖时返回 77 SKIP）
+├── tests/                         # 当前注册 114 个 CTest（以 `ctest -N` 为准；GPU 用例缺依赖时返回 77 SKIP）
 └── runs/                          # 基准数据（含完整 ADAS 10-seed 结果）
     └── adas_champion_vs_stanley_seeds1-10_tuned_20260911.json  # L3 当前 9W/7L
 ```

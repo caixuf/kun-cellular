@@ -309,6 +309,10 @@ maze 0.90 vs 0.95、cartpole 1.00 vs 1.00、maglev 1.00 vs 0.95，top-5 1% activ
 - **S2-a**：10M 推理/变异/深拷贝复测（`test_compact_10m_scale.cpp` + `test_cuda_scale.cpp`）。
 - **S2-b**：top-k 路由，只激活 1%~5% 微柱；测 **active cells vs 能力**，总参数固定。
 - **S2-c**：适配器/BPTT 训练，激活检查点；验证梯度只流过活跃子图。
+
+**S2-c 结果（2026-11-23）**：见 `docs/handoff/2026-11-23-s1b-s2c-closure.md`。
+**机制冒烟 PASS**：`test_conditional_bptt_mask` 验证 tape 有界（8）、inactive 梯度严格为 0、
+active 梯度非零。**1B 全尺度 conditional BPTT 未做**，仍是工程缺口。
 - **判据（H5 首验）**：active 100k→500k→1M 的 held-out SR 单调；总算力近似线性于 active。
 - **失败含义**：路由不生效或能力不随 active 涨 → 100M 无意义，停在 S2。
 
