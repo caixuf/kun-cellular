@@ -379,6 +379,23 @@ public:
         };
     }
 
+    // 任务层只读 helper：供 best-of-N / verifier 打分使用（不改变任务语义）
+    float current_distance_to_goal() const {
+        return std::hypot(maze_.get_goal_x() - agent_.x, maze_.get_goal_y() - agent_.y);
+    }
+    int current_collision_count() const { return agent_.collision_count; }
+    // 测地势场距离：考虑墙体，比欧氏距离更适合做 1 步 verifier。
+    int current_geodesic_distance_to_goal() const {
+        const int x = static_cast<int>(std::floor(agent_.x));
+        const int y = static_cast<int>(std::floor(agent_.y));
+        if (x < 0 || x >= width_ || y < 0 || y >= height_) return 1000000;
+        const size_t idx = static_cast<size_t>(y) * static_cast<size_t>(width_) +
+                           static_cast<size_t>(x);
+        if (idx >= geo_dist_.size()) return 1000000;
+        const int d = geo_dist_[idx];
+        return d < 0 ? 1000000 : d;
+    }
+
     StepResult step(int action) override {
         CellularOrganism::ActionOutputs acts;
         if (action == 0) {

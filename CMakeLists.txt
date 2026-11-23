@@ -337,6 +337,15 @@ add_test(NAME test_organ_composition_v2
                  --out ${CMAKE_CURRENT_BINARY_DIR}/organ_composition_v2_quick.json)
 set_tests_properties(test_organ_composition_v2 PROPERTIES RUN_SERIAL TRUE TIMEOUT 180)
 
+# E-D Best-of-N + oracle verifier
+add_executable(bench_best_of_n "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_best_of_n.cpp")
+target_include_directories(bench_best_of_n PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(bench_best_of_n PRIVATE kun_cellular Threads::Threads m)
+add_test(NAME test_best_of_n
+         COMMAND bench_best_of_n --quick
+                 --out ${CMAKE_CURRENT_BINARY_DIR}/best_of_n_quick.json)
+set_tests_properties(test_best_of_n PROPERTIES RUN_SERIAL TRUE TIMEOUT 180)
+
 add_executable(train_quant_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_tripartite.cpp")
 target_link_libraries(train_quant_tripartite PRIVATE kun_cellular Threads::Threads m)
 
