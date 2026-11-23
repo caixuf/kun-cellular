@@ -286,9 +286,9 @@ void test_checkpoint_census_reasonableness() {
     std::vector<std::string> adas_ckpts = {
         "checkpoints/adas_cortex_champion.bin",
         "checkpoints/adas_track_champion.bin",
-        "checkpoints/adas_occupancy_10m.bin",
-        "checkpoints/adas_transient_1m.bin",
-        "checkpoints/adas_world_model_100m.bin"
+        "checkpoints/adas_occupancy_624c.bin",
+        "checkpoints/adas_transient_320c.bin",
+        "checkpoints/adas_world_model_1536c.bin"
     };
 
     for (const auto& rel : adas_ckpts) {

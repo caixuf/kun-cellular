@@ -23,6 +23,12 @@
 - **ADAS 基准择优引用**：完整 16 场景数据为 **7 胜 / 9 负**（指标为 CTE，越小越好），原 README 仅列赢的场景；该表 ✅/❌ 曾因比较方向写反导致 16/16 行倒置，已按 `runs/adas_champion_vs_stanley_seeds1-10.json` 重算（见下方勘误）。
 - **"19.06 ns / 52.47 M-Inf/s" 硬实时基准**：其源码 `include/kun/cellular/sdsc_apex_cortex.h` 与基准目标 `test_c11_apex_maneuver` 已随 `b555cb7`（2026-09-03 清理）移除，均不在版本库中，仓库内无可复现来源，暂不可引用。
 - **音乐皮层**：权重 = 随机初始化 + 高斯变异若干代，属声光玩具演示，不构成音乐生成能力宣称。
+- **100M "训练完成" 宣称**（2026-11-23 清理）：`runs/hundred_million_champion.pt`（2.5 GB）与 `runs/hundred_million_summary.json` 声称 `TRAINED_ON_CUDA`，实际仅 2 代/69 秒、无任务、无评测，参数分布接近初始化。已删除，不得作为“上亿训练”证据。
+- **1B "对话超级大脑"**（2026-11-23 清理）：`runs/laokexia_billion_summary.json` 训练耗时 9.25e-05 秒、fitness 9999，已删除；`runs/deprecated_hollow_artifacts/` 一并移除。
+- **`*_1m / *_10m / *_100m.bin` 命名膨胀**（2026-11-23 清理）：实际 header 仅 320~1536 细胞。已按真实细胞数重命名为 `*_320c / *_640c / *_624c / *_1280c / *_1536c`；禁止按文件名判断规模。
+- **ADAS 尺度"能力"指标**（2026-11-23 清理）：`bench_adas_scales` 的“波前保真度”在数据接近零时硬编码 0.88，“预测地平线”只看网络自身输出幅值、不与真值对账。两处已删除/改名；`docs/ADAS_SCALE_BENCHMARK_REPORT.md` 降级为硬件吞吐报告，不再声称 ADAS 能力。
+
+> 2026-11-23 清理明细（删除/重命名/隔离/代码修复/复现结果）：[`docs/handoff/2026-11-23-fake-artifact-cleanup.md`](docs/handoff/2026-11-23-fake-artifact-cleanup.md)
 
 ---
 
@@ -149,7 +155,7 @@ kun-cellular/
 │   ├── adas_cortex_champion_stadium.bin   # 观测台默认学生档 10W/6L
 │   └── domain_zoo_report.json             # 12 任务控制动物园报告
 ├── tools/                         # 演化工具链与后端网关
-├── tests/                         # 87 组回归测试（ctest 87/87 PASS）
+├── tests/                         # 当前注册 105 个 CTest（以 `ctest -N` 为准；GPU 用例缺依赖时返回 77 SKIP）
 └── runs/                          # 基准数据（含完整 ADAS 10-seed 结果）
     └── adas_champion_vs_stanley_seeds1-10_tuned_20260911.json  # L3 当前 9W/7L
 ```

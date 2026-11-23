@@ -1,11 +1,10 @@
 /**
  * ============================================================================
- * KunCellular ADAS 具身智能尺度全景基准测试工具 (1M / 10M / 100M+)
- * 
- * 严格恪守 AGENTS.md 宪章：
- * - 绝对不修改 include/kun/cellular/ 通用底座
- * - 纯外围 Task 具身适配 (tasks/adas/...)
- * - 在用户实际硬件 (NVIDIA GeForce RTX 5060) 上实弹压测
+ * KunCellular [1M / 10M / 100M] 硬件吞吐压测工具
+ *
+ * 定位：只测 CompactSoAGenome + CUDA 运行时的延迟/显存/吞吐。
+ * 明确不评估 ADAS 能力：拓扑均为合成构造，未训练、未演化。
+ * 2026-11-23 清理：删除硬编码 0.88 保真度、自指地平线/能力字段。
  * ============================================================================
  */
 
@@ -22,6 +21,7 @@
 #include <chrono>
 #include <cmath>
 #include <memory>
+#include <cstdlib>
 
 using namespace kun;
 using namespace kun::adas;
@@ -39,13 +39,11 @@ struct ScaleBenchmarkMetrics {
     double vram_mb_estimated;
     
     std::string spatial_resolution;
-    std::string prediction_horizon;
-    std::string embodied_capability;
-    std::string physical_metric_summary;
+    std::string honesty_note;
 };
 
-// 构造 1M 极速本能硬实时控制生命体
-CompactSoAGenome create_1m_reflex_genome() {
+// 构造 1M 合成压测拓扑（非训练控制器）
+CompactSoAGenome create_1m_stress_genome() {
     const uint32_t N_CELLS = 1000000;
     const uint32_t N_SYNS  = 1000000;
     const uint32_t IN_DIM  = 16;
@@ -99,8 +97,8 @@ CompactSoAGenome create_1m_reflex_genome() {
     return g;
 }
 
-// 构造 10M 动态时空占用网格生命体
-CompactSoAGenome create_10m_occupancy_genome() {
+// 构造 10M 合成压测拓扑（非训练占用模型）
+CompactSoAGenome create_10m_stress_genome() {
     const uint32_t N_CELLS = 10000000;
     const uint32_t N_SYNS  = 10000000;
     const uint32_t IN_DIM  = 256;
@@ -140,8 +138,8 @@ CompactSoAGenome create_10m_occupancy_genome() {
     return g;
 }
 
-// 构造 100M 全息 4D 时空连续体素世界模型生命体
-CompactSoAGenome create_100m_world_model_genome() {
+// 构造 100M 合成压测拓扑（非训练世界模型）
+CompactSoAGenome create_100m_stress_genome() {
     const uint32_t N_CELLS = 100000000;
     const uint32_t N_SYNS  = 100000000;
     const uint32_t IN_DIM  = 1024;
@@ -149,13 +147,13 @@ CompactSoAGenome create_100m_world_model_genome() {
 
     CompactSoAGenome g = CompactSoAGenome::create_empty(N_CELLS, N_SYNS, IN_DIM, OUT_DIM);
 
-    // 拓扑: 3D 嵌套体素拓扑与全息因果反事实皮层汇聚
+    // 拓扑: 3D 嵌套合成拓扑
     for (uint32_t i = 0; i < N_CELLS; ++i) {
         g.inc_off[i] = (i >= IN_DIM) ? (i - IN_DIM) : 0;
         if (i >= IN_DIM) {
             uint32_t syn_idx = i - IN_DIM;
             if (i >= N_CELLS - OUT_DIM) {
-                // 128 维反事实效应器汇聚关键盲区体素与长程时空博弈特征
+                // 128 维效应器汇聚合成特征
                 uint32_t eff_idx = i - (N_CELLS - OUT_DIM);
                 if (eff_idx < 32) {
                     g.inc_from[syn_idx] = 173 + (eff_idx % 4); // 盲区高熵特征体素
@@ -177,7 +175,7 @@ CompactSoAGenome create_100m_world_model_genome() {
     }
     g.inc_off[N_CELLS] = N_SYNS;
 
-    // 混入全息 4D 因果与反事实原语 (中间细胞)
+    // 混入合成原语分布 (中间细胞)
     for (uint32_t i = IN_DIM; i < N_CELLS - OUT_DIM; ++i) {
         if (i % 7 == 0) g.op_types[i] = SDSC_OP_DIFF;
         else if (i % 7 == 1) g.op_types[i] = SDSC_OP_CORRELATION;
@@ -192,12 +190,12 @@ CompactSoAGenome create_100m_world_model_genome() {
 }
 
 // 评测 1M 场景
-ScaleBenchmarkMetrics bench_1m_reflex(SdscCUDAGraph& cuda_graph) {
+ScaleBenchmarkMetrics bench_1m_stress(SdscCUDAGraph& cuda_graph) {
     std::cout << "\n=====================================================================\n";
-    std::cout << "  [实测 1/3] 1M 细胞规模: 本能硬实时控制与 100km/h 极速爆胎横摆抑制\n";
+    std::cout << "  [实测 1/3] 1M 细胞规模: 硬件延迟压测 (合成闭环, 非训练能力)\n";
     std::cout << "=====================================================================\n";
 
-    CompactSoAGenome g = create_1m_reflex_genome();
+    CompactSoAGenome g = create_1m_stress_genome();
     double vram_mb = (double)(g.num_cells * 21 + g.num_synapses * 8) / (1024.0 * 1024.0);
     std::cout << "  -> 紧凑 SoA 基因组内存: " << g.memory_bytes() / (1024.0 * 1024.0) << " MB | 预估 VRAM: " << vram_mb << " MB\n";
 
@@ -206,8 +204,12 @@ ScaleBenchmarkMetrics bench_1m_reflex(SdscCUDAGraph& cuda_graph) {
     auto t_up1 = std::chrono::high_resolution_clock::now();
     double upload_ms = std::chrono::duration<double, std::milli>(t_up1 - t_up0).count();
     std::cout << "  -> RTX 5060 显存上传: " << (ok ? "成功" : "失败") << " (" << upload_ms << " ms)\n";
+    if (!ok) {
+        std::cerr << "  [FATAL] upload failed (NVRTC/kernel/alloc); refusing to report latency\n";
+        std::exit(2);
+    }
 
-    // 建立 100km/h 极速爆胎瞬态物理环境 (持续 0.35s, dt = 0.5ms, 共 700 步)
+    // 建立 100km/h 合成爆胎瞬态环境 (持续 0.35s, dt = 0.5ms, 共 700 步)
     BlowoutDynamicsSimulator sim;
     std::vector<float> h_out(g.out_dim, 0.0f);
 
@@ -215,7 +217,7 @@ ScaleBenchmarkMetrics bench_1m_reflex(SdscCUDAGraph& cuda_graph) {
     std::vector<float> obs = sim.get_observation();
     cuda_graph.forward(obs.data(), h_out.data());
 
-    std::cout << "  -> 启动 100km/h 极速爆胎动力学实弹闭环测试 (700 步闭环, dt=0.5ms)...\n";
+    std::cout << "  -> 启动 100km/h 合成爆胎闭环压测 (700 步闭环, dt=0.5ms)...\n";
     const int STEPS = 700;
     auto t_f0 = std::chrono::high_resolution_clock::now();
 
@@ -223,7 +225,7 @@ ScaleBenchmarkMetrics bench_1m_reflex(SdscCUDAGraph& cuda_graph) {
         obs = sim.get_observation();
         cuda_graph.forward(obs.data(), h_out.data());
 
-        // 彻底废除手写 P 控制器！100% 由 1M 细胞神经网络效应器直出驱动物理仿真
+        // 合成闭环：手工接线效应器驱动物理仿真，仅用于延迟压测
         sim.step(h_out, 0.0005);
     }
     auto t_f1 = std::chrono::high_resolution_clock::now();
@@ -233,11 +235,10 @@ ScaleBenchmarkMetrics bench_1m_reflex(SdscCUDAGraph& cuda_graph) {
 
     std::cout << "  [PASS] 1M 闭环推演完成! 单步延迟: " << std::fixed << std::setprecision(3) << forward_ms_avg << " ms/step\n";
     std::cout << "  [PASS] RTX 5060 硬件吞吐量: " << throughput << " GigaCells/s (控制频率上限: " << (1000.0 / forward_ms_avg) << " Hz)\n";
-    std::cout << "  [PASS] 爆胎横摆角速度峰值: " << sim.peak_yaw_rate() << " rad/s | 收敛时间: " << sim.settled_time_ms() << " ms\n";
-    std::cout << "  [PASS] 极限侧向位移偏离: " << sim.peak_lat_dev() << " m (稳锁本车道内)\n";
+    std::cout << "  [NOTE] 合成爆胎闭环仅用于压测延迟，不作为 ADAS 控制能力证据\n";
 
     ScaleBenchmarkMetrics m{};
-    m.scale_name = "1M (百万级·本能硬实时)";
+    m.scale_name = "1M (硬件延迟压测)";
     m.num_cells = g.num_cells;
     m.num_synapses = g.num_synapses;
     m.in_dim = g.in_dim;
@@ -246,20 +247,18 @@ ScaleBenchmarkMetrics bench_1m_reflex(SdscCUDAGraph& cuda_graph) {
     m.forward_ms_avg = forward_ms_avg;
     m.throughput_gigacells_s = throughput;
     m.vram_mb_estimated = vram_mb;
-    m.spatial_resolution = "集总参数 (Lumped 16受体/8效应)";
-    m.prediction_horizon = "0.05s ~ 0.20s (微秒级瞬态内反射)";
-    m.embodied_capability = "100km/h极速爆胎横摆反向代偿/防滑矢量阻尼";
-    m.physical_metric_summary = "横摆收敛 " + std::to_string((int)sim.settled_time_ms()) + "ms | 侧偏 " + std::to_string(sim.peak_lat_dev()).substr(0, 4) + "m";
+    m.spatial_resolution = "合成 Lumped 16受体/8效应";
+    m.honesty_note = "hardware stress only; not a trained controller";
     return m;
 }
 
 // 评测 10M 场景
-ScaleBenchmarkMetrics bench_10m_occupancy(SdscCUDAGraph& cuda_graph) {
+ScaleBenchmarkMetrics bench_10m_stress(SdscCUDAGraph& cuda_graph) {
     std::cout << "\n=====================================================================\n";
-    std::cout << "  [实测 2/3] 10M 细胞规模: 连续动态时空占用网格与 360° 环视流场推演\n";
+    std::cout << "  [实测 2/3] 10M 细胞规模: 连续占用网格硬件延迟压测 (合成拓扑)\n";
     std::cout << "=====================================================================\n";
 
-    CompactSoAGenome g = create_10m_occupancy_genome();
+    CompactSoAGenome g = create_10m_stress_genome();
     double vram_mb = (double)(g.num_cells * 21 + g.num_synapses * 8) / (1024.0 * 1024.0);
     std::cout << "  -> 紧凑 SoA 基因组内存: " << g.memory_bytes() / (1024.0 * 1024.0) << " MB | 预估 VRAM: " << vram_mb << " MB\n";
 
@@ -268,6 +267,10 @@ ScaleBenchmarkMetrics bench_10m_occupancy(SdscCUDAGraph& cuda_graph) {
     auto t_up1 = std::chrono::high_resolution_clock::now();
     double upload_ms = std::chrono::duration<double, std::milli>(t_up1 - t_up0).count();
     std::cout << "  -> RTX 5060 显存上传: " << (ok ? "成功" : "失败") << " (" << upload_ms << " ms)\n";
+    if (!ok) {
+        std::cerr << "  [FATAL] upload failed (NVRTC/kernel/alloc); refusing to report latency\n";
+        std::exit(2);
+    }
 
     DynamicOccupancyHabitat hab(1024);
     std::vector<float> h_out(g.out_dim, 0.0f);
@@ -276,42 +279,26 @@ ScaleBenchmarkMetrics bench_10m_occupancy(SdscCUDAGraph& cuda_graph) {
     std::vector<float> obs = hab.generate_observation();
     cuda_graph.forward(obs.data(), h_out.data());
 
-    std::cout << "  -> 启动 360° 环视多障碍物高动态流场前瞻推演 (50 步, dt=0.02s)...\n";
+    std::cout << "  -> 启动 10M 合成栖息地闭环压测 (50 步, dt=0.02s)...\n";
     const int STEPS = 50;
     auto t_f0 = std::chrono::high_resolution_clock::now();
-    float correlation_sum = 0.0f;
 
     for (int step = 0; step < STEPS; ++step) {
         obs = hab.generate_observation();
         cuda_graph.forward(obs.data(), h_out.data());
-
-        // 计算推演流场与 1.5s 后真值的相关保真度
-        std::vector<float> future_gt = hab.compute_future_ground_truth(1.5f);
-        float dot = 0.0f, norm1 = 0.0f, norm2 = 0.0f;
-        for (size_t s = 0; s < future_gt.size(); ++s) {
-            float pred = std::abs(h_out[s]);
-            dot += pred * future_gt[s];
-            norm1 += pred * pred;
-            norm2 += future_gt[s] * future_gt[s];
-        }
-        float corr = (norm1 > 1e-4f && norm2 > 1e-4f) ? (dot / (std::sqrt(norm1) * std::sqrt(norm2))) : 0.88f;
-        correlation_sum += corr;
-
         hab.step(0.02f);
     }
     auto t_f1 = std::chrono::high_resolution_clock::now();
     double total_forward_ms = std::chrono::duration<double, std::milli>(t_f1 - t_f0).count();
     double forward_ms_avg = total_forward_ms / STEPS;
     double throughput = (double)g.num_cells / (forward_ms_avg / 1000.0) / 1e9;
-    float avg_corr = correlation_sum / STEPS;
 
-    std::cout << "  [PASS] 10M 时空场推演完成! 单步延迟: " << std::fixed << std::setprecision(3) << forward_ms_avg << " ms/step\n";
+    std::cout << "  [PASS] 10M 推演完成! 单步延迟: " << std::fixed << std::setprecision(3) << forward_ms_avg << " ms/step\n";
     std::cout << "  [PASS] RTX 5060 硬件吞吐量: " << throughput << " GigaCells/s (推演频率: " << (1000.0 / forward_ms_avg) << " Hz)\n";
-    std::cout << "  [PASS] 2.5D 占用栅格分辨率: 128m x 128m 连续流场 (0.25m 物理等效体素)\n";
-    std::cout << "  [PASS] 1.5s 动态流场波前传递保真度: " << (avg_corr * 100.0f) << " %\n";
+    std::cout << "  [NOTE] 合成栖息地不产生保真度/能力结论；旧 0.88 保底已删除\n";
 
     ScaleBenchmarkMetrics m{};
-    m.scale_name = "10M (千万级·连续占用网格)";
+    m.scale_name = "10M (硬件延迟压测)";
     m.num_cells = g.num_cells;
     m.num_synapses = g.num_synapses;
     m.in_dim = g.in_dim;
@@ -320,21 +307,19 @@ ScaleBenchmarkMetrics bench_10m_occupancy(SdscCUDAGraph& cuda_graph) {
     m.forward_ms_avg = forward_ms_avg;
     m.throughput_gigacells_s = throughput;
     m.vram_mb_estimated = vram_mb;
-    m.spatial_resolution = "2.5D 连续流场 (0.25m 栅格, 128m范围)";
-    m.prediction_horizon = "1.5s ~ 3.0s (动态流变前瞻)";
-    m.embodied_capability = "360°环视占据流场/遮挡弥散/多目标波前预测";
-    m.physical_metric_summary = "波前保真度 " + std::to_string((int)(avg_corr * 100.0f)) + "% | 0.25m等效分辨率";
+    m.spatial_resolution = "合成 2.5D 栖息地";
+    m.honesty_note = "hardware stress only; no fidelity metric";
     return m;
 }
 
 // 评测 100M 场景
-ScaleBenchmarkMetrics bench_100m_world_model(SdscCUDAGraph& cuda_graph) {
+ScaleBenchmarkMetrics bench_100m_stress(SdscCUDAGraph& cuda_graph) {
     std::cout << "\n=====================================================================\n";
-    std::cout << "  [实测 3/3] 100M+ 细胞规模硬件吞吐与显存上限压力测试 (Hardware Throughput Benchmark)\n";
-    std::cout << "  (科学定位说明: 验证非冯 SDSC 底座在 RTX 5060 8GB 下承载 1 亿连续细胞推演的物理吞吐与无GC硬实时)\n";
+    std::cout << "  [实测 3/3] 100M 细胞规模: 显存/吞吐压力测试 (合成拓扑, 非训练世界模型)\n";
+    std::cout << "  (定位: 只验证非冯 SDSC 底座能否承载 1 亿连续细胞推演); 不评估 ADAS 能力)\n";
     std::cout << "=====================================================================\n";
 
-    CompactSoAGenome g = create_100m_world_model_genome();
+    CompactSoAGenome g = create_100m_stress_genome();
     double vram_mb = (double)(g.num_cells * 21 + g.num_synapses * 8) / (1024.0 * 1024.0);
     std::cout << "  -> 紧凑 SoA 基因组内存: " << g.memory_bytes() / (1024.0 * 1024.0) << " MB | 预估 VRAM: " << vram_mb << " MB\n";
 
@@ -343,6 +328,10 @@ ScaleBenchmarkMetrics bench_100m_world_model(SdscCUDAGraph& cuda_graph) {
     auto t_up1 = std::chrono::high_resolution_clock::now();
     double upload_ms = std::chrono::duration<double, std::milli>(t_up1 - t_up0).count();
     std::cout << "  -> RTX 5060 显存上传: " << (ok ? "成功" : "失败") << " (" << upload_ms << " ms)\n";
+    if (!ok) {
+        std::cerr << "  [FATAL] upload failed (NVRTC/kernel/alloc); refusing to report latency\n";
+        std::exit(2);
+    }
 
     Holographic4DWorldModelHabitat hab(2026);
     std::vector<float> h_out(g.out_dim, 0.0f);
@@ -351,20 +340,13 @@ ScaleBenchmarkMetrics bench_100m_world_model(SdscCUDAGraph& cuda_graph) {
     std::vector<float> obs = hab.generate_3d_voxel_observation();
     cuda_graph.forward(obs.data(), h_out.data());
 
-    std::cout << "  -> 启动全息 4D 世界模型因果反事实推演与长程时空博弈 (20 步, dt=0.05s)...\n";
+    std::cout << "  -> 启动 100M 合成体素闭环压测 (20 步, dt=0.05s)...\n";
     const int STEPS = 20;
     auto t_f0 = std::chrono::high_resolution_clock::now();
-    float max_risk_awareness = 0.0f;
-    float max_horizon = 0.0f;
 
     for (int step = 0; step < STEPS; ++step) {
         obs = hab.generate_3d_voxel_observation();
         cuda_graph.forward(obs.data(), h_out.data());
-
-        auto eval = hab.evaluate_effectors(h_out.data(), h_out.size());
-        max_risk_awareness = std::max(max_risk_awareness, eval.blindspot_risk_awareness);
-        max_horizon = std::max(max_horizon, eval.prediction_horizon_seconds);
-
         hab.step(0.05f);
     }
     auto t_f1 = std::chrono::high_resolution_clock::now();
@@ -372,14 +354,12 @@ ScaleBenchmarkMetrics bench_100m_world_model(SdscCUDAGraph& cuda_graph) {
     double forward_ms_avg = total_forward_ms / STEPS;
     double throughput = (double)g.num_cells / (forward_ms_avg / 1000.0) / 1e9;
 
-    std::cout << "  [PASS] 100M+ 世界模型推演完成! 单步延迟: " << std::fixed << std::setprecision(3) << forward_ms_avg << " ms/step\n";
+    std::cout << "  [PASS] 100M 推演完成! 单步延迟: " << std::fixed << std::setprecision(3) << forward_ms_avg << " ms/step\n";
     std::cout << "  [PASS] RTX 5060 硬件吞吐量: " << throughput << " GigaCells/s (推演频率: " << (1000.0 / forward_ms_avg) << " Hz)\n";
-    std::cout << "  [PASS] 全息 4D 空间体素几何: 真 3D 空间立体嵌套体素 + 连续流体反事实\n";
-    std::cout << "  [PASS] 长程推演时间地平线: " << max_horizon << " 秒 (长程博弈与因果预判)\n";
-    std::cout << "  [PASS] 盲区反事实风险觉醒度: " << (max_risk_awareness * 100.0f) << " % (提前建立减速防御安全裕度)\n";
+    std::cout << "  [NOTE] 旧 '预测地平线/盲区觉醒度' 为自指指标，已从能力口径删除\n";
 
     ScaleBenchmarkMetrics m{};
-    m.scale_name = "100M+ (亿级·4D全息世界模型)";
+    m.scale_name = "100M (硬件压力测试)";
     m.num_cells = g.num_cells;
     m.num_synapses = g.num_synapses;
     m.in_dim = g.in_dim;
@@ -388,20 +368,19 @@ ScaleBenchmarkMetrics bench_100m_world_model(SdscCUDAGraph& cuda_graph) {
     m.forward_ms_avg = forward_ms_avg;
     m.throughput_gigacells_s = throughput;
     m.vram_mb_estimated = vram_mb;
-    m.spatial_resolution = "真 3D 几何立体体素 (32x16x2 层级)";
-    m.prediction_horizon = "5.0s ~ 8.0s (长程因果反事实推演)";
-    m.embodied_capability = "盲区因果反事实分支生成/长程博弈规划";
-    m.physical_metric_summary = "地平线 " + std::to_string(max_horizon).substr(0, 3) + "s | 风险觉醒 " + std::to_string((int)(max_risk_awareness * 100.0f)) + "%";
+    m.spatial_resolution = "合成 3D 体素栖息地";
+    m.honesty_note = "hardware stress only; no world-model capability";
     return m;
 }
 
 void print_summary_table(const std::vector<ScaleBenchmarkMetrics>& results) {
     std::cout << "\n\n";
     std::cout << "=========================================================================================================\n";
-    std::cout << "        KunCellular 智能驾驶硅基细胞计算机 [1M / 10M / 100M+] 尺度物理能力阶跃实测对账报告\n";
+    std::cout << "        KunCellular [1M / 10M / 100M] 硬件吞吐压测报告 (非能力报告)\n";
     std::cout << "        测试硬件: NVIDIA GeForce RTX 5060 Laptop GPU (8GB VRAM) | CUDA Driver 13.0 / NVRTC\n";
+    std::cout << "        说明: 拓扑均为合成构造，未经演化/训练；以下数字只代表硬件延迟与吞吐\n";
     std::cout << "=========================================================================================================\n";
-    std::cout << "| 指标维度 \\ 细胞尺度    | 1M (百万级·本能硬实时)     | 10M (千万级·连续占用栅格)  | 100M+ (亿级·4D全息世界模型) |\n";
+    std::cout << "| 指标维度 \\ 细胞尺度    | 1M (压力测试)              | 10M (压力测试)             | 100M (压力测试)             |\n";
     std::cout << "|-----------------------|---------------------------|---------------------------|----------------------------|\n";
     std::cout << "| 细胞数量 (Cells)      | 1,000,000                 | 10,000,000                | 100,000,000                |\n";
     std::cout << "| 突触数量 (Synapses)   | 1,000,000                 | 10,000,000                | 100,000,000                |\n";
@@ -427,44 +406,36 @@ void print_summary_table(const std::vector<ScaleBenchmarkMetrics>& results) {
               << std::setw(20) << (int)(1000.0 / results[1].forward_ms_avg) << " Hz | "
               << std::setw(21) << (int)(1000.0 / results[2].forward_ms_avg) << " Hz |\n";
 
-    std::cout << "| 空间物理表征分辨率    | " << std::setw(25) << results[0].spatial_resolution << " | "
+    std::cout << "| 空间表征 (合成栖息地)  | " << std::setw(25) << results[0].spatial_resolution << " | "
               << std::setw(25) << results[1].spatial_resolution << " | "
               << std::setw(26) << results[2].spatial_resolution << " |\n";
 
-    std::cout << "| 预测时间地平线 (Horizon)| " << std::setw(23) << results[0].prediction_horizon << " | "
-              << std::setw(25) << results[1].prediction_horizon << " | "
-              << std::setw(26) << results[2].prediction_horizon << " |\n";
-
-    std::cout << "| 智驾核心本质能力      | " << std::setw(25) << results[0].embodied_capability << " | "
-              << std::setw(25) << results[1].embodied_capability << " | "
-              << std::setw(26) << results[2].embodied_capability << " |\n";
-
-    std::cout << "| 实测物理指标对账      | " << std::setw(25) << results[0].physical_metric_summary << " | "
-              << std::setw(25) << results[1].physical_metric_summary << " | "
-              << std::setw(26) << results[2].physical_metric_summary << " |\n";
+    std::cout << "| 定性                  | " << std::setw(25) << results[0].honesty_note << " | "
+              << std::setw(25) << results[1].honesty_note << " | "
+              << std::setw(26) << results[2].honesty_note << " |\n";
     std::cout << "=========================================================================================================\n";
 }
 
 int main() {
     std::cout << "=====================================================================\n";
-    std::cout << "  KunCellular ADAS 智能驾驶具身场景 [1M / 10M / 100M+] 尺度性能基准测试\n";
+    std::cout << "  KunCellular [1M / 10M / 100M] 硬件吞吐压测 (非 ADAS 能力基准)\n";
     std::cout << "=====================================================================\n";
 
     SdscCUDAGraph cuda_graph;
     std::vector<ScaleBenchmarkMetrics> results;
 
-    // 1. 评测 1M
-    results.push_back(bench_1m_reflex(cuda_graph));
+    // 1. 压测 1M
+    results.push_back(bench_1m_stress(cuda_graph));
 
-    // 2. 评测 10M
-    results.push_back(bench_10m_occupancy(cuda_graph));
+    // 2. 压测 10M
+    results.push_back(bench_10m_stress(cuda_graph));
 
-    // 3. 评测 100M
-    results.push_back(bench_100m_world_model(cuda_graph));
+    // 3. 压测 100M
+    results.push_back(bench_100m_stress(cuda_graph));
 
     // 4. 输出汇总对账表
     print_summary_table(results);
 
-    std::cout << "\n[SUCCESS] 智能驾驶三尺度实弹对账全部通过，已验证硬件与物理表现代差！\n\n";
+    std::cout << "\n[SUCCESS] 三尺度硬件压测完成；未评估任何 ADAS 能力，未训练任何模型。\n\n";
     return 0;
 }

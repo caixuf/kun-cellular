@@ -90,7 +90,8 @@ foreach(TEST_SRC ${TEST_SOURCES})
             target_compile_options(${TEST_NAME} PRIVATE -UNDEBUG)
             add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
             # CUDA 重载测试并行偶发闪断 (单跑满分): 串行隔离
-            set_tests_properties(${TEST_NAME} PROPERTIES RUN_SERIAL TRUE)
+            # 77 = SKIP（例如 NVRTC builtins 缺失，100M 未实际执行）；禁止把 SKIP 当 PASS
+            set_tests_properties(${TEST_NAME} PROPERTIES RUN_SERIAL TRUE SKIP_RETURN_CODE 77)
             if(EXISTS "$ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib")
                 set_tests_properties(${TEST_NAME} PROPERTIES ENVIRONMENT "LD_LIBRARY_PATH=$ENV{HOME}/.local/lib/python3.12/site-packages/nvidia/cu13/lib:$ENV{LD_LIBRARY_PATH}")
             endif()

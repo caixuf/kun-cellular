@@ -17,7 +17,7 @@
   1. **确定性微基准 [E1]**：100 万细胞 / 300 万突触生命体（`checkpoints/sdsc_mega_1million.bin`）整步 CSR 前向推演耗时 **134.588 ms（7.43 MCells/s）**，mmap 零拷贝挂载 5.328 ms（`tests/test_binary_runtime_scale.c`）；运行期堆分配 0 字节。*此前宣称的 19.06 ns P50 / 52.47 M-Inferences/s / 端到端 0.385 µs 已撤回——其来源（`test_c11_apex_maneuver`、`sdsc_apex_cortex.h`）已于提交 `b555cb7` 中移除，当前代码树无法复现。*
   2. **车道保持皮层，随仓冠军 `checkpoints/adas_cortex_champion.bin`（210 细胞，630 突触）[E1]**：12/12 训练与 4/4 留出场景 100% 满分通过（≤ 0.60 m 最大 CTE 包络）；标准 S 弯平均 CTE 6.36 cm，温和 S 弯 6.03 cm，极限急弯 3.96 cm，走走停停 5.15 cm，留出验证集走走停停 7.76 cm；留出泛化比仅 0.29x；直道巡航经 L3 参数调优后稳态偏置压缩至 3.38 cm（$0.0338 \pm 0.0015\,\text{m}$，基准 Stanley 为 $0.0286 \pm 0.0017\,\text{m}$，差距仅 5.2 mm）；在其胜出的场景（s_curve、curve_easy、tight_curve、highway、ramp_merge）上优于 Stanley 1.0~1.3x，但 16 场景总战绩为 7 胜 9 负（表 2b）；C11/Python 逐帧对账达成位级一致（max |Δ| < 1e-5，PASS）。同场景同种子对照数据见 `runs/adas_champion_vs_stanley_seed7.json` 与 `runs/adas_champion_vs_stanley_seeds1-10.json`。**口径更新（2026-09-11）**：随仓冠军经 L3 sep-CMA-ES 重调后为 210 细胞 / **659 突触**、16 场景 **9 胜 7 负**（`runs/adas_champion_vs_stanley_seeds1-10_tuned_20260911.json`）；本节表格保留 2026-09-04 审计快照（630 突触 / 7 胜 9 负），当前口径以 README 为准。
   3. **10.7 年 43 品种商品期货样本外审计 [E1]**：单微柱玩具模型因缺乏空间侧向抑制而在样本外严重过拟合崩溃（10 年盲测夏普 -0.28 ~ -0.53）；43 微柱宏阵列的论文锚点曾报年化夏普 0.22 / +13.55% / 卡玛 0.67，**`--seed 0` 确定性复训未复现**（选择集夏普 2.16，OOS 夏普 **-0.03**；`checkpoints/quant_cortical_array_oos_repro_20260911.json`）。正式 `quant_cortical_array_champion.bin` 任务层冷评（`eval_cortical_array_bin`，u8/64 存盘表型）OOS 夏普 **+0.14** / +6.3% / 回撤 25.6%，**仍不是**锚点 0.22。此前 +20.30% / 夏普 +0.36 已撤回。Gate 3 对「可复现 0.22」**锁 FAIL**。
-  4. **全尺度硬件与物理动物园 [E1]**：单张消费级 RTX 5060 (8GB) 上 1 亿细胞纯算子核推演吞吐达 916.3 ~ 1,027.9 GCells/s（0.097 ~ 0.109 ms/step，显存仅 2.76 GB，全闭环 14.8 ms / 6.74 GCells/s）；DomainZoo 12 大经典物理动力学被控系统在确定性重跑（`tools/train_domain_zoo.cpp`）中 **12/12 通过 M1 门禁**（`checkpoints/domain_zoo_report.json`）；2026-09-09 曾短暂回落为 9/12（maglev / dc_motor / servo），经 Task 层植物/课程修复后于 2026-09-10/11 及 2026-09-14 复跑锁回 12/12，不得再引用过期 9/12 作为当前状态；空间迷宫死胡同寻优达成 100% 逃逸与 0 死锁。
+  4. **全尺度硬件与物理动物园 [E1]**：DomainZoo 12 大经典物理动力学被控系统在确定性重跑（`tools/train_domain_zoo.cpp`）中 **12/12 通过 M1 门禁**（`checkpoints/domain_zoo_report.json`）；2026-09-09 曾短暂回落为 9/12（maglev / dc_motor / servo），经 Task 层植物/课程修复后于 2026-09-10/11 及 2026-09-14 复跑锁回 12/12，不得再引用过期 9/12 作为当前状态；空间迷宫死胡同寻优达成 100% 逃逸与 0 死锁。**2026-11-23 撤回：1 亿细胞“纯内核”CUDA 吞吐（916.3 ~ 1,027.9 GCells/s）及 1M/10M/100M “ADAS 能力”指标全部作废——旧基准可在内核空转时“通过”，且“预测地平线”为自指指标。合成拓扑上已验证的全流水硬件数字为 1M 0.087 ms / 11.46 GCells/s、10M 1.272 ms / 7.86 GCells/s、100M 12.184 ms / 8.21 GCells/s——仅硬件，不构成能力声明。见 §5.4。**
 * **负面结果（如实报告）**：早期 +148.52% 量化论断经置换检验（p = 0.41–0.80）后撤回；上一稿驾驶头条数字（平均 CTE 0.0075 m）来自一份不可复现的报告文件，本稿撤回。
 * **局限性 (Limitations)**：冠军所用 6 类原语以外的原语必要性尚未证明；四个形态发生算子缺乏开关消融；驾驶结果为单种子训练；所有驾驶测试仅为仿真，**未经** ISO 26262 认证。
 
@@ -311,23 +311,31 @@ $$\text{GED}(G_A, G_B) = \sum_{\tau \in \mathcal{T}} \vert N_A(\tau) - N_B(\tau)
 
 * **学术发现**：单一微柱盲目加代数会样本内记忆化。43 柱 `--seed 0` 复训再现选择集繁荣（夏普 2.16）与 OOS 崩溃（-0.03）。正式 `champion.bin` 现可任务层冷评，OOS 夏普 **+0.14**，**仍不得把 0.22 当作当前成绩**。
 
-### 5.4 GPU 物理能力阶跃与 RTX 5060 真机全尺度实测 [E1]
-在单张消费级 **NVIDIA GeForce RTX 5060 Laptop GPU (8GB VRAM)** 上，基于紧凑列式基因组 (`CompactSoAGenome`) 与 CUDA NVRTC 原生硬件内核，对 1M、10M 与 100M+ 细胞生命体进行了端到端全张量化真机压力实测：
+### 5.4 GPU 规模声明 — 已撤回（2026-11-23）
 
-#### 表 4：消费级 RTX 5060 硬件上 1M / 10M / 100M+ 细胞实测对账表
-| 评测维度 | 1M (百万级·本能硬实时) | 10M (千万级·连续占用流场) | 100M+ (亿级·4D全息世界模型) |
-| :--- | :--- | :--- | :--- |
-| **细胞总数 (Cells) / 突触总数 (Synapses)** | **1,000,000 / 1,000,000** | **10,000,000 / 10,000,000** | **100,000,000 / 100,000,000 (一亿)** |
-| **感知受体维度 / 动作效应维度** | 16 In / 8 Out | 256 In / 64 Out | 1024 In / 128 Out |
-| **GPU 显存驻留空间 (VRAM)** | **27.6 MB** | **276.5 MB** | **2,765.6 MB (~2.76 GB)** |
-| **显存冷启动传输耗时** | $21.8\,\text{ms}$ | $23.6\,\text{ms}$ | $248.6\,\text{ms}$ |
-| **纯内核推演延迟 (Kernel Latency)** | **0.103 ms (103 μs)** | **0.181 ms (181 μs)** | **0.097 ~ 0.109 ms (97 μs)** |
-| **内核计算吞吐量 (Kernel Throughput)** | **9.74 GigaCells/s** | **55.38 GigaCells/s** | **916.32 ~ 1,027.95 GigaCells/s** |
-| **全闭环单步延迟 (Pipeline Latency)** | **0.142 ms** | **1.237 ms** | **14.838 ms** |
-| **全闭环控制刷新频率上限** | **7,057 ~ 9,742 Hz (~10 kHz)** | **808 Hz** | **67.4 Hz** (适配实车 50Hz 规划) |
-| **空间物理表征分辨率** | 集总参数动力学 (16 通道) | 2.5D 连续流场 (0.25m 栅格, 128m 视野) | 3D 几何立体空间体素 ($32\times 16\times 2$) |
+原 §5.4 表 4（“RTX 5060 上 1M / 10M / 100M+ 实测对账表”）**整表作废**，不得引用。
 
-* 注：上表严格为**硬件吞吐与显存基准**（测试程序 `tests/test_adas_scales.cpp`、`tests/test_cuda_scale.cpp` 与 `bench_adas_scales`）。其中纯内核吞吐（916 ~ 1,028 GCells/s）测定 GPU 流处理器的纯算子更新速率；全闭环单步延迟（14.8 ms）包含主机-设备同步与图调度开销。上一稿关于"推演地平线"、"反事实预见"等衍生行来自合成用具而非物理闭环任务，在具备真机封闭环境前明确标注为合成压力基准。
+原因：
+
+1. `SdscCUDAGraph::upload()` 在 NVRTC 编译失败时仍返回 `true`，`forward()` 静默空转；延迟/吞吐可以在根本没跑内核的情况下被打印出来。
+2. 1M/10M/100M 基因组均为手工构造的合成拓扑，不是训练或演化产物。
+3. “预测地平线”“波前保真度”均为自指代理量；保真度在数据接近零时甚至硬编码返回 `0.88`。
+
+2026-11-23 起 CUDA 运行时改为 **fail-closed**：编译/上传失败返回 `false`，`forward()` 拒绝执行，`tests/test_adas_scales` 返回 **77 (SKIP)** 而不是 PASS。设置 `LD_LIBRARY_PATH` 指向 NVRTC builtins 后，kernel 真实执行。
+
+仍可复现的数字（合成拓扑，仅硬件）：
+
+| 规模 | 路径 | 2026-11-23 实测 |
+|---|---|---|
+| 1M 细胞 / 3M 突触 | C11 mmap CSR（CPU） | **15.6 ms/step；64.08 MCells/s** |
+| 10M 细胞 / 10M 突触 | Compact SoA（CPU） | **200 MB；26.65 ms/step（375 MCells/s）** |
+| 1M 细胞 | CUDA 全流水 | **0.087 ms/step；11.46 GCells/s** |
+| 10M 细胞 | CUDA 全流水 | **1.272 ms/step；7.86 GCells/s** |
+| 100M 细胞 | CUDA 全流水 | **12.184 ms/step；8.21 GCells/s** |
+
+> 旧的 916~1028 GCells/s 为“pure kernel”口径，比全流水实测高约 100×，无可信复现；不得引用。旧的 237 GCells/s（10M）来自空转 forward，同样撤回。
+
+完整撤回说明见 `docs/ADAS_SCALE_BENCHMARK_REPORT.md`。
 
 ### 5.5 DomainZoo 12 域低维动力学物理动物园基准 [E1]
 为验证 SDSCC 在经典物理与控制理论中的普适通用性，我们在 `tasks/control/domain_zoo.hpp` 中构建了覆盖工业控制与力学运动学的 12 大经典基准，各域均秒级收敛并生成紧凑 `.bin` 镜像。以 `tools/train_domain_zoo.cpp` 确定性重跑（2026-09-14 复跑锁档，报告 `checkpoints/domain_zoo_report.json`），**12/12 域全部通过 M1 门禁**。勘误史：2026-09-09 曾因报告与 bin 漂移回落为 9/12（MagLev / DC Motor / Servo）；2026-09-10 在 **Task 层**修复被控对象与课程后对齐为 12/12——**不得把中间窗 9/12 当作当前状态**：

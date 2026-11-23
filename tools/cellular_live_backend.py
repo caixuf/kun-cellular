@@ -3012,7 +3012,8 @@ class SiliconCellularOrganism:
                     SymbioticMacroCell(3, "ZooEffectorRing", act_ids, color="#f43f5e")
                 ]
 
-            # 8.10 智能驾驶大尺度系列 (adas_transient_1m, adas_occupancy_10m, adas_world_model_100m)
+            # 8.10 智能驾驶外围小回路 (adas_transient_320c, adas_occupancy_624c, adas_world_model_1536c)
+            # 文件名已按真实 header 细胞数重命名；旧 *_1m/*_10m/*_100m 名称是膨胀命名，禁止恢复
             elif oid.startswith("adas_") and oid != "adas_track_champion":
                 raw_cells = ckpt.get("cells", [])
                 raw_syns = ckpt.get("synapses", [])
@@ -4658,13 +4659,9 @@ def get_organism_manifest_scale(oid: str) -> int:
                         return int(item.get("cells_scale", 210))
     except Exception:
         pass
-    if "100m" in oid:
-        return 100000000
-    if "10m" in oid:
-        return 10000000
-    if "1m" in oid or "mega" in oid:
-        return 1000000
-    return 210
+    # 不再按名字猜规模。文件名/oid 里的 1m/10m/100m 一律不可信；
+    # 规模必须来自 manifest 或 checkpoint header。未知返回 0。
+    return 0
 
 # 27 类动力学原语全色域生物质流调色盘 (RGB uint8)，权威严格对齐 include/kun/cellular/sdsc_primitives.h
 PALETTE_27_RGB = np.array([
@@ -4705,15 +4702,13 @@ def build_binary_manifold_payload(oid: str, target_count: int = 50000) -> bytes:
 
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     manifest_scale = get_organism_manifest_scale(oid)
-    is_macro_scale = (manifest_scale >= 100000) or ("100m" in oid) or ("10m" in oid) or ("1m" in oid)
+    is_macro_scale = manifest_scale >= 100000
     sample_n = max(60000, min(target_count, 80000)) if is_macro_scale else min(target_count, 1024)
 
-    # 优先检测真实 GPU 原生演化检查点 (.pt)
+    # 只认 runs/{oid}.pt；100m/1m 专用 .pt 已移入 runs/quarantine_unproven/
     pt_path = None
     candidate_pt = [
         os.path.join(base_dir, "runs", f"{oid}.pt"),
-        os.path.join(base_dir, "runs", "hundred_million_champion.pt") if ("100m" in oid or oid == "quant_world_model_100m") else None,
-        os.path.join(base_dir, "runs", "quant_million_brain_evolved_champion.pt") if ("1m" in oid or oid == "quant_market_making_1m") else None
     ]
     for cp in candidate_pt:
         if cp and os.path.exists(cp):
@@ -4968,12 +4963,10 @@ def build_binary_synapse_payload(oid: str, target_lines: int = 24000) -> bytes:
     real_edges = []
     real_weights = []
 
-    # 1. 优先从真实 GPU 原生演化检查点 (.pt) 抽取真实因果突触拓扑
+    # 1. 只从 runs/{oid}.pt 抽取拓扑；100m/1m 专用 .pt 已移入 quarantine_unproven
     pt_path = None
     candidate_pt = [
         os.path.join(ROOT_DIR, "runs", f"{oid}.pt"),
-        os.path.join(ROOT_DIR, "runs", "hundred_million_champion.pt") if ("100m" in oid or oid == "quant_world_model_100m") else None,
-        os.path.join(ROOT_DIR, "runs", "quant_million_brain_evolved_champion.pt") if ("1m" in oid or oid == "quant_market_making_1m") else None
     ]
     for cp in candidate_pt:
         if cp and os.path.exists(cp):

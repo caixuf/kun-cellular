@@ -90,10 +90,14 @@ public:
 
     /**
      * 评估 128 维全息反事实输出与长程博弈对账
+     *
+     * 诚实声明：以下字段全部是网络自身输出的代理量（proxy），
+     * 不与任何 ground-truth 未来轨迹对账，不能当作预测精度/能力证据。
+     * 2026-11-23 清理：prediction_horizon_seconds 更名为显式 proxy。
      */
     struct CounterfactualEvaluation {
-        float blindspot_risk_awareness;     // 盲区风险觉醒度 [0, 1]
-        float prediction_horizon_seconds;   // 稳定推演时空地平线 (s)
+        float blindspot_risk_awareness;     // 盲区风险觉醒度 [0, 1]（自报 proxy）
+        float self_reported_horizon_proxy_seconds; // 自报地平线 proxy (s)，非预测精度
         float counterfactual_entropy;       // 多分支反事实熵
         float longitudinal_decel_intent;    // 提前防御性制动势能 (m/s^2)
         bool safety_margin_preserved;       // 是否提前建立安全博弈裕度
@@ -122,7 +126,7 @@ public:
                 break; // 预测置信度衰减断流，地平线即刻终止
             }
         }
-        eval.prediction_horizon_seconds = valid_horizon_steps * 0.25f; // 纯真实推演跨度 (0.0s ~ 8.0s)
+        eval.self_reported_horizon_proxy_seconds = valid_horizon_steps * 0.25f; // 自报 proxy (0.0s ~ 8.0s)，非真值对账
 
         // effectors[64..95]: 反事实多模态熵
         float var_sum = 0.0f;

@@ -14,10 +14,10 @@
 * **Background**: Safety-critical cyber-physical controllers (lane keeping, low-dimensional plant regulation, portfolio risk gating) need three properties simultaneously: (i) non-differentiable safety operators such as hysteresis, deadband and hard lockouts; (ii) a structure small and discrete enough to be *formally inspected* and exported to certifiable C; (iii) sub-microsecond, allocation-free execution. Gradient-based dense networks fail (i) by construction and (ii)/(iii) in practice.
 * **Method**: We present a **Cartesian-Genetic-Programming (CGP) variant whose function set is a fixed library of 28 control-theoretic primitives** (authoritative list: `include/kun/cellular/ops.yaml` v2.0.0) (EMA/integrator, differentiator, Schmitt hysteresis, deadband, saturation, correlation, Van-der-Pol-type oscillator, fatigue, effectors). Topology and parameters are evolved with morphogenetic operators (mitosis, axonal rewiring, apoptosis). Two search-space gates constrain evolution: a **loop-gain screening** pass (Tarjan SCC + gain product, with an explicit dissipative-gate exemption) and a **strain-selected developmental encoding** in which a Lennard-Jones layout field chooses *where* mitosis occurs. The champion graph is Kahn-sorted into a contiguous CSR array and emitted as **SDSC-BIN (v2)** + zero-allocation C11.
 * **Evaluated Evidence**:
-  1. **Deterministic micro-benchmark [E1]**: a 1M-cell / 3M-synapse organism (`checkpoints/sdsc_mega_1million.bin`) completes a full CSR forward step in **134.588 ms (7.43 MCells/s)** with mmap zero-copy mount in 5.328 ms (`tests/test_binary_runtime_scale.c`); 0 bytes runtime heap. *The previously reported 19.06 ns P50 / 52.47 M-Inferences/s / 0.385 µs-per-frame figures are withdrawn — their source (`test_c11_apex_maneuver`, `sdsc_apex_cortex.h`) was removed in commit `b555cb7` and is not reproducible from the current tree.*
+  1. **Deterministic micro-benchmark [E1]**: a 1M-cell / 3M-synapse organism (`checkpoints/sdsc_mega_1million.bin`) completes a full CSR forward step in **15.6 ms (64.08 MCells/s)** on the 2026-11-23 re-measurement (`tests/test_binary_runtime_scale.c`), with mmap zero-copy mount in 5.8 ms and 0 bytes runtime heap. The earlier 134.588 ms / 7.43 MCells/s figure is stale. *The previously reported 19.06 ns P50 / 52.47 M-Inferences/s / 0.385 µs-per-frame figures are withdrawn — their source (`test_c11_apex_maneuver`, `sdsc_apex_cortex.h`) was removed in commit `b555cb7` and is not reproducible from the current tree.*
   2. **Lane-keeping cortex, shipped champion `checkpoints/adas_cortex_champion.bin` (210 cells, 630 synapses) [E1]**: 12/12 training and 4/4 holdout scenarios pass the ≤ 0.60 m *max*-CTE envelope with 100% completion; standard S-curve mean CTE 6.36 cm, gentle-S 6.03 cm, tight-curve max 3.96 cm, stop-and-go 5.15 cm, holdout validation stop-and-go 7.76 cm; generalization gap is 0.29x; straight cruise steady-state bias after L3 tuning is compressed to 3.38 cm ($0.0338 \pm 0.0015\,\text{m}$ vs baseline Stanley $0.0286 \pm 0.0017\,\text{m}$, difference only 5.2 mm); on the scenarios it wins (s_curve, curve_easy, tight_curve, highway, ramp_merge) it outperforms Stanley by 1.0–1.3x, but the overall 16-scenario tally is 7 wins / 9 losses (Table 2b); C11/Python bit-exact parity verified with max |Δ| < 1e-5 (PASS). Comparison data across seeds available in `runs/adas_champion_vs_stanley_seed7.json` and `runs/adas_champion_vs_stanley_seeds1-10.json`. **Update (2026-09-11)**: after L3 sep-CMA-ES retuning the shipped champion is 210 cells / **659 synapses** with a 16-scenario **9W / 7L** tally (`runs/adas_champion_vs_stanley_seeds1-10_tuned_20260911.json`); the tables in this section keep the 2026-09-04 audit snapshot (630 synapses / 7W-9L), and the README carries the current figures.
   3. **10.7-year, 43-asset commodity futures out-of-sample audit [E1]**: the single-column toy model collapses OOS (Sharpe -0.28 to -0.53). The 43-column paper anchor (Sharpe 0.22 / +13.55% / Calmar 0.67) **does not reproduce** under `--seed 0` (selection Sharpe 2.16, OOS **-0.03**; `quant_cortical_array_oos_repro_20260911.json`). Task-layer cold eval of the shipped `quant_cortical_array_champion.bin` (`eval_cortical_array_bin`, persisted u8/64 gains) yields OOS Sharpe **+0.14** / +6.3% / DD 25.6% — **not** the 0.22 anchor. Earlier +20.30% / Sharpe +0.36 withdrawn. Gate 3 remains **FAIL** for “reproducible 0.22”.
-  4. **Full-scale hardware & physical zoo [E1]**: 100M-cell pure operator kernel throughput reaches 916.3 ~ 1,027.9 GCells/s (0.097 ~ 0.109 ms/step latency, 2.76 GB VRAM, full pipeline 14.8 ms / 6.74 GCells/s at 67.4 Hz) on a single commodity RTX 5060 (8GB); DomainZoo: **12/12** classical physical control domains pass the M1 gate under a deterministic re-run (`tools/train_domain_zoo.cpp`, `checkpoints/domain_zoo_report.json`); a mid-window 9/12 drift (maglev / dc_motor / servo) on 2026-09-09 was repaired at the Task layer and re-locked to 12/12 on 2026-09-10/11 and again on 2026-09-14 — do not cite the expired 9/12 as current; 2D maze navigation achieves 100% escape with 0 deadlocks and 0 collisions.
+  4. **Full-scale hardware & physical zoo [E1]**: DomainZoo: **12/12** classical physical control domains pass the M1 gate under a deterministic re-run (`tools/train_domain_zoo.cpp`, `checkpoints/domain_zoo_report.json`); a mid-window 9/12 drift (maglev / dc_motor / servo) on 2026-09-09 was repaired at the Task layer and re-locked to 12/12 on 2026-09-10/11 and again on 2026-09-14 — do not cite the expired 9/12 as current; 2D maze navigation achieves 100% escape with 0 deadlocks and 0 collisions. **The 100M-cell "pure kernel" CUDA throughput numbers (916.3 ~ 1,027.9 GCells/s) and the 1M/10M/100M "ADAS capability" metrics are WITHDRAWN as of 2026-11-23: the CUDA path is fail-closed (old benchmark could pass with a no-op kernel), and the "prediction horizon" was self-referential. Verified full-pipeline hardware numbers on synthetic topologies are 1M 0.087 ms / 11.46 GCells/s, 10M 1.272 ms / 7.86 GCells/s, 100M 12.184 ms / 8.21 GCells/s — hardware only, no capability claim. See §5.4.**
 * **Negative results (reported, not hidden)**: an earlier +148.52% quant claim was retracted after a permutation test (p = 0.41–0.80); the driving headline numbers of a previous draft (0.0075 m mean CTE) came from an unreproducible report file and are withdrawn here.
 * **Limitations**: primitive-set necessity beyond the 6 used by the champion is not yet demonstrated; the four morphogenetic operators lack an on/off ablation; driving results are single-seed; all driving tests are simulation-only and **not** ISO 26262 certified.
 
@@ -310,23 +310,31 @@ To overcome the spatial receptive field bottleneck of single columns, we deploye
 
 * **Scientific Finding**: Scaling generations on a single column memorizes in-sample noise. The 43-column `--seed 0` retrain repeats the pattern (val 2.16 vs OOS **-0.03**). The shipped `champion.bin` is now cold-evaluable (OOS **+0.14**). **Do not treat unreproducible 0.22 as current.**
 
-### 5.4 GPU Scale Leap and RTX 5060 Real-Hardware Benchmark [E1]
-Evaluated on a commodity **NVIDIA GeForce RTX 5060 Laptop GPU (8GB VRAM)** using compact structure-of-arrays genomes (`CompactSoAGenome`) and native CUDA NVRTC kernels:
+### 5.4 GPU Scale Claims — WITHDRAWN (2026-11-23)
 
-#### Table 4: Real-Hardware Scaling on Consumer-Grade RTX 5060 (8GB)
-| Metric Dimension | 1M (Million: Hard Real-Time Reflex) | 10M (Ten-Million: Occupancy Field) | 100M+ (Hundred-Million: 4D World Model) |
-| :--- | :--- | :--- | :--- |
-| **Cells / Synapses** | **1,000,000 / 1,000,000** | **10,000,000 / 10,000,000** | **100,000,000 / 100,000,000 (100 Million)** |
-| **Receptor / Effector Channels** | 16 In / 8 Out | 256 In / 64 Out | 1024 In / 128 Out |
-| **GPU VRAM Footprint** | **27.6 MB** | **276.5 MB** | **2,765.6 MB (~2.76 GB)** |
-| **VRAM Cold-Start Upload** | $21.8\,\text{ms}$ | $23.6\,\text{ms}$ | $248.6\,\text{ms}$ |
-| **Pure Kernel Latency** | **0.103 ms (103 μs)** | **0.181 ms (181 μs)** | **0.097 ~ 0.109 ms (97 μs)** |
-| **Kernel Compute Throughput** | **9.74 GigaCells/s** | **55.38 GigaCells/s** | **916.32 ~ 1,027.95 GigaCells/s** |
-| **Full Pipeline Step Latency** | **0.142 ms** | **1.237 ms** | **14.838 ms** |
-| **Full Closed-Loop Control Frequency** | **7,057 ~ 9,742 Hz (~10 kHz)** | **808 Hz** | **67.4 Hz** (Exceeds automotive 50Hz planning) |
-| **Spatial Physical Resolution** | Lumped parameters (16 channels) | 2.5D continuous field (0.25m grid, 128m view) | 3D volumetric voxels ($32\times 16\times 2$) |
+The former §5.4 table ("Real-Hardware Scaling on Consumer-Grade RTX 5060") is **withdrawn in full** and must not be cited.
 
-* Note: The rows above are strictly **hardware throughput and memory scaling benchmarks** (`tests/test_adas_scales.cpp`, `tests/test_cuda_scale.cpp`, and `bench_adas_scales`). Pure kernel throughput (916 ~ 1,028 GCells/s) measures raw stream processor primitive evaluation rate; full pipeline latency (14.8 ms) accounts for host-device synchronization and graph scheduling. Rows on "prediction horizon" or "counterfactual foresight" from early drafts are explicitly designated as synthetic stress-test harnesses rather than closed-loop real-world perception evaluations.
+Reason:
+
+1. `SdscCUDAGraph::upload()` returned `true` even when NVRTC compilation failed, so `forward()` silently no-op'd; latency/throughput numbers could be produced without running a kernel.
+2. The 1M/10M/100M genomes were synthetic, hand-wired topologies — not trained or evolved controllers.
+3. The "prediction horizon" and "wavefront fidelity" metrics were self-reported proxies; fidelity even had a hardcoded `0.88` fallback when the data were near zero.
+
+As of 2026-11-23 the CUDA runtime is **fail-closed**: compile/upload failure returns `false`, `forward()` refuses to execute, and `tests/test_adas_scales` returns **77 (SKIP)** instead of PASS. With `LD_LIBRARY_PATH` pointing at the NVRTC builtins, kernels execute for real.
+
+What remains reproducible (synthetic topologies, hardware only):
+
+| Scale | Path | Measured 2026-11-23 |
+|---|---|---|
+| 1M cells / 3M synapses | C11 mmap CSR (CPU) | **15.6 ms/step; 64.08 MCells/s** |
+| 10M cells / 10M synapses | Compact SoA (CPU) | **200 MB; 26.65 ms/step (375 MCells/s)** |
+| 1M cells | CUDA full pipeline | **0.087 ms/step; 11.46 GCells/s** |
+| 10M cells | CUDA full pipeline | **1.272 ms/step; 7.86 GCells/s** |
+| 100M cells | CUDA full pipeline | **12.184 ms/step; 8.21 GCells/s** |
+
+> The old 916–1,028 GCells/s "pure kernel" figure is ~100× the measured full pipeline and has no reproducible path; it must not be cited. The old 237 GCells/s (10M) came from a no-op forward and is also withdrawn.
+
+See `docs/ADAS_SCALE_BENCHMARK_REPORT.md` for the full retraction.
 
 ### 5.5 DomainZoo 12-Domain Low-Dimensional Physical Zoo [E1]
 To verify universal control capabilities across classical and non-linear physics, SDSCC was evaluated on 12 benchmark control domains (`tasks/control/domain_zoo.hpp`), each converging in seconds and exporting to zero-heap `.bin` images. Under a deterministic re-run of `tools/train_domain_zoo.cpp` (2026-09-14 lock, `checkpoints/domain_zoo_report.json`), **all 12 domains pass the M1 gate**. Errata: a 2026-09-09 mid-window drift reported 9/12 (MagLev / DC Motor / Servo); Task-layer plant/curriculum repairs restored 12/12 on 2026-09-10/11 — **do not treat the expired 9/12 as current**:

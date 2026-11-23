@@ -25,6 +25,12 @@
 
 namespace kun {
 
+// 最近一次 CUDA Driver API 错误（thread-local）。宏只记录，不静默吞掉。
+inline CUresult& sdsc_cuda_last_error() {
+    static thread_local CUresult err = CUDA_SUCCESS;
+    return err;
+}
+
 #define SDSC_CUDA_CHECK(call) do { \
     CUresult err = (call); \
     if (err != CUDA_SUCCESS) { \
@@ -32,6 +38,7 @@ namespace kun {
         cuGetErrorString(err, &err_str); \
         std::cerr << "[SDSC CUDA ERROR] " << (err_str ? err_str : "Unknown") \
                   << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        kun::sdsc_cuda_last_error() = err; \
     } \
 } while(0)
 
@@ -40,15 +47,27 @@ public:
     SdscCUDAGraph() {
         init_cuda_context();
         compile_cuda_kernel();
+        if (!compile_ok_) {
+            std::cerr << "[SDSC CUDA FATAL] kernel JIT compilation failed; "
+                         "graph is NOT usable (fail-closed)" << std::endl;
+        }
     }
 
     ~SdscCUDAGraph() {
         free_device_memory();
+        if (module_) { cuModuleUnload(module_); module_ = 0; }
+        if (ctx_) { cuDevicePrimaryCtxRelease(dev_); ctx_ = 0; }
     }
 
-    // 将紧凑 SoA 基因组上传至 GPU 显存
+    // 将紧凑 SoA 基因组上传至 GPU 显存；任何失败都返回 false（fail-closed）
     bool upload(const CompactSoAGenome& g) {
+        ready_ = false;
+        if (!compile_ok_) {
+            std::cerr << "[SDSC CUDA ERROR] upload rejected: kernel not compiled" << std::endl;
+            return false;
+        }
         if (g.num_cells == 0) return false;
+        sdsc_cuda_last_error() = CUDA_SUCCESS;
         num_cells_ = g.num_cells;
         num_synapses_ = g.num_synapses;
         in_dim_ = g.in_dim;
@@ -84,6 +103,12 @@ public:
         SDSC_CUDA_CHECK(cuMemcpyHtoD(d_out_cell_ids_, g.out_cell_ids.data(), out_dim_ * sizeof(uint32_t)));
 
         reset_device_states();
+        if (sdsc_cuda_last_error() != CUDA_SUCCESS) {
+            std::cerr << "[SDSC CUDA ERROR] upload failed during alloc/copy; "
+                         "graph remains not ready" << std::endl;
+            return false;
+        }
+        ready_ = true;
         return true;
     }
 
@@ -96,6 +121,11 @@ public:
 
     // 运行单步 CUDA 并发前向推演
     void forward(const float* h_in, float* h_out) {
+        if (!ready_) {
+            std::cerr << "[SDSC CUDA ERROR] forward rejected: graph not ready "
+                         "(upload failed or kernel not compiled)" << std::endl;
+            return;
+        }
         if (!h_in || !h_out || num_cells_ == 0) return;
 
         // 拷贝输入到显存
@@ -138,6 +168,7 @@ private:
         SDSC_CUDA_CHECK(cuInit(0));
         CUdevice dev;
         SDSC_CUDA_CHECK(cuDeviceGet(&dev, 0));
+        dev_ = dev;
         SDSC_CUDA_CHECK(cuDevicePrimaryCtxRetain(&ctx_, dev));
         SDSC_CUDA_CHECK(cuCtxSetCurrent(ctx_));
     }
@@ -213,19 +244,35 @@ private:
             nvrtcGetProgramLogSize(prog, &log_size);
             std::vector<char> log(log_size);
             nvrtcGetProgramLog(prog, log.data());
-            std::cerr << "[NVRTC CUDA COMPILE ERROR]\n" << log.data() << std::endl;
+            std::cerr << "[NVRTC CUDA COMPILE ERROR] code=" << res << "\n"
+                      << log.data() << std::endl;
+            nvrtcDestroyProgram(&prog);
+            compile_ok_ = false;
+            return;
         }
 
-        size_t ptx_size;
-        nvrtcGetPTXSize(prog, &ptx_size);
+        size_t ptx_size = 0;
+        if (nvrtcGetPTXSize(prog, &ptx_size) != NVRTC_SUCCESS || ptx_size == 0) {
+            std::cerr << "[NVRTC CUDA ERROR] failed to get PTX size" << std::endl;
+            nvrtcDestroyProgram(&prog);
+            compile_ok_ = false;
+            return;
+        }
         std::vector<char> ptx(ptx_size);
-        nvrtcGetPTX(prog, ptx.data());
+        if (nvrtcGetPTX(prog, ptx.data()) != NVRTC_SUCCESS) {
+            std::cerr << "[NVRTC CUDA ERROR] failed to get PTX" << std::endl;
+            nvrtcDestroyProgram(&prog);
+            compile_ok_ = false;
+            return;
+        }
         nvrtcDestroyProgram(&prog);
 
+        sdsc_cuda_last_error() = CUDA_SUCCESS;
         SDSC_CUDA_CHECK(cuModuleLoadDataEx(&module_, ptx.data(), 0, 0, 0));
         SDSC_CUDA_CHECK(cuModuleGetFunction(&kernel_input_inject_, module_, "kernel_input_inject"));
         SDSC_CUDA_CHECK(cuModuleGetFunction(&kernel_eval_, module_, "kernel_eval"));
         SDSC_CUDA_CHECK(cuModuleGetFunction(&kernel_output_collect_, module_, "kernel_output_collect"));
+        compile_ok_ = (sdsc_cuda_last_error() == CUDA_SUCCESS);
     }
 
     void free_device_memory() {
@@ -246,6 +293,9 @@ private:
     uint32_t num_synapses_{0};
     uint32_t in_dim_{0};
     uint32_t out_dim_{0};
+    bool compile_ok_{false};
+    bool ready_{false};
+    CUdevice dev_{0};
 
     CUcontext ctx_{0};
     CUmodule  module_{0};
