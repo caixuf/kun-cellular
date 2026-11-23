@@ -165,6 +165,14 @@ H2 PASS：D=16 上无草稿纸 55.0%、8 通道真实反馈 100%、随机反馈 
 
 **标签纪律**：只有全部满足才允许写 E2；否则 E1 或负结果。禁止裸写“涌现”。
 
+**结果（2026-11-23）**：见 `docs/handoff/2026-11-23-ec-organ-composition.md`。
+H3 **FAIL**：full 100%，最佳单器官 75.6%（single_event），Δ=24.4pp < 25pp（差 0.6pp）。
+但这是**阈值天花板问题**：二选一任务里 single_event 靠“有 pulse 就猜边”拿到 50%，
+整体被抬到 75.6%，而 full 已满分 100%，+25pp 数学上不可达。
+条件在 pulse 子集上：full 100% vs single 51.9%，Δ=48.1pp，p=7.07e-74；
+LOO 49.3%，monolith 50.7%。结论：组合效应真实且大，但预注册总 SR 阈值设计错误；
+按纪律标 E1，不写 E2。v2 建议：4-way cue（chance 25%）重新预注册。
+
 ---
 
 ### E-D Best-of-N + verifier（stretch，1 周，可与 E-B 并行）

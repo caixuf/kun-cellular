@@ -319,6 +319,15 @@ add_test(NAME test_scratchpad_cot
                  --out ${CMAKE_CURRENT_BINARY_DIR}/scratchpad_quick.json)
 set_tests_properties(test_scratchpad_cot PROPERTIES RUN_SERIAL TRUE TIMEOUT 180)
 
+# E-C 冻结器官组合超加性
+add_executable(bench_organ_composition "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_organ_composition.cpp")
+target_include_directories(bench_organ_composition PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(bench_organ_composition PRIVATE kun_cellular Threads::Threads m)
+add_test(NAME test_organ_composition
+         COMMAND bench_organ_composition --quick
+                 --out ${CMAKE_CURRENT_BINARY_DIR}/organ_composition_quick.json)
+set_tests_properties(test_organ_composition PROPERTIES RUN_SERIAL TRUE TIMEOUT 180)
+
 add_executable(train_quant_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_tripartite.cpp")
 target_link_libraries(train_quant_tripartite PRIVATE kun_cellular Threads::Threads m)
 
