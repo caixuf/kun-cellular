@@ -108,6 +108,11 @@
 
 **产出**：`runs/ttc_scaling_<date>.json` + `docs/handoff/<date>-ttc-scaling.md`。
 
+**结果（2026-11-23）**：见 `docs/handoff/2026-11-23-ea-ttc.md`。
+机械门禁 PASS（maze d=0.5，K=4 相对 K=1 +28pp，p=7.45e-09），但**能力门禁 FAIL**：
+K=1 + damping=1.0 已是 0.98，K=4 + damping=0.5 也是 0.98，相对最佳 K=1 基线 Δ=0.00。
+结论：松弛只补偿低 damping 的收敛不足，不是能力增益（E1，非 E2）→ E-B 成为强制下一步。
+
 **负结果处理**：若全平，明确写「固定点松弛不产生能力相变」，并作为 E-B 的强制前置动机。
 
 ---

@@ -301,6 +301,15 @@ target_link_libraries(train_cart_pole_tripartite PRIVATE kun_cellular Threads::T
 add_executable(bench_easy_task_regression "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_easy_task_regression.cpp")
 target_link_libraries(bench_easy_task_regression PRIVATE kun_cellular Threads::Threads m)
 
+# E-A 推理时计算缩放 (Test-Time Compute Scaling) 预注册基准
+add_executable(bench_ttc_scaling "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_ttc_scaling.cpp")
+target_include_directories(bench_ttc_scaling PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(bench_ttc_scaling PRIVATE kun_cellular Threads::Threads m)
+add_test(NAME test_ttc_scaling
+         COMMAND bench_ttc_scaling --quick --episodes 6 --seed 70000
+                 --out ${CMAKE_CURRENT_BINARY_DIR}/ttc_scaling_quick.json)
+set_tests_properties(test_ttc_scaling PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
+
 add_executable(train_quant_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_tripartite.cpp")
 target_link_libraries(train_quant_tripartite PRIVATE kun_cellular Threads::Threads m)
 
