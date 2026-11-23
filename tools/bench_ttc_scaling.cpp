@@ -384,7 +384,7 @@ static void write_results(std::ostream& os, const std::vector<TaskResult>& rows)
            << ",\"sr\":" << r.sr
            << ",\"baseline_sr\":" << r.baseline_sr
            << ",\"delta_sr\":" << r.delta_sr
-           << ",\"p_mcnemar\":" << r.p_mcnemar
+           << ",\"p_mcnemar\":" << std::scientific << r.p_mcnemar << std::fixed
            << ",\"mean_steps\":" << r.mean_steps
            << ",\"mean_relax_steps\":" << r.mean_relax_steps
            << ",\"converged_rate\":" << r.converged_rate
@@ -393,7 +393,7 @@ static void write_results(std::ostream& os, const std::vector<TaskResult>& rows)
            << ",\"fluid_cost\":" << r.fluid_cost
            << ",\"best_k1_sr\":" << r.best_k1_sr
            << ",\"delta_vs_best_k1\":" << r.delta_vs_best_k1
-           << ",\"p_vs_best_k1\":" << r.p_vs_best_k1
+           << ",\"p_vs_best_k1\":" << std::scientific << r.p_vs_best_k1 << std::fixed
            << ",\"bits\":[";
         for (size_t j = 0; j < r.bits.size(); ++j) {
             if (j) os << ",";
@@ -592,12 +592,13 @@ int main(int argc, char** argv) {
        << "\"best_k\": " << best.k << ","
        << "\"best_damping\": " << best.damping << ","
        << "\"best_delta_sr\": " << best.delta_sr << ","
-       << "\"best_p\": " << best.p_mcnemar << ","
+       << "\"best_p\": " << std::scientific << best.p_mcnemar << std::fixed << ","
        << "\"cap_best_task\": \"" << json_escape(cap_best.task) << "\","
        << "\"cap_best_k\": " << cap_best.k << ","
        << "\"cap_best_damping\": " << cap_best.damping << ","
        << "\"cap_best_delta_vs_best_k1\": " << cap_best.delta_vs_best_k1 << ","
-       << "\"cap_best_p_vs_best_k1\": " << cap_best.p_vs_best_k1 << "}\n";
+       << "\"cap_best_p_vs_best_k1\": " << std::scientific << cap_best.p_vs_best_k1
+       << std::fixed << "}\n";
     os << "}\n";
     os.close();
 

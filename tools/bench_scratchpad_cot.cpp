@@ -493,7 +493,7 @@ int main(int argc, char** argv) {
        << ",\"hard_delay\":" << opt.delays_eval[hard_di]
        << ",\"mcnemar_b\":" << b
        << ",\"mcnemar_c\":" << c
-       << ",\"p_mcnemar\":" << p_mcnemar
+       << ",\"p_mcnemar\":" << std::scientific << p_mcnemar << std::fixed
        << "},\n  \"gate\":{\"H2\":\"" << (gate ? "PASS" : "FAIL")
        << "\",\"ablation_ok\":" << (ablation_ok ? "true" : "false")
        << ",\"random_ok\":" << (random_ok ? "true" : "false") << "}\n}\n";
