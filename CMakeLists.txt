@@ -310,6 +310,15 @@ add_test(NAME test_ttc_scaling
                  --out ${CMAKE_CURRENT_BINARY_DIR}/ttc_scaling_quick.json)
 set_tests_properties(test_ttc_scaling PROPERTIES RUN_SERIAL TRUE TIMEOUT 120)
 
+# E-B 串行 scratchpad 因果验证
+add_executable(bench_scratchpad_cot "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_scratchpad_cot.cpp")
+target_include_directories(bench_scratchpad_cot PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(bench_scratchpad_cot PRIVATE kun_cellular Threads::Threads m)
+add_test(NAME test_scratchpad_cot
+         COMMAND bench_scratchpad_cot --quick
+                 --out ${CMAKE_CURRENT_BINARY_DIR}/scratchpad_quick.json)
+set_tests_properties(test_scratchpad_cot PROPERTIES RUN_SERIAL TRUE TIMEOUT 180)
+
 add_executable(train_quant_tripartite "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_quant_tripartite.cpp")
 target_link_libraries(train_quant_tripartite PRIVATE kun_cellular Threads::Threads m)
 
