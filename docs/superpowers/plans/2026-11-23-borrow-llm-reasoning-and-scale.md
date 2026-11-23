@@ -194,6 +194,11 @@ LOO 49.3%，monolith 50.7%。结论：组合效应真实且大，但预注册总
 
 **说明**：quick pilot（1 seed × 40 episodes）仅用于烟测，不作为门禁证据；正式运行必须用 5 seeds × 200 episodes，结果以 `runs/organ_composition_v2_<date>.json` 为准。
 
+**结果（2026-11-23 正式 5-seed）**：见 `docs/handoff/2026-11-23-ec-organ-composition-v2.md`。
+H3-v2 **PASS**：full 100%，best single 62.9%，Δ=37.1pp；LOO 49.3%（掉 50.7pp）；
+monolith 59.9%（掉 40.1pp）；pulse 子集 full 100% vs 26.8%（p=4.16e-112）。
+标签：E2 窄口径（该任务上的组合超加性），不是通用组合智能。
+
 ---
 
 ### E-D Best-of-N + verifier（stretch，1 周，可与 E-B 并行）
