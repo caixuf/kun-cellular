@@ -43,8 +43,8 @@ using namespace kun;
 
 namespace {
 
-constexpr uint32_t kCells = 1'000'000;
-constexpr uint32_t kSyns = 3'000'000;
+static uint32_t g_cells = 1000000;
+static uint32_t g_syns = 3000000;
 constexpr uint32_t kIn = 64;
 constexpr uint32_t kFeat = 64;
 constexpr uint32_t kRaw = 4;
@@ -100,8 +100,8 @@ static std::string json_escape(const std::string& s) {
 }
 
 // 构建有功能的 1M 稀疏 DAG 储层。
-static CompactSoAGenome make_reservoir(uint32_t seed) {
-    auto g = CompactSoAGenome::create_empty(kCells, kSyns, kIn, kFeat);
+static CompactSoAGenome make_reservoir(uint32_t cells, uint32_t syns, uint32_t seed) {
+    auto g = CompactSoAGenome::create_empty(cells, syns, kIn, kFeat);
     std::mt19937 rng(seed);
     std::uniform_real_distribution<double> gain(0.5, 1.5);
     std::normal_distribution<double> wdist(0.0, 0.25);
@@ -110,13 +110,13 @@ static CompactSoAGenome make_reservoir(uint32_t seed) {
         SDSC_OP_DAMPER, SDSC_OP_INTEGRATE, SDSC_OP_DIFF, SDSC_OP_SUM,
         SDSC_OP_MULTIPLY, SDSC_OP_CLIP, SDSC_OP_ABS,
     };
-    for (uint32_t i = 0; i < kCells; ++i) {
+    for (uint32_t i = 0; i < cells; ++i) {
         g.op_types[i] = (i < kIn) ? SDSC_OP_PASSTHRU : ops[rng() % (sizeof(ops))];
         g.gains[i] = static_cast<float>(gain(rng));
         g.biases[i] = 0.0f;
     }
     // 输入细胞与 feature 细胞用稳定透传/求和
-    for (uint32_t i = kCells - kFeat; i < kCells; ++i) {
+    for (uint32_t i = cells - kFeat; i < cells; ++i) {
         g.op_types[i] = SDSC_OP_SUM;
         g.gains[i] = 1.0f;
     }
@@ -124,16 +124,16 @@ static CompactSoAGenome make_reservoir(uint32_t seed) {
     uint32_t cursor = 0;
     g.inc_off[0] = 0;
     for (uint32_t i = 0; i < kIn; ++i) g.inc_off[i + 1] = 0;
-    for (uint32_t i = kIn; i < kCells; ++i) {
+    for (uint32_t i = kIn; i < cells; ++i) {
         // 每个 hidden 3 条入边；最后余量分给前面的细胞
         uint32_t edges = 3;
-        if (cursor + edges > kSyns) edges = 0;
-        // 保证总数正好 kSyns
-        const uint32_t remaining_cells = kCells - i;
-        const uint32_t remaining_edges = kSyns - cursor;
+        if (cursor + edges > syns) edges = 0;
+        // 保证总数正好 syns
+        const uint32_t remaining_cells = cells - i;
+        const uint32_t remaining_edges = syns - cursor;
         if (remaining_cells > 0) edges = remaining_edges / remaining_cells;
         if (edges == 0) edges = 1;
-        if (cursor + edges > kSyns) edges = kSyns - cursor;
+        if (cursor + edges > syns) edges = syns - cursor;
 
         g.inc_off[i] = cursor;  // 注意：inc_off[i] 已在上一轮设置；此处仅防御
         for (uint32_t e = 0; e < edges; ++e) {
@@ -145,18 +145,18 @@ static CompactSoAGenome make_reservoir(uint32_t seed) {
         }
         g.inc_off[i + 1] = cursor;
     }
-    g.inc_off[kCells] = cursor;
-    if (cursor != kSyns) {
-        // 理论上不会发生；若发生，截断/补齐到 kSyns
-        for (uint32_t k = cursor; k < kSyns; ++k) {
+    g.inc_off[cells] = cursor;
+    if (cursor != syns) {
+        // 理论上不会发生；若发生，截断/补齐到 syns
+        for (uint32_t k = cursor; k < syns; ++k) {
             g.inc_from[k] = 0;
             g.inc_weight[k] = 0.0f;
         }
-        g.inc_off[kCells] = kSyns;
+        g.inc_off[cells] = syns;
     }
 
     for (uint32_t k = 0; k < kIn; ++k) g.in_cell_ids[k] = k;
-    for (uint32_t k = 0; k < kFeat; ++k) g.out_cell_ids[k] = kCells - kFeat + k;
+    for (uint32_t k = 0; k < kFeat; ++k) g.out_cell_ids[k] = cells - kFeat + k;
     return g;
 }
 
@@ -434,6 +434,8 @@ int main(int argc, char** argv) {
         auto next = [&]() -> std::string { return (i + 1 < argc) ? argv[++i] : ""; };
         if (a == "--out") out = next();
         else if (a == "--reservoir") reservoir_path = next();
+        else if (a == "--cells") g_cells = static_cast<uint32_t>(std::stoul(next()));
+        else if (a == "--syns") g_syns = static_cast<uint32_t>(std::stoul(next()));
         else if (a == "--eval-episodes") eval_episodes = std::stoi(next());
         else if (a == "--seed") seed = static_cast<uint32_t>(std::stoul(next()));
         else if (a == "--collect-episodes") g_collect_episodes = std::max(1, std::stoi(next()));
@@ -451,7 +453,7 @@ int main(int argc, char** argv) {
     if (std::filesystem::exists(reservoir_path)) {
         // 有 bin 就直接用 SDSC-BIN 读取不方便；这里总是重建，保证可复现
     }
-    genome = make_reservoir(seed);
+    genome = make_reservoir(g_cells, g_syns, seed);
     std::filesystem::create_directories(std::filesystem::path(reservoir_path).parent_path());
     if (!genome.save_binary(reservoir_path)) {
         std::cerr << "cannot save " << reservoir_path << "\n";
@@ -489,7 +491,7 @@ int main(int argc, char** argv) {
     os << "  \"generated_at\":\"" << today() << "\",\n";
     os << "  \"commit\":\"" << json_escape(commit) << "\",\n";
     os << "  \"reservoir\":\"" << json_escape(reservoir_path) << "\",\n";
-    os << "  \"reservoir_cells\":" << kCells << ",\"reservoir_syns\":" << kSyns
+    os << "  \"reservoir_cells\":" << genome.num_cells << ",\"reservoir_syns\":" << genome.num_synapses
        << ",\"readout_params\":" << (kDim + 1) * 2 << ",\n";
     os << "  \"tasks\":[";
 

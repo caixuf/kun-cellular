@@ -291,11 +291,14 @@ monolith 59.9%（掉 40.1pp）；pulse 子集 full 100% vs 26.8%（p=4.16e-112�
 - 三任务判据仍 FAIL。E3（资产/前提失败），不是适配器全面失败。
 下一步：A（预训练多任务主干）是唯一能解锁 S1 的路径；否则 C（停规模线，回机制线）。
 
-**S1-A0 规模里程碑（2026-11-23）**：见 `docs/handoff/2026-11-23-scaled-agent-1m.md`。
-新建 1M 细胞 / 3M 突触稀疏 DAG 储层（`checkpoints/scaled_reservoir_1m.bin`），
-冠军蒸馏 ridge 读出 138 参数。reservoir-only：**Maze 95% vs 冠军 95%**，
-CartPole 70% vs 100%，Maglev 0%。1M 储层确实提供可用特征（不是靠原始观测）；
-但三任务 S1 判据仍 FAIL，S2/S3 继续 PAUSED。
+**S1-A0 规模里程碑（2026-11-23）**：见 `docs/handoff/2026-11-23-scaled-agent-1m.md` 与
+`docs/handoff/2026-11-23-scaled-agent-10m.md`。
+新建 1M/10M 细胞稀疏 DAG 储层，冠军蒸馏 ridge 读出 138 参数：
+- 1M/3M：Maze 95% vs 冠军 95%；CartPole 70%；Maglev 0%；
+- 10M/30M：**Maze 95% vs 95%**；CartPole 0%；Maglev 5%；
+- 100M：不稳定（100M/100M 特征全 0；100M/300M 特征 1e-5，Maze 50%–80%）。
+1M/10M 储层确实提供可用特征（reservoir-only 与 hybrid 的 Maze 都是 95%）；
+但三任务 S1 判据仍 FAIL，S2 条件计算/S3 100M 训练继续 PAUSED。
 
 ### 3.4 S2（10M）：条件计算是分水岭
 

@@ -118,15 +118,18 @@ compute 会超过 20× 预算。E1 负结果。
 - 用冠军蒸馏：每任务 20 episodes 采集 `(obs, action)`；ridge 读出 138 参数；
 - 特征探针非零；储层冻结。
 
-| 任务 | 冠军 | 1M agent（reservoir-only） | 1M agent（hybrid） |
+| 任务 | 冠军 | 1M agent（reservoir-only） | 10M agent（reservoir-only） |
 |---|---:|---:|---:|
 | **Maze** | **95%** | **95%** | **95%** |
-| CartPole | 100% | 70% | 70% |
-| Maglev | 100% | 0% | 0% |
+| CartPole | 100% | 70% | 0% |
+| Maglev | 100% | 0% | 5% |
 
-- reservoir-only 与 hybrid 的 Maze 都是 95% → **不是靠 4 维原始观测**；
-- 这是仓库里第一个**真正有功能**的 1M 细胞 agent；
-- 产物：`checkpoints/scaled_reservoir_1m.bin` + `checkpoints/scaled_agent_maze_readout.json`。
+- reservoir-only 与 hybrid 的 1M Maze 都是 95% → **不是靠 4 维原始观测**；
+- **10M/30M 也达到 Maze 95% = 冠军**（20 episodes）；
+- **100M 不稳定**：100M/100M 特征全 0；100M/300M 特征 1e-5，Maze 50%–80%；
+- 这是仓库里第一个**真正有功能**的 1M/10M 细胞 agent；
+- 产物：`checkpoints/scaled_reservoir_1m.bin` + `checkpoints/scaled_agent_maze_readout.json`；
+  10M bin 306 MB 本地不入库，读出权重 `checkpoints/scaled_agent_10m_maze_readout.json` 入库。
 
 **标签**：E2 窄口径（Maze 达到冠军水平）；CartPole E1；Maglev E3。
 **仍是 S1-A0 里程碑，不是 S1 三任务全通，也不是 S2/S3。**

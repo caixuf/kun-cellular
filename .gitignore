@@ -27,3 +27,7 @@ scratch/
 dist/
 r8-native-test-*.db
 *.db-journal
+
+# 大储层 checkpoint：本地可复现，不入库（1M bin 已入库作为可部署产物）
+checkpoints/scaled_reservoir_10m.bin
+checkpoints/scaled_reservoir_100m*.bin
