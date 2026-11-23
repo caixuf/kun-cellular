@@ -308,6 +308,11 @@ monolith 59.9%（掉 40.1pp）；pulse 子集 full 100% vs 26.8%（p=4.16e-112�
 - **判据（H5 首验）**：active 100k→500k→1M 的 held-out SR 单调；总算力近似线性于 active。
 - **失败含义**：路由不生效或能力不随 active 涨 → 100M 无意义，停在 S2。
 
+**结果（2026-11-23）**：见 `docs/handoff/2026-11-23-s2-conditional-moe.md`。
+**S2 PASS**：100 blocks × 100k = 10M cells / 30M syns；k-means 路由；
+**top-1（1% active）Maze 95% = 全量 95%**；top-2/5/10（2/5/10%）也是 95%；
+100/100 blocks ready；门禁阈值 85.5%。E2 窄口径：1% active 保持全量 Maze 能力。
+
 > 为什么这是分水岭：10M 全图反传的激活内存约 `10M × T × 4B`（T=64 已 2.5GB，加优化器/梯度/检查点再 ×3~5），单卡可做但很紧；一旦 top-k 把 active 降到 1%，训练成本回到 S1，显存仍按总参数算——**这才是“上亿”可行的唯一路径**。
 
 ### 3.5 S3（100M）：先补 bench，再谈训练

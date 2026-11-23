@@ -383,6 +383,11 @@ if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
     add_executable(train_scaled_agent "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_scaled_agent.cpp")
     target_include_directories(train_scaled_agent PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_HEADER_PATH})
     target_link_libraries(train_scaled_agent PRIVATE kun_cellular ${CUDA_DRIVER_LIB} ${NVRTC_LIB} Threads::Threads m)
+
+    # S2: 10M 总参数 / top-k active 分块 MoE（CPU block 前向）
+    add_executable(train_moe_agent "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_moe_agent.cpp")
+    target_include_directories(train_moe_agent PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(train_moe_agent PRIVATE kun_cellular Threads::Threads m)
 endif()
 
 # 4. 构建纯 C11 硬件级通用运行时动态共享库 (C-ABI Shared Library for ctypes / Python Binding)
