@@ -319,6 +319,15 @@ add_test(NAME test_scratchpad_cot
                  --out ${CMAKE_CURRENT_BINARY_DIR}/scratchpad_quick.json)
 set_tests_properties(test_scratchpad_cot PROPERTIES RUN_SERIAL TRUE TIMEOUT 180)
 
+# E-B v2 延迟泛化（单延迟 vs 混合延迟）
+add_executable(bench_scratchpad_generalize "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_scratchpad_generalize.cpp")
+target_include_directories(bench_scratchpad_generalize PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(bench_scratchpad_generalize PRIVATE kun_cellular Threads::Threads m)
+add_test(NAME test_scratchpad_generalize
+         COMMAND bench_scratchpad_generalize --quick
+                 --out ${CMAKE_CURRENT_BINARY_DIR}/scratchpad_generalize_quick.json)
+set_tests_properties(test_scratchpad_generalize PROPERTIES RUN_SERIAL TRUE TIMEOUT 180)
+
 # E-C 冻结器官组合超加性
 add_executable(bench_organ_composition "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_organ_composition.cpp")
 target_include_directories(bench_organ_composition PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
