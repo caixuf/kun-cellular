@@ -398,6 +398,11 @@ if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
     add_executable(train_moe_agent_1b "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_moe_agent_1b.cpp")
     target_include_directories(train_moe_agent_1b PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(train_moe_agent_1b PRIVATE kun_cellular Threads::Threads m)
+
+    # S1 三任务：共享 1B block bins + 每任务独立读出/路由
+    add_executable(train_moe_agent_1b_3task "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_moe_agent_1b_3task.cpp")
+    target_include_directories(train_moe_agent_1b_3task PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(train_moe_agent_1b_3task PRIVATE kun_cellular Threads::Threads m)
 endif()
 
 # 4. 构建纯 C11 硬件级通用运行时动态共享库 (C-ABI Shared Library for ctypes / Python Binding)

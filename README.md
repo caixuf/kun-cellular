@@ -52,6 +52,7 @@
 | E-C v2 组合（4-way） | **PASS** | full 100% vs best single 62.9% |
 | E-D Best-of-N | FAIL | 1 步 oracle 只 +2pp |
 | S1 1M 主干 | BLOCKED | 1M/8k 不是训练主干；ADAS 仅 maglev −4pp |
+| **S1 三任务** | **PASS** | 1B 共享储层，top-5 1% active，三任务 ≥ champion −5pp |
 | **S1-A0** 1M/10M 储层 agent | **PASS（Maze）** | 1M/10M 细胞 + 138 参数读出，Maze 95% = 冠军；随机 100M 不稳定 |
 | **S2** 条件计算 MoE | **PASS** | 10M 总参数，top-1 1% active，Maze 95% = 全量 |
 | **S3** 100M 条件探针 | **PASS** | 500×200k，top-5 1M active（1%），Maze 95% |

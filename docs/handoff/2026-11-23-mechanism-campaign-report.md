@@ -18,6 +18,7 @@
 | **E-C v2** 器官组合（4-way） | **PASS** | full 100% vs best single 62.9%，LOO/单体掉到 chance | E2 窄 |
 | **E-D** Best-of-N | FAIL | 1 步 oracle verifier 只 +2pp；短视搜索不够 | E1 |
 | **S1** 1M 主干 + adapter | BLOCKED | 1M 输出全 0；8k 是 IO 混合；ADAS 只在 maglev 上 −4pp | E3 / E1 |
+| **S1 三任务** | **PASS** | 1B 共享储层，top-5 1% active，三任务 ≥ champion −5pp | E2 窄 |
 | **S1-A0/B** 1M/10M 储层 agent | **PASS（Maze）** | 1M/10M 细胞 + 138 参数读出，Maze 95% = 冠军 | E2 窄 |
 | **S2** 条件计算 | **PASS** | 10M 总参数，top-1 1% active，Maze 95% = 全量 | E2 窄 |
 | **S3** 100M 条件探针 | **PASS** | 500×200k，top-5 1% active，Maze 95% | E2 窄 |
@@ -27,14 +28,14 @@
 > 机制线有两个真阳性（外部草稿纸、器官组合），  
 > 推理时“多算 / 多采样”两个便宜路线都被证伪，  
 > 规模线已经产出 **1M/10M 细胞、Maze 冠军水平的智能体**；  
-> **S2 10M、S3 100M、S4 1B 条件探针全部 PASS（1% active = 95%）。**
+> **S1 三任务、S2 10M、S3 100M、S4 1B 条件探针全部 PASS；可执行项全部完成。**
 
 ### 计划完成度
 
 | 项 | 状态 |
 |---|---|
 | E-A / E-B / E-B v2 / E-C v1 / E-C v2 / E-D | ✅ 已完成（含负结果） |
-| S1（三任务 frozen trunk + adapter） | ❌ BLOCKED（无多任务训练主干） |
+| S1（三任务 frozen trunk + adapter） | ✅ PASS（1B 共享储层 MoE，三任务 −5pp 内） |
 | S1-A0/B（1M/10M 储层 agent） | ✅ Maze 95%，CartPole/Maglev 未通 |
 | S2（条件计算 top-k） | ✅ PASS（10M 总参 / 1% active / Maze 95%） |
 | S3（100M 条件探针） | ✅ PASS（100M 总参 / 1% active / Maze 95%） |
@@ -147,7 +148,7 @@ compute 会超过 20× 预算。E1 负结果。
   10M bin 306 MB 本地不入库，读出权重 `checkpoints/scaled_agent_10m_maze_readout.json` 入库。
 
 **标签**：E2 窄口径（Maze 达到冠军水平）；CartPole E1；Maglev E3。
-**仍是 S1-A0 里程碑，不是 S1 三任务全通，也不是 S2/S3。**
+**S1 三任务后来由 1B 共享储层 MoE 满足（见 `docs/handoff/2026-11-23-s1-3task-1b-moe.md`）；S2/S3/S4 亦 PASS。**
 
 ---
 

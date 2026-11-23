@@ -11,7 +11,7 @@
 - E-B：**PASS**（外部 scratchpad 因果必要，E2 窄）；E-B v2 延迟泛化：**PASS**；
 - E-C v1：FAIL（阈值天花板）；E-C v2：**PASS**（4-way 组合，E2 窄）；
 - E-D：FAIL（1 步 oracle best-of-N 只 +2pp）；
-- S1：**BLOCKED**（1M/8k 不是训练主干；ADAS 只在 maglev 上 −4pp）；
+- S1：原始 1M/8k 资产 **BLOCKED**；S1 三任务判据已由 **1B 共享储层 MoE PASS**（maze −5pp / cartpole 0 / maglev +5pp）；
 - S1-A0/B：**PASS（Maze）**（1M/10M 储层 + 138 参数读出，95% = 冠军）；
 - S2：**PASS**（10M 总参 / top-1 1% active / Maze 95%）；
 - S3：**PASS**（100M 总参 / top-5 1M active / Maze 95%）；
@@ -301,7 +301,8 @@ monolith 59.9%（掉 40.1pp）；pulse 子集 full 100% vs 26.8%（p=4.16e-112�
 - 10M/30M：**Maze 95% vs 95%**；CartPole 0%；Maglev 5%；
 - 100M：不稳定（100M/100M 特征全 0；100M/300M 特征 1e-5，Maze 50%–80%）。
 1M/10M 储层确实提供可用特征（reservoir-only 与 hybrid 的 Maze 都是 95%）；
-但三任务 S1 判据仍 FAIL，S2 条件计算/S3 100M 训练继续 PAUSED。
+三任务 S1 判据后来由 1B 共享储层 MoE 满足（见 `docs/handoff/2026-11-23-s1-3task-1b-moe.md`）：
+maze 0.90 vs 0.95、cartpole 1.00 vs 1.00、maglev 1.00 vs 0.95，top-5 1% active。
 
 ### 3.4 S2（10M）：条件计算是分水岭
 
