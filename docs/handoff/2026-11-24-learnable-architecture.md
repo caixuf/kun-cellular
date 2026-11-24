@@ -6,7 +6,8 @@
 > 3) 自动采老师轨迹、路由、训练读出、评测。
 >
 > 结论：**新任务 `cruise` / `water` PASS（100/100，top-1 = 1% active）**；
-> 难任务（thermal 39%、cartpole 57%、maglev/rocket 0%）说明架构可用但非万能。
+> 200M 共享储层 + `combiner-topk=1` 后 **maze/cartpole/maglev 三任务 100ep PASS**；
+> rocket/thermal 仍失败（强非线性）。
 
 ---
 
@@ -46,10 +47,11 @@ COMMAND: ./build/train_from_teacher --task water ... --out runs/distill_water_20
 |---|---:|---:|---:|---|
 | **cruise**（新） | 1.00 | **1.00** | 0.00 | ✅ PASS |
 | **water**（新） | 1.00 | **1.00** | 0.00 | ✅ PASS |
-| cartpole | 1.00 | 0.57 | −0.43 | ❌ |
-| thermal | 0.95 | 0.39 | −0.56 | ❌ |
-| maglev | 0.98 | 0.00 | −0.98 | ❌ |
-| rocket | 0.84 | 0.00 | −0.84 | ❌ |
+| cartpole（200M c1） | 1.00 | **1.00** | 0.00 | ✅ |
+| maglev（200M c1） | 0.98 | **1.00** | +0.02 | ✅ |
+| maze（200M c1） | 0.97 | **0.98** | +0.01 | ✅ |
+| thermal（200M c1） | 0.95 | 0.35 | −0.60 | ❌ |
+| rocket（200M c1） | 0.84 | 0.05 | −0.79 | ❌ |
 
 - `cruise` / `water`：10M total / 100 blocks / top-1 = 100k active = **1%**；
 - 只训练每块 readout + combiner；block 权重是随机储层；

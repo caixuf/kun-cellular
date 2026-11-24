@@ -18,7 +18,7 @@
 | **E-C v2** 器官组合（4-way） | **PASS** | full 100% vs best single 62.9%，LOO/单体掉到 chance | E2 窄 |
 | **E-D** Best-of-N | FAIL | 1 步 oracle verifier 只 +2pp；短视搜索不够 | E1 |
 | **S1** 1M 主干 + adapter | BLOCKED | 1M 输出全 0；8k 是 IO 混合；ADAS 只在 maglev 上 −4pp | E3 / E1 |
-| **S1 三任务** | **PASS** | 1B 共享储层，top-5 1% active，三任务 ≥ champion −5pp | E2 窄 |
+| **S1 三任务（100ep）** | **PASS** | 200M 共享储层，top-1 1% active，maze 98/97、cartpole 100/100、maglev 100/98 | E2 窄 |
 | **S1-A0/B** 1M/10M 储层 agent | **PASS（Maze）** | 1M/10M 细胞 + 138 参数读出，Maze 95% = 冠军 | E2 窄 |
 | **S2** 条件计算 | **PASS** | 10M 总参数，top-1 1% active，Maze 95% = 全量 | E2 窄 |
 | **S3** 100M 条件探针 | **PASS** | 500×200k，top-5 1% active，Maze 95% | E2 窄 |
@@ -35,7 +35,7 @@
 | 项 | 状态 |
 |---|---|
 | E-A / E-B / E-B v2 / E-C v1 / E-C v2 / E-D | ✅ 已完成（含负结果） |
-| S1（三任务 frozen trunk + adapter） | ✅ PASS（1B 共享储层 MoE，三任务 −5pp 内） |
+| S1（三任务 frozen trunk + adapter） | ✅ PASS（200M 共享储层，100 held-out episodes） |
 | S1-A0/B（1M/10M 储层 agent） | ✅ Maze 95%，CartPole/Maglev 未通 |
 | S2（条件计算 top-k） | ✅ PASS（10M 总参 / 1% active / Maze 95%） |
 | S2-c（conditional BPTT） | ⚠️ 机制冒烟 PASS；1B 全尺度未做 |
