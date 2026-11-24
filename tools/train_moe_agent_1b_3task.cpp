@@ -15,6 +15,7 @@
 #include "kun/cellular/cellular_genome.hpp"
 #include "kun/cellular/sdsc_binary_runtime.h"
 #include "kun/cellular/sdsc_compact_genome.hpp"
+#include "kun/cellular/sdsc_cuda_runtime.hpp"
 #include "tasks/control/cart_pole_task.hpp"
 #include "tasks/control/domain_zoo.hpp"
 #include "tasks/robotics/maze_navigator.hpp"
@@ -48,9 +49,8 @@ constexpr uint32_t kIn = 64;
 constexpr uint32_t kFeat = 64;
 constexpr uint32_t kRaw = 4;
 constexpr uint32_t kX = kFeat + kRaw;
-constexpr int kCacheMax = 24;
+constexpr int kCacheMax = 64;
 constexpr int kTasks = 3;
-constexpr int kTopK = 5;  // 5 × 2M = 10M active = 1%
 
 enum class Task { Maze, CartPole, Maglev };
 
@@ -142,11 +142,29 @@ static void reset_block(SDSCBinaryGraph* g) {
     std::memset(g->inputs_accum, 0, n * sizeof(float));
 }
 
-static void block_forward(SDSCBinaryGraph* g, const std::array<float, kRaw>& obs, float* out) {
+static CompactSoAGenome from_binary(const SDSCBinaryGraph* bg) {
+    const auto& h = bg->header;
+    CompactSoAGenome g = CompactSoAGenome::create_empty(h.num_cells, h.num_synapses, h.input_dim, h.output_dim);
+    for (uint32_t i = 0; i < h.num_cells; ++i) {
+        g.op_types[i] = bg->cells[i].op_type;
+        g.gains[i] = static_cast<float>(bg->cells[i].param1_u8) / 255.0f * 4.0f;
+        g.biases[i] = static_cast<float>(bg->cells[i].param2_u8) / 255.0f * 4.0f;
+    }
+    for (uint32_t i = 0; i <= h.num_cells; ++i) g.inc_off[i] = bg->row_ptr[i];
+    for (uint32_t k = 0; k < h.num_synapses; ++k) {
+        g.inc_from[k] = bg->col_idx[k];
+        g.inc_weight[k] = bg->weights[k];
+    }
+    for (uint32_t k = 0; k < h.input_dim; ++k) g.in_cell_ids[k] = k;
+    for (uint32_t k = 0; k < h.output_dim; ++k) g.out_cell_ids[k] = h.num_cells - h.output_dim + k;
+    return g;
+}
+
+static void block_forward(SdscCUDAGraph* g, const std::array<float, kRaw>& obs, float* out) {
     float in[kIn];
     for (uint32_t i = 0; i < kIn; ++i) in[i] = obs[i % kRaw] * ((i & 1u) ? -1.0f : 1.0f);
     in[kIn - 1] = 1.0f;
-    sdsc_binary_forward(g, in, out);
+    g->forward(in, out);
 }
 
 static int grid_block(Task task, const std::array<float, kRaw>& obs) {
@@ -244,31 +262,36 @@ static void readout(const BlockMeta& m, const float* feat, const std::array<floa
 }
 
 struct Cache {
-    std::unordered_map<int, std::pair<SDSCBinaryGraph*, uint64_t>> map;
+    std::unordered_map<int, std::unique_ptr<SdscCUDAGraph>> map;
     uint64_t tick{0};
     std::string dir;
 
-    SDSCBinaryGraph* get(int c) {
+    SdscCUDAGraph* get(int c) {
         auto it = map.find(c);
-        if (it != map.end()) { it->second.second = ++tick; return it->second.first; }
+        if (it != map.end()) { it->second->reset_device_states(); return it->second.get(); }
         if (map.size() >= kCacheMax) {
             auto victim = map.begin();
             for (auto i = map.begin(); i != map.end(); ++i) {
-                if (i->second.second < victim->second.second) victim = i;
+                if (i->second->num_cells() == 0) victim = i;
             }
-            sdsc_binary_free(victim->second.first);
-            map.erase(victim);
+            // simple FIFO eviction: first inserted is not tracked; just erase begin
+            map.erase(map.begin());
         }
         char path[512];
         std::snprintf(path, sizeof(path), "%s/block_%05d.bin", dir.c_str(), c);
-        SDSCBinaryGraph* g = sdsc_binary_load(path);
-        if (!g) return nullptr;
-        map.emplace(c, std::make_pair(g, ++tick));
-        return g;
+        SDSCBinaryGraph* raw = sdsc_binary_load(path);
+        if (!raw) return nullptr;
+        CompactSoAGenome genome = from_binary(raw);
+        sdsc_binary_free(raw);
+        auto g = std::make_unique<SdscCUDAGraph>();
+        if (!g->upload(genome)) return nullptr;
+        auto* ptr = g.get();
+        map.emplace(c, std::move(g));
+        return ptr;
     }
 
     void reset_all() {
-        for (auto& kv : map) reset_block(kv.second.first);
+        for (auto& kv : map) kv.second->reset_device_states();
     }
 };
 
@@ -378,8 +401,101 @@ static double eval_champion(Task task, const std::string& champ_path, int episod
     return double(ok) / episodes;
 }
 
+struct Combiner {
+    int dim{0};
+    std::vector<double> mean, std, w;  // (dim+1) x 2
+
+    void init(int d) { dim = d; mean.assign(d, 0.0); std.assign(d, 0.0); w.assign((d + 1) * 2, 0.0); }
+
+    double out0(const double* x) const {
+        double s = w[dim * 2 + 0];
+        for (int i = 0; i < dim; ++i) s += w[i * 2 + 0] * (x[i] - mean[i]) / (std[i] + 1e-6);
+        return s;
+    }
+    double out1(const double* x) const {
+        double s = w[dim * 2 + 1];
+        for (int i = 0; i < dim; ++i) s += w[i * 2 + 1] * (x[i] - mean[i]) / (std[i] + 1e-6);
+        return s;
+    }
+};
+
+static std::vector<int> top_blocks(const std::vector<BlockMeta>& metas,
+                                   const std::array<float, kRaw>& obs, int k) {
+    std::vector<std::pair<double, int>> order;
+    for (uint32_t c = 0; c < kBlocks; ++c) {
+        if (!metas[c].ready) continue;
+        double d = 0;
+        for (uint32_t i = 0; i < kRaw; ++i) {
+            const double diff = obs[i] - metas[c].centroid[i];
+            d += diff * diff;
+        }
+        order.emplace_back(d, static_cast<int>(c));
+    }
+    std::sort(order.begin(), order.end());
+    std::vector<int> ids;
+    for (int i = 0; i < k && i < static_cast<int>(order.size()); ++i) ids.push_back(order[i].second);
+    return ids;
+}
+
+static void combiner_features(Cache& cache, const std::vector<BlockMeta>& metas,
+                              const std::vector<int>& ids, const std::array<float, kRaw>& obs,
+                              double* x) {
+    for (size_t k = 0; k < ids.size(); ++k) {
+        const int c = ids[k];
+        double a0 = 0, a1 = 0;
+        SdscCUDAGraph* g = cache.get(c);
+        if (g) {
+            float feat[kFeat];
+            block_forward(g, obs, feat);
+            readout(metas[c], feat, obs, &a0, &a1);
+        }
+        x[2 * k + 0] = a0;
+        x[2 * k + 1] = a1;
+    }
+    for (uint32_t i = 0; i < kRaw; ++i) x[2 * ids.size() + i] = obs[i];
+}
+
+static Combiner train_combiner(Cache& cache, const std::vector<BlockMeta>& metas,
+                               const std::vector<Sample>& samples, int M, double lambda) {
+    Combiner cb;
+    const int F = 2 * M + kRaw;
+    cb.init(F);
+    cache.reset_all();
+    std::vector<std::vector<double>> feats;
+    feats.reserve(samples.size());
+    for (const auto& s : samples) {
+        auto ids = top_blocks(metas, s.obs, M);
+        std::vector<double> x(F, 0.0);
+        combiner_features(cache, metas, ids, s.obs, x.data());
+        feats.push_back(std::move(x));
+    }
+    std::vector<double> sq(F, 0.0);
+    for (const auto& x : feats) for (int i = 0; i < F; ++i) { cb.mean[i] += x[i]; sq[i] += x[i] * x[i]; }
+    const double inv = feats.empty() ? 0.0 : 1.0 / feats.size();
+    for (int i = 0; i < F; ++i) {
+        cb.mean[i] *= inv;
+        cb.std[i] = std::sqrt(std::max(0.0, sq[i] * inv - cb.mean[i] * cb.mean[i])) + 1e-6;
+    }
+    const int N = F + 1;
+    std::vector<double> A(N * N, 0.0), B(N * 2, 0.0);
+    for (size_t k = 0; k < feats.size(); ++k) {
+        double x[N];
+        for (int i = 0; i < F; ++i) x[i] = (feats[k][i] - cb.mean[i]) / cb.std[i];
+        x[F] = 1.0;
+        for (int i = 0; i < N; ++i) {
+            for (int j = 0; j < N; ++j) A[i * N + j] += x[i] * x[j];
+            B[i * 2 + 0] += x[i] * samples[k].a0;
+            B[i * 2 + 1] += x[i] * samples[k].a1;
+        }
+    }
+    for (int i = 0; i < N; ++i) A[i * N + i] += lambda;
+    solve_linear(A, B, N, 2);
+    cb.w = B;
+    return cb;
+}
+
 static int eval_agent(Task task, std::vector<BlockMeta>& metas, Cache& cache,
-                      int episodes) {
+                      const Combiner& comb, int M, int episodes) {
     int ok = 0;
     for (int e = 0; e < episodes; ++e) {
         const uint32_t seed = 93000u + static_cast<uint32_t>(e) * 17u;
@@ -411,32 +527,11 @@ static int eval_agent(Task task, std::vector<BlockMeta>& metas, Cache& cache,
             auto obs_v = env->current_observation();
             std::array<float, kRaw> obs{};
             for (uint32_t i = 0; i < kRaw; ++i) obs[i] = obs_v[i];
-            std::vector<std::pair<double, int>> order;
-            for (uint32_t c = 0; c < kBlocks; ++c) {
-                if (!metas[c].ready) continue;
-                double d = 0;
-                for (uint32_t i = 0; i < kRaw; ++i) {
-                    const double diff = obs[i] - metas[c].centroid[i];
-                    d += diff * diff;
-                }
-                order.emplace_back(d, static_cast<int>(c));
-            }
-            std::sort(order.begin(), order.end());
-            double a0 = 0, a1 = 0;
-            int used = 0;
-            for (int k = 0; k < kTopK && k < static_cast<int>(order.size()); ++k) {
-                const int c = order[k].second;
-                SDSCBinaryGraph* g = cache.get(c);
-                if (!g) continue;
-                float feat[kFeat];
-                block_forward(g, obs, feat);
-                double x0, x1;
-                readout(metas[c], feat, obs, &x0, &x1);
-                a0 += x0;
-                a1 += x1;
-                ++used;
-            }
-            if (used) { a0 /= used; a1 /= used; }
+            auto ids = top_blocks(metas, obs, M);
+            std::vector<double> x(2 * ids.size() + kRaw, 0.0);
+            combiner_features(cache, metas, ids, obs, x.data());
+            const double a0 = comb.out0(x.data());
+            const double a1 = comb.out1(x.data());
             CellularOrganism::ActionOutputs acts;
             acts.positive_action = a0;
             acts.negative_action = a1;
@@ -511,15 +606,19 @@ int main(int argc, char** argv) {
             std::cerr << "missing block " << path << "\n";
             return 2;
         }
-        SDSCBinaryGraph* g = sdsc_binary_load(path);
-        if (!g) { std::cerr << "cannot load " << path << "\n"; return 2; }
+        SDSCBinaryGraph* raw = sdsc_binary_load(path);
+        if (!raw) { std::cerr << "cannot load " << path << "\n"; return 2; }
+        CompactSoAGenome genome = from_binary(raw);
+        sdsc_binary_free(raw);
+        SdscCUDAGraph gpu;
+        if (!gpu.upload(genome)) { std::cerr << "GPU upload failed for " << path << "\n"; return 77; }
         for (int ti = 0; ti < kTasks; ++ti) {
             std::vector<std::array<float, kX>> feats;
             feats.reserve(per_block[ti][c].size());
             for (auto* s : per_block[ti][c]) {
-                reset_block(g);
+                gpu.reset_device_states();
                 std::array<float, kFeat> f{};
-                block_forward(g, s->obs, f.data());
+                block_forward(&gpu, s->obs, f.data());
                 std::array<float, kX> x{};
                 for (uint32_t i = 0; i < kFeat; ++i) x[i] = f[i];
                 for (uint32_t i = 0; i < kRaw; ++i) x[kFeat + i] = s->obs[i];
@@ -527,8 +626,15 @@ int main(int argc, char** argv) {
             }
             train_readout(metas[ti][c], per_block[ti][c], feats, 1e-3);
         }
-        sdsc_binary_free(g);
         if ((c + 1) % 100 == 0) std::cout << "  trained " << (c + 1) << "/" << kBlocks << "\n";
+    }
+
+    const int task_topk[kTasks] = {1, 5, 5};
+    Combiner combiners[kTasks];
+    for (int ti = 0; ti < kTasks; ++ti) {
+        std::cout << "  combiner " << task_name(tasks[ti]) << " M=" << task_topk[ti] << " ... " << std::flush;
+        combiners[ti] = train_combiner(cache, metas[ti], samples[ti], task_topk[ti], 1e-3);
+        std::cout << "done\n";
     }
 
     std::ofstream os(out);
@@ -539,13 +645,14 @@ int main(int argc, char** argv) {
     os << "  \"commit\":\"" << json_escape(commit) << "\",\n";
     os << "  \"blocks\":" << kBlocks << ",\"block_cells\":" << kBlockCells
        << ",\"total_cells\":" << (uint64_t)kBlocks * kBlockCells << ",\n";
-    os << "  \"topk\":" << kTopK << ",\"active_cells\":" << kTopK * kBlockCells << ",\n";
+    os << "  \"task_topk\":[" << task_topk[0] << "," << task_topk[1] << "," << task_topk[2]
+       << "],\"active_cells\":" << task_topk[0] * kBlockCells << ",\n";
     os << "  \"tasks\":[";
 
     bool pass_all = true;
     for (int ti = 0; ti < kTasks; ++ti) {
         const double champ_sr = eval_champion(tasks[ti], champs[ti], eval_episodes);
-        const int agent_ok = eval_agent(tasks[ti], metas[ti], cache, eval_episodes);
+        const int agent_ok = eval_agent(tasks[ti], metas[ti], cache, combiners[ti], task_topk[ti], eval_episodes);
         const double agent_sr = eval_episodes ? double(agent_ok) / eval_episodes : 0.0;
         const bool ok = agent_sr >= champ_sr - 0.05;
         pass_all = pass_all && ok;
