@@ -11,6 +11,8 @@
 - E-B：**PASS**（外部 scratchpad 因果必要，E2 窄）；E-B v2 延迟泛化：**PASS**；
 - E-C v1：FAIL（阈值天花板）；E-C v2：**PASS**（4-way 组合，E2 窄）；
 - E-D：FAIL（1 步 oracle best-of-N 只 +2pp）；
+- L（可学习架构）：**新任务 cruise/water PASS**（teacher + 10M / 1% active，100 episodes 100%）；
+  cartpole 57% / thermal 39% / maglev/rocket 0% —— 架构可复用，非万能。
 - S1：原始 1M/8k 资产 **BLOCKED**；S1 三任务判据已由 **1B 共享储层 MoE PASS**（maze −5pp / cartpole 0 / maglev +5pp）；
 - S1-A0/B：**PASS（Maze）**（1M/10M 储层 + 138 参数读出，95% = 冠军）；
 - S2：**PASS**（10M 总参 / top-1 1% active / Maze 95%）；
@@ -247,6 +249,18 @@ monolith 59.9%（掉 40.1pp）；pulse 子集 full 100% vs 26.8%（p=4.16e-112�
 **ED FAIL**：11×11 上 N=1 84.0% → N=16 86.0%（+2pp），N=64 87.0%（+3pp）；
 21×21 上 N=1 20% → N=16 17.5%（负增益）。1 步 oracle verifier 是局部贪心，
 收益远低于 +10pp。按纪律停，不偷偷加预算；下一步 S1。
+
+---
+
+### L. 可学习架构（teacher distillation，2026-11-24）
+
+**契约**：新任务 = `TaskSpec`（环境工厂 + 成功语义 + teacher checkpoint）+ 启动 `train_from_teacher`。
+管线自动完成：teacher 轨迹 → k-means 路由 → 每块 ridge 读出 → combiner → held-out 评测。
+
+**结果**：`cruise` / `water` 100% vs teacher 100%（10M / 100 blocks / top-1 1% active，100 episodes）。
+cartpole 57%、thermal 39%、maglev/rocket 0%：难任务需要更大 blocks / 非线性 combiner。
+
+见 `docs/handoff/2026-11-24-learnable-architecture.md`。
 
 ---
 

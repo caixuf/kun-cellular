@@ -401,8 +401,18 @@ if(CUDA_HEADER_PATH AND CUDA_DRIVER_LIB AND NVRTC_LIB)
 
     # S1 三任务：共享 1B block bins + 每任务独立读出/路由
     add_executable(train_moe_agent_1b_3task "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_moe_agent_1b_3task.cpp")
-    target_include_directories(train_moe_agent_1b_3task PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    target_link_libraries(train_moe_agent_1b_3task PRIVATE kun_cellular Threads::Threads m)
+    target_include_directories(train_moe_agent_1b_3task PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${CUDA_HEADER_PATH})
+    target_link_libraries(train_moe_agent_1b_3task PRIVATE kun_cellular ${CUDA_DRIVER_LIB} ${NVRTC_LIB} Threads::Threads m)
+
+    # S2-c: 2M block conditional BPTT + segment checkpointing
+    add_executable(bench_block_bptt "${CMAKE_CURRENT_SOURCE_DIR}/tools/bench_block_bptt.cpp")
+    target_include_directories(bench_block_bptt PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(bench_block_bptt PRIVATE kun_cellular Threads::Threads m)
+
+    # 可学习架构：新任务 = task adapter + teacher + 启动训练
+    add_executable(train_from_teacher "${CMAKE_CURRENT_SOURCE_DIR}/tools/train_from_teacher.cpp")
+    target_include_directories(train_from_teacher PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    target_link_libraries(train_from_teacher PRIVATE kun_cellular Threads::Threads m)
 endif()
 
 # 4. 构建纯 C11 硬件级通用运行时动态共享库 (C-ABI Shared Library for ctypes / Python Binding)
